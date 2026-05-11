@@ -1,0 +1,342 @@
+{
+  "schemaVersion": "1",
+  "kind": "tool",
+  "exportedAt": "2026-03-09T12:18:45.697Z",
+  "metadata": {
+    "fromSlug": "create-account",
+    "fromStarshipSlug": "starborn-dvlif0"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "tool": {
+      "name": "Create Account",
+      "description": "Create a new row in the Accounts dataset (append default; optional upsert). Inputs are strictly aligned to the Accounts dataset schema (types, enums, references).",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "row": {
+            "type": "object",
+            "required": [
+              "account_name",
+              "status"
+            ],
+            "properties": {
+              "raw": {
+                "type": "string"
+              },
+              "city": {
+                "type": "string"
+              },
+              "notes": {
+                "type": "string"
+              },
+              "owner": {
+                "type": "string"
+              },
+              "state": {
+                "type": "string"
+              },
+              "source": {
+                "type": "string"
+              },
+              "status": {
+                "enum": [
+                  "new",
+                  "researched",
+                  "qualified",
+                  "disqualified"
+                ],
+                "type": "string"
+              },
+              "country": {
+                "type": "string"
+              },
+              "icp_fit": {
+                "enum": [
+                  "strong",
+                  "medium",
+                  "weak",
+                  "unknown"
+                ],
+                "type": "string"
+              },
+              "website": {
+                "type": "string"
+              },
+              "industry": {
+                "type": "string"
+              },
+              "account_id": {
+                "type": "number",
+                "description": "Primary key. Required when mode=upsert."
+              },
+              "created_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "source_url": {
+                "type": "string"
+              },
+              "icp_profile": {
+                "type": "object",
+                "required": [
+                  "kind",
+                  "datasetIdOrSlug",
+                  "key"
+                ],
+                "properties": {
+                  "key": {
+                    "type": "number"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "dataset_row"
+                  },
+                  "label": {
+                    "type": "string"
+                  },
+                  "datasetIdOrSlug": {
+                    "type": "string",
+                    "const": "icp-profiles"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "account_name": {
+                "type": "string",
+                "description": "Company name"
+              },
+              "linkedin_url": {
+                "type": "string"
+              },
+              "icp_fit_notes": {
+                "type": "string"
+              },
+              "employee_range": {
+                "enum": [
+                  "1_10",
+                  "11_50",
+                  "51_200",
+                  "201_500",
+                  "501_1000",
+                  "1000_plus"
+                ],
+                "type": "string"
+              },
+              "disqualify_reason": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          },
+          "mode": {
+            "enum": [
+              "append",
+              "upsert"
+            ],
+            "type": "string",
+            "description": "Write mode (append or upsert). Default: append."
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "account_name",
+                "status"
+              ],
+              "properties": {
+                "raw": {
+                  "type": "string"
+                },
+                "city": {
+                  "type": "string"
+                },
+                "notes": {
+                  "type": "string"
+                },
+                "owner": {
+                  "type": "string"
+                },
+                "state": {
+                  "type": "string"
+                },
+                "source": {
+                  "type": "string"
+                },
+                "status": {
+                  "enum": [
+                    "new",
+                    "researched",
+                    "qualified",
+                    "disqualified"
+                  ],
+                  "type": "string"
+                },
+                "country": {
+                  "type": "string"
+                },
+                "icp_fit": {
+                  "enum": [
+                    "strong",
+                    "medium",
+                    "weak",
+                    "unknown"
+                  ],
+                  "type": "string"
+                },
+                "website": {
+                  "type": "string"
+                },
+                "industry": {
+                  "type": "string"
+                },
+                "account_id": {
+                  "type": "number"
+                },
+                "created_at": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "source_url": {
+                  "type": "string"
+                },
+                "icp_profile": {
+                  "type": "object",
+                  "required": [
+                    "kind",
+                    "datasetIdOrSlug",
+                    "key"
+                  ],
+                  "properties": {
+                    "key": {
+                      "type": "number"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "const": "dataset_row"
+                    },
+                    "label": {
+                      "type": "string"
+                    },
+                    "datasetIdOrSlug": {
+                      "type": "string",
+                      "const": "icp-profiles"
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "account_name": {
+                  "type": "string"
+                },
+                "linkedin_url": {
+                  "type": "string"
+                },
+                "icp_fit_notes": {
+                  "type": "string"
+                },
+                "employee_range": {
+                  "enum": [
+                    "1_10",
+                    "11_50",
+                    "51_200",
+                    "201_500",
+                    "501_1000",
+                    "1000_plus"
+                  ],
+                  "type": "string"
+                },
+                "disqualify_reason": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            },
+            "minItems": 1
+          },
+          "starshipId": {
+            "type": "string",
+            "description": "Optional override. Defaults to env('STARSHIP_ID')."
+          }
+        }
+      },
+      "blueprint": {
+        "edges": [
+          {
+            "to": "prep",
+            "ref": "e1",
+            "from": "s"
+          },
+          {
+            "to": "upsert",
+            "ref": "e2",
+            "from": "prep"
+          },
+          {
+            "to": "unwrap",
+            "ref": "e3",
+            "from": "upsert"
+          },
+          {
+            "to": "end",
+            "ref": "e4",
+            "from": "unwrap"
+          }
+        ],
+        "nodes": [
+          {
+            "ref": "s",
+            "name": "Start",
+            "type": "start",
+            "parameters": {}
+          },
+          {
+            "ref": "prep",
+            "name": "Validate & Normalize Input",
+            "type": "code",
+            "parameters": {
+              "code": "\nfunction assertEnum(path, value, options) {\n  if (value == null) return;\n  const v = String(value).trim();\n  if (!options.includes(v)) throw new Error(`${path} must be one of: ${options.join(', ')}`);\n}\n\nfunction assertIsoDatetime(path, value) {\n  if (value == null) return;\n  if (typeof value !== 'string' || !value.trim()) throw new Error(`${path} must be an ISO8601 datetime string`);\n  const s = value.trim();\n  if (!(/[zZ]$/.test(s) || /[+-]\\d{2}:\\d{2}$/.test(s))) {\n    throw new Error(`${path} must include timezone offset or Z (e.g. 2026-03-07T12:00:00Z)`);\n  }\n  const t = Date.parse(s);\n  if (!Number.isFinite(t)) throw new Error(`${path} must be parseable ISO8601 datetime`);\n}\n\nfunction assertFiniteNumber(path, value) {\n  if (value == null) return;\n  if (typeof value !== 'number' || !Number.isFinite(value)) throw new Error(`${path} must be a finite number`);\n}\n\nfunction assertReference(path, value, datasetIdOrSlug) {\n  if (value == null) return;\n  if (!value || typeof value !== 'object' || Array.isArray(value)) {\n    throw new Error(`${path} must be a reference object`);\n  }\n  if (value.kind !== 'dataset_row') throw new Error(`${path}.kind must be 'dataset_row'`);\n  if (value.datasetIdOrSlug !== datasetIdOrSlug) throw new Error(`${path}.datasetIdOrSlug must be '${datasetIdOrSlug}'`);\n  if (value.key == null) throw new Error(`${path}.key is required`);\n  assertFiniteNumber(`${path}.key`, value.key);\n  const allowed = new Set(['kind', 'datasetIdOrSlug', 'key', 'label']);\n  for (const k of Object.keys(value)) {\n    if (!allowed.has(k)) throw new Error(`${path} has unknown field: ${k}`);\n  }\n}\n\nfunction assertNoUnknownFields(obj, allowed, where) {\n  for (const k of Object.keys(obj)) {\n    if (!allowed.has(k)) throw new Error(`${where} has unknown field: ${k}`);\n  }\n}\n\nfunction normalizeRow(row, idx, mode) {\n  if (!row || typeof row !== 'object' || Array.isArray(row)) throw new Error(`rows[${idx}] must be an object`);\n\n  const allowedKeys = new Set([\n    'account_id',\n    'account_name',\n    'website',\n    'linkedin_url',\n    'industry',\n    'employee_range',\n    'country',\n    'state',\n    'city',\n    'icp_profile',\n    'icp_fit',\n    'icp_fit_notes',\n    'status',\n    'disqualify_reason',\n    'owner',\n    'source',\n    'source_url',\n    'created_at',\n    'notes',\n    'raw'\n  ]);\n\n  assertNoUnknownFields(row, allowedKeys, `rows[${idx}]`);\n\n  // account_id column is number (dataset primary key). If provided, it must be numeric.\n  assertFiniteNumber(`rows[${idx}].account_id`, row.account_id);\n\n  if (row.account_name == null || String(row.account_name).trim() === '') {\n    throw new Error(`rows[${idx}].account_name is required (dataset constraint)`);\n  }\n  if (row.status == null || String(row.status).trim() === '') {\n    throw new Error(`rows[${idx}].status is required (dataset constraint)`);\n  }\n\n  if (mode === 'upsert') {\n    if (row.account_id == null) {\n      throw new Error(`rows[${idx}].account_id is required for mode=upsert`);\n    }\n  }\n\n  assertEnum(`rows[${idx}].status`, row.status, ['new', 'researched', 'qualified', 'disqualified']);\n  assertEnum(`rows[${idx}].employee_range`, row.employee_range, ['1_10', '11_50', '51_200', '201_500', '501_1000', '1000_plus']);\n  assertEnum(`rows[${idx}].icp_fit`, row.icp_fit, ['strong', 'medium', 'weak', 'unknown']);\n\n  assertReference(`rows[${idx}].icp_profile`, row.icp_profile, 'icp-profiles');\n  assertIsoDatetime(`rows[${idx}].created_at`, row.created_at);\n\n  return row;\n}\n\nasync function main(ctx) {\n  const input = ctx.input || {};\n\n  const starshipId = String(input.starshipId ?? ctx.env('STARSHIP_ID') ?? '');\n  if (!starshipId) throw new Error('starshipId is required (or STARSHIP_ID must be available in env)');\n\n  const datasetSlug = 'accounts';\n\n  const mode = (typeof input.mode === 'string' && input.mode.trim().length)\n    ? input.mode.trim()\n    : 'append';\n  if (!['append', 'upsert'].includes(mode)) throw new Error('mode must be one of: append, upsert');\n\n  let rows = [];\n  if (Array.isArray(input.rows) && input.rows.length) {\n    rows = input.rows;\n  } else if (input.row && typeof input.row === 'object' && !Array.isArray(input.row)) {\n    rows = [input.row];\n  }\n\n  if (!Array.isArray(rows) || rows.length === 0) {\n    throw new Error('Provide either row (object) or rows (non-empty array)');\n  }\n\n  rows = rows.map((r, idx) => normalizeRow(r, idx, mode));\n\n  return { starshipId, datasetSlug, mode, rows };\n}\n",
+              "timeout": 5000
+            }
+          },
+          {
+            "ref": "upsert",
+            "name": "Connector: upsert-dataset-rows",
+            "type": "connector_action",
+            "parameters": {
+              "action": "upsert-dataset-rows",
+              "timeout": 30000,
+              "connector": "starships",
+              "failOnNon2xx": true
+            }
+          },
+          {
+            "ref": "unwrap",
+            "name": "Unwrap Response",
+            "type": "code",
+            "parameters": {
+              "code": "\nasync function main(ctx) {\n  const resp = ctx.input || {};\n  const body = resp.body;\n\n  const prep = (typeof ctx.lastOutputOf === 'function' ? ctx.lastOutputOf('prep') : null) || {};\n  const datasetIdOrSlug = typeof prep.datasetSlug === 'string' ? prep.datasetSlug : '';\n  const mode = typeof prep.mode === 'string' ? prep.mode : '';\n  const rowsCount = Array.isArray(prep.rows) ? prep.rows.length : null;\n\n  const widget = datasetIdOrSlug\n    ? {\n        widgetType: 'dataset_card',\n        props: {\n          id: 'dataset:' + datasetIdOrSlug,\n          datasetIdOrSlug,\n          title: 'Accounts Dataset',\n          description: `${rowsCount ?? ''}${rowsCount != null ? ' row(s) ' : ''}${mode ? mode + ' ' : ''}written`.trim(),\n        },\n      }\n    : null;\n\n  if (body && typeof body === 'object' && body.success === true && 'data' in body) {\n    const data = body.data;\n    if (widget && data && typeof data === 'object' && !Array.isArray(data)) {\n      return { ...data, widget };\n    }\n    if (widget) return { data, widget };\n    return data;\n  }\n\n  if (widget && body && typeof body === 'object' && !Array.isArray(body)) {\n    return { ...body, widget };\n  }\n\n  return body ?? resp;\n}\n",
+              "timeout": 5000
+            }
+          },
+          {
+            "ref": "end",
+            "name": "End",
+            "type": "end",
+            "parameters": {
+              "output": "{{ lastOutputOf('unwrap') }}"
+            }
+          }
+        ]
+      },
+      "transforms": null,
+      "mutations": null,
+      "condition": null,
+      "isEnabled": true,
+      "status": "active"
+    }
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "name": "Talos",
+  "description": "Expert manager of Cursor cloud coding agents. Launches agents to work on repositories, monitors their progress, and coordinates multi-agent coding workflows. Specializes in delegating coding tasks to cloud agents and tracking their execution",
+  "version": "1.0.5",
+  "tags": [
+    "coding"
+  ],
+  "kind": "agent"
+}

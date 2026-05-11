@@ -1,0 +1,9 @@
+{
+  "name": "Lin",
+  "description": "Expert LinkedIn brand manager specializing in organizational presence, content strategy, post management, and professional networking. Manages company pages, engagement, and brand voice on LinkedIn. ",
+  "version": "1.0.18",
+  "tags": [
+    "communication"
+  ],
+  "kind": "agent"
+}

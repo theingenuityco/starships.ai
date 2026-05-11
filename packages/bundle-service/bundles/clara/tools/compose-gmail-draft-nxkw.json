@@ -1,0 +1,193 @@
+{
+  "schemaVersion": "1",
+  "kind": "tool",
+  "exportedAt": "2026-05-11T21:17:34.347Z",
+  "metadata": {
+    "fromSlug": "compose-gmail-draft-nxkw"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "tool": {
+      "name": "Compose Gmail Draft",
+      "description": "Create and save email drafts in Gmail. Review before sending.",
+      "parameters": {
+        "type": "object",
+        "required": [
+          "to",
+          "subject",
+          "body"
+        ],
+        "properties": {
+          "cc": {
+            "type": "string",
+            "description": "CC email addresses (comma-separated)"
+          },
+          "to": {
+            "type": "string",
+            "description": "Recipient email address (comma-separated for multiple)"
+          },
+          "bcc": {
+            "type": "string",
+            "description": "BCC email addresses (comma-separated)"
+          },
+          "body": {
+            "type": "string",
+            "description": "Email body content (plain text or HTML)"
+          },
+          "is_html": {
+            "type": "boolean",
+            "default": false,
+            "description": "Whether body contains HTML"
+          },
+          "subject": {
+            "type": "string",
+            "description": "Email subject line"
+          },
+          "reply_to_message_id": {
+            "type": "string",
+            "description": "Message ID to reply to (for threading)"
+          }
+        }
+      },
+      "blueprint": {
+        "edges": [
+          {
+            "to": "check_reply",
+            "ref": "start_to_check",
+            "from": "start"
+          },
+          {
+            "to": "fetch_original",
+            "ref": "check_to_fetch",
+            "from": "check_reply",
+            "condition": "fetch_original"
+          },
+          {
+            "to": "build_email",
+            "ref": "check_to_build",
+            "from": "check_reply",
+            "condition": "build_email"
+          },
+          {
+            "to": "extract_headers",
+            "ref": "fetch_to_extract",
+            "from": "fetch_original"
+          },
+          {
+            "to": "build_email",
+            "ref": "extract_to_build",
+            "from": "extract_headers"
+          },
+          {
+            "to": "prepare_draft_args",
+            "ref": "build_to_prepare",
+            "from": "build_email"
+          },
+          {
+            "to": "create_draft",
+            "ref": "prepare_to_create",
+            "from": "prepare_draft_args"
+          },
+          {
+            "to": "format_result",
+            "ref": "create_to_format",
+            "from": "create_draft"
+          },
+          {
+            "to": "end",
+            "ref": "format_to_end",
+            "from": "format_result"
+          }
+        ],
+        "nodes": [
+          {
+            "ref": "start",
+            "name": "Start",
+            "type": "start"
+          },
+          {
+            "ref": "check_reply",
+            "name": "Check if Reply",
+            "type": "conditional",
+            "parameters": {
+              "condition": "{{ input.reply_to_message_id ? 'fetch_original' : 'build_email' }}"
+            }
+          },
+          {
+            "ref": "fetch_original",
+            "name": "Fetch Original Message",
+            "type": "connector_action",
+            "parameters": {
+              "args": {
+                "id": "{{ input.reply_to_message_id }}",
+                "format": "full"
+              },
+              "action": "get-message",
+              "timeout": 15000,
+              "connector": "gmail"
+            }
+          },
+          {
+            "ref": "extract_headers",
+            "name": "Extract Threading Headers",
+            "type": "code",
+            "parameters": {
+              "code": "async function main(ctx) {\n  const originalMsg = ctx.input?.body || {};\n  const headers = originalMsg.payload?.headers || [];\n  \n  let messageId = '';\n  let references = '';\n  \n  for (const header of headers) {\n    if (header.name.toLowerCase() === 'message-id') {\n      messageId = header.value;\n    }\n    if (header.name.toLowerCase() === 'references') {\n      references = header.value;\n    }\n  }\n  \n  return {\n    messageId: messageId,\n    references: references\n  };\n}",
+              "timeout": 3000
+            }
+          },
+          {
+            "ref": "build_email",
+            "name": "Build RFC 2822 Email",
+            "type": "code",
+            "parameters": {
+              "code": "async function main(ctx) {\n  const args = ctx.lastOutputOf('__initial__') || {};\n  const threadingHeaders = ctx.lastOutputOf('extract_headers') || {};\n  \n  // Build email headers\n  const lines = [];\n  lines.push('To: ' + (args.to || ''));\n  \n  if (args.cc) {\n    lines.push('Cc: ' + args.cc);\n  }\n  if (args.bcc) {\n    lines.push('Bcc: ' + args.bcc);\n  }\n  \n  lines.push('Subject: ' + (args.subject || ''));\n  \n  // Add threading headers if replying\n  if (threadingHeaders.messageId) {\n    lines.push('In-Reply-To: ' + threadingHeaders.messageId);\n    \n    let refs = threadingHeaders.references || '';\n    if (refs && threadingHeaders.messageId) {\n      refs = refs + ' ' + threadingHeaders.messageId;\n    } else if (threadingHeaders.messageId) {\n      refs = threadingHeaders.messageId;\n    }\n    if (refs) {\n      lines.push('References: ' + refs);\n    }\n  }\n  \n  // Content-Type header\n  const contentType = args.is_html ? 'text/html; charset=utf-8' : 'text/plain; charset=utf-8';\n  lines.push('Content-Type: ' + contentType);\n  lines.push('');\n  lines.push(args.body || '');\n  \n  const rawMessage = lines.join('\\r\\n');\n  \n  // Base64url encode\n  const base64 = Buffer.from(rawMessage).toString('base64');\n  const base64url = base64.replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/, '');\n  \n  return {\n    raw: base64url\n  };\n}",
+              "timeout": 5000
+            }
+          },
+          {
+            "ref": "prepare_draft_args",
+            "name": "Prepare Draft Args",
+            "type": "code",
+            "parameters": {
+              "code": "async function main(ctx) {\n  const buildOutput = ctx.lastOutputOf('build_email') || {};\n  return {\n    message: {\n      raw: buildOutput.raw\n    }\n  };\n}",
+              "timeout": 2000
+            }
+          },
+          {
+            "ref": "create_draft",
+            "name": "Create Draft",
+            "type": "connector_action",
+            "parameters": {
+              "action": "create-draft",
+              "timeout": 30000,
+              "connector": "gmail"
+            }
+          },
+          {
+            "ref": "format_result",
+            "name": "Format Draft Result",
+            "type": "code",
+            "parameters": {
+              "code": "async function main(ctx) {\n  const response = ctx.input?.body || {};\n  return {\n    status: 'draft_created',\n    draftId: response.id,\n    messageId: response.message?.id,\n    threadId: response.message?.threadId\n  };\n}",
+              "timeout": 2000
+            }
+          },
+          {
+            "ref": "end",
+            "name": "End",
+            "type": "end"
+          }
+        ]
+      },
+      "transforms": null,
+      "mutations": null,
+      "condition": null,
+      "isEnabled": true,
+      "status": "active"
+    }
+  }
+}

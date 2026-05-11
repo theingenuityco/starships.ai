@@ -1,0 +1,9 @@
+{
+  "name": "Gaia",
+  "description": "Expert agent creator that designs and scaffolds new agents (Agent instances) on the current starship. Creates agents with custom system prompts, tool assignments, and workflows. ",
+  "version": "1.0.16",
+  "tags": [
+    "automation"
+  ],
+  "kind": "agent"
+}

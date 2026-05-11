@@ -1,0 +1,96 @@
+{
+  "schemaVersion": "1",
+  "kind": "tool",
+  "exportedAt": "2026-05-11T21:17:34.347Z",
+  "metadata": {
+    "fromSlug": "read-rows-from-google-sheet-oydx"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "tool": {
+      "name": "Read Rows from Google Sheet",
+      "description": "Read rows from a Google Sheet range using the Google Sheets API",
+      "parameters": {
+        "type": "object",
+        "required": [
+          "spreadsheetId",
+          "range"
+        ],
+        "properties": {
+          "range": {
+            "type": "string",
+            "description": "The range to read (e.g., 'Sheet1!A:Z')"
+          },
+          "spreadsheetId": {
+            "type": "string",
+            "description": "The ID of the spreadsheet (found in the URL)"
+          }
+        }
+      },
+      "blueprint": {
+        "edges": [
+          {
+            "to": "read_rows",
+            "ref": "e1",
+            "from": "start"
+          },
+          {
+            "to": "format_response",
+            "ref": "e2",
+            "from": "read_rows"
+          },
+          {
+            "to": "end",
+            "ref": "e3",
+            "from": "format_response"
+          }
+        ],
+        "nodes": [
+          {
+            "ref": "start",
+            "name": "Start",
+            "type": "start",
+            "parameters": {}
+          },
+          {
+            "ref": "read_rows",
+            "name": "Read Rows",
+            "type": "connector_action",
+            "parameters": {
+              "args": {
+                "range": "{{ String(input.range) }}",
+                "spreadsheetId": "{{ String(input.spreadsheetId) }}"
+              },
+              "action": "read-rows",
+              "timeout": 15000,
+              "connector": "google-sheets",
+              "failOnNon2xx": true
+            }
+          },
+          {
+            "ref": "format_response",
+            "name": "Format Response",
+            "type": "code",
+            "parameters": {
+              "code": "async function main(ctx) {\n  const resp = ctx.lastOutputOf('read_rows') || {};\n  \n  if (!resp.body) {\n    throw new Error('No response body from Google Sheets API');\n  }\n  \n  return {\n    success: true,\n    range: resp.body.range,\n    majorDimension: resp.body.majorDimension,\n    values: resp.body.values || []\n  };\n}"
+            }
+          },
+          {
+            "ref": "end",
+            "name": "End",
+            "type": "end",
+            "parameters": {}
+          }
+        ]
+      },
+      "transforms": null,
+      "mutations": null,
+      "condition": null,
+      "isEnabled": true,
+      "status": "active"
+    }
+  }
+}

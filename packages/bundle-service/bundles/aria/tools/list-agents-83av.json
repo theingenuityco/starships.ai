@@ -1,0 +1,105 @@
+{
+  "schemaVersion": "1",
+  "kind": "tool",
+  "exportedAt": "2026-05-11T21:17:34.347Z",
+  "metadata": {
+    "fromSlug": "list-agents-83av"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "tool": {
+      "name": "List Agents",
+      "description": "List all agents on the current starship for discovery. Returns a lean array (slug, name, description, category) without heavy fields like blueprint.",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      },
+      "blueprint": {
+        "edges": [
+          {
+            "to": "prepare",
+            "ref": "e1",
+            "from": "start_1"
+          },
+          {
+            "to": "http_list",
+            "ref": "e2",
+            "from": "prepare"
+          },
+          {
+            "to": "summarize",
+            "ref": "e3",
+            "from": "http_list"
+          },
+          {
+            "to": "end_1",
+            "ref": "e4",
+            "from": "summarize"
+          }
+        ],
+        "nodes": [
+          {
+            "ref": "start_1",
+            "name": "Start",
+            "type": "start",
+            "parameters": {},
+            "description": ""
+          },
+          {
+            "ref": "prepare",
+            "name": "Prepare Request",
+            "type": "code",
+            "parameters": {
+              "code": "\n            async function main(ctx) {\n              return {\n                ok: true\n              };\n            }\n          ",
+              "timeout": 3000
+            },
+            "description": "Validate inputs"
+          },
+          {
+            "ref": "http_list",
+            "name": "List Agents",
+            "type": "connector_action",
+            "parameters": {
+              "args": {
+                "starshipId": "{{ env(\"STARSHIP_ID\") }}"
+              },
+              "action": "list-agents",
+              "timeout": 5000,
+              "connector": "starships",
+              "failOnNon2xx": true
+            },
+            "description": "GET /starships/:starshipId/agents"
+          },
+          {
+            "ref": "summarize",
+            "name": "Summarize Agents",
+            "type": "code",
+            "parameters": {
+              "code": "\n            async function main(ctx) {\n              // Input is the HttpResponse from http_list (see HttpRequest node contract)\n              const http = ctx.input;\n              const body = http && typeof http === 'object' ? http.body : http;\n              // Server sendSuccess returns { data: T }, so prefer body.data when present\n              const data = body && typeof body === 'object' && Array.isArray(body.data)\n                ? body.data\n                : (Array.isArray(body) ? body : []);\n\n              // Return a lean summary to avoid leaking large/templated blueprint contents\n              return data.map((a) => ({\n                slug: a && a.slug,\n                name: a && a.name,\n                description: a && a.description,\n                category: a && a.category,\n              }));\n            }\n          ",
+              "timeout": 2000
+            },
+            "description": "Strip heavy fields (e.g., blueprint) and return a lean list"
+          },
+          {
+            "ref": "end_1",
+            "name": "End",
+            "type": "end",
+            "parameters": {
+              "output": "{{ lastOutputOf(\"summarize\") }}"
+            },
+            "description": ""
+          }
+        ],
+        "metadata": {}
+      },
+      "transforms": null,
+      "mutations": null,
+      "condition": null,
+      "isEnabled": true,
+      "status": "active"
+    }
+  }
+}

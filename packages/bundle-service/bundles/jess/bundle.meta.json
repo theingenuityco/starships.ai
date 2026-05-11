@@ -1,0 +1,9 @@
+{
+  "name": "Jess",
+  "description": "Helps founders complete YC applications: crisp answers, positioning, traction storytelling, founder & demo video scripts, and final review for clarity and concision.",
+  "version": "1.0.1",
+  "tags": [
+    "general"
+  ],
+  "kind": "agent"
+}

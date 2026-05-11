@@ -1,0 +1,211 @@
+{
+  "schemaVersion": "1",
+  "kind": "tool",
+  "exportedAt": "2026-05-11T21:17:34.347Z",
+  "metadata": {
+    "fromSlug": "manage-gmail-label-structure-q2gj"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "tool": {
+      "name": "Manage Gmail Label Structure",
+      "description": "Manage Gmail label hierarchy and structure. Create organized label systems, audit existing labels, and maintain clean taxonomy for email organization.",
+      "parameters": {
+        "type": "object",
+        "required": [
+          "action"
+        ],
+        "properties": {
+          "action": {
+            "enum": [
+              "audit",
+              "create",
+              "update"
+            ],
+            "type": "string",
+            "description": "Action to perform on labels"
+          },
+          "label_id": {
+            "type": "string",
+            "description": "Label ID for update operations"
+          },
+          "label_name": {
+            "type": "string",
+            "description": "Label name (use '/' for nested labels, e.g., 'Work/Projects/Active')"
+          },
+          "visibility": {
+            "type": "object",
+            "properties": {
+              "label_list": {
+                "enum": [
+                  "labelShow",
+                  "labelShowIfUnread",
+                  "labelHide"
+                ],
+                "type": "string",
+                "description": "Visibility in label list"
+              },
+              "message_list": {
+                "enum": [
+                  "show",
+                  "hide"
+                ],
+                "type": "string",
+                "description": "Visibility of messages with this label"
+              }
+            }
+          },
+          "include_usage_stats": {
+            "type": "boolean",
+            "default": true,
+            "description": "For audit: include message counts per label"
+          }
+        }
+      },
+      "blueprint": {
+        "edges": [
+          {
+            "to": "route_action",
+            "ref": "start_to_route",
+            "from": "start"
+          },
+          {
+            "to": "audit_labels",
+            "ref": "route_to_audit",
+            "from": "route_action",
+            "condition": "audit"
+          },
+          {
+            "to": "process_audit",
+            "ref": "audit_to_process",
+            "from": "audit_labels"
+          },
+          {
+            "to": "end",
+            "ref": "process_to_end",
+            "from": "process_audit"
+          },
+          {
+            "to": "create_label",
+            "ref": "route_to_create",
+            "from": "route_action",
+            "condition": "create"
+          },
+          {
+            "to": "format_create_result",
+            "ref": "create_to_format",
+            "from": "create_label"
+          },
+          {
+            "to": "end",
+            "ref": "format_create_to_end",
+            "from": "format_create_result"
+          },
+          {
+            "to": "update_label",
+            "ref": "route_to_update",
+            "from": "route_action",
+            "condition": "update"
+          },
+          {
+            "to": "format_update_result",
+            "ref": "update_to_format",
+            "from": "update_label"
+          },
+          {
+            "to": "end",
+            "ref": "format_update_to_end",
+            "from": "format_update_result"
+          }
+        ],
+        "nodes": [
+          {
+            "ref": "start",
+            "name": "Start",
+            "type": "start"
+          },
+          {
+            "ref": "route_action",
+            "name": "Route by Action",
+            "type": "conditional",
+            "parameters": {
+              "condition": "{{ (ctx.input || {}).action }}"
+            }
+          },
+          {
+            "ref": "audit_labels",
+            "name": "List All Labels",
+            "type": "connector_action",
+            "parameters": {
+              "action": "list-labels",
+              "timeout": 15000,
+              "connector": "gmail"
+            }
+          },
+          {
+            "ref": "process_audit",
+            "name": "Process Audit Results",
+            "type": "code",
+            "parameters": {
+              "code": "async function main(ctx) {\n  const input = ctx.input || {};\n  const includeStats = ctx.lastOutputOf('__initial__')?.include_usage_stats !== false;\n  const labelsResponse = input.body || {};\n  const labels = labelsResponse.labels || [];\n  \n  const systemLabels = labels.filter(l => l.type === 'system');\n  const customLabels = labels.filter(l => l.type === 'user');\n  \n  const result = {\n    summary: {\n      total: labels.length,\n      system: systemLabels.length,\n      custom: customLabels.length\n    },\n    system_labels: systemLabels.map(l => ({\n      id: l.id,\n      name: l.name,\n      type: l.type,\n      messagesTotal: includeStats ? (l.messagesTotal || 0) : undefined,\n      messagesUnread: includeStats ? (l.messagesUnread || 0) : undefined\n    })),\n    custom_labels: customLabels.map(l => ({\n      id: l.id,\n      name: l.name,\n      type: l.type,\n      labelListVisibility: l.labelListVisibility,\n      messageListVisibility: l.messageListVisibility,\n      messagesTotal: includeStats ? (l.messagesTotal || 0) : undefined,\n      messagesUnread: includeStats ? (l.messagesUnread || 0) : undefined\n    }))\n  };\n  \n  return result;\n}",
+              "timeout": 5000
+            }
+          },
+          {
+            "ref": "create_label",
+            "name": "Create Label",
+            "type": "connector_action",
+            "parameters": {
+              "args": "{{ (() => { const initial = ctx.lastOutputOf('__initial__') || {}; const vis = initial.visibility || {}; return { name: initial.label_name, labelListVisibility: vis.label_list, messageListVisibility: vis.message_list }; })() }}",
+              "action": "create-label",
+              "timeout": 15000,
+              "connector": "gmail"
+            }
+          },
+          {
+            "ref": "format_create_result",
+            "name": "Format Create Result",
+            "type": "code",
+            "parameters": {
+              "code": "async function main(ctx) {\n  const input = ctx.input || {};\n  const body = input.body || {};\n  return {\n    action: 'create',\n    success: true,\n    label: {\n      id: body.id,\n      name: body.name,\n      labelListVisibility: body.labelListVisibility,\n      messageListVisibility: body.messageListVisibility\n    }\n  };\n}",
+              "timeout": 3000
+            }
+          },
+          {
+            "ref": "update_label",
+            "name": "Update Label",
+            "type": "connector_action",
+            "parameters": {
+              "args": "{{ (() => { const initial = ctx.lastOutputOf('__initial__') || {}; const vis = initial.visibility || {}; return { id: initial.label_id, name: initial.label_name, labelListVisibility: vis.label_list, messageListVisibility: vis.message_list }; })() }}",
+              "action": "update-label",
+              "timeout": 15000,
+              "connector": "gmail"
+            }
+          },
+          {
+            "ref": "format_update_result",
+            "name": "Format Update Result",
+            "type": "code",
+            "parameters": {
+              "code": "async function main(ctx) {\n  const input = ctx.input || {};\n  const body = input.body || {};\n  return {\n    action: 'update',\n    success: true,\n    label: {\n      id: body.id,\n      name: body.name,\n      labelListVisibility: body.labelListVisibility,\n      messageListVisibility: body.messageListVisibility\n    }\n  };\n}",
+              "timeout": 3000
+            }
+          },
+          {
+            "ref": "end",
+            "name": "End",
+            "type": "end"
+          }
+        ]
+      },
+      "transforms": null,
+      "mutations": null,
+      "condition": null,
+      "isEnabled": true,
+      "status": "active"
+    }
+  }
+}

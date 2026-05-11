@@ -1,0 +1,82 @@
+{
+  "schemaVersion": "1",
+  "kind": "tool",
+  "exportedAt": "2026-05-11T21:17:34.347Z",
+  "metadata": {
+    "fromSlug": "get-linkedin-member-profile-7o5j"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "tool": {
+      "name": "Get LinkedIn Member Profile",
+      "description": "Fetch the authenticated user's LinkedIn member profile information including name, headline, and profile picture. (Personal/member accounts only)",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      },
+      "blueprint": {
+        "edges": [
+          {
+            "to": "get_profile",
+            "ref": "start_to_get_profile",
+            "from": "start"
+          },
+          {
+            "to": "transform_output",
+            "ref": "get_profile_to_end",
+            "from": "get_profile"
+          },
+          {
+            "to": "end",
+            "ref": "transform_to_end",
+            "from": "transform_output"
+          }
+        ],
+        "nodes": [
+          {
+            "ref": "start",
+            "name": "Start",
+            "type": "start"
+          },
+          {
+            "ref": "get_profile",
+            "name": "Get LinkedIn Profile",
+            "type": "connector_action",
+            "parameters": {
+              "args": {},
+              "action": "get-profile",
+              "timeout": 15000,
+              "connector": "linkedin",
+              "failOnNon2xx": true
+            }
+          },
+          {
+            "ref": "end",
+            "name": "End",
+            "type": "end",
+            "parameters": {
+              "output": "{{ lastOutputOf('transform_output') }}"
+            }
+          },
+          {
+            "ref": "transform_output",
+            "name": "Extract Profile Data",
+            "type": "code",
+            "parameters": {
+              "code": "async function main(ctx) {\n  const resp = ctx.input || {};\n  const profile = resp.body || {};\n  \n  return {\n    id: profile.id,\n    firstName: profile.localizedFirstName,\n    lastName: profile.localizedLastName,\n    headline: profile.localizedHeadline,\n    vanityName: profile.vanityName,\n    profilePictureUrn: profile.profilePicture?.displayImage\n  };\n}",
+              "timeout": 3000
+            }
+          }
+        ]
+      },
+      "transforms": null,
+      "mutations": null,
+      "condition": null,
+      "isEnabled": true,
+      "status": "active"
+    }
+  }
+}

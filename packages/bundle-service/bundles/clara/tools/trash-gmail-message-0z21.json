@@ -1,0 +1,74 @@
+{
+  "schemaVersion": "1",
+  "kind": "tool",
+  "exportedAt": "2026-05-11T21:17:34.347Z",
+  "metadata": {
+    "fromSlug": "trash-gmail-message-0z21"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "tool": {
+      "name": "Trash Gmail Message",
+      "description": "Move a message to the trash folder. The message can be recovered from trash until it is permanently deleted. Use gmail_delete_message for permanent deletion.",
+      "parameters": {
+        "type": "object",
+        "required": [
+          "messageId"
+        ],
+        "properties": {
+          "messageId": {
+            "type": "string",
+            "description": "The ID of the message to move to trash"
+          }
+        }
+      },
+      "blueprint": {
+        "edges": [
+          {
+            "to": "trash_message",
+            "ref": "start_to_trash",
+            "from": "start"
+          },
+          {
+            "to": "end",
+            "ref": "trash_to_end",
+            "from": "trash_message"
+          }
+        ],
+        "nodes": [
+          {
+            "ref": "start",
+            "name": "Start",
+            "type": "start"
+          },
+          {
+            "ref": "trash_message",
+            "name": "Trash Message",
+            "type": "connector_action",
+            "parameters": {
+              "args": {
+                "id": "{{ String(ctx.input.messageId) }}"
+              },
+              "action": "trash-message",
+              "timeout": 15000,
+              "connector": "gmail"
+            }
+          },
+          {
+            "ref": "end",
+            "name": "End",
+            "type": "end"
+          }
+        ]
+      },
+      "transforms": null,
+      "mutations": null,
+      "condition": null,
+      "isEnabled": true,
+      "status": "active"
+    }
+  }
+}

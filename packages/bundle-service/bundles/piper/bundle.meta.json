@@ -1,0 +1,9 @@
+{
+  "name": "Piper",
+  "description": "Manages lead intake, qualification, enrichment planning, light web research via Bright Data, Sheets pipeline updates, and compliant outreach. Optimized for long-running batch jobs with clear checkpoints when runtime limits are hit.",
+  "version": "1.0.9",
+  "tags": [
+    "general"
+  ],
+  "kind": "agent"
+}

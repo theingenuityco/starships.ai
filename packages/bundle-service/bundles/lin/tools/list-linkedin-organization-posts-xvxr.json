@@ -1,0 +1,132 @@
+{
+  "schemaVersion": "1",
+  "kind": "tool",
+  "exportedAt": "2026-05-11T21:17:34.347Z",
+  "metadata": {
+    "fromSlug": "list-linkedin-organization-posts-xvxr"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "tool": {
+      "name": "List LinkedIn Organization Posts",
+      "description": "Fetch posts from a LinkedIn organization's feed. Looks up the organization by vanity name and retrieves its posts with pagination support.",
+      "parameters": {
+        "type": "object",
+        "required": [
+          "vanityName"
+        ],
+        "properties": {
+          "count": {
+            "type": "number",
+            "default": 10,
+            "description": "Number of posts to fetch (default: 10, max: 100)"
+          },
+          "start": {
+            "type": "number",
+            "default": 0,
+            "description": "Starting index for pagination (default: 0)"
+          },
+          "vanityName": {
+            "type": "string",
+            "description": "Organization vanity name (e.g., 'microsoft', 'linkedin', 'google')"
+          }
+        }
+      },
+      "blueprint": {
+        "edges": [
+          {
+            "to": "get_org",
+            "ref": "start_to_get_org",
+            "from": "start"
+          },
+          {
+            "to": "extract_org_id",
+            "ref": "get_org_to_extract",
+            "from": "get_org"
+          },
+          {
+            "to": "get_posts",
+            "ref": "extract_to_get_posts",
+            "from": "extract_org_id"
+          },
+          {
+            "to": "transform_posts_data",
+            "ref": "get_posts_to_transform",
+            "from": "get_posts"
+          },
+          {
+            "to": "end",
+            "ref": "transform_to_end",
+            "from": "transform_posts_data"
+          }
+        ],
+        "nodes": [
+          {
+            "ref": "start",
+            "name": "Start",
+            "type": "start",
+            "parameters": {}
+          },
+          {
+            "ref": "get_org",
+            "name": "Get Organization by Vanity Name",
+            "type": "connector_action",
+            "parameters": {
+              "args": "{{ { vanityName: input.vanityName } }}",
+              "action": "get-organization-by-vanity",
+              "timeout": 15000,
+              "connector": "linkedin",
+              "failOnNon2xx": true
+            }
+          },
+          {
+            "ref": "extract_org_id",
+            "name": "Extract Organization ID and Build URN",
+            "type": "code",
+            "parameters": {
+              "code": "async function main(ctx) {\n  const response = ctx.input?.body || {};\n  const elements = response.elements || [];\n  \n  if (elements.length === 0) {\n    throw new Error('Organization not found');\n  }\n  \n  const org = elements[0];\n  const orgId = org.id;\n  \n  if (!orgId) {\n    throw new Error('Could not extract organization ID');\n  }\n  \n  const authorUrn = 'urn:li:organization:' + orgId;\n  const initialArgs = ctx.lastOutputOf('__initial__') || {};\n  \n  return {\n    author: authorUrn,\n    count: initialArgs.count || 10,\n    start: initialArgs.start || 0,\n    organizationName: org.localizedName || org.name || 'Unknown',\n    organizationId: orgId\n  };\n}",
+              "timeout": 3000
+            }
+          },
+          {
+            "ref": "get_posts",
+            "name": "Get Posts for Organization",
+            "type": "connector_action",
+            "parameters": {
+              "args": "{{ { author: input.author, count: input.count, start: input.start } }}",
+              "action": "get-posts-for-author",
+              "timeout": 15000,
+              "connector": "linkedin",
+              "failOnNon2xx": true
+            }
+          },
+          {
+            "ref": "transform_posts_data",
+            "name": "Transform Posts Data",
+            "type": "code",
+            "parameters": {
+              "code": "async function main(ctx) {\n  const response = ctx.input?.body || {};\n  const elements = response.elements || [];\n  const orgData = ctx.lastOutputOf('extract_org_id') || {};\n  \n  // Transform posts to include only essential data\n  const posts = elements.map(post => {\n    const commentary = post.commentary || '';\n    const specificContent = post.specificContent || {};\n    const shareMediaCategory = specificContent['com.linkedin.ugc.ShareMediaCategory'] || {};\n    const media = shareMediaCategory.media || [];\n    \n    return {\n      id: post.id,\n      author: post.author,\n      created: post.created?.time,\n      lastModified: post.lastModified?.time,\n      text: commentary,\n      visibility: post.visibility?.['com.linkedin.ugc.MemberNetworkVisibility'],\n      lifecycleState: post.lifecycleState,\n      media: media.map(m => ({\n        status: m.status,\n        description: m.description?.text,\n        media: m.media,\n        title: m.title?.text\n      })),\n      shareCommentary: post.shareCommentary?.text,\n      shareMediaCategory: shareMediaCategory.category\n    };\n  });\n  \n  return {\n    organizationName: orgData.organizationName,\n    organizationId: orgData.organizationId,\n    posts: posts,\n    count: posts.length,\n    start: orgData.start || 0\n  };\n}",
+              "timeout": 3000
+            }
+          },
+          {
+            "ref": "end",
+            "name": "End",
+            "type": "end",
+            "parameters": {
+              "output": "{{ lastOutputOf('transform_posts_data') }}"
+            }
+          }
+        ]
+      },
+      "transforms": null,
+      "mutations": null,
+      "condition": null,
+      "isEnabled": true,
+      "status": "active"
+    }
+  }
+}

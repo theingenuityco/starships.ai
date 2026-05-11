@@ -1,0 +1,92 @@
+{
+  "schemaVersion": "1",
+  "kind": "tool",
+  "exportedAt": "2026-05-11T21:17:34.347Z",
+  "metadata": {
+    "fromSlug": "get-gmail-message-metadata-b1fy"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "tool": {
+      "name": "Get Gmail Message Metadata",
+      "description": "Retrieve message metadata including headers, labels, and snippet without downloading the full message body. Use this for efficient message inspection before deciding whether to retrieve full content.",
+      "parameters": {
+        "type": "object",
+        "required": [
+          "messageId"
+        ],
+        "properties": {
+          "headers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Optional array of specific header names to retrieve (e.g., ['From', 'To', 'Subject', 'Date']). If omitted, returns common headers."
+          },
+          "messageId": {
+            "type": "string",
+            "description": "The ID of the message to retrieve metadata for"
+          }
+        }
+      },
+      "blueprint": {
+        "edges": [
+          {
+            "to": "prepare_args",
+            "ref": "edge_start_to_prepare",
+            "from": "start"
+          },
+          {
+            "to": "get_metadata",
+            "ref": "edge_prepare_to_get",
+            "from": "prepare_args"
+          },
+          {
+            "to": "end",
+            "ref": "edge_get_to_end",
+            "from": "get_metadata"
+          }
+        ],
+        "nodes": [
+          {
+            "ref": "start",
+            "name": "Start",
+            "type": "start"
+          },
+          {
+            "ref": "prepare_args",
+            "name": "Prepare Gmail API Args",
+            "type": "code",
+            "parameters": {
+              "code": "async function main(ctx) {\n  const input = ctx.input || {};\n  const messageId = input.messageId;\n  const headers = input.headers;\n  \n  // Build the args object for Gmail API\n  const args = {\n    id: messageId,\n    format: 'metadata'\n  };\n  \n  // If specific headers are requested, join them as comma-separated string\n  if (headers && Array.isArray(headers) && headers.length > 0) {\n    args.metadataHeaders = headers.join(',');\n  }\n  \n  return args;\n}",
+              "timeout": 3000
+            }
+          },
+          {
+            "ref": "get_metadata",
+            "name": "Get Message Metadata",
+            "type": "connector_action",
+            "parameters": {
+              "action": "get-message",
+              "timeout": 15000,
+              "connector": "gmail"
+            }
+          },
+          {
+            "ref": "end",
+            "name": "End",
+            "type": "end"
+          }
+        ]
+      },
+      "transforms": null,
+      "mutations": null,
+      "condition": null,
+      "isEnabled": true,
+      "status": "active"
+    }
+  }
+}

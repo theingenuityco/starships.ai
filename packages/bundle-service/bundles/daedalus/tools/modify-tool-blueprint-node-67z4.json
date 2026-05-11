@@ -1,0 +1,205 @@
+{
+  "schemaVersion": "1",
+  "kind": "tool",
+  "exportedAt": "2026-05-11T21:17:34.347Z",
+  "metadata": {
+    "fromSlug": "modify-tool-blueprint-node-67z4"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "tool": {
+      "name": "Modify Tool Blueprint Node",
+      "description": "Add, edit, or remove a blueprint node in an existing tool by slug using a single interface (op=add/edit/remove). Returns { ok: true } on success, or validation errors.",
+      "parameters": {
+        "type": "object",
+        "required": [
+          "toolSlug",
+          "op"
+        ],
+        "properties": {
+          "op": {
+            "enum": [
+              "add",
+              "edit",
+              "remove"
+            ],
+            "type": "string",
+            "description": "Operation to perform: add, edit, or remove"
+          },
+          "node": {
+            "type": "object",
+            "description": "Full node definition (required for op = \"add\")"
+          },
+          "nodeRef": {
+            "type": "string",
+            "description": "Reference of the node to edit/remove (required for op = \"edit\" or \"remove\")"
+          },
+          "updates": {
+            "type": "object",
+            "description": "Partial node definition with properties to update (required for op = \"edit\")"
+          },
+          "toolSlug": {
+            "type": "string",
+            "description": "Slug of the tool to modify"
+          }
+        }
+      },
+      "blueprint": {
+        "edges": [
+          {
+            "to": "prepare",
+            "ref": "e1",
+            "from": "start_1"
+          },
+          {
+            "to": "fetch_tool",
+            "ref": "e2",
+            "from": "prepare"
+          },
+          {
+            "to": "modify_node",
+            "ref": "e3",
+            "from": "fetch_tool"
+          },
+          {
+            "to": "route_update",
+            "ref": "e4",
+            "from": "modify_node"
+          },
+          {
+            "to": "update_tool",
+            "ref": "e5",
+            "from": "route_update",
+            "condition": "true"
+          },
+          {
+            "to": "unwrap_update",
+            "ref": "e6",
+            "from": "update_tool"
+          },
+          {
+            "to": "okify",
+            "ref": "e7",
+            "from": "unwrap_update"
+          },
+          {
+            "to": "end_1",
+            "ref": "e8",
+            "from": "okify"
+          },
+          {
+            "to": "end_1",
+            "ref": "e9",
+            "from": "route_update",
+            "condition": "false"
+          }
+        ],
+        "nodes": [
+          {
+            "ref": "start_1",
+            "name": "Start",
+            "type": "start",
+            "parameters": {},
+            "description": ""
+          },
+          {
+            "ref": "prepare",
+            "name": "Prepare Request",
+            "type": "code",
+            "parameters": {
+              "code": "\n            async function main(ctx) {\n              const input = ctx.input || {};\n              const op = input.op;\n\n              if (!input.toolSlug || typeof input.toolSlug !== 'string') {\n                throw new Error('toolSlug is required and must be a string');\n              }\n\n              const allowedOps = ['add', 'edit', 'remove'];\n              if (!op || typeof op !== 'string' || !allowedOps.includes(op)) {\n                throw new Error('op is required and must be one of: add, edit, remove');\n              }\n\n              if (op === 'add') {\n                if (!input.node || typeof input.node !== 'object') {\n                  throw new Error('node is required and must be an object when op = \"add\"');\n                }\n                return {\n                  toolSlug: input.toolSlug,\n                  op,\n                  node: input.node,\n                };\n              }\n\n              if (op === 'edit') {\n                if (!input.nodeRef || typeof input.nodeRef !== 'string') {\n                  throw new Error('nodeRef is required and must be a string when op = \"edit\"');\n                }\n                if (!input.updates || typeof input.updates !== 'object') {\n                  throw new Error('updates is required and must be an object when op = \"edit\"');\n                }\n                return {\n                  toolSlug: input.toolSlug,\n                  op,\n                  nodeRef: input.nodeRef,\n                  updates: input.updates,\n                };\n              }\n\n              if (op === 'remove') {\n                if (!input.nodeRef || typeof input.nodeRef !== 'string') {\n                  throw new Error('nodeRef is required and must be a string when op = \"remove\"');\n                }\n                return {\n                  toolSlug: input.toolSlug,\n                  op,\n                  nodeRef: input.nodeRef,\n                };\n              }\n\n              throw new Error('Unsupported op: ' + op);\n            }\n          ",
+              "timeout": 3000
+            },
+            "description": "Validate inputs and normalize operation payload"
+          },
+          {
+            "ref": "fetch_tool",
+            "name": "Fetch Current Tool",
+            "type": "connector_action",
+            "parameters": {
+              "args": {
+                "slug": "{{ (lastOutputOf(\"prepare\") || {}).toolSlug }}",
+                "starshipId": "{{ env(\"STARSHIP_ID\") }}"
+              },
+              "action": "get-tool",
+              "timeout": 5000,
+              "connector": "starships",
+              "failOnNon2xx": true
+            },
+            "description": "GET /starships/:starshipId/tools/:toolSlug"
+          },
+          {
+            "ref": "modify_node",
+            "name": "Apply Node Operation",
+            "type": "code",
+            "parameters": {
+              "code": "\n            async function main(ctx) {\n              const supportedTypes = [\n                'start',\n                'end',\n                'llm',\n                'code',\n                'http_request',\n                'conditional',\n                'transform',\n                'mutate',\n                'tool',\n                'workflow',\n                'user_prompt',\n              ];\n\n              const fetchResponse = ctx.lastOutputOf('fetch_tool') || {};\n              const toolData = fetchResponse.body?.data || fetchResponse.body;\n\n              if (!toolData || !toolData.blueprint) {\n                throw new Error('Tool not found or missing blueprint');\n              }\n\n              const payload = ctx.lastOutputOf('prepare') || {};\n              const op = payload.op;\n\n              const blueprint = JSON.parse(JSON.stringify(toolData.blueprint || {}));\n              if (!Array.isArray(blueprint.nodes)) blueprint.nodes = [];\n              if (!Array.isArray(blueprint.edges)) blueprint.edges = [];\n\n              const errors = [];\n\n              if (op === 'add') {\n                const newNode = payload.node || {};\n\n                // Validate node structure (based on add-tool-blueprint-node)\n                if (!newNode.ref || typeof newNode.ref !== 'string') {\n                  errors.push('Node must have a valid ref (string)');\n                }\n                if (!newNode.type || typeof newNode.type !== 'string') {\n                  errors.push('Node must have a valid type (string)');\n                } else if (!supportedTypes.includes(newNode.type)) {\n                  errors.push(`Unsupported node type: ${newNode.type}`);\n                }\n                if (!newNode.name || typeof newNode.name !== 'string') {\n                  errors.push('Node must have a valid name (string)');\n                }\n                if (!newNode.parameters || typeof newNode.parameters !== 'object') {\n                  newNode.parameters = {};\n                }\n                const existingRefs = new Set(\n                  blueprint.nodes.map((n) => n?.ref).filter(Boolean)\n                );\n                if (existingRefs.has(newNode.ref)) {\n                  errors.push(`Node ref already exists: ${newNode.ref}`);\n                }\n\n                if (errors.length > 0) {\n                  return {\n                    success: false,\n                    op,\n                    errors,\n                    toolData,\n                  };\n                }\n\n                blueprint.nodes.push(newNode);\n\n                return {\n                  success: true,\n                  op,\n                  toolData,\n                  updatedBlueprint: blueprint,\n                  addedNode: newNode,\n                  nodeCount: blueprint.nodes.length,\n                };\n              }\n\n              if (op === 'edit') {\n                const nodeRef = payload.nodeRef;\n                const updates = payload.updates || {};\n\n                const nodeIndex = blueprint.nodes.findIndex((n) => n?.ref === nodeRef);\n                if (nodeIndex === -1) {\n                  return {\n                    success: false,\n                    op,\n                    error: `Node not found: ${nodeRef}`,\n                    toolData,\n                  };\n                }\n\n                const currentNode = blueprint.nodes[nodeIndex];\n\n                if (updates.type) {\n                  if (typeof updates.type !== 'string') {\n                    errors.push('Node type must be a string');\n                  } else if (!supportedTypes.includes(updates.type)) {\n                    errors.push(`Unsupported node type: ${updates.type}`);\n                  }\n                }\n                if (\n                  updates.name !== undefined &&\n                  (typeof updates.name !== 'string' || updates.name.trim() === '')\n                ) {\n                  errors.push('Node name must be a non-empty string');\n                }\n                if (updates.parameters !== undefined && typeof updates.parameters !== 'object') {\n                  errors.push('Node parameters must be an object');\n                }\n\n                if (errors.length > 0) {\n                  return {\n                    success: false,\n                    op,\n                    errors,\n                    toolData,\n                  };\n                }\n\n                const updatedNode = { ...currentNode };\n                if (updates.name !== undefined) updatedNode.name = updates.name;\n                if (updates.description !== undefined) updatedNode.description = updates.description;\n                if (updates.type !== undefined) updatedNode.type = updates.type;\n                if (updates.parameters !== undefined) updatedNode.parameters = updates.parameters;\n\n                blueprint.nodes[nodeIndex] = updatedNode;\n\n                return {\n                  success: true,\n                  op,\n                  toolData,\n                  updatedBlueprint: blueprint,\n                  editedNode: updatedNode,\n                  nodeRef,\n                };\n              }\n\n              if (op === 'remove') {\n                const nodeRef = payload.nodeRef;\n                const nodeIndex = blueprint.nodes.findIndex((n) => n?.ref === nodeRef);\n                if (nodeIndex === -1) {\n                  return {\n                    success: false,\n                    op,\n                    error: `Node not found: ${nodeRef}`,\n                    toolData,\n                  };\n                }\n\n                const nodeToRemove = blueprint.nodes[nodeIndex];\n\n                // Enforce basic structural rules (inspired by remove-tool-blueprint-node)\n                if (nodeToRemove.type === 'start' || nodeToRemove.type === 'end') {\n                  const remainingStartNodes = blueprint.nodes.filter(\n                    (n) => n?.type === 'start' && n.ref !== nodeRef\n                  ).length;\n                  const remainingEndNodes = blueprint.nodes.filter(\n                    (n) => n?.type === 'end' && n.ref !== nodeRef\n                  ).length;\n\n                  if (nodeToRemove.type === 'start' && remainingStartNodes === 0) {\n                    errors.push(\n                      'Cannot remove last start node - workflow must have at least one start node'\n                    );\n                  }\n                  if (nodeToRemove.type === 'end' && remainingEndNodes === 0) {\n                    errors.push(\n                      'Cannot remove last end node - workflow must have at least one end node'\n                    );\n                  }\n                }\n\n                if (errors.length > 0) {\n                  return {\n                    success: false,\n                    op,\n                    errors,\n                    toolData,\n                  };\n                }\n\n                const edgesToRemove = blueprint.edges.filter(\n                  (e) => e?.from === nodeRef || e?.to === nodeRef\n                );\n\n                blueprint.edges = blueprint.edges.filter(\n                  (e) => e?.from !== nodeRef && e?.to !== nodeRef\n                );\n                blueprint.nodes.splice(nodeIndex, 1);\n\n                return {\n                  success: true,\n                  op,\n                  toolData,\n                  updatedBlueprint: blueprint,\n                  removedNode: nodeToRemove,\n                  removedEdges: edgesToRemove,\n                  nodeRef,\n                  remainingNodes: blueprint.nodes.length,\n                  remainingEdges: blueprint.edges.length,\n                };\n              }\n\n              return {\n                success: false,\n                op,\n                error: 'Unsupported operation',\n                toolData,\n              };\n            }\n          ",
+              "timeout": 3000
+            },
+            "description": "Add, edit, or remove a node with validation and integrity checks"
+          },
+          {
+            "ref": "route_update",
+            "name": "Route Update",
+            "type": "conditional",
+            "parameters": {
+              "condition": "{{ !!(lastOutputOf(\"modify_node\") || {}).success }}"
+            },
+            "description": "Only persist changes when modify_node succeeded"
+          },
+          {
+            "ref": "update_tool",
+            "name": "Update Tool with Modified Blueprint",
+            "type": "connector_action",
+            "parameters": {
+              "args": "{{ (() => { const result = lastOutputOf(\"modify_node\") || {}; return { toolId: result.toolData && result.toolData.id ? String(result.toolData.id) : \"\", blueprint: result.updatedBlueprint }; })() }}",
+              "action": "update-tool",
+              "timeout": 10000,
+              "connector": "starships",
+              "failOnNon2xx": true
+            },
+            "description": "PUT /tools/:id with updated blueprint"
+          },
+          {
+            "ref": "unwrap_update",
+            "name": "Unwrap Update Response",
+            "type": "code",
+            "parameters": {
+              "code": "\n            async function main(ctx) {\n              const resp = ctx.input || {};\n              const body = resp && typeof resp === 'object' ? resp.body : undefined;\n\n              if (body && typeof body === 'object') {\n                if (body.success === true) return body.data ?? body;\n                if (body.success === false) return body.error ?? body;\n              }\n              return body ?? resp;\n            }\n          ",
+              "timeout": 2000
+            },
+            "description": "Return body.data/body.error where applicable; otherwise return body/resp"
+          },
+          {
+            "ref": "okify",
+            "name": "Ok",
+            "type": "code",
+            "parameters": {
+              "code": "\n            async function main(ctx) {\n              const input = ctx.input;\n\n              // Preserve structured API errors when present.\n              if (input && typeof input === 'object') {\n                const any = input;\n                if (typeof any.code === 'string' && typeof any.message === 'string') return any;\n                if (any.success === false) return any; // validation errors from modify_node\n              }\n\n              return { ok: true };\n            }\n          ",
+              "timeout": 2000
+            },
+            "description": "Return { ok: true } on success; pass through errors"
+          },
+          {
+            "ref": "end_1",
+            "name": "End",
+            "type": "end",
+            "parameters": {
+              "output": "{{ lastOutputOf(\"okify\") || lastOutputOf(\"modify_node\") }}"
+            },
+            "description": "Return ok on success, or validation errors"
+          }
+        ],
+        "metadata": {}
+      },
+      "transforms": null,
+      "mutations": null,
+      "condition": null,
+      "isEnabled": true,
+      "status": "active"
+    }
+  }
+}

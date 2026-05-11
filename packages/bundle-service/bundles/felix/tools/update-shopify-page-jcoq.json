@@ -1,0 +1,99 @@
+{
+  "schemaVersion": "1",
+  "kind": "tool",
+  "exportedAt": "2026-05-11T21:17:34.347Z",
+  "metadata": {
+    "fromSlug": "update-shopify-page-jcoq"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "tool": {
+      "name": "Update Shopify Page",
+      "description": "Update an existing page's title, content, or published status",
+      "parameters": {
+        "type": "object",
+        "required": [
+          "id",
+          "page"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The page ID to update"
+          },
+          "page": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string",
+                "description": "Page title"
+              },
+              "author": {
+                "type": "string",
+                "description": "Page author"
+              },
+              "body_html": {
+                "type": "string",
+                "description": "Page content (HTML)"
+              },
+              "published": {
+                "type": "boolean",
+                "description": "Whether the page is published"
+              }
+            },
+            "description": "The page fields to update (title, body_html, author, published, etc.)"
+          }
+        }
+      },
+      "blueprint": {
+        "edges": [
+          {
+            "to": "update_page",
+            "ref": "edge_start_to_update",
+            "from": "start"
+          },
+          {
+            "to": "end",
+            "ref": "edge_update_to_end",
+            "from": "update_page"
+          }
+        ],
+        "nodes": [
+          {
+            "ref": "start",
+            "name": "Start",
+            "type": "start",
+            "parameters": {}
+          },
+          {
+            "ref": "update_page",
+            "name": "Update Shopify Page",
+            "type": "connector_action",
+            "parameters": {
+              "args": "{{ input }}",
+              "action": "update_page",
+              "timeout": 30000,
+              "connector": "shopify"
+            }
+          },
+          {
+            "ref": "end",
+            "name": "End",
+            "type": "end",
+            "parameters": {
+              "output": "{{ lastOutputOf('update_page') }}"
+            }
+          }
+        ]
+      },
+      "transforms": null,
+      "mutations": null,
+      "condition": null,
+      "isEnabled": true,
+      "status": "active"
+    }
+  }
+}

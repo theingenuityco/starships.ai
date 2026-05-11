@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { PresenceIndicator } from '@/components/ui/PresenceIndicator'
 import { MobileNavToggleButton } from '@/components/navigation/MobileNavToggleButton'
+import { BundleServiceModal } from '@/components/bundles/BundleServiceModal'
 
 import { useStarshipBySlug } from '@/hooks/useStarships'
 import { useInfiniteStarshipAgents } from '@/hooks/useAgents'
@@ -34,6 +35,7 @@ export default function AgentsPage(): React.JSX.Element {
   const { data: starship, isLoading: starshipLoading } = useStarshipBySlug(slug, Boolean(slug))
   const starshipId = starship?.id ? String(starship.id) : ''
 
+  const [bundlesOpen, setBundlesOpen] = useState(false)
   const [searchValue, setSearchValue] = useState('')
   const [debouncedQuery, setDebouncedQuery] = useState('')
 
@@ -220,9 +222,29 @@ export default function AgentsPage(): React.JSX.Element {
                 </div>
               </div>
             </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setBundlesOpen(true)}
+                disabled={!starshipId}
+              >
+                <Icon name="download" className="h-4 w-4 mr-1.5" />
+                Browse bundles
+              </Button>
+            </div>
           </div>
         </div>
       </div>
+
+      <BundleServiceModal
+        open={bundlesOpen}
+        onOpenChange={setBundlesOpen}
+        starshipId={starshipId}
+        kindFilter={['agent', 'tool']}
+        title="Browse agent bundles"
+        description="Install pre-built agents and tools from the bundle service."
+      />
 
       <div className="flex-1 min-h-0 overflow-y-visible md:overflow-y-auto px-4 pt-6 pb-8 md:pb-8">
         <div className={cn('w-full bg-transparent max-w-4xl mx-auto min-h-full flex flex-col')}>

@@ -1,0 +1,112 @@
+{
+  "schemaVersion": "1",
+  "kind": "tool",
+  "exportedAt": "2026-05-11T21:17:34.347Z",
+  "metadata": {
+    "fromSlug": "search-docs-43po"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "tool": {
+      "name": "Search Docs",
+      "description": "Search Starships documentation by query and return a ranked list of matching pages (supports limit; empty query returns a lightweight listing).",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "q": {
+            "type": "string",
+            "description": "Search query. Empty returns a lightweight listing."
+          },
+          "limit": {
+            "type": "number",
+            "description": "Maximum number of results to return (1-100)."
+          }
+        }
+      },
+      "blueprint": {
+        "edges": [
+          {
+            "to": "prepare",
+            "ref": "e1",
+            "from": "start_1"
+          },
+          {
+            "to": "http_search",
+            "ref": "e2",
+            "from": "prepare"
+          },
+          {
+            "to": "extract",
+            "ref": "e3",
+            "from": "http_search"
+          },
+          {
+            "to": "end_1",
+            "ref": "e4",
+            "from": "extract"
+          }
+        ],
+        "nodes": [
+          {
+            "ref": "start_1",
+            "name": "Start",
+            "type": "start",
+            "parameters": {},
+            "description": ""
+          },
+          {
+            "ref": "prepare",
+            "name": "Prepare Payload",
+            "type": "code",
+            "parameters": {
+              "code": "\n            async function main(ctx) {\n              const input = ctx.input && typeof ctx.input === 'object' ? ctx.input : {};\n              const q = typeof input.q === 'string' ? input.q : '';\n              const limit = typeof input.limit === 'number' && input.limit > 0 ? input.limit : 20;\n              return { q, limit };\n            }\n          ",
+              "timeout": 2000
+            },
+            "description": "Normalize query and limit for connector payload"
+          },
+          {
+            "ref": "http_search",
+            "name": "Search Docs (Starships)",
+            "type": "connector_action",
+            "parameters": {
+              "args": "{{ lastOutputOf(\"prepare\") }}",
+              "action": "search-docs",
+              "timeout": 5000,
+              "connector": "starships",
+              "failOnNon2xx": true
+            },
+            "description": "Search documentation via Starships docs HTTP API"
+          },
+          {
+            "ref": "extract",
+            "name": "Extract Payload",
+            "type": "code",
+            "parameters": {
+              "code": "\n            async function main(ctx) {\n              const raw = ctx.input;\n              const hasBody = raw && typeof raw === 'object' && Object.prototype.hasOwnProperty.call(raw, 'body');\n              const payload = hasBody ? raw.body : raw;\n              if (payload && typeof payload === 'object' && Object.prototype.hasOwnProperty.call(payload, 'data')) {\n                return payload.data;\n              }\n              return payload;\n            }\n          ",
+              "timeout": 2000
+            },
+            "description": "Return connector payload (prefer data when present)"
+          },
+          {
+            "ref": "end_1",
+            "name": "End",
+            "type": "end",
+            "parameters": {
+              "output": "{{ lastOutputOf(\"extract\") }}"
+            },
+            "description": ""
+          }
+        ],
+        "metadata": {}
+      },
+      "transforms": null,
+      "mutations": null,
+      "condition": null,
+      "isEnabled": true,
+      "status": "active"
+    }
+  }
+}

@@ -1,0 +1,88 @@
+{
+  "schemaVersion": "1",
+  "kind": "tool",
+  "exportedAt": "2026-05-11T21:17:34.347Z",
+  "metadata": {
+    "fromSlug": "search-gmail-messages-qp8x"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "tool": {
+      "name": "Search Gmail Messages",
+      "description": "Search for messages using Gmail query syntax. Returns message IDs and thread IDs only for efficient searching. Use this to find messages before retrieving full content with other tools.",
+      "parameters": {
+        "type": "object",
+        "required": [
+          "query"
+        ],
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "Gmail search query using Gmail syntax (e.g., 'from:user@example.com is:unread', 'subject:invoice after:2024/01/01', 'has:attachment older_than:7d')"
+          },
+          "maxResults": {
+            "type": "number",
+            "default": 100,
+            "maximum": 500,
+            "minimum": 1,
+            "description": "Maximum number of messages to return (1-500, default 100)"
+          },
+          "includeSpamTrash": {
+            "type": "boolean",
+            "default": false,
+            "description": "Include messages from SPAM and TRASH folders"
+          }
+        }
+      },
+      "blueprint": {
+        "edges": [
+          {
+            "to": "search_messages",
+            "ref": "start_to_search",
+            "from": "start"
+          },
+          {
+            "to": "end",
+            "ref": "search_to_end",
+            "from": "search_messages"
+          }
+        ],
+        "nodes": [
+          {
+            "ref": "start",
+            "name": "Start",
+            "type": "start"
+          },
+          {
+            "ref": "search_messages",
+            "name": "Search Gmail Messages",
+            "type": "connector_action",
+            "parameters": {
+              "args": {
+                "q": "{{ String(ctx.input.query) }}",
+                "maxResults": "{{ ctx.input.maxResults || 100 }}",
+                "includeSpamTrash": "{{ String(ctx.input.includeSpamTrash || false) }}"
+              },
+              "action": "list-messages",
+              "timeout": 15000,
+              "connector": "gmail"
+            }
+          },
+          {
+            "ref": "end",
+            "name": "End",
+            "type": "end"
+          }
+        ]
+      },
+      "transforms": null,
+      "mutations": null,
+      "condition": null,
+      "isEnabled": true,
+      "status": "active"
+    }
+  }
+}

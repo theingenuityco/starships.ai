@@ -1,0 +1,9 @@
+{
+  "name": "Janus",
+  "description": "GitHub operations specialist - manages repositories, issues, pull requests, and code browsing.",
+  "version": "1.0.3",
+  "tags": [
+    "coding"
+  ],
+  "kind": "agent"
+}

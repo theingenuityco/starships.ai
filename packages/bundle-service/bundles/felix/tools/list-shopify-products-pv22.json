@@ -1,0 +1,89 @@
+{
+  "schemaVersion": "1",
+  "kind": "tool",
+  "exportedAt": "2026-05-11T21:17:34.347Z",
+  "metadata": {
+    "fromSlug": "list-shopify-products-pv22"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "tool": {
+      "name": "List Shopify Products",
+      "description": "List all products in the Shopify store with optional filtering by status and pagination",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "number",
+            "default": 50,
+            "maximum": 250,
+            "minimum": 1,
+            "description": "Maximum number of products to return (default 50, max 250)"
+          },
+          "status": {
+            "enum": [
+              "active",
+              "archived",
+              "draft"
+            ],
+            "type": "string",
+            "description": "Filter by product status"
+          },
+          "since_id": {
+            "type": "string",
+            "description": "Return products after this ID for pagination"
+          }
+        }
+      },
+      "blueprint": {
+        "edges": [
+          {
+            "to": "list_products",
+            "ref": "e1",
+            "from": "start"
+          },
+          {
+            "to": "end",
+            "ref": "e2",
+            "from": "list_products"
+          }
+        ],
+        "nodes": [
+          {
+            "ref": "start",
+            "name": "Start",
+            "type": "start",
+            "parameters": {}
+          },
+          {
+            "ref": "list_products",
+            "name": "List Shopify Products",
+            "type": "connector_action",
+            "parameters": {
+              "args": "{{ ctx.input }}",
+              "action": "list_products",
+              "timeout": 30000,
+              "connector": "shopify"
+            }
+          },
+          {
+            "ref": "end",
+            "name": "End",
+            "type": "end",
+            "parameters": {
+              "output": "{{ lastOutputOf('list_products') }}"
+            }
+          }
+        ]
+      },
+      "transforms": null,
+      "mutations": null,
+      "condition": null,
+      "isEnabled": true,
+      "status": "active"
+    }
+  }
+}

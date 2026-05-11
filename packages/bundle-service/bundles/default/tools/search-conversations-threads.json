@@ -1,0 +1,120 @@
+{
+  "schemaVersion": "1",
+  "kind": "tool",
+  "exportedAt": "2026-03-09T12:18:45.695Z",
+  "metadata": {
+    "fromSlug": "search-conversations-threads",
+    "fromStarshipSlug": "starborn-dvlif0"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "tool": {
+      "name": "Search Conversations Threads",
+      "description": "Search child conversations (threads) for a parent conversation. Uses Starships connector action list-conversation-children. Supports pagination cursors and DB-level search via optional q.",
+      "parameters": {
+        "type": "object",
+        "required": [],
+        "properties": {
+          "q": {
+            "type": "string",
+            "description": "Optional search query (handled server-side by list-conversation-children)"
+          },
+          "limit": {
+            "type": "number",
+            "description": "Page size (optional)"
+          },
+          "beforeId": {
+            "type": "string",
+            "description": "Cursor: conversation id (must be provided together with beforeUpdatedAt)"
+          },
+          "conversationId": {
+            "type": "string",
+            "description": "Parent conversation id (optional; defaults to runtime CONVERSATION_ID)"
+          },
+          "beforeUpdatedAt": {
+            "type": "string",
+            "description": "Cursor: ISO datetime (must be provided together with beforeId)"
+          }
+        }
+      },
+      "blueprint": {
+        "edges": [
+          {
+            "to": "prep",
+            "ref": "e1",
+            "from": "start"
+          },
+          {
+            "to": "list_children",
+            "ref": "e2",
+            "from": "prep"
+          },
+          {
+            "to": "unwrap",
+            "ref": "e3",
+            "from": "list_children"
+          },
+          {
+            "to": "end",
+            "ref": "e4",
+            "from": "unwrap"
+          }
+        ],
+        "nodes": [
+          {
+            "ref": "start",
+            "name": "Start",
+            "type": "start",
+            "parameters": {}
+          },
+          {
+            "ref": "prep",
+            "name": "Prepare args",
+            "type": "code",
+            "parameters": {
+              "code": "async function main(ctx) {\n  const input = ctx.input || {};\n\n  const beforeId = input.beforeId ?? undefined;\n  const beforeUpdatedAt = input.beforeUpdatedAt ?? undefined;\n\n  const hasBeforeId = typeof beforeId === 'string' && beforeId.trim().length > 0;\n  const hasBeforeUpdatedAt = typeof beforeUpdatedAt === 'string' && beforeUpdatedAt.trim().length > 0;\n  if (hasBeforeId !== hasBeforeUpdatedAt) {\n    throw new Error('beforeId and beforeUpdatedAt must be provided together');\n  }\n\n  const limitRaw = input.limit;\n  const limit = limitRaw === undefined || limitRaw === null || limitRaw === '' ? undefined : Number(limitRaw);\n  if (limit !== undefined && (!Number.isFinite(limit) || limit <= 0)) {\n    throw new Error('limit must be a positive number');\n  }\n\n  const qRaw = (input.q ?? '').toString().trim();\n  const q = qRaw.length ? qRaw : undefined;\n\n  const conversationIdRaw = input.conversationId ?? input.parentConversationId ?? input.id ?? ctx.env('CONVERSATION_ID') ?? undefined;\n  const conversationId = conversationIdRaw === undefined ? '' : String(conversationIdRaw).trim();\n  if (!conversationId) throw new Error('conversationId is required (or provide runtime CONVERSATION_ID)');\n\n  const args = {\n    conversationId,\n    limit,\n    q,\n    beforeId: hasBeforeId ? String(beforeId) : undefined,\n    beforeUpdatedAt: hasBeforeUpdatedAt ? String(beforeUpdatedAt) : undefined\n  };\n\n  for (const k of Object.keys(args)) {\n    if (args[k] === undefined) delete args[k];\n  }\n\n  return args;\n}\n",
+              "timeout": 5000
+            }
+          },
+          {
+            "ref": "list_children",
+            "name": "Connector: list-conversation-children",
+            "type": "connector_action",
+            "parameters": {
+              "args": "{{ lastOutputOf('prep') }}",
+              "action": "list-conversation-children",
+              "timeout": 20000,
+              "connector": "starships",
+              "failOnNon2xx": true
+            }
+          },
+          {
+            "ref": "unwrap",
+            "name": "Unwrap response",
+            "type": "code",
+            "parameters": {
+              "code": "async function main(ctx) {\n  const resp = ctx.input || {};\n  const body = resp.body;\n  if (body && typeof body === 'object' && body.success === true && 'data' in body) return body.data;\n  return body ?? resp;\n}\n",
+              "timeout": 5000
+            }
+          },
+          {
+            "ref": "end",
+            "name": "End",
+            "type": "end",
+            "parameters": {
+              "output": "{{ lastOutputOf('unwrap') }}"
+            }
+          }
+        ]
+      },
+      "transforms": null,
+      "mutations": null,
+      "condition": null,
+      "isEnabled": true,
+      "status": "active"
+    }
+  }
+}

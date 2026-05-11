@@ -1,0 +1,112 @@
+{
+  "schemaVersion": "1",
+  "kind": "tool",
+  "exportedAt": "2026-05-11T21:17:34.347Z",
+  "metadata": {
+    "fromSlug": "create-wordpress-post-on8w"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "tool": {
+      "name": "Create WordPress Post",
+      "description": "Create a new blog post on a WordPress site with title, content, categories, tags, and publication status.",
+      "parameters": {
+        "type": "object",
+        "required": [
+          "siteId",
+          "title",
+          "content"
+        ],
+        "properties": {
+          "tags": {
+            "type": "string",
+            "description": "Comma-separated tag names"
+          },
+          "title": {
+            "type": "string",
+            "description": "Post title"
+          },
+          "siteId": {
+            "type": "string",
+            "description": "WordPress site ID or domain"
+          },
+          "status": {
+            "enum": [
+              "draft",
+              "publish",
+              "private",
+              "pending"
+            ],
+            "type": "string",
+            "description": "Post status (default: draft)"
+          },
+          "content": {
+            "type": "string",
+            "description": "Post content (HTML or plain text)"
+          },
+          "excerpt": {
+            "type": "string",
+            "description": "Post excerpt/summary"
+          },
+          "categories": {
+            "type": "string",
+            "description": "Comma-separated category names or IDs"
+          },
+          "featuredImage": {
+            "type": "string",
+            "description": "URL of the featured image"
+          }
+        }
+      },
+      "blueprint": {
+        "edges": [
+          {
+            "to": "create_post",
+            "ref": "e1",
+            "from": "start"
+          },
+          {
+            "to": "end",
+            "ref": "e2",
+            "from": "create_post"
+          }
+        ],
+        "nodes": [
+          {
+            "ref": "start",
+            "name": "Start",
+            "type": "start",
+            "parameters": {}
+          },
+          {
+            "ref": "create_post",
+            "name": "Create WordPress Post",
+            "type": "connector_action",
+            "parameters": {
+              "args": "{{ ctx.input }}",
+              "action": "create-post",
+              "timeout": 30000,
+              "connector": "wordpress"
+            }
+          },
+          {
+            "ref": "end",
+            "name": "End",
+            "type": "end",
+            "parameters": {
+              "output": "{{ lastOutputOf('create_post') }}"
+            }
+          }
+        ]
+      },
+      "transforms": null,
+      "mutations": null,
+      "condition": null,
+      "isEnabled": true,
+      "status": "active"
+    }
+  }
+}

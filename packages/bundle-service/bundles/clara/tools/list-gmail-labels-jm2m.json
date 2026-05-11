@@ -1,0 +1,63 @@
+{
+  "schemaVersion": "1",
+  "kind": "tool",
+  "exportedAt": "2026-05-11T21:17:34.347Z",
+  "metadata": {
+    "fromSlug": "list-gmail-labels-jm2m"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "tool": {
+      "name": "List Gmail Labels",
+      "description": "Retrieve all labels in the user's mailbox, including system labels (INBOX, SENT, STARRED, etc.) and custom user-created labels. Use this to discover label IDs for filtering and modification operations.",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      },
+      "blueprint": {
+        "edges": [
+          {
+            "to": "list_labels",
+            "ref": "start_to_list",
+            "from": "start"
+          },
+          {
+            "to": "end",
+            "ref": "list_to_end",
+            "from": "list_labels"
+          }
+        ],
+        "nodes": [
+          {
+            "ref": "start",
+            "name": "Start",
+            "type": "start"
+          },
+          {
+            "ref": "list_labels",
+            "name": "List Gmail Labels",
+            "type": "connector_action",
+            "parameters": {
+              "action": "list-labels",
+              "timeout": 15000,
+              "connector": "gmail"
+            }
+          },
+          {
+            "ref": "end",
+            "name": "End",
+            "type": "end"
+          }
+        ]
+      },
+      "transforms": null,
+      "mutations": null,
+      "condition": null,
+      "isEnabled": true,
+      "status": "active"
+    }
+  }
+}

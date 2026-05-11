@@ -1,0 +1,77 @@
+{
+  "schemaVersion": "1",
+  "kind": "tool",
+  "exportedAt": "2026-05-11T21:17:34.347Z",
+  "metadata": {
+    "fromSlug": "update-shopify-product-qpi3"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "tool": {
+      "name": "Update Shopify Product",
+      "description": "Update an existing product's details including title, description, pricing, and status",
+      "parameters": {
+        "type": "object",
+        "required": [
+          "id",
+          "product"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The product ID to update"
+          },
+          "product": {
+            "type": "object",
+            "description": "The product fields to update (title, body_html, vendor, product_type, tags, variants, status, etc.)"
+          }
+        }
+      },
+      "blueprint": {
+        "edges": [
+          {
+            "to": "update_product",
+            "ref": "start_to_update",
+            "from": "start"
+          },
+          {
+            "to": "end",
+            "ref": "update_to_end",
+            "from": "update_product"
+          }
+        ],
+        "nodes": [
+          {
+            "ref": "start",
+            "name": "Start",
+            "type": "start"
+          },
+          {
+            "ref": "update_product",
+            "name": "Update Product in Shopify",
+            "type": "connector_action",
+            "parameters": {
+              "args": "{{ ctx.input }}",
+              "action": "update_product",
+              "timeout": 15000,
+              "connector": "shopify"
+            }
+          },
+          {
+            "ref": "end",
+            "name": "End",
+            "type": "end"
+          }
+        ]
+      },
+      "transforms": null,
+      "mutations": null,
+      "condition": null,
+      "isEnabled": true,
+      "status": "active"
+    }
+  }
+}

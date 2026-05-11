@@ -1,0 +1,68 @@
+{
+  "schemaVersion": "1",
+  "kind": "tool",
+  "exportedAt": "2026-05-11T21:17:34.347Z",
+  "metadata": {
+    "fromSlug": "list-cursor-accessible-repositories-kk6l"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "tool": {
+      "name": "List Cursor Accessible Repositories",
+      "description": "Retrieve GitHub repositories accessible to the authenticated user via Cursor Cloud Agents API. STRICT rate limits: 1 req/min, 30 req/hour per user. May take tens of seconds for users with many repos. Use sparingly with caching.",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      },
+      "blueprint": {
+        "edges": [
+          {
+            "to": "list_repos",
+            "ref": "start_to_list",
+            "from": "start"
+          },
+          {
+            "to": "end",
+            "ref": "list_to_end",
+            "from": "list_repos"
+          }
+        ],
+        "nodes": [
+          {
+            "ref": "start",
+            "name": "Start",
+            "type": "start",
+            "parameters": {}
+          },
+          {
+            "ref": "list_repos",
+            "name": "List Repositories",
+            "type": "connector_action",
+            "parameters": {
+              "action": "list-repositories",
+              "timeout": 60000,
+              "connector": "cursor",
+              "failOnNon2xx": true
+            }
+          },
+          {
+            "ref": "end",
+            "name": "End",
+            "type": "end",
+            "parameters": {
+              "output": "{{ ((lastOutputOf('list_repos') || {}).body ?? lastOutputOf('list_repos')) }}"
+            }
+          }
+        ]
+      },
+      "transforms": null,
+      "mutations": null,
+      "condition": null,
+      "isEnabled": true,
+      "status": "active"
+    }
+  }
+}

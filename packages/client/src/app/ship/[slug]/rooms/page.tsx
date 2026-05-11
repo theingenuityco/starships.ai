@@ -16,6 +16,7 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { WizardStepper } from '@/components/marketplace/WizardStepper'
+import { BundleServiceModal } from '@/components/bundles/BundleServiceModal'
 import { getCurrentToken } from '@/lib/api'
 import { getSafeErrorMessage } from '@/lib/error-utils'
 import { cn } from '@/lib/utils'
@@ -68,6 +69,8 @@ export default function RoomsIndexPage(): React.JSX.Element {
   const createRoom = useCreateRoom(starshipId)
   const updateRoom = useUpdateRoom(starshipId)
   const deleteRoom = useDeleteRoom(starshipId)
+
+  const [bundlesOpen, setBundlesOpen] = useState(false)
 
   // Import bundle (room + resources)
   const [importOpen, setImportOpen] = useState(false)
@@ -285,6 +288,16 @@ export default function RoomsIndexPage(): React.JSX.Element {
               <Button
                 variant="outline"
                 size="sm"
+                onClick={() => setBundlesOpen(true)}
+                disabled={!canManageRooms || !starshipId}
+                title={!canManageRooms ? 'Only the starship owner (or instance admin) can install bundles' : undefined}
+              >
+                <Icon name="download" className="h-4 w-4 mr-1.5" />
+                Browse bundles
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={() => {
                   setImportOpen(true)
                   setImportStep(1)
@@ -434,6 +447,15 @@ export default function RoomsIndexPage(): React.JSX.Element {
           )}
         </div>
       </div>
+
+      <BundleServiceModal
+        open={bundlesOpen}
+        onOpenChange={setBundlesOpen}
+        starshipId={starshipId}
+        kindFilter={['room']}
+        title="Browse room bundles"
+        description="Install pre-built rooms with agents, datasets, and task boards from the bundle service."
+      />
 
       {/* Create */}
       <Dialog

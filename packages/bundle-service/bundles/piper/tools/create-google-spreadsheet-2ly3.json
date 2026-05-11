@@ -1,0 +1,77 @@
+{
+  "schemaVersion": "1",
+  "kind": "tool",
+  "exportedAt": "2026-05-11T21:17:34.347Z",
+  "metadata": {
+    "fromSlug": "create-google-spreadsheet-2ly3"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "tool": {
+      "name": "Create Google Spreadsheet",
+      "description": "Creates a new Google Spreadsheet with a given title using the Google Sheets API",
+      "parameters": {
+        "type": "object",
+        "required": [
+          "title"
+        ],
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "The name of the new spreadsheet"
+          }
+        }
+      },
+      "blueprint": {
+        "edges": [
+          {
+            "to": "create_spreadsheet",
+            "ref": "e1",
+            "from": "start"
+          },
+          {
+            "to": "end",
+            "ref": "e2",
+            "from": "create_spreadsheet"
+          }
+        ],
+        "nodes": [
+          {
+            "ref": "start",
+            "name": "Start",
+            "type": "start",
+            "parameters": {}
+          },
+          {
+            "ref": "create_spreadsheet",
+            "name": "Create Spreadsheet",
+            "type": "connector_action",
+            "parameters": {
+              "args": {
+                "name": "{{ String(input.title) }}"
+              },
+              "action": "create-spreadsheet",
+              "timeout": 20000,
+              "connector": "google-sheets",
+              "failOnNon2xx": true
+            }
+          },
+          {
+            "ref": "end",
+            "name": "End",
+            "type": "end",
+            "parameters": {}
+          }
+        ]
+      },
+      "transforms": null,
+      "mutations": null,
+      "condition": null,
+      "isEnabled": true,
+      "status": "active"
+    }
+  }
+}

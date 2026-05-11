@@ -1,0 +1,195 @@
+{
+  "schemaVersion": "1",
+  "kind": "tool",
+  "exportedAt": "2026-05-11T21:17:34.347Z",
+  "metadata": {
+    "fromSlug": "bright-data-serp-request-kupk"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "tool": {
+      "name": "Bright Data: SERP Request",
+      "description": "Retrieve search engine results (Google, Bing, etc.) via Bright Data SERP API. Returns structured JSON with organic results, ads, and metadata.",
+      "parameters": {
+        "type": "object",
+        "required": [
+          "query"
+        ],
+        "properties": {
+          "zone": {
+            "type": "string",
+            "description": "Bright Data SERP API zone identifier (optional, auto-discovered if not provided)"
+          },
+          "query": {
+            "type": "string",
+            "description": "Search query (e.g., 'best CRM software 2024')"
+          },
+          "engine": {
+            "enum": [
+              "google",
+              "bing"
+            ],
+            "type": "string",
+            "default": "google",
+            "description": "Search engine to query"
+          }
+        }
+      },
+      "blueprint": {
+        "edges": [
+          {
+            "to": "check_zone",
+            "ref": "e1",
+            "from": "start"
+          },
+          {
+            "to": "route_zone",
+            "ref": "e2",
+            "from": "check_zone"
+          },
+          {
+            "to": "discover_zones",
+            "ref": "e3",
+            "from": "route_zone",
+            "condition": "discover_zone"
+          },
+          {
+            "to": "merge_zone",
+            "ref": "e4",
+            "from": "route_zone",
+            "condition": "has_zone"
+          },
+          {
+            "to": "select_serp_zone",
+            "ref": "e5",
+            "from": "discover_zones"
+          },
+          {
+            "to": "build_url",
+            "ref": "e6",
+            "from": "select_serp_zone"
+          },
+          {
+            "to": "build_url",
+            "ref": "e7",
+            "from": "merge_zone"
+          },
+          {
+            "to": "serp_call",
+            "ref": "e8",
+            "from": "build_url"
+          },
+          {
+            "to": "check_status",
+            "ref": "e9",
+            "from": "serp_call"
+          },
+          {
+            "to": "end",
+            "ref": "e10",
+            "from": "check_status"
+          }
+        ],
+        "nodes": [
+          {
+            "ref": "start",
+            "name": "Start",
+            "type": "start",
+            "parameters": {}
+          },
+          {
+            "ref": "check_zone",
+            "name": "Check Zone Provided",
+            "type": "code",
+            "parameters": {
+              "code": "async function main(ctx) {\n  const input = ctx.input || {};\n  const zone = String(input.zone || ctx.env('BRIGHT_DATA_SERP_ZONE') || '').trim();\n  \n  return {\n    hasZone: zone.length > 0,\n    zone: zone,\n    input: input\n  };\n}",
+              "timeout": 2000
+            }
+          },
+          {
+            "ref": "route_zone",
+            "name": "Zone Provided?",
+            "type": "conditional",
+            "parameters": {
+              "condition": "{{ lastOutputOf('check_zone').hasZone ? 'has_zone' : 'discover_zone' }}"
+            }
+          },
+          {
+            "ref": "discover_zones",
+            "name": "Discover Active Zones",
+            "type": "connector_action",
+            "parameters": {
+              "args": "{{ ({}) }}",
+              "action": "get-active-zones",
+              "timeout": 15000,
+              "connector": "bright-data"
+            }
+          },
+          {
+            "ref": "select_serp_zone",
+            "name": "Select SERP Zone",
+            "type": "code",
+            "parameters": {
+              "code": "async function main(ctx) {\n  const resp = ctx.lastOutputOf('discover_zones') || {};\n  const zones = resp.body || [];\n  \n  // Find SERP zone\n  const serpZone = zones.find(z => {\n    const name = String(z.name || z.zone || '').toLowerCase();\n    const type = String(z.type || z.plan_type || '').toLowerCase();\n    return name.includes('serp') || type.includes('serp');\n  });\n  \n  if (!serpZone) {\n    throw new Error('No SERP zones found in your Bright Data account. Please create a SERP API zone first.');\n  }\n  \n  const zone = serpZone.name || serpZone.zone;\n  const checkOutput = ctx.lastOutputOf('check_zone') || {};\n  \n  return {\n    zone: zone,\n    input: checkOutput.input || {}\n  };\n}",
+              "timeout": 2000
+            }
+          },
+          {
+            "ref": "merge_zone",
+            "name": "Use Provided Zone",
+            "type": "code",
+            "parameters": {
+              "code": "async function main(ctx) {\n  const checkOutput = ctx.lastOutputOf('check_zone') || {};\n  return {\n    zone: checkOutput.zone,\n    input: checkOutput.input || {}\n  };\n}",
+              "timeout": 2000
+            }
+          },
+          {
+            "ref": "build_url",
+            "name": "Build Search URL",
+            "type": "code",
+            "parameters": {
+              "code": "async function main(ctx) {\n  const prev = ctx.lastOutputOf('select_serp_zone') || ctx.lastOutputOf('merge_zone') || {};\n  const input = prev.input || {};\n  const zone = prev.zone || '';\n  const query = String(input.query || '');\n  const engine = String(input.engine || 'google');\n  \n  if (!query) throw new Error('query is required');\n  if (!zone) throw new Error('zone could not be determined');\n  \n  const encodedQuery = encodeURIComponent(query);\n  let searchUrl;\n  \n  if (engine === 'bing') {\n    searchUrl = `https://www.bing.com/search?q=${encodedQuery}`;\n  } else {\n    searchUrl = `https://www.google.com/search?q=${encodedQuery}`;\n  }\n  \n  return {\n    url: searchUrl,\n    zone: zone,\n    format: 'json'\n  };\n}",
+              "timeout": 5000
+            }
+          },
+          {
+            "ref": "serp_call",
+            "name": "Call SERP API",
+            "type": "connector_action",
+            "parameters": {
+              "args": "{{ lastOutputOf('build_url') }}",
+              "action": "serp-request",
+              "timeout": 30000,
+              "connector": "bright-data"
+            }
+          },
+          {
+            "ref": "check_status",
+            "name": "Validate Response",
+            "type": "code",
+            "parameters": {
+              "code": "async function main(ctx) {\n  const resp = ctx.lastOutputOf('serp_call') || {};\n  const status = resp.status || 0;\n  const body = resp.body;\n  \n  if (status < 200 || status >= 300) {\n    throw new Error(`SERP API request failed (${status}): ${JSON.stringify(body)}`);\n  }\n  \n  // Parse JSON string if needed\n  if (typeof body === 'string') {\n    try {\n      return JSON.parse(body);\n    } catch (e) {\n      throw new Error(`Failed to parse SERP response: ${e.message}`);\n    }\n  }\n  \n  return body;\n}",
+              "timeout": 2000
+            }
+          },
+          {
+            "ref": "end",
+            "name": "End",
+            "type": "end",
+            "parameters": {
+              "output": "{{ lastOutputOf('check_status') }}"
+            }
+          }
+        ]
+      },
+      "transforms": null,
+      "mutations": null,
+      "condition": null,
+      "isEnabled": true,
+      "status": "active"
+    }
+  }
+}

@@ -1,0 +1,85 @@
+{
+  "schemaVersion": "1",
+  "kind": "tool",
+  "exportedAt": "2026-05-11T21:17:34.347Z",
+  "metadata": {
+    "fromSlug": "get-shopify-order-7sej"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "tool": {
+      "name": "Get Shopify Order",
+      "description": "Retrieve detailed information about a specific order including items, customer, and fulfillment status",
+      "parameters": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The order ID to retrieve"
+          }
+        }
+      },
+      "blueprint": {
+        "edges": [
+          {
+            "to": "get_order",
+            "ref": "start_to_get_order",
+            "from": "start"
+          },
+          {
+            "to": "extract_body",
+            "ref": "get_order_to_extract",
+            "from": "get_order"
+          },
+          {
+            "to": "end",
+            "ref": "extract_to_end",
+            "from": "extract_body"
+          }
+        ],
+        "nodes": [
+          {
+            "ref": "start",
+            "name": "Start",
+            "type": "start"
+          },
+          {
+            "ref": "get_order",
+            "name": "Get Shopify Order",
+            "type": "connector_action",
+            "parameters": {
+              "args": "{{ ctx.input }}",
+              "action": "get_order",
+              "timeout": 15000,
+              "connector": "shopify"
+            }
+          },
+          {
+            "ref": "end",
+            "name": "End",
+            "type": "end"
+          },
+          {
+            "ref": "extract_body",
+            "name": "Extract Order Body",
+            "type": "code",
+            "parameters": {
+              "code": "async function main(ctx) {\n  const response = ctx.lastOutputOf('get_order');\n  return response?.body || null;\n}"
+            }
+          }
+        ]
+      },
+      "transforms": null,
+      "mutations": null,
+      "condition": null,
+      "isEnabled": true,
+      "status": "active"
+    }
+  }
+}

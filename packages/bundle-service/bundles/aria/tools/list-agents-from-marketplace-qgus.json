@@ -1,0 +1,120 @@
+{
+  "schemaVersion": "1",
+  "kind": "tool",
+  "exportedAt": "2026-05-11T21:17:34.347Z",
+  "metadata": {
+    "fromSlug": "list-agents-from-marketplace-qgus"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "tool": {
+      "name": "List Agents From Marketplace",
+      "description": "Search and list agent templates available in the marketplace for discovery and deployment. Supports search by name, description, or capabilities. Returns a lean array (id, slug, name, description, category, role) without heavy fields like systemPrompt or blueprint.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "number",
+            "description": "Page number for pagination (default: 1)"
+          },
+          "limit": {
+            "type": "number",
+            "description": "Number of results per page (default: 50)"
+          },
+          "query": {
+            "type": "string",
+            "description": "Search query to filter agents by name, description, or capabilities (e.g., \"customer support\", \"coding\", \"research\")"
+          }
+        }
+      },
+      "blueprint": {
+        "edges": [
+          {
+            "to": "prepare",
+            "ref": "e1",
+            "from": "start_1"
+          },
+          {
+            "to": "http_list",
+            "ref": "e2",
+            "from": "prepare"
+          },
+          {
+            "to": "summarize",
+            "ref": "e3",
+            "from": "http_list"
+          },
+          {
+            "to": "end_1",
+            "ref": "e4",
+            "from": "summarize"
+          }
+        ],
+        "nodes": [
+          {
+            "ref": "start_1",
+            "name": "Start",
+            "type": "start",
+            "parameters": {},
+            "description": ""
+          },
+          {
+            "ref": "prepare",
+            "name": "Prepare Request",
+            "type": "code",
+            "parameters": {
+              "code": "\n            async function main(ctx) {\n              const query = ctx.input?.query || '';\n              const page = ctx.input?.page || 1;\n              const limit = ctx.input?.limit || 50;\n              \n              return {\n                query: query.trim(),\n                page,\n                limit,\n                ok: true\n              };\n            }\n          ",
+              "timeout": 3000
+            },
+            "description": "Prepare search and pagination parameters"
+          },
+          {
+            "ref": "http_list",
+            "name": "Search Agent Templates",
+            "type": "connector_action",
+            "parameters": {
+              "args": {
+                "page": "{{ lastOutputOf(\"prepare\").page }}",
+                "limit": "{{ lastOutputOf(\"prepare\").limit }}",
+                "query": "{{ lastOutputOf(\"prepare\").query }}"
+              },
+              "action": "list-agents-from-marketplace",
+              "timeout": 5000,
+              "connector": "starships",
+              "failOnNon2xx": true
+            },
+            "description": "GET /agent-templates with optional search query"
+          },
+          {
+            "ref": "summarize",
+            "name": "Summarize Templates",
+            "type": "code",
+            "parameters": {
+              "code": "\n            async function main(ctx) {\n              // Input is the HttpResponse from http_list (see HttpRequest node contract)\n              const http = ctx.input;\n              const body = http && typeof http === 'object' ? http.body : http;\n              // Server sendSuccess returns { data: T }, so prefer body.data when present\n              const data = body && typeof body === 'object' && Array.isArray(body.data)\n                ? body.data\n                : (Array.isArray(body) ? body : []);\n\n              // Return a lean summary with public fields only\n              return data.map((template) => ({\n                slug: template && template.slug,\n                name: template && template.name,\n                description: template && template.description,\n                category: template && template.category,\n                role: template && template.role,\n                version: template && template.version,\n                previewPrompts: template && template.previewPrompts,\n              }));\n            }\n          ",
+              "timeout": 2000
+            },
+            "description": "Extract and format agent template data"
+          },
+          {
+            "ref": "end_1",
+            "name": "End",
+            "type": "end",
+            "parameters": {
+              "output": "{{ lastOutputOf(\"summarize\") }}"
+            },
+            "description": ""
+          }
+        ],
+        "metadata": {}
+      },
+      "transforms": null,
+      "mutations": null,
+      "condition": null,
+      "isEnabled": true,
+      "status": "active"
+    }
+  }
+}

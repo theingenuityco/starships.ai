@@ -1,0 +1,120 @@
+{
+  "schemaVersion": "1",
+  "kind": "tool",
+  "exportedAt": "2026-05-11T21:17:34.347Z",
+  "metadata": {
+    "fromSlug": "generate-shopify-product-image-y1tx"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "tool": {
+      "name": "Generate Shopify Product Image",
+      "description": "Generate 1 new Shopify product image using a reference product image (URL or data URL) + a prompt, via google/gemini-3-pro-image-preview.",
+      "parameters": {
+        "type": "object",
+        "required": [
+          "prompt"
+        ],
+        "properties": {
+          "image": {
+            "type": "string",
+            "description": "Alias for imageUrl/imageDataUrl. Provide either an http(s) URL or a data URL."
+          },
+          "prompt": {
+            "type": "string",
+            "description": "Instruction describing what to render using the reference product image."
+          },
+          "imageUrl": {
+            "type": "string",
+            "description": "Publicly accessible http(s) URL of the Shopify product image."
+          },
+          "imageDataUrl": {
+            "type": "string",
+            "description": "Data URL for the product image (data:image/...;base64,...) if not using imageUrl."
+          }
+        }
+      },
+      "blueprint": {
+        "edges": [
+          {
+            "to": "prep",
+            "ref": "e1",
+            "from": "start"
+          },
+          {
+            "to": "llm",
+            "ref": "e2",
+            "from": "prep"
+          },
+          {
+            "to": "extract",
+            "ref": "e3",
+            "from": "llm"
+          },
+          {
+            "to": "end",
+            "ref": "e4",
+            "from": "extract"
+          }
+        ],
+        "nodes": [
+          {
+            "ref": "start",
+            "name": "Start",
+            "type": "start",
+            "parameters": {}
+          },
+          {
+            "ref": "prep",
+            "name": "Prepare Gemini Messages",
+            "type": "code",
+            "parameters": {
+              "code": "async function main(ctx) {\n  const input = ctx.input || {};\n\n  const prompt = String(input.prompt ?? '').trim();\n  if (!prompt) throw new Error('prompt is required (string)');\n\n  const imageCandidate =\n    (typeof input.imageUrl === 'string' && input.imageUrl.trim().length ? input.imageUrl.trim() : '') ||\n    (typeof input.imageDataUrl === 'string' && input.imageDataUrl.trim().length ? input.imageDataUrl.trim() : '') ||\n    (typeof input.image === 'string' && input.image.trim().length ? input.image.trim() : '');\n\n  if (!imageCandidate) throw new Error('imageUrl or imageDataUrl (or image) is required');\n\n  const isDataUrl = /^data:image\\/[a-zA-Z0-9.+-]+;base64,/.test(imageCandidate);\n  const isHttpUrl = /^https?:\\/\\//.test(imageCandidate);\n  if (!isDataUrl && !isHttpUrl) {\n    throw new Error('image must be an http(s) URL or a data URL like data:image/...;base64,...');\n  }\n\n  const instruction =\n    prompt +\n    '\\n\\nUse the provided product image as a reference. Generate exactly ONE output image. Return the image only (no extra text).';\n\n  // OpenAI-compatible multimodal message format (passed through to OpenRouter)\n  const messages = [\n    {\n      role: 'user',\n      content: [\n        { type: 'text', text: instruction },\n        { type: 'image_url', image_url: { url: imageCandidate } },\n      ],\n    },\n  ];\n\n  return {\n    messages,\n    modalities: ['text', 'image'],\n    imageConfig: { n: 1 },\n    original: { prompt, image: imageCandidate },\n  };\n}\n",
+              "timeout": 3000
+            }
+          },
+          {
+            "ref": "llm",
+            "name": "Gemini (image ref)",
+            "type": "llm",
+            "parameters": {
+              "model": "google/gemini-3-pro-image-preview",
+              "stream": false,
+              "timeout": 120000,
+              "messages": "{{ (input || {}).messages }}",
+              "maxTokens": 4096,
+              "modalities": "{{ (input || {}).modalities }}",
+              "imageConfig": "{{ (input || {}).imageConfig }}",
+              "temperature": 0.7
+            }
+          },
+          {
+            "ref": "extract",
+            "name": "Extract 1 Image",
+            "type": "code",
+            "parameters": {
+              "code": "async function main(ctx) {\n  const resp = ctx.input || {};\n  const prep = ctx.lastOutputOf('prep') || {};\n\n  const choice = (resp.choices && resp.choices[0]) ? resp.choices[0] : {};\n  const message = choice.message || {};\n  const content = message.content;\n\n  function normalizeImageUrl(url) {\n    if (typeof url !== 'string' || !url.trim()) return null;\n    const u = url.trim();\n    if (u.startsWith('data:image/')) return { kind: 'data_url', value: u };\n    return { kind: 'url', value: u };\n  }\n\n  function pickFromContent(c) {\n    if (Array.isArray(c)) {\n      for (const part of c) {\n        if (!part || typeof part !== 'object') continue;\n\n        // OpenAI-style\n        if (part.type === 'image_url' && part.image_url && typeof part.image_url.url === 'string') {\n          return normalizeImageUrl(part.image_url.url);\n        }\n\n        // Some providers may return inline base64\n        if (part.type === 'image') {\n          const data = typeof part.data === 'string' ? part.data : undefined;\n          const mimeType = typeof part.mimeType === 'string' ? part.mimeType : undefined;\n          if (data && data.startsWith('data:')) return { kind: 'data_url', value: data, mimeType };\n          if (data && mimeType) return { kind: 'data_url', value: `data:${mimeType};base64,${data}`, mimeType };\n          if (data) return { kind: 'base64', value: data, mimeType };\n        }\n      }\n    }\n\n    if (typeof c === 'string') {\n      const mData = c.match(/data:image\\/[a-zA-Z0-9.+-]+;base64,[A-Za-z0-9+/=]+/);\n      if (mData) return { kind: 'data_url', value: mData[0] };\n\n      const mUrl = c.match(/https?:\\/\\/\\S+\\.(?:png|jpg|jpeg|webp)(?:\\?\\S+)?/i);\n      if (mUrl) return { kind: 'url', value: mUrl[0] };\n    }\n\n    return null;\n  }\n\n  let image = pickFromContent(content);\n\n  // Provider-specific: message.images (Gemini image preview returns this)\n  if (!image && Array.isArray(message.images) && message.images.length) {\n    const v = message.images[0];\n\n    // Sometimes it's directly a string\n    if (typeof v === 'string') {\n      image = normalizeImageUrl(v);\n    } else if (v && typeof v === 'object') {\n      // OpenAI-style inside message.images[]\n      if (v.type === 'image_url' && v.image_url && typeof v.image_url.url === 'string') {\n        image = normalizeImageUrl(v.image_url.url);\n      }\n\n      // Alternate shapes\n      if (!image && typeof v.url === 'string') image = normalizeImageUrl(v.url);\n\n      if (!image && typeof v.data === 'string') {\n        const mimeType = typeof v.mimeType === 'string' ? v.mimeType : undefined;\n        image = mimeType\n          ? { kind: 'data_url', value: `data:${mimeType};base64,${v.data}`, mimeType }\n          : { kind: 'base64', value: v.data, mimeType };\n      }\n    }\n  }\n\n  if (!image) {\n    const debug = {\n      hasChoices: Array.isArray(resp.choices),\n      messageKeys: message && typeof message === 'object' ? Object.keys(message) : [],\n      contentType: Array.isArray(content) ? 'array' : typeof content,\n      contentPreview: typeof content === 'string' ? content.slice(0, 4000) : content,\n    };\n\n    return {\n      ok: false,\n      model: String(resp.model || 'google/gemini-3-pro-image-preview'),\n      prompt: (prep.original || {}).prompt,\n      referenceImage: (prep.original || {}).image,\n      image: null,\n      debug,\n    };\n  }\n\n  return {\n    ok: true,\n    model: String(resp.model || 'google/gemini-3-pro-image-preview'),\n    prompt: (prep.original || {}).prompt,\n    referenceImage: (prep.original || {}).image,\n    image,\n  };\n}\n",
+              "timeout": 5000
+            }
+          },
+          {
+            "ref": "end",
+            "name": "End",
+            "type": "end",
+            "parameters": {
+              "output": "{{ (lastOutputOf('extract') || {}).image }}"
+            }
+          }
+        ]
+      },
+      "transforms": null,
+      "mutations": null,
+      "condition": null,
+      "isEnabled": true,
+      "status": "active"
+    }
+  }
+}

@@ -1,0 +1,132 @@
+{
+  "schemaVersion": "1",
+  "kind": "tool",
+  "exportedAt": "2026-05-11T21:17:34.347Z",
+  "metadata": {
+    "fromSlug": "create-widget-pdv8"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "tool": {
+      "name": "Create Widget",
+      "description": "Create (persist) a widget given a widgetType + props. Always include name + description; returns the created widget record.",
+      "parameters": {
+        "type": "object",
+        "required": [
+          "name",
+          "description",
+          "widgetType",
+          "props"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Widget display name"
+          },
+          "props": {
+            "type": "object",
+            "description": "Component props with data"
+          },
+          "widgetType": {
+            "type": "string",
+            "description": "Widget type (component name)"
+          },
+          "description": {
+            "type": "string",
+            "description": "Widget purpose"
+          }
+        }
+      },
+      "blueprint": {
+        "edges": [
+          {
+            "to": "validate_input",
+            "ref": "e1",
+            "from": "start_1"
+          },
+          {
+            "to": "save_widget",
+            "ref": "e2",
+            "from": "validate_input"
+          },
+          {
+            "to": "extract_result",
+            "ref": "e3",
+            "from": "save_widget"
+          },
+          {
+            "to": "end_1",
+            "ref": "e4",
+            "from": "extract_result"
+          }
+        ],
+        "nodes": [
+          {
+            "ref": "start_1",
+            "name": "Start",
+            "type": "start",
+            "parameters": {},
+            "description": ""
+          },
+          {
+            "ref": "validate_input",
+            "name": "Validate Input",
+            "type": "code",
+            "parameters": {
+              "code": "\n            async function main(ctx) {\n              const input = ctx.input || {};\n              const name = typeof input.name === 'string' ? input.name.trim() : '';\n              const description = typeof input.description === 'string' ? input.description.trim() : '';\n              const widgetType = typeof input.widgetType === 'string' ? input.widgetType.trim() : '';\n              const props = input.props && typeof input.props === 'object' ? input.props : null;\n\n              if (!name) throw new Error('name is required');\n              if (!description) throw new Error('description is required');\n              if (!widgetType) throw new Error('widgetType is required for widget creation');\n              if (!props) throw new Error('props is required for widget creation');\n\n              return { name, description, widgetType, props: props || {}, starshipId: ctx.env('STARSHIP_ID') };\n            }\n          ",
+              "timeout": 3000
+            },
+            "description": "Validate widget creation inputs"
+          },
+          {
+            "ref": "save_widget",
+            "name": "Save Widget",
+            "type": "connector_action",
+            "parameters": {
+              "args": {
+                "name": "{{ (lastOutputOf(\"validate_input\") || {}).name }}",
+                "props": "{{ (lastOutputOf(\"validate_input\") || {}).props }}",
+                "starshipId": "{{ (lastOutputOf(\"validate_input\") || {}).starshipId }}",
+                "widgetType": "{{ (lastOutputOf(\"validate_input\") || {}).widgetType }}",
+                "description": "{{ (lastOutputOf(\"validate_input\") || {}).description }}"
+              },
+              "action": "create-widget",
+              "timeout": 5000,
+              "connector": "starships",
+              "failOnNon2xx": true
+            },
+            "description": "Save widget to database via API"
+          },
+          {
+            "ref": "extract_result",
+            "name": "Extract Result",
+            "type": "code",
+            "parameters": {
+              "code": "\n            async function main(ctx) {\n              const raw = ctx.input;\n              const hasBody = raw && typeof raw === 'object' && Object.prototype.hasOwnProperty.call(raw, 'body');\n              const payload = hasBody ? raw.body : raw;\n              if (payload && typeof payload === 'object' && Object.prototype.hasOwnProperty.call(payload, 'data')) {\n                return payload.data;\n              }\n              return payload;\n            }\n          ",
+              "timeout": 2000
+            },
+            "description": "Extract widget data from API response"
+          },
+          {
+            "ref": "end_1",
+            "name": "End",
+            "type": "end",
+            "parameters": {
+              "output": "{{ lastOutputOf(\"extract_result\") }}"
+            },
+            "description": ""
+          }
+        ],
+        "metadata": {}
+      },
+      "transforms": null,
+      "mutations": null,
+      "condition": null,
+      "isEnabled": true,
+      "status": "active"
+    }
+  }
+}

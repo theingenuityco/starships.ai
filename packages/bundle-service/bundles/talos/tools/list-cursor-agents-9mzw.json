@@ -1,0 +1,80 @@
+{
+  "schemaVersion": "1",
+  "kind": "tool",
+  "exportedAt": "2026-05-11T21:17:34.347Z",
+  "metadata": {
+    "fromSlug": "list-cursor-agents-9mzw"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "tool": {
+      "name": "List Cursor Agents",
+      "description": "List all Cursor cloud agents for the authenticated user with pagination support.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "number",
+            "maximum": 100,
+            "minimum": 1,
+            "description": "Number of cloud agents to return. Default: 20, Max: 100"
+          },
+          "cursor": {
+            "type": "string",
+            "description": "Pagination cursor from the previous response"
+          }
+        }
+      },
+      "blueprint": {
+        "edges": [
+          {
+            "to": "list_agents",
+            "ref": "start_to_list",
+            "from": "start"
+          },
+          {
+            "to": "end",
+            "ref": "list_to_end",
+            "from": "list_agents"
+          }
+        ],
+        "nodes": [
+          {
+            "ref": "start",
+            "name": "Start",
+            "type": "start",
+            "parameters": {}
+          },
+          {
+            "ref": "list_agents",
+            "name": "List Cursor Cloud Agents",
+            "type": "connector_action",
+            "parameters": {
+              "args": "{{ (input || {}) }}",
+              "action": "list-agents",
+              "timeout": 15000,
+              "connector": "cursor",
+              "failOnNon2xx": true
+            }
+          },
+          {
+            "ref": "end",
+            "name": "End",
+            "type": "end",
+            "parameters": {
+              "output": "{{ ((lastOutputOf('list_agents') || {}).body ?? lastOutputOf('list_agents')) }}"
+            }
+          }
+        ]
+      },
+      "transforms": null,
+      "mutations": null,
+      "condition": null,
+      "isEnabled": true,
+      "status": "active"
+    }
+  }
+}

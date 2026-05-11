@@ -1,0 +1,96 @@
+{
+  "schemaVersion": "1",
+  "kind": "tool",
+  "exportedAt": "2026-05-11T21:17:34.347Z",
+  "metadata": {
+    "fromSlug": "delete-sheet-from-google-spreadsheet-zypw"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "tool": {
+      "name": "Delete Sheet from Google Spreadsheet",
+      "description": "Delete a sheet from a Google Spreadsheet using the Google Sheets API",
+      "parameters": {
+        "type": "object",
+        "required": [
+          "spreadsheetId",
+          "sheetId"
+        ],
+        "properties": {
+          "sheetId": {
+            "type": "number",
+            "description": "The ID of the sheet to delete"
+          },
+          "spreadsheetId": {
+            "type": "string",
+            "description": "The ID of the spreadsheet (found in the URL)"
+          }
+        }
+      },
+      "blueprint": {
+        "edges": [
+          {
+            "to": "delete_sheet",
+            "ref": "e1",
+            "from": "start"
+          },
+          {
+            "to": "format_response",
+            "ref": "e2",
+            "from": "delete_sheet"
+          },
+          {
+            "to": "end",
+            "ref": "e3",
+            "from": "format_response"
+          }
+        ],
+        "nodes": [
+          {
+            "ref": "start",
+            "name": "Start",
+            "type": "start",
+            "parameters": {}
+          },
+          {
+            "ref": "delete_sheet",
+            "name": "Delete Sheet",
+            "type": "connector_action",
+            "parameters": {
+              "args": {
+                "sheetId": "{{ Number(input.sheetId) }}",
+                "spreadsheetId": "{{ String(input.spreadsheetId) }}"
+              },
+              "action": "delete-sheet",
+              "timeout": 15000,
+              "connector": "google-sheets",
+              "failOnNon2xx": true
+            }
+          },
+          {
+            "ref": "format_response",
+            "name": "Format Response",
+            "type": "code",
+            "parameters": {
+              "code": "async function main(ctx) {\n  const resp = ctx.lastOutputOf('delete_sheet') || {};\n  \n  if (!resp.body) {\n    throw new Error('No response body from Google Sheets API');\n  }\n  \n  return {\n    success: true,\n    spreadsheetId: resp.body.spreadsheetId,\n    replies: resp.body.replies\n  };\n}"
+            }
+          },
+          {
+            "ref": "end",
+            "name": "End",
+            "type": "end",
+            "parameters": {}
+          }
+        ]
+      },
+      "transforms": null,
+      "mutations": null,
+      "condition": null,
+      "isEnabled": true,
+      "status": "active"
+    }
+  }
+}

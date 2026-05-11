@@ -1,0 +1,96 @@
+{
+  "schemaVersion": "1",
+  "kind": "tool",
+  "exportedAt": "2026-05-11T21:17:34.347Z",
+  "metadata": {
+    "fromSlug": "list-google-drive-files-pbyn"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "tool": {
+      "name": "List Google Drive Files",
+      "description": "Lists files from Google Drive with optional query filtering and page size control",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "default": "",
+            "description": "Optional Google Drive query string to filter files (e.g., \"mimeType='application/vnd.google-apps.folder'\" or \"name contains 'report'\")"
+          },
+          "fields": {
+            "type": "string",
+            "default": "files(id,name,mimeType,size,modifiedTime,webViewLink,iconLink)",
+            "description": "Optional fields parameter to specify which file metadata to return (e.g., \"files(id,name,mimeType,modifiedTime,webViewLink)\")"
+          },
+          "pageSize": {
+            "type": "number",
+            "default": 100,
+            "maximum": 1000,
+            "minimum": 1,
+            "description": "Maximum number of files to return (1-1000)"
+          }
+        }
+      },
+      "blueprint": {
+        "edges": [
+          {
+            "to": "list_files",
+            "ref": "edge_start_to_list",
+            "from": "start"
+          },
+          {
+            "to": "extract_body",
+            "ref": "edge_list_to_extract",
+            "from": "list_files"
+          },
+          {
+            "to": "end",
+            "ref": "edge_extract_to_end",
+            "from": "extract_body"
+          }
+        ],
+        "nodes": [
+          {
+            "ref": "start",
+            "name": "Start",
+            "type": "start"
+          },
+          {
+            "ref": "list_files",
+            "name": "List Drive Files",
+            "type": "connector_action",
+            "parameters": {
+              "args": "{{ { q: ctx.input.query, fields: ctx.input.fields || 'nextPageToken, files(id, name, mimeType, createdTime, modifiedTime, size, parents, webViewLink)', pageSize: ctx.input.pageSize || 100 } }}",
+              "action": "list-files",
+              "timeout": 15000,
+              "connector": "google_drive"
+            }
+          },
+          {
+            "ref": "extract_body",
+            "name": "Extract Response Body",
+            "type": "code",
+            "parameters": {
+              "code": "async function main(ctx) {\n  const response = ctx.lastOutputOf('list_files');\n  return response.body;\n}",
+              "timeout": 3000
+            }
+          },
+          {
+            "ref": "end",
+            "name": "End",
+            "type": "end"
+          }
+        ]
+      },
+      "transforms": null,
+      "mutations": null,
+      "condition": null,
+      "isEnabled": true,
+      "status": "active"
+    }
+  }
+}

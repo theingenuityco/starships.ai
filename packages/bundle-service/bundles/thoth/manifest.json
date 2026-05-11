@@ -1,0 +1,21 @@
+{
+  "schemaVersion": "1",
+  "kind": "bundle",
+  "exportedAt": "2026-05-11T21:17:34.347Z",
+  "entities": {
+    "agents": [
+      {
+        "kind": "agent",
+        "fromSlug": "thoth-a1lk",
+        "file": "agents/thoth.json"
+      }
+    ],
+    "tools": [
+      {
+        "kind": "tool",
+        "fromSlug": "read-url-e226",
+        "file": "tools/read-url-e226.json"
+      }
+    ]
+  }
+}

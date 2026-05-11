@@ -1,0 +1,315 @@
+{
+  "schemaVersion": "1",
+  "kind": "tool",
+  "exportedAt": "2026-05-11T21:17:34.347Z",
+  "metadata": {
+    "fromSlug": "suggest-agents-a0y2"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "tool": {
+      "name": "Suggest Agents",
+      "description": "Suggest 2–3 marketplace agents by rendering agent cards inline in chat (via render_widget). Creates or reuses a saved widget with a deterministic slug.",
+      "parameters": {
+        "type": "object",
+        "required": [
+          "templateSlugs"
+        ],
+        "properties": {
+          "templateSlugs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Marketplace agent template slugs to suggest (e.g. [\"data-analyst\",\"support-triage\"])"
+          }
+        }
+      },
+      "blueprint": {
+        "edges": [
+          {
+            "to": "validate_input",
+            "ref": "e1",
+            "from": "start_1"
+          },
+          {
+            "to": "fetch_templates",
+            "ref": "e2",
+            "from": "validate_input"
+          },
+          {
+            "to": "extract_templates",
+            "ref": "e3",
+            "from": "fetch_templates"
+          },
+          {
+            "to": "build_widget_meta",
+            "ref": "e4",
+            "from": "extract_templates"
+          },
+          {
+            "to": "search_widgets",
+            "ref": "e5",
+            "from": "build_widget_meta"
+          },
+          {
+            "to": "extract_found_widget",
+            "ref": "e6",
+            "from": "search_widgets"
+          },
+          {
+            "to": "widget_exists?",
+            "ref": "e7",
+            "from": "extract_found_widget"
+          },
+          {
+            "to": "update_existing_widget",
+            "ref": "e_exists",
+            "from": "widget_exists?",
+            "condition": "exists"
+          },
+          {
+            "to": "create_widget",
+            "ref": "e_missing",
+            "from": "widget_exists?",
+            "condition": "missing"
+          },
+          {
+            "to": "extract_updated_widget",
+            "ref": "e_update",
+            "from": "update_existing_widget"
+          },
+          {
+            "to": "emit_existing",
+            "ref": "e_emit_existing",
+            "from": "extract_updated_widget"
+          },
+          {
+            "to": "extract_created_widget",
+            "ref": "e_create",
+            "from": "create_widget"
+          },
+          {
+            "to": "emit_created",
+            "ref": "e_after_create",
+            "from": "extract_created_widget"
+          },
+          {
+            "to": "ok_output",
+            "ref": "e_after_emit_existing",
+            "from": "emit_existing"
+          },
+          {
+            "to": "ok_output",
+            "ref": "e_after_emit_created",
+            "from": "emit_created"
+          },
+          {
+            "to": "end_1",
+            "ref": "e_end",
+            "from": "ok_output"
+          }
+        ],
+        "nodes": [
+          {
+            "ref": "start_1",
+            "name": "Start",
+            "type": "start",
+            "parameters": {},
+            "description": ""
+          },
+          {
+            "ref": "validate_input",
+            "name": "Validate Input",
+            "type": "code",
+            "parameters": {
+              "code": "\n            async function main(ctx) {\n              const input = ctx.input || {};\n              const raw = Array.isArray(input.templateSlugs) ? input.templateSlugs : [];\n              const slugs = raw\n                .map((s) => String(s ?? '').trim().toLowerCase())\n                .filter((s) => s.length > 0);\n\n              // Dedup, preserve order\n              const seen = new Set();\n              const unique = [];\n              for (const s of slugs) {\n                if (seen.has(s)) continue;\n                seen.add(s);\n                unique.push(s);\n              }\n              if (unique.length === 0) throw new Error('templateSlugs is required');\n\n              // Cap at 3 (chat-friendly).\n              const capped = unique.slice(0, 3);\n\n              const starshipId = ctx.env('STARSHIP_ID');\n              if (!starshipId || typeof starshipId !== 'string' || !starshipId.trim()) throw new Error('STARSHIP_ID is required');\n\n              const safe = (s) => String(s || '')\n                .trim()\n                .toLowerCase()\n                .replace(/_/g, '-')\n                .replace(/[^a-z0-9-]/g, '-')\n                .replace(/-+/g, '-')\n                .replace(/^-|-$/g, '');\n\n              const joined = capped.map(safe).filter(Boolean).join('-');\n\n              // Small deterministic hash (FNV-1a-ish)\n              const hash32 = (str) => {\n                let h = 2166136261;\n                for (let i = 0; i < str.length; i++) {\n                  h ^= str.charCodeAt(i);\n                  h = Math.imul(h, 16777619);\n                }\n                return (h >>> 0).toString(16);\n              };\n\n              const base = 'agent-suggestions';\n              const h = hash32(joined);\n              const middle = joined.length > 0 ? joined.slice(0, 60) : 'templates';\n              const slug = safe(`${base}-${middle}-${h}`).slice(0, 100);\n\n              const props = {\n                starshipId: String(starshipId).trim(),\n                templateSlugs: capped,\n                maxColumns: 2,\n              };\n\n              return {\n                starshipId: String(starshipId).trim(),\n                slug,\n                templateSlugs: capped,\n                widgetType: 'AgentSuggestionCard',\n                props,\n              };\n            }\n          ",
+              "timeout": 3000
+            },
+            "description": "Normalize template slugs and compute deterministic widget slug"
+          },
+          {
+            "ref": "fetch_templates",
+            "name": "Fetch Agent Templates",
+            "type": "http_request",
+            "parameters": {
+              "url": "{{ String(env(\"SERVER_URL\") ?? \"\") + \"/api/v1/agent-templates\" }}",
+              "method": "GET",
+              "headers": {
+                "Accept": "application/json"
+              },
+              "timeout": 5000
+            },
+            "description": "Fetch marketplace agent templates to map slug -> display name"
+          },
+          {
+            "ref": "extract_templates",
+            "name": "Extract Templates",
+            "type": "code",
+            "parameters": {
+              "code": "\n            async function main(ctx) {\n              const raw = ctx.input;\n              const hasBody = raw && typeof raw === 'object' && Object.prototype.hasOwnProperty.call(raw, 'body');\n              let payload = hasBody ? raw.body : raw;\n              if (typeof payload === 'string') {\n                try { payload = JSON.parse(payload); } catch (e) { payload = {}; }\n              }\n              const data = (payload && typeof payload === 'object' && Object.prototype.hasOwnProperty.call(payload, 'data')) ? payload.data : payload;\n              const arr = Array.isArray(data) ? data : [];\n              return arr\n                .map((t) => ({\n                  slug: t && typeof t === 'object' ? String(t.slug ?? '').trim().toLowerCase() : '',\n                  name: t && typeof t === 'object' ? String(t.name ?? '').trim() : '',\n                }))\n                .filter((t) => t.slug.length > 0);\n            }\n          ",
+              "timeout": 3000
+            },
+            "description": "Extract template slug -> name mapping"
+          },
+          {
+            "ref": "build_widget_meta",
+            "name": "Build Widget Meta",
+            "type": "code",
+            "parameters": {
+              "code": "\n            async function main(ctx) {\n              const base = (ctx.lastOutputOf && ctx.lastOutputOf('validate_input')) || {};\n              const slugs = Array.isArray(base.templateSlugs) ? base.templateSlugs.map((s) => String(s).toLowerCase()) : [];\n              const templates = (ctx.lastOutputOf && ctx.lastOutputOf('extract_templates')) || [];\n\n              const nameBySlug = new Map();\n              for (const t of templates) {\n                if (!t || typeof t !== 'object') continue;\n                const slug = String(t.slug ?? '').trim().toLowerCase();\n                const name = String(t.name ?? '').trim();\n                if (slug) nameBySlug.set(slug, name || slug);\n              }\n\n              const display = slugs.map((s) => nameBySlug.get(String(s)) || String(s));\n              const list = display.filter((s) => String(s).trim().length > 0);\n              const joined = list.join(', ');\n              const title = list.length === 1 ? `Recommended agent: ${list[0]}` : `Recommended agents: ${joined}`;\n              const description = list.length === 1 ? `Suggested agent: ${list[0]}` : `Suggested agents: ${joined}`;\n\n              return {\n                starshipId: String(base.starshipId || ''),\n                slug: String(base.slug || ''),\n                widgetType: String(base.widgetType || 'AgentSuggestionCard'),\n                props: base.props && typeof base.props === 'object' ? base.props : { starshipId: String(base.starshipId || ''), templateSlugs: slugs, maxColumns: 2 },\n                name: title,\n                description,\n              };\n            }\n          ",
+              "timeout": 3000
+            },
+            "description": "Build widget name/description using template display names"
+          },
+          {
+            "ref": "search_widgets",
+            "name": "Search Widgets",
+            "type": "connector_action",
+            "parameters": {
+              "args": {
+                "slug": "{{ (lastOutputOf(\"build_widget_meta\") || {}).slug }}",
+                "limit": 1,
+                "starshipId": "{{ (lastOutputOf(\"build_widget_meta\") || {}).starshipId }}"
+              },
+              "action": "search-widgets",
+              "timeout": 5000,
+              "connector": "starships",
+              "failOnNon2xx": true
+            },
+            "description": "Look up existing widget by deterministic slug"
+          },
+          {
+            "ref": "extract_found_widget",
+            "name": "Extract Found Widget",
+            "type": "code",
+            "parameters": {
+              "code": "\n            async function main(ctx) {\n              const raw = ctx.input;\n              const hasBody = raw && typeof raw === 'object' && Object.prototype.hasOwnProperty.call(raw, 'body');\n              const payload = hasBody ? raw.body : raw;\n              const data = (payload && typeof payload === 'object' && Object.prototype.hasOwnProperty.call(payload, 'data')) ? payload.data : payload;\n              const widgets = Array.isArray(data) ? data : (data && typeof data === 'object' && Array.isArray(data.widgets)) ? data.widgets : null;\n              if (!widgets || !Array.isArray(widgets) || widgets.length === 0) return null;\n              return widgets[0];\n            }\n          ",
+              "timeout": 2000
+            },
+            "description": "Extract first widget if it exists, else null"
+          },
+          {
+            "ref": "widget_exists?",
+            "name": "Widget exists?",
+            "type": "conditional",
+            "parameters": {
+              "condition": "{{ lastOutputOf(\"extract_found_widget\") ? \"exists\" : \"missing\" }}"
+            },
+            "description": "Branch: reuse existing widget or create it"
+          },
+          {
+            "ref": "update_existing_widget",
+            "name": "Update Widget (Title)",
+            "type": "connector_action",
+            "parameters": {
+              "args": {
+                "name": "{{ (lastOutputOf(\"build_widget_meta\") || {}).name }}",
+                "props": "{{ (lastOutputOf(\"build_widget_meta\") || {}).props }}",
+                "widgetId": "{{ (lastOutputOf(\"extract_found_widget\") || {}).id }}",
+                "description": "{{ (lastOutputOf(\"build_widget_meta\") || {}).description }}"
+              },
+              "action": "update-widget",
+              "timeout": 5000,
+              "connector": "starships",
+              "failOnNon2xx": true
+            },
+            "description": "Update existing widget name/description to use template display names"
+          },
+          {
+            "ref": "extract_updated_widget",
+            "name": "Extract Updated Widget",
+            "type": "code",
+            "parameters": {
+              "code": "\n            async function main(ctx) {\n              const raw = ctx.input;\n              const hasBody = raw && typeof raw === 'object' && Object.prototype.hasOwnProperty.call(raw, 'body');\n              const payload = hasBody ? raw.body : raw;\n              if (payload && typeof payload === 'object' && Object.prototype.hasOwnProperty.call(payload, 'data')) {\n                return payload.data;\n              }\n              return payload;\n            }\n          ",
+              "timeout": 2000
+            },
+            "description": "Extract widget data from API response"
+          },
+          {
+            "ref": "emit_existing",
+            "name": "Emit render_widget (existing)",
+            "type": "ui_action",
+            "parameters": {
+              "action": "render_widget",
+              "payload": {
+                "widget": "{{ lastOutputOf(\"extract_updated_widget\") }}"
+              }
+            },
+            "description": "Render existing widget in the conversation UI"
+          },
+          {
+            "ref": "create_widget",
+            "name": "Create Widget",
+            "type": "connector_action",
+            "parameters": {
+              "args": {
+                "name": "{{ (lastOutputOf(\"build_widget_meta\") || {}).name }}",
+                "slug": "{{ (lastOutputOf(\"build_widget_meta\") || {}).slug }}",
+                "props": "{{ (lastOutputOf(\"build_widget_meta\") || {}).props }}",
+                "starshipId": "{{ (lastOutputOf(\"build_widget_meta\") || {}).starshipId }}",
+                "widgetType": "{{ (lastOutputOf(\"build_widget_meta\") || {}).widgetType }}",
+                "description": "{{ (lastOutputOf(\"build_widget_meta\") || {}).description }}"
+              },
+              "action": "create-widget",
+              "timeout": 5000,
+              "connector": "starships",
+              "failOnNon2xx": true
+            },
+            "description": "Create the suggestion widget (deterministic slug)"
+          },
+          {
+            "ref": "extract_created_widget",
+            "name": "Extract Created Widget",
+            "type": "code",
+            "parameters": {
+              "code": "\n            async function main(ctx) {\n              const raw = ctx.input;\n              const hasBody = raw && typeof raw === 'object' && Object.prototype.hasOwnProperty.call(raw, 'body');\n              const payload = hasBody ? raw.body : raw;\n              if (payload && typeof payload === 'object' && Object.prototype.hasOwnProperty.call(payload, 'data')) {\n                return payload.data;\n              }\n              return payload;\n            }\n          ",
+              "timeout": 2000
+            },
+            "description": "Extract widget data from API response"
+          },
+          {
+            "ref": "emit_created",
+            "name": "Emit render_widget (created)",
+            "type": "ui_action",
+            "parameters": {
+              "action": "render_widget",
+              "payload": {
+                "widget": "{{ lastOutputOf(\"extract_created_widget\") }}"
+              }
+            },
+            "description": "Render newly created widget in the conversation UI"
+          },
+          {
+            "ref": "ok_output",
+            "name": "OK Output",
+            "type": "code",
+            "parameters": {
+              "code": "\n            async function main() {\n              return { ok: true };\n            }\n          ",
+              "timeout": 1000
+            },
+            "description": "Return minimal tool output"
+          },
+          {
+            "ref": "end_1",
+            "name": "End",
+            "type": "end",
+            "parameters": {
+              "output": "{{ lastOutputOf(\"ok_output\") }}"
+            },
+            "description": ""
+          }
+        ],
+        "metadata": {}
+      },
+      "transforms": null,
+      "mutations": null,
+      "condition": null,
+      "isEnabled": true,
+      "status": "active"
+    }
+  }
+}

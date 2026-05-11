@@ -1,0 +1,61 @@
+{
+  "schemaVersion": "1",
+  "kind": "bundle",
+  "exportedAt": "2026-05-11T21:17:34.347Z",
+  "entities": {
+    "agents": [
+      {
+        "kind": "agent",
+        "fromSlug": "gaia-ngzc",
+        "file": "agents/gaia.json"
+      }
+    ],
+    "tools": [
+      {
+        "kind": "tool",
+        "fromSlug": "assign-agent-tool-lrjh",
+        "file": "tools/assign-agent-tool-lrjh.json"
+      },
+      {
+        "kind": "tool",
+        "fromSlug": "call-agent-ezwk",
+        "file": "tools/call-agent-ezwk.json"
+      },
+      {
+        "kind": "tool",
+        "fromSlug": "edit-agent-6ivs",
+        "file": "tools/edit-agent-6ivs.json"
+      },
+      {
+        "kind": "tool",
+        "fromSlug": "get-agent-z6q0",
+        "file": "tools/get-agent-z6q0.json"
+      },
+      {
+        "kind": "tool",
+        "fromSlug": "list-agents-83av",
+        "file": "tools/list-agents-83av.json"
+      },
+      {
+        "kind": "tool",
+        "fromSlug": "list-models-bui6",
+        "file": "tools/list-models-bui6.json"
+      },
+      {
+        "kind": "tool",
+        "fromSlug": "list-tools-1l2o",
+        "file": "tools/list-tools-1l2o.json"
+      },
+      {
+        "kind": "tool",
+        "fromSlug": "open-agent-ht7w",
+        "file": "tools/open-agent-ht7w.json"
+      },
+      {
+        "kind": "tool",
+        "fromSlug": "unassign-agent-tool-6051",
+        "file": "tools/unassign-agent-tool-6051.json"
+      }
+    ]
+  }
+}

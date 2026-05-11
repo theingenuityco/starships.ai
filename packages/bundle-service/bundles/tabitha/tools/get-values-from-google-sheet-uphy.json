@@ -1,0 +1,106 @@
+{
+  "schemaVersion": "1",
+  "kind": "tool",
+  "exportedAt": "2026-05-11T21:17:34.347Z",
+  "metadata": {
+    "fromSlug": "get-values-from-google-sheet-uphy"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "tool": {
+      "name": "Get Values from Google Sheet",
+      "description": "Get formatted values from a specific range in a Google Sheet using the Google Sheets API",
+      "parameters": {
+        "type": "object",
+        "required": [
+          "spreadsheetId",
+          "range"
+        ],
+        "properties": {
+          "range": {
+            "type": "string",
+            "description": "The range to read (e.g., 'Sheet1!A1:D10')"
+          },
+          "spreadsheetId": {
+            "type": "string",
+            "description": "The ID of the spreadsheet (found in the URL)"
+          },
+          "valueRenderOption": {
+            "enum": [
+              "FORMATTED_VALUE",
+              "UNFORMATTED_VALUE",
+              "FORMULA"
+            ],
+            "type": "string",
+            "description": "How to render values (default: FORMATTED_VALUE)"
+          }
+        }
+      },
+      "blueprint": {
+        "edges": [
+          {
+            "to": "get_values",
+            "ref": "e1",
+            "from": "start"
+          },
+          {
+            "to": "format_response",
+            "ref": "e2",
+            "from": "get_values"
+          },
+          {
+            "to": "end",
+            "ref": "e3",
+            "from": "format_response"
+          }
+        ],
+        "nodes": [
+          {
+            "ref": "start",
+            "name": "Start",
+            "type": "start",
+            "parameters": {}
+          },
+          {
+            "ref": "get_values",
+            "name": "Get Values",
+            "type": "connector_action",
+            "parameters": {
+              "args": {
+                "range": "{{ String(input.range) }}",
+                "spreadsheetId": "{{ String(input.spreadsheetId) }}",
+                "valueRenderOption": "{{ input.valueRenderOption ? String(input.valueRenderOption) : 'FORMATTED_VALUE' }}"
+              },
+              "action": "get-values",
+              "timeout": 15000,
+              "connector": "google-sheets",
+              "failOnNon2xx": true
+            }
+          },
+          {
+            "ref": "format_response",
+            "name": "Format Response",
+            "type": "code",
+            "parameters": {
+              "code": "async function main(ctx) {\n  const resp = ctx.lastOutputOf('get_values') || {};\n  \n  if (!resp.body) {\n    throw new Error('No response body from Google Sheets API');\n  }\n  \n  return {\n    success: true,\n    range: resp.body.range,\n    majorDimension: resp.body.majorDimension || 'ROWS',\n    values: resp.body.values || [],\n    rowCount: resp.body.values?.length || 0\n  };\n}"
+            }
+          },
+          {
+            "ref": "end",
+            "name": "End",
+            "type": "end",
+            "parameters": {}
+          }
+        ]
+      },
+      "transforms": null,
+      "mutations": null,
+      "condition": null,
+      "isEnabled": true,
+      "status": "active"
+    }
+  }
+}

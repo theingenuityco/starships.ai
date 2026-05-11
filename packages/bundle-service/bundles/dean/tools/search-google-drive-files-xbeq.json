@@ -1,0 +1,81 @@
+{
+  "schemaVersion": "1",
+  "kind": "tool",
+  "exportedAt": "2026-05-11T21:17:34.347Z",
+  "metadata": {
+    "fromSlug": "search-google-drive-files-xbeq"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "tool": {
+      "name": "Search Google Drive Files",
+      "description": "Search for files in Google Drive using Google Drive query syntax. Supports powerful filtering by name, type, folder, date, and more. Returns matching files with metadata.",
+      "parameters": {
+        "type": "object",
+        "required": [
+          "query"
+        ],
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "Search query using Google Drive syntax (e.g., 'name contains \"report\"', 'mimeType=\"application/pdf\"', 'modifiedTime > \"2024-01-01T00:00:00\"')"
+          },
+          "fields": {
+            "type": "string",
+            "description": "Fields to include in response (default: 'files(id, name, mimeType, modifiedTime, webViewLink)')"
+          },
+          "pageSize": {
+            "type": "number",
+            "default": 20,
+            "description": "Maximum number of results to return (default 20)"
+          }
+        }
+      },
+      "blueprint": {
+        "edges": [
+          {
+            "to": "search_files",
+            "ref": "start_to_search",
+            "from": "start"
+          },
+          {
+            "to": "end",
+            "ref": "search_to_end",
+            "from": "search_files"
+          }
+        ],
+        "nodes": [
+          {
+            "ref": "start",
+            "name": "Start",
+            "type": "start"
+          },
+          {
+            "ref": "search_files",
+            "name": "Search Google Drive Files",
+            "type": "connector_action",
+            "parameters": {
+              "args": "{{ ctx.input }}",
+              "action": "search-files",
+              "timeout": 15000,
+              "connector": "google_drive"
+            }
+          },
+          {
+            "ref": "end",
+            "name": "End",
+            "type": "end"
+          }
+        ]
+      },
+      "transforms": null,
+      "mutations": null,
+      "condition": null,
+      "isEnabled": true,
+      "status": "active"
+    }
+  }
+}

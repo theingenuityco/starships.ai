@@ -1,0 +1,108 @@
+{
+  "schemaVersion": "1",
+  "kind": "tool",
+  "exportedAt": "2026-05-11T21:17:34.347Z",
+  "metadata": {
+    "fromSlug": "insert-rows-in-google-sheet-6s0g"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "tool": {
+      "name": "Insert Rows in Google Sheet",
+      "description": "Insert empty rows at a specific position in a Google Sheet using the Google Sheets API",
+      "parameters": {
+        "type": "object",
+        "required": [
+          "spreadsheetId",
+          "sheetId",
+          "index",
+          "count"
+        ],
+        "properties": {
+          "count": {
+            "type": "number",
+            "description": "Number of rows to insert"
+          },
+          "index": {
+            "type": "number",
+            "description": "The index where rows will be inserted (0-based)"
+          },
+          "sheetId": {
+            "type": "number",
+            "description": "The sheet ID where rows will be inserted"
+          },
+          "spreadsheetId": {
+            "type": "string",
+            "description": "The ID of the spreadsheet (found in the URL)"
+          }
+        }
+      },
+      "blueprint": {
+        "edges": [
+          {
+            "to": "insert_rows",
+            "ref": "e1",
+            "from": "start"
+          },
+          {
+            "to": "format_response",
+            "ref": "e2",
+            "from": "insert_rows"
+          },
+          {
+            "to": "end",
+            "ref": "e3",
+            "from": "format_response"
+          }
+        ],
+        "nodes": [
+          {
+            "ref": "start",
+            "name": "Start",
+            "type": "start",
+            "parameters": {}
+          },
+          {
+            "ref": "insert_rows",
+            "name": "Insert Rows",
+            "type": "connector_action",
+            "parameters": {
+              "args": {
+                "count": "{{ Number(input.count) }}",
+                "index": "{{ Number(input.index) }}",
+                "sheetId": "{{ Number(input.sheetId) }}",
+                "spreadsheetId": "{{ String(input.spreadsheetId) }}"
+              },
+              "action": "insert-rows",
+              "timeout": 15000,
+              "connector": "google-sheets",
+              "failOnNon2xx": true
+            }
+          },
+          {
+            "ref": "format_response",
+            "name": "Format Response",
+            "type": "code",
+            "parameters": {
+              "code": "async function main(ctx) {\n  const resp = ctx.lastOutputOf('insert_rows') || {};\n  \n  if (!resp.body) {\n    throw new Error('No response body from Google Sheets API');\n  }\n  \n  return {\n    success: true,\n    spreadsheetId: resp.body.spreadsheetId,\n    replies: resp.body.replies\n  };\n}"
+            }
+          },
+          {
+            "ref": "end",
+            "name": "End",
+            "type": "end",
+            "parameters": {}
+          }
+        ]
+      },
+      "transforms": null,
+      "mutations": null,
+      "condition": null,
+      "isEnabled": true,
+      "status": "active"
+    }
+  }
+}

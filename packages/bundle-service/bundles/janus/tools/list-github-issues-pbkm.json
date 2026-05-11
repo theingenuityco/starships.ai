@@ -1,0 +1,135 @@
+{
+  "schemaVersion": "1",
+  "kind": "tool",
+  "exportedAt": "2026-05-11T21:17:34.347Z",
+  "metadata": {
+    "fromSlug": "list-github-issues-pbkm"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "tool": {
+      "name": "List GitHub Issues",
+      "description": "List issues in a GitHub repository using the GitHub connector. Supports filtering by state, labels, sort order, and pagination.",
+      "parameters": {
+        "type": "object",
+        "required": [
+          "owner",
+          "repo"
+        ],
+        "properties": {
+          "page": {
+            "type": "number",
+            "minimum": 1,
+            "description": "The page number of results to fetch"
+          },
+          "repo": {
+            "type": "string",
+            "description": "The name of the repository"
+          },
+          "sort": {
+            "enum": [
+              "created",
+              "updated",
+              "comments"
+            ],
+            "type": "string",
+            "description": "What to sort results by"
+          },
+          "owner": {
+            "type": "string",
+            "description": "The account owner of the repository"
+          },
+          "since": {
+            "type": "string",
+            "description": "Only show results updated after this time (ISO 8601 format: YYYY-MM-DDTHH:MM:SSZ)"
+          },
+          "state": {
+            "enum": [
+              "open",
+              "closed",
+              "all"
+            ],
+            "type": "string",
+            "description": "Filter issues by state (open, closed, or all)"
+          },
+          "labels": {
+            "type": "string",
+            "description": "Comma-separated list of label names (e.g., 'bug,ui,@high')"
+          },
+          "per_page": {
+            "type": "number",
+            "maximum": 100,
+            "minimum": 1,
+            "description": "The number of results per page (max 100)"
+          },
+          "direction": {
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "type": "string",
+            "description": "The direction to sort results"
+          }
+        }
+      },
+      "blueprint": {
+        "edges": [
+          {
+            "to": "filter_args",
+            "ref": "start_to_filter",
+            "from": "start"
+          },
+          {
+            "to": "list_issues",
+            "ref": "filter_to_list",
+            "from": "filter_args"
+          },
+          {
+            "to": "end",
+            "ref": "list_to_end",
+            "from": "list_issues"
+          }
+        ],
+        "nodes": [
+          {
+            "ref": "start",
+            "name": "Start",
+            "type": "start"
+          },
+          {
+            "ref": "filter_args",
+            "name": "Filter Args",
+            "type": "code",
+            "parameters": {
+              "code": "async function main(ctx) {\n  const input = ctx.input || {};\n  const filtered = {};\n  if (input.owner) filtered.owner = input.owner;\n  if (input.repo) filtered.repo = input.repo;\n  if (input.page) filtered.page = input.page;\n  if (input.sort) filtered.sort = input.sort;\n  if (input.since) filtered.since = input.since;\n  if (input.state) filtered.state = input.state;\n  if (input.labels) filtered.labels = input.labels;\n  if (input.per_page) filtered.per_page = input.per_page;\n  if (input.direction) filtered.direction = input.direction;\n  return filtered;\n}"
+            }
+          },
+          {
+            "ref": "list_issues",
+            "name": "List GitHub Issues",
+            "type": "connector_action",
+            "parameters": {
+              "args": "{{ ctx.lastOutputOf('filter_args') }}",
+              "action": "list-repo-issues",
+              "timeout": 15000,
+              "connector": "github"
+            }
+          },
+          {
+            "ref": "end",
+            "name": "End",
+            "type": "end"
+          }
+        ]
+      },
+      "transforms": null,
+      "mutations": null,
+      "condition": null,
+      "isEnabled": true,
+      "status": "active"
+    }
+  }
+}

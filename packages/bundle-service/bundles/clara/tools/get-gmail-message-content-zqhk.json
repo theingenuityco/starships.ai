@@ -1,0 +1,109 @@
+{
+  "schemaVersion": "1",
+  "kind": "tool",
+  "exportedAt": "2026-05-11T21:17:34.347Z",
+  "metadata": {
+    "fromSlug": "get-gmail-message-content-zqhk"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "tool": {
+      "name": "Get Gmail Message Content",
+      "description": "Retrieve the complete message content including headers, body, and MIME structure. Use this when you need the full message text or to access attachments. For lightweight inspection, use gmail_get_message_metadata instead.",
+      "parameters": {
+        "type": "object",
+        "required": [
+          "messageId"
+        ],
+        "properties": {
+          "format": {
+            "enum": [
+              "full",
+              "raw"
+            ],
+            "type": "string",
+            "default": "full",
+            "description": "Format to return: 'full' for parsed structure with headers and body parts, 'raw' for RFC 2822 format"
+          },
+          "messageId": {
+            "type": "string",
+            "description": "The ID of the message to retrieve"
+          }
+        }
+      },
+      "blueprint": {
+        "edges": [
+          {
+            "to": "build_args",
+            "ref": "start_to_build",
+            "from": "start"
+          },
+          {
+            "to": "get_message",
+            "ref": "build_to_get",
+            "from": "build_args"
+          },
+          {
+            "to": "extract_body",
+            "ref": "get_to_extract",
+            "from": "get_message"
+          },
+          {
+            "to": "end",
+            "ref": "extract_to_end",
+            "from": "extract_body"
+          }
+        ],
+        "nodes": [
+          {
+            "ref": "start",
+            "name": "Start",
+            "type": "start"
+          },
+          {
+            "ref": "build_args",
+            "name": "Build Args",
+            "type": "code",
+            "parameters": {
+              "code": "async function main(ctx) {\n  const input = ctx.input || {};\n  return {\n    id: String(input.messageId || ''),\n    format: String(input.format || 'full')\n  };\n}",
+              "timeout": 3000
+            }
+          },
+          {
+            "ref": "get_message",
+            "name": "Get Message",
+            "type": "connector_action",
+            "parameters": {
+              "args": "{{ lastOutputOf('build_args') || {} }}",
+              "action": "get-message",
+              "timeout": 15000,
+              "connector": "gmail"
+            }
+          },
+          {
+            "ref": "extract_body",
+            "name": "Extract Body",
+            "type": "code",
+            "parameters": {
+              "code": "async function main(ctx) {\n  const response = ctx.input || {};\n  return response.body || response;\n}",
+              "timeout": 2000
+            }
+          },
+          {
+            "ref": "end",
+            "name": "End",
+            "type": "end"
+          }
+        ]
+      },
+      "transforms": null,
+      "mutations": null,
+      "condition": null,
+      "isEnabled": true,
+      "status": "active"
+    }
+  }
+}

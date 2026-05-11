@@ -1,0 +1,101 @@
+{
+  "schemaVersion": "1",
+  "kind": "tool",
+  "exportedAt": "2026-05-11T21:17:34.347Z",
+  "metadata": {
+    "fromSlug": "create-google-sheet-5rcg"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "tool": {
+      "name": "Create Google Sheet",
+      "description": "Create a new sheet within an existing Google Spreadsheet using the Google Sheets API",
+      "parameters": {
+        "type": "object",
+        "required": [
+          "spreadsheetId",
+          "title"
+        ],
+        "properties": {
+          "index": {
+            "type": "number",
+            "description": "Position of the new sheet (0-based, optional)"
+          },
+          "title": {
+            "type": "string",
+            "description": "Title for the new sheet"
+          },
+          "spreadsheetId": {
+            "type": "string",
+            "description": "The ID of the spreadsheet (found in the URL)"
+          }
+        }
+      },
+      "blueprint": {
+        "edges": [
+          {
+            "to": "create_sheet",
+            "ref": "e1",
+            "from": "start"
+          },
+          {
+            "to": "format_response",
+            "ref": "e2",
+            "from": "create_sheet"
+          },
+          {
+            "to": "end",
+            "ref": "e3",
+            "from": "format_response"
+          }
+        ],
+        "nodes": [
+          {
+            "ref": "start",
+            "name": "Start",
+            "type": "start",
+            "parameters": {}
+          },
+          {
+            "ref": "create_sheet",
+            "name": "Create Sheet",
+            "type": "connector_action",
+            "parameters": {
+              "args": {
+                "index": "{{ input.index !== undefined ? Number(input.index) : undefined }}",
+                "title": "{{ String(input.title) }}",
+                "spreadsheetId": "{{ String(input.spreadsheetId) }}"
+              },
+              "action": "create-sheet",
+              "timeout": 15000,
+              "connector": "google-sheets",
+              "failOnNon2xx": true
+            }
+          },
+          {
+            "ref": "format_response",
+            "name": "Format Response",
+            "type": "code",
+            "parameters": {
+              "code": "async function main(ctx) {\n  const resp = ctx.lastOutputOf('create_sheet') || {};\n  \n  if (!resp.body) {\n    throw new Error('No response body from Google Sheets API');\n  }\n  \n  const reply = resp.body?.replies?.[0]?.addSheet;\n  \n  return {\n    success: true,\n    sheetId: reply?.properties?.sheetId,\n    title: reply?.properties?.title,\n    index: reply?.properties?.index,\n    gridProperties: reply?.properties?.gridProperties\n  };\n}"
+            }
+          },
+          {
+            "ref": "end",
+            "name": "End",
+            "type": "end",
+            "parameters": {}
+          }
+        ]
+      },
+      "transforms": null,
+      "mutations": null,
+      "condition": null,
+      "isEnabled": true,
+      "status": "active"
+    }
+  }
+}

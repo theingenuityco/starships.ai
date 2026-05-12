@@ -8,7 +8,6 @@ import {
   UserRepository,
 } from '@starships/models';
 import type { AgentModel, AuthUser, StarshipModel, UpdateStarshipRequest } from '@starships/protocol';
-import { WalletService } from './WalletService';
 import { logger } from '@/utils/logger';
 
 export interface CreateStarshipData {
@@ -17,7 +16,6 @@ export interface CreateStarshipData {
   shipClass?: 'scout' | 'frigate';
   maxAgents?: number;
   maxConcurrentTurns?: number;
-  initialCredits?: number;
 }
 
 export interface StarshipWithDetails extends StarshipModel {
@@ -67,20 +65,7 @@ export class StarshipService {
       status: 'active',
     });
 
-    // Auto-create wallet for this starship with optional initial credits (default: 0)
-    try {
-      const walletService = new WalletService();
-      const initialCredits = data.initialCredits ?? 0;
-      await walletService.createForStarship(starship.id, initialCredits);
-      // Optional: silent success
-    } catch (err) {
-      // Log and continue - starship creation should not fail due to wallet issues
-      logger.error('[StarshipService] Failed to create wallet for starship', {
-        starshipId: starship.id,
-        operation: 'create_wallet',
-        error: err instanceof Error ? err.message : String(err),
-      });
-    }
+
 
     // Ensure every starship has a default public room (e.g. #lobby).
     // This must succeed; otherwise the starship isn't usable in the rooms-first UI.
@@ -395,12 +380,10 @@ export class StarshipService {
     // Generate a random name for the starship
     const starshipName = getRandomStarshipName();
 
-    // Create the starship with default settings and 200 welcome credits
     const starship = await starshipService.createStarship({
       ownerId: userId,
       name: starshipName,
       shipClass: 'scout',
-      initialCredits: 200, // 200 welcome credits for new users
     });
 
     return starship;

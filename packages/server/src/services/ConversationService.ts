@@ -38,10 +38,7 @@ import { getEnvConfig } from '@starships/env';
 import { buildAutopilotExecutionBundle } from '@/services/autopilot-execution-bundle';
 import OpenAI from 'openai';
 import type { Runner } from '@starships/autopilot';
-import { BillingService } from '@/services/BillingService';
 import { StarshipTurnLeaseService } from '@/services/StarshipTurnLeaseService';
-import { WalletService } from '@/services/WalletService';
-import { BalanceValidationService } from '@/services/BalanceValidationService';
 import { UIActionService } from '@/services/UIActionService';
 import { NotificationService } from '@/services/NotificationService';
 import { parse, Allow } from 'partial-json-parser';
@@ -156,12 +153,7 @@ export class ConversationService {
 
   private connectorSecretService!: ConnectorSecretService;
   private usageService!: UsageService;
-  private billingService!: BillingService;
-  private walletService!: WalletService;
   private notifications!: NotificationService;
-  // Auto-stop guards for low balance
-  private lowBalanceStopTriggered: Set<string> = new Set();
-  private lastLowBalanceCheckAt: Map<string, number> = new Map();
   // Track accumulated content for streaming messages by conversation ID
   private streamingContent: Map<string, string> = new Map();
   // Resume state per conversation generation
@@ -265,8 +257,6 @@ export class ConversationService {
     this.uiActions = new UIActionService(this.streamBus);
     this.connectorSecretService = new ConnectorSecretService();
     this.usageService = new UsageService();
-    this.billingService = new BillingService();
-    this.walletService = new WalletService();
     this.notifications = new NotificationService();
 
     // Choose default runner based on whether a remote runner is configured.
@@ -513,9 +503,6 @@ export class ConversationService {
     // If we clear lastPersistedIndex, the node_completed persistence pass can start from -1 and
     // re-persist the entire execution.state.messages history, duplicating all conversation messages.
 
-    // Balance guards and suppression flags
-    this.lowBalanceStopTriggered.delete(conversationId);
-    this.lastLowBalanceCheckAt.delete(conversationId);
     this.suppressCompleteFor.delete(conversationId);
 
     // Misc per-conversation flags / attribution
@@ -1865,84 +1852,6 @@ export class ConversationService {
     return extractPersistableStateUtil(executionState);
   }
 
-  /**
-   * Auto-stop an active turn when wallet balance drops below minimum threshold.
-   * Returns true if a stop was triggered.
-   */
-  private async maybeAutoStopForLowBalance(conversationId: string): Promise<boolean> {
-    try {
-      // Avoid repeat stops in the same turn
-      if (this.lowBalanceStopTriggered.has(conversationId)) {
-        return false;
-      }
-
-      // Throttle balance checks to at most once per second per conversation
-      const now = Date.now();
-      const last = this.lastLowBalanceCheckAt.get(conversationId) ?? 0;
-      if (now - last < 250) {
-        return false;
-      }
-      this.lastLowBalanceCheckAt.set(conversationId, now);
-
-      const starship = await this.getConversationStarship(conversationId);
-      if (!starship) return false;
-
-      // Load wallet and validate against centralized threshold
-      const wallet = await this.walletService.getByStarshipId(starship.id);
-      if (!wallet) return false;
-
-      const validation = BalanceValidationService.validateBalance({
-        id: wallet.id,
-        balance: wallet.balance,
-      });
-
-      if (!validation.isValid) {
-        // Mark as triggered before broadcasting to de-dup system messages
-        this.lowBalanceStopTriggered.add(conversationId);
-
-        // Best-effort: inline system message for clear CTA in chat
-        try {
-          const sys = await this.messageService.createMessage({
-            conversationId,
-            role: 'system',
-            content: 'Insufficient balance. Add credits from Billing to continue.',
-            messageType: 'error',
-          });
-          try {
-            await this.streamBus.publish(conversationId, { type: 'message.append', data: { conversationId, message: sys } });
-            await this.uiActions.publish(conversationId, { action: 'insufficient_balance' });
-          } catch (err) {
-            console.error('[ConversationService] Failed to publish insufficient balance messages', {
-              error: err instanceof Error ? err.message : String(err),
-              conversationId,
-            });
-          }
-        } catch (err) {
-          console.error('[ConversationService] Failed to emit system message', {
-            error: err instanceof Error ? err.message : String(err),
-            conversationId,
-          });
-        }
-
-        // Trigger stop pipeline (cancel runner, persist partials, finalize SSE)
-        try {
-          await this.stopConversation(conversationId);
-        } catch (err) {
-          console.warn('[STOP] Auto-stop due to low balance failed', {
-            conversationId,
-            error: err instanceof Error ? err.message : String(err),
-          });
-        }
-        return true;
-      }
-    } catch (e) {
-      console.warn('[BALANCE] Auto-stop check failed', {
-        conversationId,
-        error: e instanceof Error ? e.message : String(e),
-      });
-    }
-    return false;
-  }
 
   /**
    * Get deployed tool instances with their actual blueprints for the agent
@@ -3991,21 +3900,6 @@ export class ConversationService {
           console.warn('[STREAMING] Failed to persist turn_started state', err);
         }
 
-        // Reset per-turn balance enforcement guards and enforce immediately
-        this.lowBalanceStopTriggered.delete(conversationId);
-        this.lastLowBalanceCheckAt.delete(conversationId);
-        try {
-          const stoppedAtStart = await this.maybeAutoStopForLowBalance(conversationId);
-          if (stoppedAtStart) {
-            break;
-          }
-        } catch (err) {
-          console.error('[ConversationService] Failed to check balance auto-stop at workflow start', {
-            error: err instanceof Error ? err.message : String(err),
-            conversationId,
-          });
-        }
-
         // Do not clear pending finalization here; previous turn must finish to preserve event ordering
         break;
       }
@@ -4043,19 +3937,6 @@ export class ConversationService {
         // CRITICAL FIX: Serialize chunk processing using a lock pattern
         // Wait for previous chunk to complete before starting this one
         const processThisChunk = async () => {
-          // Proactively stop mid-turn if balance falls below minimum threshold (throttled)
-          try {
-            const stopped = await this.maybeAutoStopForLowBalance(conversationId);
-            if (stopped) {
-              return;
-            }
-          } catch (err) {
-            console.error('[ConversationService] Failed to check balance auto-stop', {
-              error: err instanceof Error ? err.message : String(err),
-              conversationId,
-            });
-          }
-
           // Stream content chunks in real-time (supports both delta.* and message.* providers)
           const chunkContent = (event as LLMEvent).data?.chunk;
 
@@ -5235,18 +5116,6 @@ export class ConversationService {
       }
 
       case 'tool_started': {
-        // Enforce balance at the moment tool execution starts
-        try {
-          const stoppedToolStart = await this.maybeAutoStopForLowBalance(conversationId);
-          if (stoppedToolStart) {
-            break;
-          }
-        } catch (err) {
-          console.error('[ConversationService] Failed to check balance auto-stop during tool_started', {
-            error: err instanceof Error ? err.message : String(err),
-            conversationId,
-          });
-        }
         break;
       }
 

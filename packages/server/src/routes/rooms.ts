@@ -32,10 +32,7 @@ import {
 import type { MessageModel, RoomModel } from '@starships/protocol';
 import { NotificationStreamBus } from '@/services/NotificationStreamBus';
 import { MessageService } from '@/services/MessageService';
-import { WalletService } from '@/services/WalletService';
-import { BillingService } from '@/services/BillingService';
 import { StarshipTurnLeaseService } from '@/services/StarshipTurnLeaseService';
-import { CREDITS_PER_USER_MESSAGE } from '@/config/credits';
 import archiver from 'archiver';
 import crypto from 'crypto';
 import { rateLimiters } from '@/middleware/rateLimiter';
@@ -461,16 +458,8 @@ router.post(
             .catch(() => false);
           if (!willTrigger) return;
 
-          // Billing + concurrency guard (mirrors POST /conversations/:id/messages behavior at a high level).
           const starship = await conversationService.getConversationStarship(conversationId).catch(() => null);
           if (!starship) return;
-
-          const requiredCredits = Number(CREDITS_PER_USER_MESSAGE) || 0;
-          const walletService = new WalletService();
-          const wallet = await walletService.getByStarshipId(starship.id).catch(() => null);
-          if (!wallet) return;
-          const currentCredits = Number(wallet.balance) || 0;
-          if (currentCredits < requiredCredits) return;
 
           const leaseService = new StarshipTurnLeaseService();
           let turnLeaseId: string | undefined;
@@ -488,20 +477,6 @@ router.post(
           const turnGuardId = crypto.randomUUID();
           const turnGuardAcquired = await conversationRepo.acquireTurnGuard(conversationId, turnGuardId).catch(() => false);
           if (!turnGuardAcquired) {
-            if (turnLeaseId) await leaseService.release(turnLeaseId).catch(() => undefined);
-            return;
-          }
-
-          try {
-            const billingService = new BillingService();
-            await billingService.debitForUserMessage({
-              walletId: wallet.id,
-              starshipId: starship.id,
-              conversationId,
-              messageId,
-            });
-          } catch {
-            await conversationRepo.mergeState(conversationId, { turnActive: false }).catch(() => undefined);
             if (turnLeaseId) await leaseService.release(turnLeaseId).catch(() => undefined);
             return;
           }

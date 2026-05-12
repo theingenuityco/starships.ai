@@ -27,7 +27,6 @@ export default function AccountPage(): React.JSX.Element {
   }, [selectedStarshipId, user?.id, userStarships])
 
   const activeStarshipSlug = activeStarship?.slug ?? null
-  const canManageBilling = Boolean(isInstanceAdmin === true || (user?.id && activeStarship?.ownerId && String(activeStarship.ownerId) === String(user.id)))
 
   useEffect(() => {
     if (authLoading) return
@@ -73,18 +72,6 @@ export default function AccountPage(): React.JSX.Element {
                     <Icon name="rocket" className="h-4 w-4" />
                     <span>My Starship</span>
                   </TabsTrigger>
-                  {canManageBilling ? (
-                    <TabsTrigger value="upgrade" className="gap-2 rounded-xl px-3 py-1" disabled={!activeStarshipSlug}>
-                      <Icon name="arrow-up" className="h-4 w-4" />
-                      <span>Upgrade</span>
-                    </TabsTrigger>
-                  ) : null}
-                  {canManageBilling ? (
-                    <TabsTrigger value="billing" className="gap-2 rounded-xl px-3 py-1" disabled={!activeStarshipSlug}>
-                      <Icon name="credit-card" className="h-4 w-4" />
-                      <span>Billing</span>
-                    </TabsTrigger>
-                  ) : null}
                   {showAnalytics ? (
                     <TabsTrigger value="usage" className="gap-2 rounded-xl px-3 py-1 border border-border/50 hover:border-border/80" disabled={!activeStarshipSlug}>
                       <Icon name="sparkles" className="h-4 w-4 text-fuchsia-600 dark:text-fuchsia-400" />

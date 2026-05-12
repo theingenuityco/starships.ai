@@ -175,7 +175,7 @@ export function getMarkdownComponents({
   highlightTerm: _highlightTerm,
 }: GetMarkdownComponentsOptions) {
   const base = {
-    p: ({ children }: any) => <p className="mb-2 last:mb-0 leading-relaxed">{children}</p>,
+    p: ({ children }: any) => <p className="mb-2 last:mb-0 leading-normal">{children}</p>,
 
     a: ({ href, children }: any) => (
       <a

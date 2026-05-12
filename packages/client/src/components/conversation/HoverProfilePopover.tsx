@@ -11,6 +11,7 @@ export function HoverProfilePopover({
   side = 'bottom',
   sideOffset = 6,
   contentClassName,
+  triggerClassName,
 }: {
   trigger: ReactNode
   content: ReactNode
@@ -18,6 +19,7 @@ export function HoverProfilePopover({
   side?: 'top' | 'bottom' | 'left' | 'right'
   sideOffset?: number
   contentClassName?: string
+  triggerClassName?: string
 }) {
   const [open, setOpen] = useState(false)
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -79,7 +81,7 @@ export function HoverProfilePopover({
       <PopoverTrigger asChild>
         <span
           ref={triggerRef}
-          className="inline-flex items-center"
+          className={cn('inline-flex items-center group/hover-name', triggerClassName)}
           onPointerEnter={openPopover}
           onPointerLeave={handleTriggerPointerLeave}
           onFocusCapture={openPopover}

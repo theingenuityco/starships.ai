@@ -542,7 +542,7 @@ export function ConversationMessageContent({
   contentTextClass,
   highlightTerm,
 }: MessageContentProps) {
-  const resolvedContentClass = contentTextClass ?? 'text-sm leading-relaxed prose prose-sm'
+  const resolvedContentClass = contentTextClass ?? 'text-sm leading-normal prose prose-sm font-sans'
   const { theme } = useTheme()
   const [copiedStates, setCopiedStates] = useState<Record<string, boolean>>({})
   const [toolNameBySlug, setToolNameBySlug] = useState<Record<string, string>>({})

@@ -40,7 +40,7 @@ export function ConversationContextBar({ conversationId, className, budgetTokens
 
   return (
     <div className={cn('sticky top-0 z-10 border-b border-border/30 bg-background/30 backdrop-blur-sm supports-[backdrop-filter]:bg-background/20', className)}>
-      <div className="max-w-4xl mx-auto px-4 pt-4 pb-3 md:py-3">
+      <div className="max-w-5xl mx-auto px-4 pt-4 pb-3 md:py-3">
         {/* Header row: combined usage and cost */}
         <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
           <div className="font-medium text-foreground">Usage</div>

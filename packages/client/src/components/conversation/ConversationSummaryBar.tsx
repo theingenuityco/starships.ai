@@ -358,20 +358,20 @@ export function ConversationSummaryBar({
     const hasDraftParticipants = isDraftHeader && effectiveParticipantItems.length > 0
 
     return (
-      <div className="sticky top-0 z-10 border-b border-border/60 bg-card">
-        <div className="px-4 pt-3.5 pb-2 md:py-2">
+      <div className="sticky top-0 z-10 border-b border-border/60">
+        <div className="px-4 py-2.5">
           <div className="w-full">
             <div className="flex items-center justify-between">
               {/* Title and metadata (stacked) - exact structural match */}
               <div className="flex-1 min-w-0 flex flex-col justify-center gap-1">
                 {/* Title + metadata rows share a left "mobile nav" column (prevents row-2 misalignment) */}
                 <div className="flex min-w-0 w-full gap-2 items-center">
-                  <span className="flex-shrink-0 self-center md:hidden">{mobileLeftSlot ?? <MobileNavToggleButton className="mx-2" />}</span>
+                  <span className="flex-shrink-0 self-center md:hidden">{mobileLeftSlot ?? <MobileNavToggleButton className="mx-1" />}</span>
                   <div className="min-w-0 flex-1 flex flex-col justify-center gap-1">
                     {/* Title - exact match */}
                     <div className="flex items-center gap-2 min-w-0 w-full">
-                      {titlePrefix ? <span className="flex-shrink-0 self-center text-foreground leading-none">{titlePrefix}</span> : null}
-                      <h3 className="flex-1 text-base font-medium text-foreground truncate leading-tight min-w-0">
+                      {titlePrefix ? <span className="flex-shrink-0 self-center text-muted-foreground leading-none">{titlePrefix}</span> : null}
+                      <h3 className="flex-1 text-sm font-semibold text-foreground truncate leading-tight min-w-0">
                       {titlePrepend ? <span>{titlePrepend}</span> : null}
                         <span className="opacity-50">{effectiveFallbackTitle}</span>
                       </h3>
@@ -485,21 +485,21 @@ export function ConversationSummaryBar({
               ease: [0.25, 0.46, 0.45, 0.94],
             }
       }
-      className="sticky top-0 z-10 border-b border-border/60 bg-card"
+      className="sticky top-0 z-10 border-b border-border/60"
     >
-      <div className="px-4 pt-3.5 pb-2 md:py-2">
+      <div className="px-4 py-2.5">
         <div className="w-full">
           <div className="flex items-center justify-between">
             {/* Title and metadata (stacked) */}
             <div className="flex-1 min-w-0 flex flex-col justify-center gap-1">
               {/* Title + metadata rows share a left "mobile nav" column (prevents row-2 misalignment) */}
                 <div className="flex min-w-0 w-full gap-2 items-center">
-                <span className="flex-shrink-0 self-center md:hidden">{mobileLeftSlot ?? <MobileNavToggleButton className="mx-2" />}</span>
+                <span className="flex-shrink-0 self-center md:hidden">{mobileLeftSlot ?? <MobileNavToggleButton className="mx-1" />}</span>
                 <div className="min-w-0 flex-1 flex flex-col justify-center gap-1">
                   {/* Title */}
                     <div className="flex items-center gap-2 min-w-0 w-full">
-                    {titlePrefix ? <span className="flex-shrink-0 self-center text-foreground leading-none">{titlePrefix}</span> : null}
-                    <h3 className="flex-1 text-base font-medium text-foreground truncate leading-tight min-w-0">
+                    {titlePrefix ? <span className="flex-shrink-0 self-center text-muted-foreground leading-none">{titlePrefix}</span> : null}
+                    <h3 className="flex-1 text-sm font-semibold text-foreground truncate leading-tight min-w-0">
                       {titlePrepend ? <span>{titlePrepend}</span> : null}
                       {title}
                     </h3>

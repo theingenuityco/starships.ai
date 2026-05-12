@@ -80,9 +80,8 @@ export default function StarshipDocsPage(): React.JSX.Element {
         icon="file-text"
         title="Docs"
         actions={
-          <Button size="sm" onClick={() => setCreateOpen(true)}>
-            <Icon name="plus" className="w-4 h-4 mr-1.5" />
-            New doc
+          <Button type="button" variant="ghost" size="sm" className="h-8 w-8 px-0 text-muted-foreground hover:text-foreground" aria-label="New doc" title="New doc" onClick={() => setCreateOpen(true)}>
+            <Icon name="plus" className="h-4 w-4" />
           </Button>
         }
       />

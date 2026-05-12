@@ -258,28 +258,36 @@ export default function RoomsIndexPage(): React.JSX.Element {
         actions={
           <>
             <Button
-              variant="outline"
+              type="button"
+              variant="ghost"
               size="sm"
+              className="h-8 w-8 px-0 text-muted-foreground hover:text-foreground"
+              aria-label="New room"
+              title={!canManageRooms ? 'Only the starship owner (or instance admin) can manage rooms' : 'New room'}
               onClick={() => setCreateOpen(true)}
               disabled={!canManageRooms || !starshipId || createRoom.isPending}
-              title={!canManageRooms ? 'Only the starship owner (or instance admin) can manage rooms' : undefined}
             >
-              <Icon name="plus" className="h-4 w-4 mr-1.5" />
-              New room
+              <Icon name="plus" className="h-4 w-4" />
             </Button>
             <Button
-              variant="outline"
+              type="button"
+              variant="ghost"
               size="sm"
+              className="h-8 w-8 px-0 text-muted-foreground hover:text-foreground"
+              aria-label="Browse bundles"
+              title={!canManageRooms ? 'Only the starship owner (or instance admin) can install bundles' : 'Browse bundles'}
               onClick={() => setBundlesOpen(true)}
               disabled={!canManageRooms || !starshipId}
-              title={!canManageRooms ? 'Only the starship owner (or instance admin) can install bundles' : undefined}
             >
-              <Icon name="download" className="h-4 w-4 mr-1.5" />
-              Browse bundles
+              <Icon name="download" className="h-4 w-4" />
             </Button>
             <Button
-              variant="outline"
+              type="button"
+              variant="ghost"
               size="sm"
+              className="h-8 w-8 px-0 text-muted-foreground hover:text-foreground"
+              aria-label="Import bundle"
+              title={!canManageRooms ? 'Only the starship owner (or instance admin) can import rooms' : 'Import bundle'}
               onClick={() => {
                 setImportOpen(true)
                 setImportStep(1)
@@ -288,10 +296,8 @@ export default function RoomsIndexPage(): React.JSX.Element {
                 setImportDecisions({ rooms: {}, views: {}, datasets: {}, taskBoards: {}, tools: {}, agents: {} })
               }}
               disabled={!canManageRooms || !starshipId}
-              title={!canManageRooms ? 'Only the starship owner (or instance admin) can import rooms' : undefined}
             >
-              <Icon name="upload" className="h-4 w-4 mr-1.5" />
-              Import bundle
+              <Icon name="upload" className="h-4 w-4" />
             </Button>
           </>
         }

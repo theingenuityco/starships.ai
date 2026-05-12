@@ -201,9 +201,8 @@ export default function AgentsPage(): React.JSX.Element {
         icon="bot"
         title="Agents"
         actions={
-          <Button variant="outline" size="sm" onClick={() => setBundlesOpen(true)} disabled={!starshipId}>
-            <Icon name="download" className="h-4 w-4 mr-1.5" />
-            Browse bundles
+          <Button type="button" variant="ghost" size="sm" className="h-8 w-8 px-0 text-muted-foreground hover:text-foreground" aria-label="Browse bundles" title="Browse bundles" onClick={() => setBundlesOpen(true)} disabled={!starshipId}>
+            <Icon name="download" className="h-4 w-4" />
           </Button>
         }
       />

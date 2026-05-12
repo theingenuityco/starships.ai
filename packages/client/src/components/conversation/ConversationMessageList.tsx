@@ -2059,9 +2059,9 @@ export function ConversationMessageList({
 
     return (
       <div className="pb-6">
-        <Row variant="assistant" topMarginClass="mt-6" />
-        <Row variant="user" topMarginClass="mt-4" />
-        <Row variant="assistant" topMarginClass="mt-4" />
+        <Row variant="assistant" topMarginClass="mt-3" />
+        <Row variant="user" topMarginClass="mt-2" />
+        <Row variant="assistant" topMarginClass="mt-2" />
       </div>
     )
   }
@@ -3057,7 +3057,7 @@ const MemoizedMessageBubble = memo(
         // User message: Neutral bubble on the right (landing demos)
         // Keep spacing similar to assistant hero/delegation rows (avoid large inter-message gaps)
         // IMPORTANT: Avoid `mb-*` here; it creates unwanted gaps even when the next message is consecutive.
-        const userRowClass = isDelegation ? cn('gap-2', isConsecutiveSameUser ? 'mt-0' : 'mt-4') : cn('gap-3', isConsecutiveSameUser ? 'mt-0' : 'mt-8')
+        const userRowClass = isDelegation ? cn('gap-2', isConsecutiveSameUser ? 'mt-0' : 'mt-2') : cn('gap-3', isConsecutiveSameUser ? 'mt-0' : 'mt-4')
         // Always use the compact bubble padding (no "normal" padding mode).
         const userBubbleClass = 'px-3 py-2'
         const userTextClass = isHero ? 'text-base' : 'text-sm'
@@ -3217,7 +3217,7 @@ const MemoizedMessageBubble = memo(
               'py-0',
               // Keep a little top spacing when a user message starts a conversation chunk
               // (No negative margins; we handle tight stacking by not reserving avatar height below.)
-              isConsecutiveSameUser ? 'mt-0' : 'mt-6'
+              isConsecutiveSameUser ? 'mt-0' : 'mt-3'
             )}
           >
             {isConsecutiveSameUser ? (
@@ -3448,7 +3448,7 @@ const MemoizedMessageBubble = memo(
       if (isHero || isDelegation) {
         const assistantGap = isDelegation ? 'gap-2' : 'gap-3'
         return (
-          <div className={cn('flex justify-start', startsNewGroup ? (isDelegation ? 'mt-2' : 'mt-4') : '')}>
+          <div className={cn('flex justify-start', startsNewGroup ? (isDelegation ? 'mt-1' : 'mt-2') : '')}>
             <div className={cn('relative flex items-start w-full', assistantGap)}>
               {showAssistantAvatar ? (
                 compactAssistantGroup ? (
@@ -3552,7 +3552,7 @@ const MemoizedMessageBubble = memo(
       }
 
       return (
-        <div className={cn('flex justify-start w-full', isFirstMessage ? 'mt-6' : startsNewGroup ? 'mt-4' : '')}>
+        <div className={cn('flex justify-start w-full', isFirstMessage ? 'mt-3' : startsNewGroup ? 'mt-2' : '')}>
           <div
             className={cn(
               'group relative flex flex-1 min-w-0 items-start gap-3 w-full max-w-full rounded-lg px-2 -mx-2',

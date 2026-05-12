@@ -2,7 +2,6 @@
 
 import Icon from '@/components/primitives/Icon'
 import { NavigationItem } from '@/components/navigation/NavigationItem'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import { useStarshipRooms } from '@/hooks/useRooms'
 import { RoomNestedRecentConversations } from '@/components/rooms/RoomNestedRecentConversations'
 import type { RoomModel } from '@starships/protocol'
@@ -78,7 +77,7 @@ export function RoomSidebarList(props: { starshipId: string; starshipSlug: strin
       </div>
 
       <div className="flex-1 min-h-0 overflow-hidden">
-        <ScrollArea className="h-full pr-1">
+        <div className="h-full overflow-y-auto pr-1">
           <div className="space-y-0.5">
             {isLoading && sorted.length === 0 ? (
               <div className="text-xs text-muted-foreground px-1 py-2">Loading…</div>
@@ -122,7 +121,7 @@ export function RoomSidebarList(props: { starshipId: string; starshipSlug: strin
               )
             })}
           </div>
-        </ScrollArea>
+        </div>
       </div>
 
       <button

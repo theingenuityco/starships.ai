@@ -74,7 +74,7 @@ export function NavigationItem({ href, label, icon, isActive, badgeCount, showLa
       onClick={handleClick}
       className={cn(
         // Match compact channel/DM row styling in the sidebar.
-        'group relative rounded-lg flex items-center border w-full h-7 cursor-pointer text-sm px-1',
+        'group relative rounded-lg flex items-center border w-full h-7 cursor-pointer text-sm px-1 overflow-hidden',
         special
           ? 'text-primary border-transparent hover:bg-muted/70 dark:hover:bg-[#2C2C30]'
           : isActive

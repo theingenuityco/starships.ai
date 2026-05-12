@@ -8,6 +8,7 @@ import { DELETED_MESSAGE_MARKER, type MessageModel } from '@starships/protocol'
 import LoadingSpinner from '@/components/primitives/LoadingSpinner'
 import { useEffect, useLayoutEffect, useMemo, useRef, memo, useState, Fragment, useCallback, type ReactNode } from 'react'
 import { ConversationMessageContent } from './ConversationMessageContent'
+import { TurnHoverContext, useTurnHover } from './TurnHoverContext'
 import { useConversationAgents, useConversationDetail, useDeleteMessage, useUpdateMessage } from '@/hooks/useConversations'
 import { useConversationStreamContextOptional } from '@/hooks/ConversationStreamContext'
 import { useApproveRoomInviteApproval, useDenyRoomInviteApproval, useRoomInviteApprovalsPending, type PendingRoomInviteApproval } from '@/hooks/useRooms'
@@ -1548,6 +1549,8 @@ export function ConversationMessageList({
     return filtered.filter(m => m.id !== pinnedId)
   }, [displayMessages, pinnedFirstMessage])
 
+  const turnGroupsList = useMemo(() => buildTurnGroups(renderMessages), [renderMessages])
+
   // Prevent a brief "channel hero" flash while messages are still hydrating on reload.
   // NOTE: use `displayMessages` (stream-derived) rather than `renderMessages` (can include pinned message).
   const hasStreamSnapshot = Boolean((stream as any)?.hasSnapshot)
@@ -2203,7 +2206,11 @@ export function ConversationMessageList({
                     bottomAlign={shouldBottomAlignHero}
                   />
                 ) : null}
-                {renderMessages.map((message, idx) => {
+                {turnGroupsList.map(turnGroup => {
+                  const lastLocalIdx = turnGroup.messages.length - 1
+                  return (
+                    <TurnGroupWrapper key={turnGroup.groupId}>
+                      {turnGroup.messages.map(({ message, originalIdx: idx }, localIdx) => {
                   const prev = idx > 0 ? (renderMessages[idx - 1] as ExtendedMessage) : null
                   const next = idx < renderMessages.length - 1 ? (renderMessages[idx + 1] as ExtendedMessage) : null
                   const messageDateKey = getMessageDateKey(message)
@@ -2213,43 +2220,21 @@ export function ConversationMessageList({
                   const showAssistantAvatar = message.role !== 'assistant' ? true : !(prev && prev.role === 'assistant' && !timeGapBreaksGroup)
                   const pinnedId = typeof (pinnedFirstMessage as any)?.id === 'string' ? String((pinnedFirstMessage as any).id).trim() : ''
                   const suppressLinkedConversationCard = Boolean(pinnedId && String(message.id) === pinnedId)
-                  const userKey = (m: any): string | null => {
-                    if (!m || String(m?.role ?? '') !== 'user') return null
-                    const uid = typeof m?.userId === 'string' ? m.userId.trim() : ''
-                    if (uid) return `id:${uid}`
-                    const un = typeof m?.userName === 'string' ? m.userName.trim() : ''
-                    if (un) return `name:${un}`
-                    const ua = typeof m?.userAvatar === 'string' ? m.userAvatar.trim() : ''
-                    if (ua) return `avatar:${ua}`
-                    // Backward-compat: treat unknown human author as the same person.
-                    return 'unknown'
-                  }
-                  const assistantKey = (m: any): string | null => {
-                    if (!m || String(m?.role ?? '') !== 'assistant') return null
-                    // Don't treat tool_result rows as part of an assistant "turn" for spacing.
-                    if (String(m?.messageType ?? '') === 'tool_result') return null
-                    const turnId = typeof m?.turnId === 'string' ? String(m.turnId).trim() : ''
-                    if (turnId) return `turn:${turnId}`
-                    const agentId = typeof m?.agentId === 'string' ? String(m.agentId).trim() : ''
-                    if (agentId) return `agent:${agentId}`
-                    const agentName = typeof m?.agentName === 'string' ? String(m.agentName).trim() : ''
-                    if (agentName) return `name:${agentName}`
-                    return 'unknown'
-                  }
-                  const prevUserKey = prev ? userKey(prev) : null
-                  const currUserKey = userKey(message)
-                  const nextUserKey = next ? userKey(next) : null
+                  const prevUserKey = prev ? getTurnUserKey(prev) : null
+                  const currUserKey = getTurnUserKey(message)
+                  const nextUserKey = next ? getTurnUserKey(next) : null
                   const isConsecutiveUser = Boolean(currUserKey && prevUserKey && currUserKey === prevUserKey && !timeGapBreaksGroup)
                   const isNextConsecutiveUser = Boolean(currUserKey && nextUserKey && currUserKey === nextUserKey && !hasGroupTimeGap(message, next))
                   // When a user "turn" spans multiple messages, render *all* messages in that run using the compact
                   // message chrome so the spacing/padding is consistent (including the first message in the run).
                   const compactUserGroup = Boolean(currUserKey && (isConsecutiveUser || isNextConsecutiveUser))
-                  const prevAssistantKey = prev ? assistantKey(prev) : null
-                  const currAssistantKey = assistantKey(message)
-                  const nextAssistantKey = next ? assistantKey(next) : null
+                  const prevAssistantKey = prev ? getTurnAssistantKey(prev) : null
+                  const currAssistantKey = getTurnAssistantKey(message)
+                  const nextAssistantKey = next ? getTurnAssistantKey(next) : null
                   const isConsecutiveAssistant = Boolean(currAssistantKey && prevAssistantKey && currAssistantKey === prevAssistantKey && !timeGapBreaksGroup)
                   const isNextConsecutiveAssistant = Boolean(currAssistantKey && nextAssistantKey && currAssistantKey === nextAssistantKey && !hasGroupTimeGap(message, next))
                   const compactAssistantGroup = Boolean(currAssistantKey && (isConsecutiveAssistant || isNextConsecutiveAssistant))
+                  const isLastInTurn = localIdx === lastLocalIdx
                   const startsNewGroup = (() => {
                     if (!prev) return false
                     if (message.role === 'assistant') return Boolean(showAssistantAvatar)
@@ -2371,6 +2356,7 @@ export function ConversationMessageList({
                                 })()
                               ]
                           )}
+                          isLastInTurn={isLastInTurn}
                         />
                         {roomId && cid && pendingInvitesByMessageId.has(String(message.id)) ? (
                           <div className="ml-10 sm:ml-12">
@@ -2403,6 +2389,9 @@ export function ConversationMessageList({
                         ) : null}
                       </div>
                     </Fragment>
+                      )
+                      })}
+                    </TurnGroupWrapper>
                   )
                 })}
               </>
@@ -2602,6 +2591,8 @@ interface ConversationMessageBubbleProps {
   presenceRevision?: number
   /** When true, apply the quick enter animation to user messages. */
   animateUserEnter?: boolean
+  /** True when this is the last message in its turn group — only this message shows the action bar and reactions. */
+  isLastInTurn?: boolean
 }
 
 const HIGHLIGHT_TERM_MAX_LENGTH = 200
@@ -2668,6 +2659,104 @@ function MessageDateDivider({ label }: { label: string }) {
       <div className="rounded-full border border-border/60 bg-muted/40 px-3 py-0.5 text-xs font-medium text-muted-foreground">{label}</div>
       <div className="h-px flex-1 bg-border/60" />
     </div>
+  )
+}
+
+function getTurnUserKey(m: any): string | null {
+  if (!m || String(m?.role ?? '') !== 'user') return null
+  const uid = typeof m?.userId === 'string' ? m.userId.trim() : ''
+  if (uid) return `id:${uid}`
+  const un = typeof m?.userName === 'string' ? m.userName.trim() : ''
+  if (un) return `name:${un}`
+  const ua = typeof m?.userAvatar === 'string' ? m.userAvatar.trim() : ''
+  if (ua) return `avatar:${ua}`
+  return 'unknown'
+}
+
+function getTurnAssistantKey(m: any): string | null {
+  if (!m || String(m?.role ?? '') !== 'assistant') return null
+  if (String(m?.messageType ?? '') === 'tool_result') return null
+  const turnId = typeof m?.turnId === 'string' ? String(m.turnId).trim() : ''
+  if (turnId) return `turn:${turnId}`
+  const agentId = typeof m?.agentId === 'string' ? String(m.agentId).trim() : ''
+  if (agentId) return `agent:${agentId}`
+  const agentName = typeof m?.agentName === 'string' ? String(m.agentName).trim() : ''
+  if (agentName) return `name:${agentName}`
+  return 'unknown'
+}
+
+type TurnGroup = {
+  groupId: string
+  messages: Array<{ message: any; originalIdx: number }>
+}
+
+function buildTurnGroups(messages: any[]): TurnGroup[] {
+  const groups: TurnGroup[] = []
+  for (let i = 0; i < messages.length; i++) {
+    const message = messages[i]
+    const prev = i > 0 ? messages[i - 1] : null
+    const messageDateKey = getMessageDateKey(message)
+    const prevDateKey = getMessageDateKey(prev)
+    const dateBoundary = Boolean(messageDateKey && prevDateKey && messageDateKey !== prevDateKey)
+    const timeGap = hasGroupTimeGap(prev, message)
+    const currKey = getTurnAssistantKey(message) ?? getTurnUserKey(message) ?? `msg:${message.id}`
+    const prevKey = prev ? (getTurnAssistantKey(prev) ?? getTurnUserKey(prev) ?? `msg:${prev.id}`) : null
+    const sameGroup = Boolean(prevKey && currKey && prevKey === currKey && !timeGap && !dateBoundary)
+    if (!sameGroup || groups.length === 0) {
+      groups.push({ groupId: `grp:${message.id}`, messages: [] })
+    }
+    groups[groups.length - 1].messages.push({ message, originalIdx: i })
+  }
+  return groups
+}
+
+function TurnGroupWrapper({ children }: { children: ReactNode }) {
+  const [isTurnHovered, setIsTurnHovered] = useState(false)
+  const [mobileActionsOpen, setMobileActionsOpen] = useState(false)
+  const longPressTimerRef = useRef<number | null>(null)
+  const longPressTriggeredRef = useRef(false)
+
+  return (
+    <TurnHoverContext.Provider value={{ isTurnHovered, mobileActionsOpen, setMobileActionsOpen }}>
+      <div
+        className={cn('rounded-lg transition-colors -mx-2 px-2', isTurnHovered ? 'bg-muted/30' : '')}
+        onMouseEnter={() => setIsTurnHovered(true)}
+        onMouseLeave={() => setIsTurnHovered(false)}
+        onPointerDown={e => {
+          if (e.pointerType !== 'touch') return
+          longPressTriggeredRef.current = false
+          if (longPressTimerRef.current) {
+            window.clearTimeout(longPressTimerRef.current)
+            longPressTimerRef.current = null
+          }
+          longPressTimerRef.current = window.setTimeout(() => {
+            longPressTimerRef.current = null
+            longPressTriggeredRef.current = true
+            setMobileActionsOpen(true)
+          }, 420)
+        }}
+        onPointerUp={() => {
+          if (longPressTimerRef.current) {
+            window.clearTimeout(longPressTimerRef.current)
+            longPressTimerRef.current = null
+          }
+        }}
+        onPointerCancel={() => {
+          if (longPressTimerRef.current) {
+            window.clearTimeout(longPressTimerRef.current)
+            longPressTimerRef.current = null
+          }
+        }}
+        onClickCapture={e => {
+          if (!longPressTriggeredRef.current) return
+          longPressTriggeredRef.current = false
+          e.preventDefault()
+          e.stopPropagation()
+        }}
+      >
+        {children}
+      </div>
+    </TurnHoverContext.Provider>
   )
 }
 
@@ -2867,6 +2956,7 @@ const MemoizedMessageBubble = memo(
     notifUnread,
     presenceRevision,
     animateUserEnter = false,
+    isLastInTurn = true,
   }: ConversationMessageBubbleProps) {
     void presenceRevision
     const isHero = sizeVariant === 'hero'
@@ -3351,9 +3441,9 @@ const MemoizedMessageBubble = memo(
                   content={messageDisplayContent}
                   messageId={message.id}
                   enableMarkdown={true}
-                  enableCopy={!isDeletedMessage}
-                  extraActions={messageActionNodesBeforeCopy}
-                  extraActionsAfterCopy={moreActionButton}
+                  enableCopy={isLastInTurn && !isDeletedMessage}
+                  extraActions={isLastInTurn ? messageActionNodesBeforeCopy : null}
+                  extraActionsAfterCopy={isLastInTurn ? moreActionButton : null}
                   enableLinkPreview={true}
                   isStreaming={false}
                   // Always compact (no "normal" padding mode).
@@ -3375,7 +3465,7 @@ const MemoizedMessageBubble = memo(
                   highlightTerm={highlightTerm}
                 />
               )}
-              {typeof starshipId === 'string' && starshipId.trim().length > 0 && !isDeletedMessage && (
+              {isLastInTurn && typeof starshipId === 'string' && starshipId.trim().length > 0 && !isDeletedMessage && (
                 <MessageReactions
                   conversationId={cid}
                   starshipId={starshipId}
@@ -3494,9 +3584,9 @@ const MemoizedMessageBubble = memo(
                   content={messageDisplayContent}
                   messageId={message.id}
                   enableMarkdown={true}
-                  enableCopy={!isStreamingActive && !isDeletedMessage}
-                  extraActions={messageActionNodesBeforeCopy}
-                  extraActionsAfterCopy={moreActionButton}
+                  enableCopy={isLastInTurn && !isStreamingActive && !isDeletedMessage}
+                  extraActions={isLastInTurn ? messageActionNodesBeforeCopy : null}
+                  extraActionsAfterCopy={isLastInTurn ? moreActionButton : null}
                   enableLinkPreview={true}
                   isStreaming={!!isStreamingActive}
                   // Always compact (no "normal" padding mode).
@@ -3518,7 +3608,7 @@ const MemoizedMessageBubble = memo(
                   isLastMessage={isLastMessage}
                   highlightTerm={highlightTerm}
                 />
-                {typeof starshipId === 'string' && starshipId.trim().length > 0 && !isDeletedMessage && (
+                {isLastInTurn && typeof starshipId === 'string' && starshipId.trim().length > 0 && !isDeletedMessage && (
                   <MessageReactions
                     conversationId={cid}
                     starshipId={starshipId}
@@ -3627,9 +3717,9 @@ const MemoizedMessageBubble = memo(
                 content={messageDisplayContent}
                 messageId={message.id}
                 enableMarkdown={true}
-                enableCopy={!isStreamingActive && !isDeletedMessage}
-                extraActions={messageActionNodesBeforeCopy}
-                extraActionsAfterCopy={moreActionButton}
+                enableCopy={isLastInTurn && !isStreamingActive && !isDeletedMessage}
+                extraActions={isLastInTurn ? messageActionNodesBeforeCopy : null}
+                extraActionsAfterCopy={isLastInTurn ? moreActionButton : null}
                 enableLinkPreview={true}
                 isStreaming={!!isStreamingActive}
                 // Always compact (no "normal" padding mode).
@@ -3650,7 +3740,7 @@ const MemoizedMessageBubble = memo(
                 isLastMessage={isLastMessage}
                 highlightTerm={highlightTerm}
               />
-              {typeof starshipId === 'string' && starshipId.trim().length > 0 && !isDeletedMessage && (
+              {isLastInTurn && typeof starshipId === 'string' && starshipId.trim().length > 0 && !isDeletedMessage && (
                 <MessageReactions
                   conversationId={cid}
                   starshipId={starshipId}
@@ -3717,6 +3807,7 @@ const MemoizedMessageBubble = memo(
     if (Boolean(prevProps.compactUserGroup) !== Boolean(nextProps.compactUserGroup)) return false
     if (Boolean(prevProps.compactAssistantGroup) !== Boolean(nextProps.compactAssistantGroup)) return false
     if (Boolean(prevProps.startsNewGroup) !== Boolean(nextProps.startsNewGroup)) return false
+    if (Boolean(prevProps.isLastInTurn) !== Boolean(nextProps.isLastInTurn)) return false
     if ((prevProps.isFirstMessage ?? false) !== (nextProps.isFirstMessage ?? false)) return false
     if (Boolean(prevProps.suppressLinkedConversationCard) !== Boolean(nextProps.suppressLinkedConversationCard)) return false
 

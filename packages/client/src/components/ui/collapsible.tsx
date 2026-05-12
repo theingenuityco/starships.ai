@@ -80,11 +80,12 @@ const CollapsibleTrigger = React.forwardRef<HTMLButtonElement, CollapsibleTrigge
       id={triggerId}
       aria-expanded={isOpen}
       aria-controls={contentId}
+      data-state={isOpen ? 'open' : 'closed'}
       className={cn('flex items-center justify-between w-full text-left transition-colors hover:bg-muted/50 rounded-md p-2', className)}
       onClick={toggle}
       {...props}
     >
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 w-full">
         {children}
       </div>
     </button>

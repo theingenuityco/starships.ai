@@ -363,7 +363,7 @@ export function AgentActivityColumn({ starshipId }: AgentActivityColumnProps) {
                             </span>
                           )}
                           {conv.status === 'paused' && (
-                            <span className="inline-flex items-center text-[10px] text-amber-500/80 px-1.5 py-0.5 rounded border border-amber-500/20 bg-amber-500/5">
+                            <span className="inline-flex items-center text-[10px] text-muted-foreground px-1.5 py-0.5 rounded border border-border/60 bg-muted/30">
                               Paused
                             </span>
                           )}

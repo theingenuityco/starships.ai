@@ -160,10 +160,10 @@ export function ApprovalsPanel({ starshipId }: ApprovalsPanelProps) {
     <div className="flex flex-col min-h-0">
       {/* Header */}
       <div className="flex items-center gap-2 px-5 py-3.5">
-        <Icon name="alert-circle" className="h-3.5 w-3.5 text-amber-500 flex-shrink-0" />
+        <Icon name="alert-circle" className="h-3.5 w-3.5 text-primary flex-shrink-0" />
         <span className="text-sm font-semibold tracking-tight">Approvals</span>
         {allApprovals.length > 0 && (
-          <span className="inline-flex items-center justify-center rounded-full bg-amber-500 text-white text-[10px] font-bold px-1.5 h-[18px] min-w-[18px] tabular-nums">
+          <span className="inline-flex items-center justify-center rounded-full bg-primary text-primary-foreground text-[10px] font-bold px-1.5 h-[18px] min-w-[18px] tabular-nums">
             {allApprovals.length}
           </span>
         )}

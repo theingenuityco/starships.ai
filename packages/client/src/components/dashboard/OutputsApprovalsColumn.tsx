@@ -203,13 +203,13 @@ export function OutputsApprovalsColumn({ starshipId }: OutputsApprovalsColumnPro
 
   return (
     <div className="flex flex-col h-full min-h-0">
-      <div className="h-0.5 bg-amber-500/70 flex-shrink-0" />
+      <div className="h-0.5 bg-primary/50 flex-shrink-0" />
       {/* Column header */}
       <div className="flex items-center gap-2 px-5 py-3.5 border-b border-border/40">
-        <Icon name="check-circle" className="h-3.5 w-3.5 text-amber-500 flex-shrink-0" />
+        <Icon name="check-circle" className="h-3.5 w-3.5 text-primary flex-shrink-0" />
         <span className="text-sm font-semibold tracking-tight">Outputs</span>
         {allApprovals.length > 0 && (
-          <span className="inline-flex items-center justify-center rounded-full bg-amber-500 text-white text-[10px] font-bold px-1.5 h-[18px] min-w-[18px] tabular-nums">
+          <span className="inline-flex items-center justify-center rounded-full bg-primary text-primary-foreground text-[10px] font-bold px-1.5 h-[18px] min-w-[18px] tabular-nums">
             {allApprovals.length}
           </span>
         )}
@@ -220,21 +220,21 @@ export function OutputsApprovalsColumn({ starshipId }: OutputsApprovalsColumnPro
         <div className={cn(
           'flex items-center gap-2 px-5 py-2.5 border-b',
           allApprovals.length > 0
-            ? 'bg-amber-500/5 border-amber-500/15'
+            ? 'bg-primary/5 border-primary/15'
             : 'border-border/30'
         )}>
           <Icon
             name="alert-circle"
-            className={cn('h-3.5 w-3.5 flex-shrink-0', allApprovals.length > 0 ? 'text-amber-500' : 'text-muted-foreground/40')}
+            className={cn('h-3.5 w-3.5 flex-shrink-0', allApprovals.length > 0 ? 'text-primary' : 'text-muted-foreground/40')}
           />
           <span className={cn(
             'text-xs font-semibold',
-            allApprovals.length > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground/60'
+            allApprovals.length > 0 ? 'text-primary' : 'text-muted-foreground/60'
           )}>
             Pending Approvals
           </span>
           {allApprovals.length > 0 && (
-            <span className="ml-auto text-[10px] text-amber-500 font-semibold tabular-nums">{allApprovals.length} waiting</span>
+            <span className="ml-auto text-[10px] text-primary font-semibold tabular-nums">{allApprovals.length} waiting</span>
           )}
         </div>
 

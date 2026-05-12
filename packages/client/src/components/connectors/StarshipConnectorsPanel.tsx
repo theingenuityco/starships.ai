@@ -27,8 +27,8 @@ import { cn } from '@/lib/utils'
 import { ConnectorLogo } from '@/components/marketplace/ConnectorLogo'
 
 const CONNECTOR_CTA_BUTTON_CLASS =
-  'h-9 px-3 font-medium transition-all duration-200 border border-transparent text-[rgba(245,158,11,0.8)] hover:text-[rgba(245,158,11,0.8)] hover:border-[rgba(245,158,11,0.25)] hover:bg-[linear-gradient(135deg,rgba(245,158,11,0.10),rgba(251,191,36,0.06))] hover:shadow-[0_0_4px_rgba(245,158,11,0.10)] disabled:text-muted-foreground disabled:hover:text-muted-foreground disabled:hover:border-transparent disabled:hover:bg-transparent disabled:hover:shadow-none'
-const CONNECTOR_CTA_ICON_CLASS = 'mr-1 h-4 w-4 text-[rgba(245,158,11,0.85)] group-disabled:text-muted-foreground'
+  'h-9 px-3 font-medium transition-all duration-200 border border-transparent text-primary/80 hover:text-primary hover:border-primary/25 hover:bg-primary/10 hover:shadow-sm disabled:text-muted-foreground disabled:hover:text-muted-foreground disabled:hover:border-transparent disabled:hover:bg-transparent disabled:hover:shadow-none'
+const CONNECTOR_CTA_ICON_CLASS = 'mr-1 h-4 w-4 text-primary/80 group-disabled:text-muted-foreground'
 
 const INTERNAL_STARSHIPS_CONNECTOR_PROVIDER = 'starships'
 
@@ -1345,7 +1345,7 @@ export function StarshipConnectorsPanel({
                           <div key={f.key} className="space-y-1 sm:col-span-2">
                             <label className="text-xs font-medium text-muted-foreground">
                               {f.title ?? f.key}
-                              {f.required ? <span className="text-[rgba(245,158,11,0.85)]"> *</span> : null}
+                              {f.required ? <span className="text-primary/70"> *</span> : null}
                               {basicMetadataErrors[f.key] ? <span className="ml-2 text-rose-300">{basicMetadataErrors[f.key]}</span> : null}
                             </label>
                             {f.description ? <div className="text-[11px] text-muted-foreground">{f.description}</div> : null}
@@ -1373,7 +1373,7 @@ export function StarshipConnectorsPanel({
                           <div key={f.key} className="space-y-1 sm:col-span-1">
                             <label className="text-xs font-medium text-muted-foreground">
                               {f.title ?? f.key}
-                              {f.required ? <span className="text-[rgba(245,158,11,0.85)]"> *</span> : null}
+                              {f.required ? <span className="text-primary/70"> *</span> : null}
                               {basicMetadataErrors[f.key] ? <span className="ml-2 text-rose-300">{basicMetadataErrors[f.key]}</span> : null}
                             </label>
                             <Input
@@ -1403,7 +1403,7 @@ export function StarshipConnectorsPanel({
                         <div key={f.key} className="space-y-1">
                           <label className="text-xs font-medium text-muted-foreground">
                             {f.title ?? f.key}
-                            {f.required ? <span className="text-[rgba(245,158,11,0.85)]"> *</span> : null}
+                            {f.required ? <span className="text-primary/70"> *</span> : null}
                             {basicMetadataErrors[f.key] ? <span className="ml-2 text-rose-300">{basicMetadataErrors[f.key]}</span> : null}
                           </label>
                           <Input
@@ -1444,7 +1444,7 @@ export function StarshipConnectorsPanel({
                                 <div key={f.key} className="space-y-1">
                                   <label className="text-xs font-medium text-muted-foreground">
                                     {f.title ?? f.key}
-                                    {f.required ? <span className="text-[rgba(245,158,11,0.85)]"> *</span> : null}
+                                    {f.required ? <span className="text-primary/70"> *</span> : null}
                                     {basicMetadataErrors[f.key] ? <span className="ml-2 text-rose-300">{basicMetadataErrors[f.key]}</span> : null}
                                   </label>
                                   {f.description ? <div className="text-[11px] text-muted-foreground">{f.description}</div> : null}
@@ -1520,7 +1520,7 @@ export function StarshipConnectorsPanel({
                       <div key={f.key} className="space-y-1">
                         <label className="text-xs font-medium text-muted-foreground">
                           {f.title ?? f.key}
-                          {f.required ? <span className="text-[rgba(245,158,11,0.85)]"> *</span> : null}
+                          {f.required ? <span className="text-primary/70"> *</span> : null}
                           {basicMetadataErrors[f.key] ? <span className="ml-2 text-rose-300">{basicMetadataErrors[f.key]}</span> : null}
                         </label>
                         {f.description ? <div className="text-[11px] text-muted-foreground">{f.description}</div> : null}

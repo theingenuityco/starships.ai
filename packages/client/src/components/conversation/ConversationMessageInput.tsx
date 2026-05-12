@@ -2224,7 +2224,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
               </div>
               <div className="flex-shrink-0">
                 <Link href={billingHref}>
-                  <Button variant="default" size="sm" className="bg-amber-500 hover:bg-amber-600 text-white border-0 shadow-md hover:shadow-lg transition-all duration-200 font-medium">
+                  <Button variant="default" size="sm" className="border-0 shadow-md hover:shadow-lg transition-all duration-200 font-medium">
                     Get credits
                   </Button>
                 </Link>
@@ -2453,7 +2453,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                       className={cn(
                         'h-8 w-8 rounded-full shrink-0 transition-all',
                         canSend
-                          ? 'text-white bg-gradient-to-b from-amber-300 via-amber-400 to-amber-500 shadow-[0_4px_0_0_rgba(180,83,9,1)] hover:brightness-110 active:shadow-[0_2px_0_0_rgba(180,83,9,1)] active:-translate-y-[1px] [&_svg]:text-white'
+                          ? 'text-white bg-primary shadow-[0_4px_0_0_rgba(71,85,105,1)] hover:brightness-110 active:shadow-[0_2px_0_0_rgba(71,85,105,1)] active:-translate-y-[1px] [&_svg]:text-white'
                           : 'border border-border bg-muted/80 text-muted-foreground cursor-not-allowed [&_svg]:text-muted-foreground'
                       )}
                       aria-label="Send"
@@ -2606,7 +2606,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                     className={cn(
                       'h-8 w-8 rounded-full shrink-0 transition-all',
                       canSend
-                        ? 'text-white bg-gradient-to-b from-amber-300 via-amber-400 to-amber-500 shadow-[0_4px_0_0_rgba(180,83,9,1)] hover:brightness-110 active:shadow-[0_2px_0_0_rgba(180,83,9,1)] active:-translate-y-[1px] [&_svg]:text-white'
+                        ? 'text-white bg-primary shadow-[0_4px_0_0_rgba(71,85,105,1)] hover:brightness-110 active:shadow-[0_2px_0_0_rgba(71,85,105,1)] active:-translate-y-[1px] [&_svg]:text-white'
                         : 'border border-border bg-muted/80 text-muted-foreground cursor-not-allowed [&_svg]:text-muted-foreground'
                     )}
                     aria-label="Send"

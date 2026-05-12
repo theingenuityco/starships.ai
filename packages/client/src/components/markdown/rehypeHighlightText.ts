@@ -52,7 +52,7 @@ export function rehypeHighlightText(options: { highlightTerm?: string }) {
             type: 'element',
             tagName: 'mark',
             properties: {
-              className: ['bg-amber-200/70', 'dark:bg-amber-400/50', 'rounded', 'px-0.5', 'font-medium'],
+              className: ['bg-primary/20', 'rounded', 'px-0.5', 'font-medium'],
             },
             children: [{ type: 'text', value: part }],
           }

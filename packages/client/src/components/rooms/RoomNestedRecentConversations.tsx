@@ -1,11 +1,9 @@
 'use client'
 
 import Icon from '@/components/primitives/Icon'
-import { Button } from '@/components/ui/button'
 import { useChildConversationsPaged } from '@/hooks/useConversations'
 import { cn } from '@/lib/utils'
 import { normalizeConversationTitle } from '@/lib/normalizeConversationTitle'
-import { formatDistanceToNow } from 'date-fns'
 import { useRouter } from 'next/navigation'
 import { useMemo } from 'react'
 
@@ -55,7 +53,7 @@ export function RoomNestedRecentConversations(props: {
   }
 
   return (
-    <div className="ml-2 pl-2 pr-1 pb-1">
+    <div className="ml-2 pl-2 pr-1 pb-1 overflow-hidden">
       <div className="space-y-0.5">
         {recent.map((c: any, idx: number) => {
           const id = String(c?.id || '').trim()
@@ -64,30 +62,20 @@ export function RoomNestedRecentConversations(props: {
           const titleRaw = String(c?.title || '').trim()
           const titleNorm = normalizeConversationTitle(titleRaw)
           const title = titleNorm || 'Untitled conversation'
-          const when = c?.updatedAt || c?.createdAt
-          const whenText = when ? formatDistanceToNow(new Date(when), { addSuffix: false }) : ''
           return (
-            <Button
+            <button
               key={`room:${props.roomSlug}:recent:${id}`}
               type="button"
-              variant="ghost"
               className={cn(
-                // Match NavigationItem compact sidebar row styling + add connector branch.
-                "relative w-full h-7 px-2 justify-start text-left text-[12px] font-medium rounded-lg border border-transparent gap-2 min-w-0",
-                "bg-transparent hover:bg-transparent focus-visible:bg-transparent",
-                isActive ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
+                'flex items-center w-full h-7 px-2 gap-1.5 rounded-lg border border-transparent text-[12px] font-medium transition-colors overflow-hidden',
+                isActive ? 'text-primary' : 'text-muted-foreground hover:text-foreground hover:bg-muted/70 dark:hover:bg-[#2C2C30]'
               )}
               onClick={() => openConversation(id)}
               title={title}
             >
               <Icon name="message-square" className="h-3 w-3 flex-shrink-0 opacity-80" />
-              <div className="min-w-0 flex-1">
-                <span className="block w-full" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {title}
-                </span>
-              </div>
-              {whenText ? <span className="flex-shrink-0 text-[10px] text-muted-foreground">{whenText}</span> : null}
-            </Button>
+              <span className="flex-1 min-w-0 truncate">{title}</span>
+            </button>
           )
         })}
 

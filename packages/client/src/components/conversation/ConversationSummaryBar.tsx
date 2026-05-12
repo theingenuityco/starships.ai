@@ -1,19 +1,9 @@
 'use client'
 
-import { Avatar } from '@/components/ui/avatar'
-import { useConversationAgents, useConversationDetail } from '@/hooks/useConversations'
-import { useConversationStreamContextOptional } from '@/hooks/ConversationStreamContext'
-import { useConversationUsageTotals } from '@/hooks/useUsage'
-import { formatAgentDisplayName } from '@/lib/agentDisplay'
+import { useConversationDetail } from '@/hooks/useConversations'
 import { cn } from '@/lib/utils'
-import { useUserPreferencesStore } from '@/store/user-preferences-store'
-import { useAuth } from '@/hooks/useAuth'
-import { useStarshipMembersAndInvites } from '@/hooks/useStarshipMembers'
-import api from '@/lib/api'
-import { useQuery } from '@tanstack/react-query'
 import { motion } from 'motion/react'
 import { useMemo, useEffect, useRef, type ReactNode } from 'react'
-import { useStarshipPresence } from '@/hooks/useStarshipPresence'
 import { MobileNavToggleButton } from '@/components/navigation/MobileNavToggleButton'
 
 export type ConversationParticipantItem = { kind: 'human'; key: string; label: string; avatarUrl?: string } | { kind: 'agent'; key: string; label: string; seed: string; avatarAttachmentId?: string }
@@ -38,44 +28,24 @@ interface ConversationSummaryBarProps {
   titleRightSlot?: ReactNode
   /** Optional right-side content (e.g. controls). */
   rightSlot?: ReactNode
-  /** Optional third-line content under the metadata row (e.g. agent selector). */
-  thirdLineSlot?: ReactNode
   /** Optional title to show when `conversationId` is null (e.g. draft thread). */
   fallbackTitle?: string
-  /** Optional subtitle to show when `conversationId` is null (e.g. "Draft (not saved)"). */
+  /** @deprecated No longer rendered. Kept for API compatibility. */
   fallbackSubtitle?: string
-  /**
-   * Optional participants override (useful for draft headers before a conversation exists).
-   * When set, these participants will be used for the header avatars/list.
-   */
+  /** @deprecated No longer rendered. Kept for API compatibility. */
+  thirdLineSlot?: ReactNode
+  /** @deprecated No longer rendered. Kept for API compatibility. */
   participantsOverride?: ConversationParticipantItem[] | null
-  /**
-   * Optional extra participants that should be included in the header list, merged with
-   * the derived participants (deduped by `key`).
-   *
-   * Useful for thread panes where the "linked/pinned" message author may not have posted
-   * in the thread conversation yet, so message-sampling would miss them.
-   */
+  /** @deprecated No longer rendered. Kept for API compatibility. */
   participantsHint?: ConversationParticipantItem[] | null
-
-  /** Optional: clicking the participant count should open the room participants modal. */
+  /** @deprecated No longer rendered. Kept for API compatibility. */
   onParticipantsClick?: (() => void) | null
-}
-
-interface ConversationAgent {
-  id?: string
-  name: string
-  role?: string
-  slug?: string
-  model?: string
-  avatarAttachmentId?: string
 }
 
 function normalizeConversationTitle(raw: string): string {
   const t = String(raw || '').trim()
   if (!t) return t
   // Back-compat: older DM conversations were titled like "DM • Alice".
-  // Support common separators: bullet (•), middle dot (·), colon, hyphen/en-dash/em-dash.
   const m = t.match(/^DM\s*[•·:\-–—]\s*(.+)$/i)
   if (m?.[1]) {
     const rest = String(m[1]).trim()
@@ -92,7 +62,7 @@ function normalizeConversationTitle(raw: string): string {
 
 export function ConversationSummaryBar({
   conversationId,
-  starshipId,
+  starshipId: _starshipId,
   modelId: _modelId,
   maxTokens: _maxTokens,
   titlePrefix,
@@ -100,376 +70,51 @@ export function ConversationSummaryBar({
   mobileLeftSlot,
   titleRightSlot,
   rightSlot,
-  thirdLineSlot,
   fallbackTitle,
-  fallbackSubtitle,
-  participantsOverride,
-  participantsHint,
-  onParticipantsClick,
 }: ConversationSummaryBarProps) {
-  const expertMode = useUserPreferencesStore(s => s.expertMode)
-  const { isInstanceAdmin, userId: authUserId, userName: authUserName, userEmail: authUserEmail, userAvatar: authUserAvatar } = useAuth()
-  const showTokens = expertMode
-  const showCost = expertMode && isInstanceAdmin
-  const { isUserOnline } = useStarshipPresence(starshipId, Boolean(starshipId))
-
-  // Starship member directory (for resolving userId -> displayName/avatar in participant lists)
-  const { data: membersAndInvites } = useStarshipMembersAndInvites(starshipId, Boolean(starshipId))
-  const memberByUserId = useMemo(() => {
-    const list = Array.isArray((membersAndInvites as any)?.members) ? (((membersAndInvites as any).members as any[]) ?? []) : []
-    const m = new Map<string, { displayName?: string | null; email?: string | null; avatar?: string | null }>()
-    for (const it of list) {
-      const id = typeof it?.userId === 'string' ? String(it.userId).trim() : ''
-      if (!id) continue
-      m.set(id, {
-        displayName: typeof it?.displayName === 'string' ? String(it.displayName) : null,
-        email: typeof it?.email === 'string' ? String(it.email) : null,
-        avatar: typeof it?.avatar === 'string' ? String(it.avatar) : null,
-      })
-    }
-    return m
-  }, [membersAndInvites])
-
-  // Fetch conversation detail directly (avoids pagination gaps in starship conversation lists)
   const { data: currentConversation, isLoading: isLoadingConversation } = useConversationDetail(conversationId)
-  const isConversationBusy = !!((currentConversation as any)?.state && typeof (currentConversation as any)?.state === 'object' && ((currentConversation as any).state as any).turnActive === true)
 
-  // Derive agents for this conversation (same source as the left navigation list)
-  const { data: convAgents = [], isLoading: isLoadingAgents } = useConversationAgents(conversationId)
-  const agents = useMemo(() => (Array.isArray(convAgents) ? (convAgents as ConversationAgent[]) : []), [convAgents])
+  const isDataReady = !isLoadingConversation && !!currentConversation
 
-  // Include human participants by sampling recent message authors (matches thread card behavior).
-  // Derive from stream when available to avoid redundant /messages API call; fallback to API otherwise.
-  const stream = useConversationStreamContextOptional()
-  const participantsPreviewFromStream = useMemo(() => {
-    if (!conversationId || !stream?.hasSnapshot || !Array.isArray(stream.messages)) return null
-    return { messages: stream.messages, participants: [] as string[] }
-  }, [conversationId, stream?.hasSnapshot, stream?.messages])
-  const { data: participantsPreviewFromApi } = useQuery({
-    queryKey: ['conversations', 'participants-preview', conversationId],
-    enabled: Boolean(conversationId) && !participantsPreviewFromStream,
-    queryFn: async () => {
-      const cid = String(conversationId || '')
-      if (!cid) return null
-      const resp = await api.get(`/api/v1/conversations/${encodeURIComponent(cid)}/messages`, { params: { limit: 10 } })
-      return (resp as any)?.data?.data ?? null
-    },
-    staleTime: 60_000,
-  })
-  const participantsPreview = participantsPreviewFromStream ?? participantsPreviewFromApi
-
-  const participantItemsFromConversation = useMemo<ConversationParticipantItem[]>(() => {
-    type ParticipantWithSeen = (ConversationParticipantItem & { lastSeenAt: number }) | null
-    const byKey = new Map<string, ConversationParticipantItem & { lastSeenAt: number }>()
-
-    const upsert = (next: ConversationParticipantItem, lastSeenAt: number) => {
-      const prev = byKey.get(next.key)
-      if (!prev) {
-        byKey.set(next.key, { ...(next as any), lastSeenAt })
-        return
-      }
-      const prevSeen = typeof (prev as any).lastSeenAt === 'number' ? (prev as any).lastSeenAt : 0
-      const mergedSeen = Math.max(prevSeen, lastSeenAt)
-      // Prefer richer metadata (e.g. avatarUrl) as we learn it.
-      byKey.set(next.key, { ...(prev as any), ...(next as any), lastSeenAt: mergedSeen })
-    }
-
-    const parseSeenAt = (m: any): number => {
-      const raw = typeof m?.createdAt === 'string' ? m.createdAt : typeof m?.updatedAt === 'string' ? m.updatedAt : null
-      const t = raw ? Date.parse(raw) : NaN
-      return Number.isFinite(t) ? t : 0
-    }
-
-    // Humans: derive from recent messages' user identity fields.
-    const msgs = Array.isArray((participantsPreview as any)?.messages) ? (((participantsPreview as any).messages as any[]) ?? []) : []
-    for (const m of msgs) {
-      const role = String(m?.role ?? '')
-      const seenAt = parseSeenAt(m)
-
-      if (role === 'user') {
-        const userId = typeof m?.userId === 'string' ? String(m.userId).trim() : ''
-        const userName = typeof m?.userName === 'string' ? String(m.userName).trim() : ''
-        const userAvatar = typeof m?.userAvatar === 'string' ? String(m.userAvatar).trim() : ''
-
-        const fromDirectory = userId ? memberByUserId.get(userId) : null
-        const label =
-          userName ||
-          (userId === String(authUserId || '') ? String(authUserName || authUserEmail || '') : '') ||
-          fromDirectory?.displayName?.trim() ||
-          fromDirectory?.email?.trim() ||
-          '' ||
-          (userId ? `User ${userId.slice(0, 6)}` : 'User')
-        const key = userId ? `human:${userId}` : userName ? `human:name:${userName}` : `human:unknown:${label}`
-        const avatarUrl = userAvatar || fromDirectory?.avatar?.trim() || ''
-        upsert({ kind: 'human', key, label, ...(avatarUrl ? { avatarUrl } : null) }, seenAt)
-      }
-
-      if (role === 'assistant') {
-        const agentId = typeof m?.agentId === 'string' ? String(m.agentId).trim() : ''
-        const agentName = typeof m?.agentName === 'string' ? String(m.agentName).trim() : ''
-        const label = agentName || (agentId ? `Agent ${agentId.slice(0, 6)}` : 'Agent')
-        const key = `agent:${agentId || label}`
-        const seed = agentName || agentId || label
-        const fromList = agentId ? (agents as any[]).find(a => String((a as any)?.id || '') === agentId) : null
-        const avatarAttachmentId = typeof (fromList as any)?.avatarAttachmentId === 'string' ? String((fromList as any).avatarAttachmentId).trim() : ''
-        upsert({ kind: 'agent', key, label, seed, ...(avatarAttachmentId ? { avatarAttachmentId } : null) }, seenAt)
-      }
-    }
-
-    // Stable participants list from server (includes conversation member userIds and linked agentIds).
-    // This is critical for user↔user threads: the peer user may not have posted in the thread yet,
-    // so message sampling would only include the current user.
-    const participants = Array.isArray((participantsPreview as any)?.participants) ? (((participantsPreview as any).participants as any[]) ?? []) : []
-    if (participants.length > 0) {
-      for (const raw of participants) {
-        const id = typeof raw === 'string' ? raw.trim() : ''
-        if (!id) continue
-        const isAgent = (agents as any[]).some(a => String((a as any)?.id || '').trim() === id)
-        if (isAgent) {
-          const fromList = (agents as any[]).find(a => String((a as any)?.id || '').trim() === id) as any
-          const label = String(fromList?.name || fromList?.slug || (id ? `Agent ${id.slice(0, 6)}` : 'Agent')).trim() || (id ? `Agent ${id.slice(0, 6)}` : 'Agent')
-          const key = `agent:${id || label}`
-          const seed = String(fromList?.name || fromList?.slug || id || label).trim() || label
-          const avatarAttachmentId = typeof fromList?.avatarAttachmentId === 'string' ? String(fromList.avatarAttachmentId).trim() : ''
-          upsert({ kind: 'agent', key, label, seed, ...(avatarAttachmentId ? { avatarAttachmentId } : null) }, 0)
-        } else {
-          const fromDirectory = memberByUserId.get(id)
-          const labelRaw = id === String(authUserId || '') ? String(authUserName || authUserEmail || '') : fromDirectory?.displayName?.trim() || fromDirectory?.email?.trim() || ''
-          const label = labelRaw || `User ${id.slice(0, 6)}`
-          const key = `human:${id}`
-          const avatarUrl = typeof fromDirectory?.avatar === 'string' ? fromDirectory.avatar.trim() : ''
-          upsert({ kind: 'human', key, label, ...(avatarUrl ? { avatarUrl } : null) }, 0)
-        }
-      }
-    }
-
-    // Agents: from the agents list.
-    for (let idx = 0; idx < agents.length; idx++) {
-      const a = agents[idx]
-      const id = typeof (a as any)?.id === 'string' ? String((a as any).id).trim() : ''
-      const label = String((a as any)?.name || (a as any)?.slug || id || `Agent ${idx + 1}`).trim() || `Agent ${idx + 1}`
-      const key = `agent:${id || label}`
-      const seed = String((a as any)?.name || (a as any)?.slug || id || `agent-${idx}`).trim() || `agent-${idx}`
-      const aid = typeof (a as any)?.avatarAttachmentId === 'string' ? String((a as any).avatarAttachmentId).trim() : ''
-      // Keep agents that haven't spoken yet; they sort after active participants.
-      upsert({ kind: 'agent', key, label, seed, ...(aid ? { avatarAttachmentId: aid } : null) }, 0)
-    }
-
-    const sorted = Array.from(byKey.values()).filter(Boolean) as Array<Exclude<ParticipantWithSeen, null>>
-
-    sorted.sort((a, b) => {
-      const da = typeof (a as any).lastSeenAt === 'number' ? (a as any).lastSeenAt : 0
-      const db = typeof (b as any).lastSeenAt === 'number' ? (b as any).lastSeenAt : 0
-      if (db !== da) return db - da
-      return String((a as any).label || '').localeCompare(String((b as any).label || ''))
-    })
-
-    return sorted.map(({ lastSeenAt: _lastSeenAt, ...rest }: any) => rest) as ConversationParticipantItem[]
-  }, [agents, authUserEmail, authUserId, authUserName, memberByUserId, participantsPreview])
-
-  const effectiveParticipantItems = useMemo(() => {
-    const rawOverride = Array.isArray(participantsOverride) && participantsOverride.length > 0 ? participantsOverride : null
-    const dedupedOverride =
-      rawOverride != null
-        ? (() => {
-            const seen = new Set<string>()
-            return rawOverride.filter(p => {
-              if (seen.has(p.key)) return false
-              seen.add(p.key)
-              return true
-            })
-          })()
-        : null
-    const base = dedupedOverride != null && dedupedOverride.length > 0 ? dedupedOverride : participantItemsFromConversation
-    const hint = Array.isArray(participantsHint) ? participantsHint.filter(Boolean) : []
-    if (hint.length === 0) return base
-
-    const out: ConversationParticipantItem[] = []
-    const seen = new Set<string>()
-    for (const p of base) {
-      if (!p || typeof (p as any).key !== 'string') continue
-      const k = String((p as any).key)
-      if (seen.has(k)) continue
-      seen.add(k)
-      out.push(p)
-    }
-    for (const p of hint) {
-      if (!p || typeof (p as any).key !== 'string') continue
-      const k = String((p as any).key)
-      if (seen.has(k)) continue
-      seen.add(k)
-      out.push(p)
-    }
-    return out.length > 0 ? out : base
-  }, [participantItemsFromConversation, participantsHint, participantsOverride])
-
-  const participantCountLabel = useMemo(() => {
-    const n = Array.isArray(effectiveParticipantItems) ? effectiveParticipantItems.length : 0
-    if (n <= 0) return '0 participants'
-    if (n === 1) return '1 participant'
-    return `${n} participants`
-  }, [effectiveParticipantItems])
-
-  const participantsTooltipLabel = useMemo(() => {
-    const labels = effectiveParticipantItems.map(p => p.label).filter(Boolean)
-    if (labels.length === 0) return 'No participants'
-    if (labels.length === 1) return labels[0] || 'Participant'
-    if (labels.length === 2) return `${labels[0]}, ${labels[1]}`
-    return `${labels[0]}, ${labels[1]} and ${labels.length - 2} more`
-  }, [effectiveParticipantItems])
-
-  // Token indicator: utilization (server totals) vs max (model context window)
-  const usageConversationId = showTokens ? conversationId : null
-  const { data: totalsData } = useConversationUsageTotals(usageConversationId)
-  const totalCost = Number(totalsData?.cost ?? 0)
-
-  // Only render actual header when all data is ready to prevent layout shifts
-  const isDataReady = !isLoadingConversation && !isLoadingAgents && !!currentConversation
-
-  // Use a key based on conversationId to ensure smooth remount animations
-  // This helps coordinate the animation when transitioning from starter page
   const animationKey = useMemo(() => conversationId || 'none', [conversationId])
 
-  // Track if this is the initial mount to prevent animation on page reload
   const isInitialMountRef = useRef(true)
-  // If we ever rendered the loading header for this conversationId,
-  // don't animate the "real" header in from the top when data arrives.
   const renderedPlaceholderForConversationRef = useRef(false)
+
   useEffect(() => {
-    // Mark initial mount as complete after a short delay
     const timer = setTimeout(() => {
       isInitialMountRef.current = false
     }, 100)
     return () => clearTimeout(timer)
   }, [])
 
-  // Reset placeholder tracking when switching conversations.
   useEffect(() => {
     renderedPlaceholderForConversationRef.current = false
   }, [conversationId])
 
-  // Reserve space even when loading to prevent layout shift
-  // Show placeholder if: no conversationId, no currentConversation, or data is still loading
   if (!conversationId || !isDataReady) {
     renderedPlaceholderForConversationRef.current = true
     const effectiveFallbackTitle = typeof fallbackTitle === 'string' && fallbackTitle.trim().length > 0 ? fallbackTitle.trim() : !conversationId ? 'Draft' : 'Loading...'
-    const effectiveFallbackSubtitle = typeof fallbackSubtitle === 'string' && fallbackSubtitle.trim().length > 0 ? fallbackSubtitle.trim() : null
-    const isDraftHeader = !conversationId
-    const hasDraftParticipants = isDraftHeader && effectiveParticipantItems.length > 0
 
     return (
-      <div className="sticky top-0 z-10 border-b border-border/60 bg-card">
-        <div className="px-4 pt-3.5 pb-2 md:py-2">
-          <div className="w-full">
-            <div className="flex items-center justify-between">
-              {/* Title and metadata (stacked) - exact structural match */}
-              <div className="flex-1 min-w-0 flex flex-col justify-center gap-1">
-                {/* Title + metadata rows share a left "mobile nav" column (prevents row-2 misalignment) */}
-                <div className="flex min-w-0 w-full gap-2 items-center">
-                  <span className="flex-shrink-0 self-center md:hidden">{mobileLeftSlot ?? <MobileNavToggleButton className="mx-2" />}</span>
-                  <div className="min-w-0 flex-1 flex flex-col justify-center gap-1">
-                    {/* Title - exact match */}
-                    <div className="flex items-center gap-2 min-w-0 w-full">
-                      {titlePrefix ? <span className="flex-shrink-0 self-center text-foreground leading-none">{titlePrefix}</span> : null}
-                      <h3 className="flex-1 text-base font-medium text-foreground truncate leading-tight min-w-0">
-                      {titlePrepend ? <span>{titlePrepend}</span> : null}
-                        <span className="opacity-50">{effectiveFallbackTitle}</span>
-                      </h3>
-                    </div>
-                    {/* Agents + updated row - exact structural match with same classes */}
-                    <div className="flex flex-wrap items-center gap-2 text-xs leading-none text-muted-foreground">
-                      {isDraftHeader ? (
-                        <>
-                          {hasDraftParticipants ? (
-                            <button
-                              type="button"
-                              className={cn(
-                                'inline-flex items-center gap-2 rounded-lg px-1 py-0.5 -mx-1 transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
-                                onParticipantsClick ? 'cursor-pointer' : 'cursor-default'
-                              )}
-                              aria-label={`Participants: ${participantCountLabel}`}
-                              title={participantsTooltipLabel}
-                              onClick={() => onParticipantsClick?.()}
-                            >
-                              <span className="font-medium leading-none text-muted-foreground">{participantCountLabel}</span>
-                            </button>
-                          ) : (
-                            <div className="inline-flex items-center gap-2 rounded-lg px-1 py-0.5 -mx-1">
-                              <div className="inline-flex items-center gap-1.5 max-w-[14rem]">
-                                <Avatar className="h-4 w-4 ring-1 ring-border/40 bg-muted/20 overflow-hidden">
-                                  <div className="h-4 w-4 rounded-full bg-muted/30" />
-                                </Avatar>
-                                <span className="truncate font-medium leading-none opacity-70">Draft</span>
-                              </div>
-                            </div>
-                          )}
-                          <span className="inline-flex items-center gap-2 whitespace-nowrap">
-                            <span aria-hidden="true" className="h-3 w-px bg-border/60" />
-                            <span className="font-medium leading-none opacity-70">{effectiveFallbackSubtitle ?? 'Draft (not saved)'}</span>
-                          </span>
-                          {showTokens ? (
-                            <>
-                              <span className="inline-flex items-center gap-2 whitespace-nowrap">
-                                <span aria-hidden="true" className="h-3 w-px bg-border/60" />
-                                <span className="inline-flex h-4 w-4 rounded-full ring-1 ring-border/40 bg-muted/20" aria-hidden="true" />
-                              </span>
-                            </>
-                          ) : null}
-                        </>
-                      ) : (
-                        <>
-                          <span className="font-medium leading-none opacity-50">{effectiveFallbackSubtitle ?? 'Updated just now'}</span>
-                          {showTokens ? (
-                            <>
-                              {/* Token indicator placeholder (reserved space) */}
-                              <span className="inline-flex items-center gap-2 whitespace-nowrap">
-                                <span aria-hidden="true" className="h-3 w-px bg-border/60" />
-                                <span className="inline-flex h-4 w-4 rounded-full ring-1 ring-border/40 bg-muted/30 animate-pulse" aria-hidden="true" />
-                              </span>
-                            </>
-                          ) : null}
-                        </>
-                      )}
-                    </div>
-
-                    {thirdLineSlot ? <div className="pt-2">{thirdLineSlot}</div> : null}
-                  </div>
-                  {titleRightSlot ? <div className="flex items-center gap-2 flex-shrink-0">{titleRightSlot}</div> : null}
-                </div>
-              </div>
-
-              {rightSlot ? <div className="flex items-center gap-2 flex-shrink-0">{rightSlot}</div> : null}
-            </div>
+      <div className="sticky top-0 z-10 border-b border-border/60">
+        <div className="h-10 px-4 flex items-center justify-between gap-2 min-w-0">
+          <div className="flex items-center gap-2 min-w-0 flex-1 overflow-hidden">
+            <span className="flex-shrink-0 md:hidden">{mobileLeftSlot ?? <MobileNavToggleButton className="mx-1" />}</span>
+            {titlePrefix ? <span className="flex-shrink-0 text-muted-foreground leading-none">{titlePrefix}</span> : null}
+            <h3 className="flex-1 text-sm font-semibold text-foreground truncate min-w-0">
+              {titlePrepend ? <span>{titlePrepend}</span> : null}
+              <span className="opacity-50">{effectiveFallbackTitle}</span>
+            </h3>
           </div>
+          {titleRightSlot ? <div className="flex items-center gap-2 flex-shrink-0">{titleRightSlot}</div> : null}
+          {rightSlot ? <div className="flex items-center gap-2 flex-shrink-0">{rightSlot}</div> : null}
         </div>
       </div>
     )
   }
 
-  const title = (() => {
-    return normalizeConversationTitle(currentConversation?.title || `Conversation ${String(conversationId).slice(0, 8)}`)
-  })()
-  const updatedAt = new Date(currentConversation?.updatedAt || currentConversation?.createdAt || '')
-
-  // Format dates
-  const formatDate = (date: Date) => {
-    const now = new Date()
-    const diffMs = now.getTime() - date.getTime()
-    const diffMins = Math.floor(diffMs / 60000)
-    const diffHours = Math.floor(diffMs / 3600000)
-    const diffDays = Math.floor(diffMs / 86400000)
-
-    if (diffMins < 1) return 'just now'
-    if (diffMins < 60) return `${diffMins}m ago`
-    if (diffHours < 24) return `${diffHours}h ago`
-    if (diffDays < 7) return `${diffDays}d ago`
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-  }
-
-  const formatUSD2 = (v: number) => {
-    if (!(typeof v === 'number') || !Number.isFinite(v)) return '$0.00'
-    return `$${v.toFixed(2)}`
-  }
+  const title = normalizeConversationTitle(currentConversation?.title || `Conversation ${String(conversationId).slice(0, 8)}`)
 
   return (
     <motion.div
@@ -485,95 +130,19 @@ export function ConversationSummaryBar({
               ease: [0.25, 0.46, 0.45, 0.94],
             }
       }
-      className="sticky top-0 z-10 border-b border-border/60 bg-card"
+      className={cn('sticky top-0 z-10 border-b border-border/60')}
     >
-      <div className="px-4 pt-3.5 pb-2 md:py-2">
-        <div className="w-full">
-          <div className="flex items-center justify-between">
-            {/* Title and metadata (stacked) */}
-            <div className="flex-1 min-w-0 flex flex-col justify-center gap-1">
-              {/* Title + metadata rows share a left "mobile nav" column (prevents row-2 misalignment) */}
-                <div className="flex min-w-0 w-full gap-2 items-center">
-                <span className="flex-shrink-0 self-center md:hidden">{mobileLeftSlot ?? <MobileNavToggleButton className="mx-2" />}</span>
-                <div className="min-w-0 flex-1 flex flex-col justify-center gap-1">
-                  {/* Title */}
-                    <div className="flex items-center gap-2 min-w-0 w-full">
-                    {titlePrefix ? <span className="flex-shrink-0 self-center text-foreground leading-none">{titlePrefix}</span> : null}
-                    <h3 className="flex-1 text-base font-medium text-foreground truncate leading-tight min-w-0">
-                      {titlePrepend ? <span>{titlePrepend}</span> : null}
-                      {title}
-                    </h3>
-                  </div>
-
-                  {/* Agents + updated row */}
-                  <div className="flex flex-wrap items-center gap-2 text-xs leading-none text-muted-foreground">
-                    {effectiveParticipantItems.length > 0 ? (
-                      <>
-                        {/* Participants (count-only) + native tooltip preview */}
-                        <button
-                          type="button"
-                          className={cn(
-                            'inline-flex items-center gap-2 rounded-lg px-1 py-0.5 -mx-1 transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
-                            onParticipantsClick ? 'cursor-pointer' : 'cursor-default'
-                          )}
-                          aria-label={`Participants: ${participantCountLabel}`}
-                          title={participantsTooltipLabel}
-                          onClick={() => onParticipantsClick?.()}
-                        >
-                          <span className="font-medium leading-none text-muted-foreground">{participantCountLabel}</span>
-                        </button>
-
-                        <span className="inline-flex items-center gap-2 whitespace-nowrap">
-                          <span aria-hidden="true" className="h-3 w-px bg-border/60" />
-                          <span className="font-medium leading-none text-muted-foreground">Updated {formatDate(updatedAt)}</span>
-                        </span>
-
-                        {/* Usage: keep cost-only in expert mode; context is shown on agent avatar per-turn */}
-                        {showTokens && showCost ? (
-                          <>
-                            <span className="inline-flex items-center gap-2 whitespace-nowrap">
-                              <span aria-hidden="true" className="h-3 w-px bg-border/60" />
-                              <span
-                                className="inline-flex items-center text-[11px] text-muted-foreground"
-                                title={showCost ? `${formatUSD2(totalCost)} spent` : undefined}
-                                aria-label={showCost ? `${formatUSD2(totalCost)} spent` : undefined}
-                              >
-                                {showCost ? formatUSD2(totalCost) : null}
-                              </span>
-                            </span>
-                          </>
-                        ) : null}
-                      </>
-                    ) : (
-                      <>
-                        <span className="font-medium leading-none text-muted-foreground">Updated {formatDate(updatedAt)}</span>
-                        {showTokens && showCost ? (
-                          <>
-                            <span className="inline-flex items-center gap-2 whitespace-nowrap">
-                              <span aria-hidden="true" className="h-3 w-px bg-border/60" />
-                              <span
-                                className="inline-flex items-center text-[11px] text-muted-foreground"
-                                title={showCost ? `${formatUSD2(totalCost)} spent` : undefined}
-                                aria-label={showCost ? `${formatUSD2(totalCost)} spent` : undefined}
-                              >
-                                {showCost ? formatUSD2(totalCost) : null}
-                              </span>
-                            </span>
-                          </>
-                        ) : null}
-                      </>
-                    )}
-                  </div>
-
-                  {thirdLineSlot ? <div className="pt-2">{thirdLineSlot}</div> : null}
-                </div>
-                {titleRightSlot ? <div className="flex items-center gap-2 flex-shrink-0">{titleRightSlot}</div> : null}
-              </div>
-            </div>
-
-            {rightSlot ? <div className="flex items-center gap-2 flex-shrink-0">{rightSlot}</div> : null}
-          </div>
+      <div className="h-10 px-4 flex items-center justify-between gap-2 min-w-0">
+        <div className="flex items-center gap-2 min-w-0 flex-1 overflow-hidden">
+          <span className="flex-shrink-0 md:hidden">{mobileLeftSlot ?? <MobileNavToggleButton className="mx-1" />}</span>
+          {titlePrefix ? <span className="flex-shrink-0 text-muted-foreground leading-none">{titlePrefix}</span> : null}
+          <h3 className="flex-1 text-sm font-semibold text-foreground truncate min-w-0">
+            {titlePrepend ? <span>{titlePrepend}</span> : null}
+            {title}
+          </h3>
         </div>
+        {titleRightSlot ? <div className="flex items-center gap-2 flex-shrink-0">{titleRightSlot}</div> : null}
+        {rightSlot ? <div className="flex items-center gap-2 flex-shrink-0">{rightSlot}</div> : null}
       </div>
     </motion.div>
   )

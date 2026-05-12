@@ -28,7 +28,9 @@ import { useStarship } from '@/hooks/useStarships'
 import { MessageAttachment, MessageAttachmentSkeleton } from './MessageAttachment'
 import { markAnimationComplete } from '@/hooks/useMessageAnimationState'
 import { toolAPI } from '@/lib/api'
+import { useTurnHover } from './TurnHoverContext'
 import { StatusDots } from '@/components/ui/StatusDots'
+import { ChevronRight } from '@/components/primitives/lucide-compat'
 import Link from 'next/link'
 
 interface StreamChunk {
@@ -338,6 +340,10 @@ interface MessageContentProps {
   contentTextClass?: string
   /** When set, highlight this search term in the message content (in-chat search). */
   highlightTerm?: string
+  /** Pre-computed plain-text copy content for the whole turn (multi-message turns only). When set, the copy button uses this instead of the DOM clone. */
+  copyAllContent?: string
+  /** Reactions node to render inside contentChunkRef so the floating action bar's bottom-0 anchor includes reactions height. */
+  reactionsNode?: ReactNode
 }
 
 type ToolResultLike = {
@@ -541,31 +547,16 @@ export function ConversationMessageContent({
   isLastMessage = false,
   contentTextClass,
   highlightTerm,
+  copyAllContent,
+  reactionsNode,
 }: MessageContentProps) {
   const resolvedContentClass = contentTextClass ?? 'text-sm leading-normal prose prose-sm font-sans'
   const { theme } = useTheme()
   const [copiedStates, setCopiedStates] = useState<Record<string, boolean>>({})
   const [toolNameBySlug, setToolNameBySlug] = useState<Record<string, string>>({})
 
-  // On small screens, we don't rely on hover to reveal message actions (copy / reactions / etc.).
-  // Instead, we reveal them via press-and-hold to avoid accidental mobile keyboard pop and because "hover" isn't a real affordance.
-  const isSmallScreen = () => (typeof window !== 'undefined' ? window.innerWidth < 768 : false)
-  const [mobileActionsOpen, setMobileActionsOpen] = useState(false)
-  const longPressTimerRef = useRef<number | null>(null)
-  const longPressTriggeredRef = useRef(false)
+  const { isTurnHovered, mobileActionsOpen } = useTurnHover()
   const contentChunkRef = useRef<HTMLDivElement | null>(null)
-
-  useEffect(() => {
-    if (!mobileActionsOpen) return
-    const onDocPointerDown = (e: PointerEvent) => {
-      const target = e.target as Node | null
-      const root = contentChunkRef.current
-      if (root && target && root.contains(target)) return
-      setMobileActionsOpen(false)
-    }
-    document.addEventListener('pointerdown', onDocPointerDown, { capture: true })
-    return () => document.removeEventListener('pointerdown', onDocPointerDown, { capture: true } as any)
-  }, [mobileActionsOpen])
 
   // Mention token display resolution (keeps DB content parseable while rendering readable @names).
   const sid = typeof starshipId === 'string' ? starshipId : ''
@@ -844,148 +835,141 @@ export function ConversationMessageContent({
   // Collapsible should always start closed; users can expand manually
 
   const shouldRenderToolPanel: boolean = normalizedToolCalls.length > 0 && messageType !== 'tool_result'
-  const toolPanelNode: ReactNode = shouldRenderToolPanel ? (
-    <div className="not-prose">
-      {normalizedToolCalls.map((tc, idx) => {
-        const rawArgsAny = tc.function?.arguments ?? ''
-        let prettyArgs = ''
-        try {
-          // Handle case where arguments might already be an object
-          if (typeof rawArgsAny === 'object' && rawArgsAny !== null) {
-            prettyArgs = JSON.stringify(rawArgsAny, null, 2)
-          } else {
-            const asStr = String(rawArgsAny)
-            prettyArgs = JSON.stringify(JSON.parse(asStr), null, 2)
-          }
-        } catch {
-          prettyArgs = String(rawArgsAny)
+
+  const renderToolCallItem = (tc: LlmToolCall, idx: number, triggerSizeClass: string) => {
+    const rawArgsAny = tc.function?.arguments ?? ''
+    let prettyArgs = ''
+    try {
+      if (typeof rawArgsAny === 'object' && rawArgsAny !== null) {
+        prettyArgs = JSON.stringify(rawArgsAny, null, 2)
+      } else {
+        const asStr = String(rawArgsAny)
+        prettyArgs = JSON.stringify(JSON.parse(asStr), null, 2)
+      }
+    } catch {
+      prettyArgs = String(rawArgsAny)
+    }
+    const hasArgs = (() => {
+      if (typeof rawArgsAny === 'object' && rawArgsAny !== null) {
+        return Array.isArray(rawArgsAny) ? rawArgsAny.length > 0 : Object.keys(rawArgsAny).length > 0
+      }
+      const raw = typeof rawArgsAny === 'string' ? rawArgsAny.trim() : ''
+      if (!raw) return false
+      try {
+        const parsed = JSON.parse(raw)
+        if (parsed && typeof parsed === 'object') {
+          return Array.isArray(parsed) ? parsed.length > 0 : Object.keys(parsed).length > 0
         }
-        const hasArgs = (() => {
-          // Handle case where arguments might already be an object
-          if (typeof rawArgsAny === 'object' && rawArgsAny !== null) {
-            return Array.isArray(rawArgsAny) ? rawArgsAny.length > 0 : Object.keys(rawArgsAny).length > 0
-          }
+        return String(parsed).trim().length > 0
+      } catch {
+        return raw.length > 0
+      }
+    })()
+    const toolSlug = typeof tc.function?.name === 'string' && tc.function.name.trim() ? tc.function.name.trim() : ''
+    const toolDisplayName = (() => {
+      if (!toolSlug) return 'unknown'
+      const resolved = toolNameBySlug?.[toolSlug]
+      return typeof resolved === 'string' && resolved.trim().length > 0 ? resolved.trim() : toolSlug
+    })()
+    const rawCallId = tc.id ?? null
+    const toolCallId = rawCallId != null ? String(rawCallId) : ''
+    const matchingResult = toolResults?.find((result: any) => {
+      const rid = result?.toolCallId ?? result?.call_id ?? result?.id
+      if (rid == null) return false
+      return String(rid) === toolCallId
+    })
+    const isDone = Boolean(matchingResult)
+    const successFlag = matchingResult ? extractToolResultSuccess(matchingResult) : undefined
+    const toolQuoteClass = cn(
+      'relative border-l-4 px-4 pt-2 pb-3 rounded-r-lg my-1',
+      !isDone
+        ? 'border-primary/30 bg-primary/5'
+        : successFlag === false
+          ? 'border-red-500/30 dark:border-red-400/30 bg-red-500/5 dark:bg-red-400/5'
+          : 'border-emerald-500/30 dark:border-emerald-400/30 bg-emerald-500/5 dark:bg-emerald-400/5'
+    )
+    return (
+      <Collapsible key={`${toolCallId || idx}`} defaultOpen={false} className="space-y-0">
+        <CollapsibleTrigger className={cn('group w-full p-0 m-0 hover:bg-transparent rounded-none text-muted-foreground hover:text-foreground transition-colors', triggerSizeClass)}>
+          <span className={cn(!isDone && 'animate-pulse', successFlag === false && 'text-destructive')}>{toolDisplayName}</span>
+          <ChevronRight size={12} className="opacity-40 transition-transform duration-200 group-data-[state=open]:rotate-90 shrink-0" />
+        </CollapsibleTrigger>
+        <CollapsibleContent className="not-prose">
+          <blockquote className={toolQuoteClass}>
+            <div className="text-muted-foreground text-xs break-words" style={{ fontSize: '0.75rem', lineHeight: '1.25rem' }}>
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground pr-8">Name</div>
+              <pre className="mt-1 mb-2 whitespace-pre-wrap break-words pr-8">
+                <code>{toolSlug || 'unknown'}</code>
+              </pre>
 
-          const raw = typeof rawArgsAny === 'string' ? rawArgsAny.trim() : ''
-          if (!raw) return false
-          try {
-            const parsed = JSON.parse(raw)
-            if (parsed && typeof parsed === 'object') {
-              return Array.isArray(parsed) ? parsed.length > 0 : Object.keys(parsed).length > 0
-            }
-            return String(parsed).trim().length > 0
-          } catch {
-            return raw.length > 0
-          }
-        })()
-        // `function.name` is our tool identifier (slug) used for execution.
-        // For UI, prefer the human-friendly tool name when available.
-        const toolSlug = typeof tc.function?.name === 'string' && tc.function.name.trim() ? tc.function.name.trim() : ''
-        const toolDisplayName = (() => {
-          if (!toolSlug) return 'unknown'
-          const resolved = toolNameBySlug?.[toolSlug]
-          return typeof resolved === 'string' && resolved.trim().length > 0 ? resolved.trim() : toolSlug
-        })()
+              {hasArgs && (
+                <>
+                  <div className="text-[10px] uppercase tracking-wide text-muted-foreground pr-8">Arguments</div>
+                  <pre className="mt-1 whitespace-pre-wrap break-words">
+                    <code>{prettyArgs}</code>
+                  </pre>
+                </>
+              )}
 
-        // Normalize tool call id from multiple potential fields to be resilient across providers
-        const rawCallId = tc.id ?? null
-
-        const toolCallId = rawCallId != null ? String(rawCallId) : ''
-
-        // Find matching tool result using multiple possible id fields, normalized to strings
-        const matchingResult = toolResults?.find((result: any) => {
-          const rid = result?.toolCallId ?? result?.call_id ?? result?.id
-          if (rid == null) return false
-          return String(rid) === toolCallId
-        })
-
-        const isDone = Boolean(matchingResult)
-        const successFlag = matchingResult ? extractToolResultSuccess(matchingResult) : undefined
-        const statusVariant = !isDone ? 'running' : successFlag === false ? 'error' : 'success'
-        // Tool name badge (matches normal UI font) with an embedded status dot.
-        const Chip = ({ children }: { children: ReactNode }) => (
-          <span className="inline-flex items-center gap-2 bg-muted px-1.5 py-0.5 rounded text-[inherit]">
-            <StatusDots variant={statusVariant} sizePx={7} />
-            <span className="truncate">{children}</span>
-          </span>
-        )
-        // No extra margins on collapsed tool-call row (avoid prose defaults).
-        const pSpacingClass = 'm-0'
-
-        // Tool calls are always expandable (no expert-mode gating).
-        const toolQuoteClass = cn(
-          // Base quote container style (match Thought container)
-          'relative border-l-4 px-4 pt-2 pb-3 rounded-r-lg my-1',
-          !isDone
-            ? 'border-primary/30 bg-primary/5'
-            : successFlag === false
-              ? 'border-red-500/30 dark:border-red-400/30 bg-red-500/5 dark:bg-red-400/5'
-              : 'border-emerald-500/30 dark:border-emerald-400/30 bg-emerald-500/5 dark:bg-emerald-400/5'
-        )
-        return (
-          <Collapsible key={`${toolCallId || idx}`} defaultOpen={false} className="space-y-0">
-            <div className="rounded-lg px-2 py-1.5 -mx-2 transition-colors hover:bg-muted">
-              {/* Render the collapsed row as a paragraph to match markdown layout exactly */}
-              <p className={`${pSpacingClass} leading-relaxed`}>
-                <CollapsibleTrigger className="w-full p-0 m-0 inline-flex items-center gap-2 rounded-sm justify-start text-sm leading-relaxed text-muted-foreground hover:text-foreground transition-colors">
-                  <Chip>{toolDisplayName}</Chip>
-                </CollapsibleTrigger>
-              </p>
-              {/* Avoid typography/prose rules affecting the expanded card */}
-              <CollapsibleContent className="not-prose">
-                <div>
-                  <blockquote className={toolQuoteClass}>
-                    {/* Match Thought quote content sizing + color */}
-                    <div className="text-muted-foreground text-xs break-words" style={{ fontSize: '0.75rem', lineHeight: '1.25rem' }}>
-                      <div className="text-[10px] uppercase tracking-wide text-muted-foreground pr-8">Name</div>
-                      <pre className="mt-1 mb-2 whitespace-pre-wrap break-words pr-8">
-                        <code>{toolSlug || 'unknown'}</code>
-                      </pre>
-
-                      {hasArgs && (
-                        <>
-                          <div className="text-[10px] uppercase tracking-wide text-muted-foreground pr-8">Arguments</div>
-                          <pre className="mt-1 whitespace-pre-wrap break-words">
-                            <code>{prettyArgs}</code>
-                          </pre>
-                        </>
-                      )}
-
-                      {matchingResult && (
-                        <>
-                          <div className="mt-2 text-[10px] uppercase tracking-wide text-muted-foreground pr-8">Result</div>
-                          <pre className="mt-1 whitespace-pre-wrap break-words">
-                            <code>
-                              {(() => {
-                                const resultContent = (() => {
-                                  const raw = matchingResult.content ?? matchingResult.result ?? ''
-                                  if (typeof raw === 'string') return raw
-                                  try {
-                                    return JSON.stringify(raw, null, 2)
-                                  } catch {
-                                    return String(raw)
-                                  }
-                                })()
-                                try {
-                                  const t = (resultContent || '').trim()
-                                  if ((t.startsWith('{') && t.endsWith('}')) || (t.startsWith('[') && t.endsWith(']'))) {
-                                    return JSON.stringify(JSON.parse(t), null, 2)
-                                  }
-                                } catch {}
-                                return resultContent
-                              })()}
-                            </code>
-                          </pre>
-                        </>
-                      )}
-                    </div>
-                  </blockquote>
-                </div>
-              </CollapsibleContent>
+              {matchingResult && (
+                <>
+                  <div className="mt-2 text-[10px] uppercase tracking-wide text-muted-foreground pr-8">Result</div>
+                  <pre className="mt-1 whitespace-pre-wrap break-words">
+                    <code>
+                      {(() => {
+                        const resultContent = (() => {
+                          const raw = matchingResult.content ?? matchingResult.result ?? ''
+                          if (typeof raw === 'string') return raw
+                          try {
+                            return JSON.stringify(raw, null, 2)
+                          } catch {
+                            return String(raw)
+                          }
+                        })()
+                        try {
+                          const t = (resultContent || '').trim()
+                          if ((t.startsWith('{') && t.endsWith('}')) || (t.startsWith('[') && t.endsWith(']'))) {
+                            return JSON.stringify(JSON.parse(t), null, 2)
+                          }
+                        } catch {}
+                        return resultContent
+                      })()}
+                    </code>
+                  </pre>
+                </>
+              )}
             </div>
-          </Collapsible>
-        )
-      })}
+          </blockquote>
+        </CollapsibleContent>
+      </Collapsible>
+    )
+  }
+
+  const anyToolCallRunning = normalizedToolCalls.some(tc => {
+    const id = tc.id != null ? String(tc.id) : ''
+    return !toolResults?.find((r: any) => {
+      const rid = r?.toolCallId ?? r?.call_id ?? r?.id
+      return rid != null && String(rid) === id
+    })
+  })
+
+  const toolPanelNode: ReactNode = shouldRenderToolPanel ? (
+    <div className="not-prose mb-2">
+      {normalizedToolCalls.length === 1 ? (
+        renderToolCallItem(normalizedToolCalls[0], 0, 'text-sm')
+      ) : (
+        <Collapsible defaultOpen={false} className="space-y-0">
+          <CollapsibleTrigger className="group w-full p-0 m-0 hover:bg-transparent rounded-none text-sm text-muted-foreground hover:text-foreground transition-colors">
+            <span className={cn(anyToolCallRunning && 'animate-pulse')}>{normalizedToolCalls.length} tool calls</span>
+            <ChevronRight size={12} className="opacity-50 transition-transform duration-200 group-data-[state=open]:rotate-90 shrink-0" />
+          </CollapsibleTrigger>
+          <CollapsibleContent className="not-prose">
+            <div className="border-l border-border ml-[3px] pl-3 mt-0.5">
+              {normalizedToolCalls.map((tc, idx) => renderToolCallItem(tc, idx, 'py-0.5 text-xs'))}
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
+      )}
     </div>
   ) : null
 
@@ -1143,6 +1127,11 @@ export function ConversationMessageContent({
 
   const handleCopyContent = async () => {
     try {
+      if (copyAllContent) {
+        await navigator.clipboard.writeText(copyAllContent)
+        toast.success('Copied to clipboard')
+        return
+      }
       const container = messageContainerRef.current
       if (!container) {
         await navigator.clipboard.writeText(displayContent)
@@ -1263,7 +1252,7 @@ export function ConversationMessageContent({
 
   const rawDisplayContent = String(displayContent ?? '')
   const hasCopyableContent = rawDisplayContent.trim().length > 0
-  const contentContainerClassName = compact ? 'w-full rounded-lg px-2 py-0.5 -mx-2 transition-colors hover:bg-muted' : 'w-full rounded-lg px-2 py-1.5 -mx-2 transition-colors hover:bg-muted'
+  const contentContainerClassName = compact ? 'w-full px-2 py-0.5 -mx-2' : 'w-full px-2 py-1.5 -mx-2'
 
   const emojiOnlyInfo = useMemo(() => getEmojiOnlyInfo(rawDisplayContent), [rawDisplayContent])
   const shouldRenderEmojiOnlyPlain = Boolean(emojiOnlyInfo.isEmojiOnly && emojiOnlyInfo.emojiCount > 0)
@@ -1288,45 +1277,11 @@ export function ConversationMessageContent({
           'dark:prose-invert max-w-none w-full [overflow-wrap:anywhere] message-content ph-mask-chat-message'
         )}
       >
-        {/* IMPORTANT: Only render the content chunk container when there is actual content. */}
-        {hasCopyableContent ? (
+        {/* IMPORTANT: Only render the content chunk container when there is actual content or tool calls. */}
+        {hasCopyableContent || shouldRenderToolPanel ? (
           <div
             ref={contentChunkRef}
-            className="relative w-full group/content-chunk"
-            onPointerDown={e => {
-              // Only enable long-press reveal on small-screen touch devices.
-              if (!isSmallScreen()) return
-              if (e.pointerType !== 'touch') return
-              longPressTriggeredRef.current = false
-              if (longPressTimerRef.current) {
-                window.clearTimeout(longPressTimerRef.current)
-                longPressTimerRef.current = null
-              }
-              longPressTimerRef.current = window.setTimeout(() => {
-                longPressTimerRef.current = null
-                longPressTriggeredRef.current = true
-                setMobileActionsOpen(true)
-              }, 420)
-            }}
-            onPointerUp={() => {
-              if (longPressTimerRef.current) {
-                window.clearTimeout(longPressTimerRef.current)
-                longPressTimerRef.current = null
-              }
-            }}
-            onPointerCancel={() => {
-              if (longPressTimerRef.current) {
-                window.clearTimeout(longPressTimerRef.current)
-                longPressTimerRef.current = null
-              }
-            }}
-            onClickCapture={e => {
-              // If the long-press just fired, swallow the click that follows on mobile Safari/Chrome.
-              if (!longPressTriggeredRef.current) return
-              longPressTriggeredRef.current = false
-              e.preventDefault()
-              e.stopPropagation()
-            }}
+            className="relative w-full"
           >
             {/* Content chunk actions (copy + download): float at bottom edge.
                Anchor to the full-width wrapper (not the -mx content block) so user/assistant align perfectly. */}
@@ -1334,9 +1289,7 @@ export function ConversationMessageContent({
               <div
                 className={cn(
                   'pointer-events-none absolute bottom-0 right-[var(--conversation-right-gutter,0px)] translate-y-1/2 transition-opacity',
-                  // Desktop/tablet: reveal on hover/focus.
-                  // Mobile: don't reveal on hover (no real hover); reveal via long-press instead.
-                  mobileActionsOpen ? 'opacity-100' : 'opacity-0 md:group-hover/content-chunk:opacity-100 md:group-focus-within/content-chunk:opacity-100'
+                  (mobileActionsOpen || isTurnHovered) ? 'opacity-100' : 'opacity-0'
                 )}
               >
                 <div className="pointer-events-auto inline-flex items-center gap-1 rounded-full border border-border/60 bg-background/80 backdrop-blur px-1.5 py-1 shadow-sm">
@@ -1361,7 +1314,7 @@ export function ConversationMessageContent({
                 emojiOnlyHeaderGapClass
               )}
             >
-              {shouldRenderEmojiOnlyPlain ? (
+              {hasCopyableContent && (shouldRenderEmojiOnlyPlain ? (
                 <div className={cn('not-prose whitespace-pre-wrap break-words text-foreground', emojiOnlyTextClass)}>{emojiOnlyInfo.trimmed}</div>
               ) : (
                 <ReactMarkdown
@@ -1371,11 +1324,12 @@ export function ConversationMessageContent({
                 >
                   {rawDisplayContent}
                 </ReactMarkdown>
-              )}
+              ))}
+              {toolPanelNode}
             </div>
+            {reactionsNode}
           </div>
         ) : null}
-        {toolPanelNode}
       </div>
     ) : null
 

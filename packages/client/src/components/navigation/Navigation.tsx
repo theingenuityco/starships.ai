@@ -379,7 +379,7 @@ export function Navigation(props: NavigationProps) {
           <div
             className="flex flex-col transition-all duration-300 ease-in-out"
             style={{
-              width: isExpanded ? '15rem' : '3.25rem',
+              width: isExpanded ? '17rem' : '3.25rem',
               height: '100%',
               willChange: 'width',
               contain: 'layout style paint',

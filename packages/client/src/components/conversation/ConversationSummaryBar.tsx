@@ -102,12 +102,12 @@ export function ConversationSummaryBar({
           <div className="flex items-center gap-2 min-w-0 flex-1 overflow-hidden">
             <span className="flex-shrink-0 md:hidden">{mobileLeftSlot ?? <MobileNavToggleButton className="mx-1" />}</span>
             {titlePrefix ? <span className="flex-shrink-0 text-muted-foreground leading-none">{titlePrefix}</span> : null}
-            <h3 className="text-sm font-semibold text-foreground truncate min-w-0">
+            <h3 className="flex-1 text-sm font-semibold text-foreground truncate min-w-0">
               {titlePrepend ? <span>{titlePrepend}</span> : null}
               <span className="opacity-50">{effectiveFallbackTitle}</span>
             </h3>
-            {titleRightSlot ? <div className="flex items-center gap-2 flex-shrink-0">{titleRightSlot}</div> : null}
           </div>
+          {titleRightSlot ? <div className="flex items-center gap-2 flex-shrink-0">{titleRightSlot}</div> : null}
           {rightSlot ? <div className="flex items-center gap-2 flex-shrink-0">{rightSlot}</div> : null}
         </div>
       </div>
@@ -136,12 +136,12 @@ export function ConversationSummaryBar({
         <div className="flex items-center gap-2 min-w-0 flex-1 overflow-hidden">
           <span className="flex-shrink-0 md:hidden">{mobileLeftSlot ?? <MobileNavToggleButton className="mx-1" />}</span>
           {titlePrefix ? <span className="flex-shrink-0 text-muted-foreground leading-none">{titlePrefix}</span> : null}
-          <h3 className="text-sm font-semibold text-foreground truncate min-w-0">
+          <h3 className="flex-1 text-sm font-semibold text-foreground truncate min-w-0">
             {titlePrepend ? <span>{titlePrepend}</span> : null}
             {title}
           </h3>
-          {titleRightSlot ? <div className="flex items-center gap-2 flex-shrink-0">{titleRightSlot}</div> : null}
         </div>
+        {titleRightSlot ? <div className="flex items-center gap-2 flex-shrink-0">{titleRightSlot}</div> : null}
         {rightSlot ? <div className="flex items-center gap-2 flex-shrink-0">{rightSlot}</div> : null}
       </div>
     </motion.div>

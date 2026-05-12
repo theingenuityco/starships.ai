@@ -2,6 +2,7 @@
 
 import { ThreadPane } from '@/components/conversation/ThreadPane'
 import { NotificationMenu } from '@/components/conversation/NotificationMenu'
+import { PageHeader } from '@/components/ui/PageHeader'
 import { ViewPane } from '@/components/views/ViewPane'
 import { RoomConversationIndexView } from '@/components/rooms/RoomConversationIndexView'
 import { LeadgenDashboard } from '@/components/rooms/LeadgenDashboard'
@@ -1067,50 +1068,32 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
                 />
               ) : paneKind === 'participants' ? (
                 <div className="flex flex-col h-full min-h-0 w-full min-w-0">
-                  <div className="sticky top-0 z-10 border-b border-border/60 bg-card">
-                    <div className="px-4 pt-3.5 pb-2 md:py-2">
-                      <div className="w-full">
-                        <div className="flex items-center justify-between gap-4">
-                          <div className="flex-1 min-w-0 flex flex-col justify-center gap-1">
-                            <div className="flex min-w-0 w-full gap-2 items-center">
-                              <span className="flex-shrink-0 self-center md:hidden">
-                                <span className="mx-2 inline-flex h-8 w-8" aria-hidden="true" />
-                              </span>
-                              <div className="min-w-0 flex-1 flex flex-col justify-center gap-1">
-                                <div className="flex items-center gap-2 min-w-0 w-full">
-                                  <button
-                                    type="button"
-                                    className="inline-flex h-4 w-4 items-center justify-center text-foreground hover:text-foreground transition-colors"
-                                    onClick={closeParticipantsPane}
-                                    aria-label="Back to room"
-                                    title="Back to room"
-                                  >
-                                    <Icon name="arrow-left" className="h-4 w-4" />
-                                  </button>
-                                  <h3 className="flex-1 text-base font-medium text-foreground truncate leading-tight min-w-0">
-                                    <span className="inline-flex items-center whitespace-nowrap text-foreground">
-                                      <span>{String(activeRoom?.name ?? activeRoom?.slug ?? 'Room')}</span>
-                                      <span className="mx-1">/</span>
-                                    </span>
-                                    Participants
-                                  </h3>
-                                </div>
-                                <div className="flex flex-wrap items-center gap-2 text-xs leading-none text-muted-foreground">
-                                  <div className="inline-flex items-center gap-2 rounded-lg px-1 py-0.5 -mx-1">
-                                    <span className="font-medium leading-none text-muted-foreground">Manage humans and agents</span>
-                                  </div>
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-2 flex-shrink-0">
-                                <NotificationMenu type="room" roomId={activeConversationId || ''} starshipId={starshipData.id} />
-                              </div>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2 flex-shrink-0" />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                  <PageHeader
+                    title={
+                      <>
+                        <span className="inline-flex items-center whitespace-nowrap">
+                          <span>{String(activeRoom?.name ?? activeRoom?.slug ?? 'Room')}</span>
+                          <span className="mx-1">/</span>
+                        </span>
+                        Participants
+                      </>
+                    }
+                    mobileToggle={<span className="mx-2 inline-flex h-8 w-8" aria-hidden="true" />}
+                    actions={
+                      <>
+                        <button
+                          type="button"
+                          className="inline-flex h-4 w-4 items-center justify-center text-foreground hover:text-foreground transition-colors"
+                          onClick={closeParticipantsPane}
+                          aria-label="Back to room"
+                          title="Back to room"
+                        >
+                          <Icon name="arrow-left" className="h-4 w-4" />
+                        </button>
+                        <NotificationMenu type="room" roomId={activeConversationId || ''} starshipId={starshipData.id} />
+                      </>
+                    }
+                  />
                   <RoomParticipantsPane
                     starshipId={starshipData.id}
                     roomConversationId={activeConversationId || ''}
@@ -1214,50 +1197,32 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
             />
           ) : paneKind === 'participants' ? (
             <div className="flex flex-col h-full min-h-0 w-full min-w-0">
-              <div className="sticky top-0 z-10 border-b border-border/60 bg-card">
-                <div className="px-4 pt-3.5 pb-2 md:py-2">
-                  <div className="w-full">
-                    <div className="flex items-center justify-between gap-4">
-                      <div className="flex-1 min-w-0 flex flex-col justify-center gap-1">
-                        <div className="flex min-w-0 w-full gap-2 items-center">
-                          <span className="flex-shrink-0 self-center md:hidden">
-                            <span className="mx-2 inline-flex h-8 w-8" aria-hidden="true" />
-                          </span>
-                          <div className="min-w-0 flex-1 flex flex-col justify-center gap-1">
-                            <div className="flex items-center gap-2 min-w-0 w-full">
-                              <button
-                                type="button"
-                                className="inline-flex h-4 w-4 items-center justify-center text-foreground hover:text-foreground transition-colors"
-                                onClick={closeParticipantsPane}
-                                aria-label="Back to room"
-                                title="Back to room"
-                              >
-                                <Icon name="arrow-left" className="h-4 w-4" />
-                              </button>
-                              <h3 className="flex-1 text-base font-medium text-foreground truncate leading-tight min-w-0">
-                                <span className="inline-flex items-center whitespace-nowrap text-foreground">
-                                  <span>{String(activeRoom?.name ?? activeRoom?.slug ?? 'Room')}</span>
-                                  <span className="mx-1">/</span>
-                                </span>
-                                Participants
-                              </h3>
-                            </div>
-                            <div className="flex flex-wrap items-center gap-2 text-xs leading-none text-muted-foreground">
-                              <div className="inline-flex items-center gap-2 rounded-lg px-1 py-0.5 -mx-1">
-                                <span className="font-medium leading-none text-muted-foreground">Manage humans and agents</span>
-                              </div>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2 flex-shrink-0">
-                            <NotificationMenu type="room" roomId={activeConversationId || ''} starshipId={starshipData.id} />
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2 flex-shrink-0" />
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <PageHeader
+                title={
+                  <>
+                    <span className="inline-flex items-center whitespace-nowrap">
+                      <span>{String(activeRoom?.name ?? activeRoom?.slug ?? 'Room')}</span>
+                      <span className="mx-1">/</span>
+                    </span>
+                    Participants
+                  </>
+                }
+                mobileToggle={<span className="mx-2 inline-flex h-8 w-8" aria-hidden="true" />}
+                actions={
+                  <>
+                    <button
+                      type="button"
+                      className="inline-flex h-4 w-4 items-center justify-center text-foreground hover:text-foreground transition-colors"
+                      onClick={closeParticipantsPane}
+                      aria-label="Back to room"
+                      title="Back to room"
+                    >
+                      <Icon name="arrow-left" className="h-4 w-4" />
+                    </button>
+                    <NotificationMenu type="room" roomId={activeConversationId || ''} starshipId={starshipData.id} />
+                  </>
+                }
+              />
               <RoomParticipantsPane
                 starshipId={starshipData.id}
                 roomConversationId={activeConversationId || ''}

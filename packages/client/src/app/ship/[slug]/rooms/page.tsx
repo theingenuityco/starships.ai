@@ -7,7 +7,7 @@ import { toast } from 'sonner'
 import { useQueryClient } from '@tanstack/react-query'
 
 import Icon from '@/components/primitives/Icon'
-import { MobileNavToggleButton } from '@/components/navigation/MobileNavToggleButton'
+import { PageHeader } from '@/components/ui/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -252,69 +252,50 @@ export default function RoomsIndexPage(): React.JSX.Element {
 
   return (
     <div className="relative flex flex-col min-h-full min-w-0">
-      <div className="sticky top-0 z-10 border-b border-border/60 bg-card">
-        <div className="px-4 pt-3.5 pb-2 md:py-2">
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex-1 min-w-0 flex flex-col justify-center gap-1">
-              <div className="flex min-w-0 w-full gap-2 items-center">
-                <span className="flex-shrink-0 self-center md:hidden">
-                  <MobileNavToggleButton className="mx-2" />
-                </span>
-                <div className="min-w-0 flex-1 flex flex-col justify-center gap-1">
-                  <div className="flex items-baseline gap-2 min-w-0 w-full">
-                    <span aria-hidden="true" className="flex-shrink-0 self-center text-foreground leading-none">
-                      <Icon name="hash" weight="bold" className="h-4 w-4" />
-                    </span>
-                    <h3 className="flex-1 text-base font-medium text-foreground truncate leading-tight min-w-0">Rooms</h3>
-                  </div>
-                  <div className="min-w-0 text-xs leading-snug text-muted-foreground min-h-6">
-                    <span className="block min-w-0 truncate font-medium leading-snug text-muted-foreground">Forum-style spaces for threads and pins.</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setCreateOpen(true)}
-                disabled={!canManageRooms || !starshipId || createRoom.isPending}
-                title={!canManageRooms ? 'Only the starship owner (or instance admin) can manage rooms' : undefined}
-              >
-                <Icon name="plus" className="h-4 w-4 mr-1.5" />
-                New room
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setBundlesOpen(true)}
-                disabled={!canManageRooms || !starshipId}
-                title={!canManageRooms ? 'Only the starship owner (or instance admin) can install bundles' : undefined}
-              >
-                <Icon name="download" className="h-4 w-4 mr-1.5" />
-                Browse bundles
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setImportOpen(true)
-                  setImportStep(1)
-                  setImportFile(null)
-                  setImportAnalysis(null)
-                  setImportDecisions({ rooms: {}, views: {}, datasets: {}, taskBoards: {}, tools: {}, agents: {} })
-                }}
-                disabled={!canManageRooms || !starshipId}
-                title={!canManageRooms ? 'Only the starship owner (or instance admin) can import rooms' : undefined}
-              >
-                <Icon name="upload" className="h-4 w-4 mr-1.5" />
-                Import bundle
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>
+      <PageHeader
+        icon="hash"
+        title="Rooms"
+        actions={
+          <>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCreateOpen(true)}
+              disabled={!canManageRooms || !starshipId || createRoom.isPending}
+              title={!canManageRooms ? 'Only the starship owner (or instance admin) can manage rooms' : undefined}
+            >
+              <Icon name="plus" className="h-4 w-4 mr-1.5" />
+              New room
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setBundlesOpen(true)}
+              disabled={!canManageRooms || !starshipId}
+              title={!canManageRooms ? 'Only the starship owner (or instance admin) can install bundles' : undefined}
+            >
+              <Icon name="download" className="h-4 w-4 mr-1.5" />
+              Browse bundles
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setImportOpen(true)
+                setImportStep(1)
+                setImportFile(null)
+                setImportAnalysis(null)
+                setImportDecisions({ rooms: {}, views: {}, datasets: {}, taskBoards: {}, tools: {}, agents: {} })
+              }}
+              disabled={!canManageRooms || !starshipId}
+              title={!canManageRooms ? 'Only the starship owner (or instance admin) can import rooms' : undefined}
+            >
+              <Icon name="upload" className="h-4 w-4 mr-1.5" />
+              Import bundle
+            </Button>
+          </>
+        }
+      />
 
       <div className="flex-1 min-h-0 overflow-y-visible md:overflow-y-auto px-4 pt-6 pb-8 md:pb-8">
         <div className="w-full bg-transparent max-w-4xl mx-auto min-h-full flex flex-col gap-4">

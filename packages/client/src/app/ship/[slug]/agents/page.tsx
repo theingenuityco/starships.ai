@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { PresenceIndicator } from '@/components/ui/PresenceIndicator'
-import { MobileNavToggleButton } from '@/components/navigation/MobileNavToggleButton'
+import { PageHeader } from '@/components/ui/PageHeader'
 import { BundleServiceModal } from '@/components/bundles/BundleServiceModal'
 
 import { useStarshipBySlug } from '@/hooks/useStarships'
@@ -197,45 +197,16 @@ export default function AgentsPage(): React.JSX.Element {
 
   return (
     <div className="relative flex flex-col min-h-full min-w-0">
-      <div className="sticky top-0 z-10 border-b border-border/60 bg-card">
-        <div className="px-4 pt-3.5 pb-2 md:py-2">
-          <div className="w-full">
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex-1 min-w-0 flex flex-col justify-center gap-1">
-                <div className="flex min-w-0 w-full gap-2 items-center">
-                  <span className="flex-shrink-0 self-center md:hidden">
-                    <MobileNavToggleButton className="mx-2" />
-                  </span>
-                  <div className="min-w-0 flex-1 flex flex-col justify-center gap-1">
-                    <div className="flex items-baseline gap-2 min-w-0 w-full">
-                      <span aria-hidden="true" className="flex-shrink-0 self-center text-foreground leading-none">
-                        <Icon name="bot" weight="bold" className="h-4 w-4" />
-                      </span>
-                      <h3 className="flex-1 text-base font-medium text-foreground truncate leading-tight min-w-0">Agents</h3>
-                    </div>
-                    <div className="min-w-0 text-xs leading-snug text-muted-foreground min-h-6">
-                      <span className="block min-w-0 truncate font-medium leading-snug text-muted-foreground" title="Agents installed in this starship.">
-                        Agents installed in this starship.
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 flex-shrink-0">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setBundlesOpen(true)}
-                disabled={!starshipId}
-              >
-                <Icon name="download" className="h-4 w-4 mr-1.5" />
-                Browse bundles
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>
+      <PageHeader
+        icon="bot"
+        title="Agents"
+        actions={
+          <Button variant="outline" size="sm" onClick={() => setBundlesOpen(true)} disabled={!starshipId}>
+            <Icon name="download" className="h-4 w-4 mr-1.5" />
+            Browse bundles
+          </Button>
+        }
+      />
 
       <BundleServiceModal
         open={bundlesOpen}

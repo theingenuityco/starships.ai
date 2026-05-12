@@ -2,8 +2,7 @@
 
 import React from 'react'
 import { useParams } from 'next/navigation'
-import Icon from '@/components/primitives/Icon'
-import { MobileNavToggleButton } from '@/components/navigation/MobileNavToggleButton'
+import { PageHeader } from '@/components/ui/PageHeader'
 import { useStarshipBySlug } from '@/hooks/useStarships'
 import { GoalsColumn } from '@/components/dashboard/GoalsColumn'
 import { AgentActivityColumn } from '@/components/dashboard/AgentActivityColumn'
@@ -18,18 +17,7 @@ export default function DashboardPage(): React.JSX.Element {
 
   return (
     <div className="relative flex flex-col h-full min-w-0 bg-background">
-      {/* Header */}
-      <div className="sticky top-0 z-10 border-b border-border/60 bg-background/95 backdrop-blur-sm">
-        <div className="px-4 py-2.5">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <span className="flex-shrink-0 md:hidden">
-              <MobileNavToggleButton className="mx-1" />
-            </span>
-            <Icon name="dashboard" weight="bold" className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-            <h3 className="text-sm font-semibold text-foreground">Dashboard</h3>
-          </div>
-        </div>
-      </div>
+      <PageHeader icon="dashboard" title="Dashboard" />
 
       {/* Desktop: main + two-panel aside */}
       <div className="hidden md:flex flex-1 min-h-0 overflow-hidden">

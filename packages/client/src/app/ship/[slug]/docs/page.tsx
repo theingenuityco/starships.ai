@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 
 import Icon from '@/components/primitives/Icon'
-import { MobileNavToggleButton } from '@/components/navigation/MobileNavToggleButton'
+import { PageHeader } from '@/components/ui/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -76,17 +76,16 @@ export default function StarshipDocsPage(): React.JSX.Element {
 
   return (
     <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="flex items-center gap-3 px-4 py-3 border-b shrink-0">
-        <MobileNavToggleButton />
-        <Icon name="file-text" className="w-5 h-5 text-muted-foreground" />
-        <h1 className="font-semibold text-lg">Docs</h1>
-        <div className="flex-1" />
-        <Button size="sm" onClick={() => setCreateOpen(true)}>
-          <Icon name="plus" className="w-4 h-4 mr-1" />
-          New doc
-        </Button>
-      </div>
+      <PageHeader
+        icon="file-text"
+        title="Docs"
+        actions={
+          <Button size="sm" onClick={() => setCreateOpen(true)}>
+            <Icon name="plus" className="w-4 h-4 mr-1.5" />
+            New doc
+          </Button>
+        }
+      />
 
       {/* Search */}
       <div className="px-4 py-3 border-b shrink-0">

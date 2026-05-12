@@ -901,7 +901,7 @@ export function ConversationMessageContent({
     return (
       <Collapsible key={`${toolCallId || idx}`} defaultOpen={false} className="space-y-0">
         <CollapsibleTrigger className={cn('group w-full p-0 m-0 hover:bg-transparent rounded-none text-muted-foreground hover:text-foreground transition-colors', triggerSizeClass)}>
-          <span className={cn(successFlag === false && 'text-destructive')}>{toolDisplayName}</span>
+          <span className={cn(!isDone && 'animate-pulse', successFlag === false && 'text-destructive')}>{toolDisplayName}</span>
           <ChevronRight size={12} className="opacity-40 transition-transform duration-200 group-data-[state=open]:rotate-90 shrink-0" />
         </CollapsibleTrigger>
         <CollapsibleContent className="not-prose">
@@ -955,6 +955,14 @@ export function ConversationMessageContent({
     )
   }
 
+  const anyToolCallRunning = normalizedToolCalls.some(tc => {
+    const id = tc.id != null ? String(tc.id) : ''
+    return !toolResults?.find((r: any) => {
+      const rid = r?.toolCallId ?? r?.call_id ?? r?.id
+      return rid != null && String(rid) === id
+    })
+  })
+
   const toolPanelNode: ReactNode = shouldRenderToolPanel ? (
     <div className="not-prose mb-2">
       {normalizedToolCalls.length === 1 ? (
@@ -962,7 +970,7 @@ export function ConversationMessageContent({
       ) : (
         <Collapsible defaultOpen={false} className="space-y-0">
           <CollapsibleTrigger className="group w-full p-0 m-0 hover:bg-transparent rounded-none text-sm text-muted-foreground hover:text-foreground transition-colors">
-            <span>{normalizedToolCalls.length} tool calls</span>
+            <span className={cn(anyToolCallRunning && 'animate-pulse')}>{normalizedToolCalls.length} tool calls</span>
             <ChevronRight size={12} className="opacity-50 transition-transform duration-200 group-data-[state=open]:rotate-90 shrink-0" />
           </CollapsibleTrigger>
           <CollapsibleContent className="not-prose">

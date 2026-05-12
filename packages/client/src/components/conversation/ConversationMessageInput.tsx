@@ -2286,7 +2286,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             // Mobile: only a top border (flush to screen edges). Desktop: full border + rounded card.
             'border-t border-border/40 border-x-0 border-b-0 sm:border sm:border-border/40 sm:rounded-2xl rounded-none',
             // Focus state: match themed inputs (but using focus-within for TipTap).
-            'focus-within:outline-none focus-within:border-foreground',
+            'focus-within:outline-none focus-within:border-primary',
             disabled && 'opacity-50'
           )}
         >

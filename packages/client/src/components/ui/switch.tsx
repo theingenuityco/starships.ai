@@ -31,7 +31,7 @@ const Switch = React.forwardRef<HTMLButtonElement, SwitchProps>(({ className, ch
       disabled={disabled}
       ref={ref}
       className={cn(
-        'inline-flex shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:border-foreground/40 disabled:cursor-not-allowed disabled:opacity-50',
+        'inline-flex shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:border-primary/40 disabled:cursor-not-allowed disabled:opacity-50',
         sizeClasses,
         checked ? 'bg-primary' : 'bg-input',
         className

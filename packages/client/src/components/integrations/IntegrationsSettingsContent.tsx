@@ -52,8 +52,8 @@ function safeLower(s: unknown): string {
 
 // Match connector list CTA styling (see `StarshipConnectorsPanel`).
 const INTEGRATION_CTA_BUTTON_CLASS =
-  'h-8 group min-w-[130px] justify-center shrink-0 font-medium transition-all duration-200 border border-transparent text-[rgba(245,158,11,0.8)] hover:text-[rgba(245,158,11,0.8)] hover:border-[rgba(245,158,11,0.25)] hover:bg-[linear-gradient(135deg,rgba(245,158,11,0.10),rgba(251,191,36,0.06))] hover:shadow-[0_0_4px_rgba(245,158,11,0.10)] disabled:text-muted-foreground disabled:hover:text-muted-foreground disabled:hover:border-transparent disabled:hover:bg-transparent disabled:hover:shadow-none'
-const INTEGRATION_CTA_ICON_CLASS = 'mr-1 h-4 w-4 text-[rgba(245,158,11,0.85)] group-disabled:text-muted-foreground'
+  'h-8 group min-w-[130px] justify-center shrink-0 font-medium transition-all duration-200 border border-transparent text-primary/80 hover:text-primary hover:border-primary/25 hover:bg-primary/10 hover:shadow-sm disabled:text-muted-foreground disabled:hover:text-muted-foreground disabled:hover:border-transparent disabled:hover:bg-transparent disabled:hover:shadow-none'
+const INTEGRATION_CTA_ICON_CLASS = 'mr-1 h-4 w-4 text-primary/80 group-disabled:text-muted-foreground'
 const INTEGRATION_OUTLINE_BUTTON_CLASS = 'h-7 px-2.5 text-[11px] bg-transparent border-border/60 text-muted-foreground hover:text-foreground hover:bg-muted/40'
 const SEARCH_DEBOUNCE_MS = 400
 

@@ -21,8 +21,8 @@ import { useAuth } from '@/hooks/useAuth'
 import { getCategoryDotColor } from '@/components/agents/AgentBuilder/utils/categoryHelpers'
 
 const CHAT_CTA_BUTTON_CLASS =
-  'h-9 px-3 font-medium transition-all duration-200 border border-transparent text-[rgba(245,158,11,0.8)] hover:text-[rgba(245,158,11,0.8)] hover:border-[rgba(245,158,11,0.25)] hover:bg-[linear-gradient(135deg,rgba(245,158,11,0.10),rgba(251,191,36,0.06))] hover:shadow-[0_0_4px_rgba(245,158,11,0.10)] disabled:text-muted-foreground disabled:hover:text-muted-foreground disabled:hover:border-transparent disabled:hover:bg-transparent disabled:hover:shadow-none'
-const CHAT_CTA_ICON_CLASS = 'mr-1.5 h-4 w-4 text-[rgba(245,158,11,0.85)] group-disabled:text-muted-foreground'
+  'h-9 px-3 font-medium transition-all duration-200 border border-transparent text-primary/80 hover:text-primary hover:border-primary/25 hover:bg-primary/10 hover:shadow-sm disabled:text-muted-foreground disabled:hover:text-muted-foreground disabled:hover:border-transparent disabled:hover:bg-transparent disabled:hover:shadow-none'
+const CHAT_CTA_ICON_CLASS = 'mr-1.5 h-4 w-4 text-primary/80 group-disabled:text-muted-foreground'
 interface DeployedAgentCardProps {
   agent: AgentModel
   avatarUrl?: string
@@ -363,10 +363,9 @@ export function DeployedAgentCard({
               </Button>
             ) : hideChatControl ? null : (
               <div
-                className="flex items-center gap-1.5 text-[rgba(245,158,11,0.85)] px-2 py-1 rounded-md bg-[rgba(245,158,11,0.08)] border border-[rgba(245,158,11,0.18)] transition-all duration-200"
-                style={{ boxShadow: '0 0 8px rgba(245,158,11,0.08)' }}
+                className="flex items-center gap-1.5 text-primary/80 px-2 py-1 rounded-md bg-primary/8 border border-primary/20 transition-all duration-200"
               >
-                <Icon name="fingerprint" className="h-3.5 w-3.5" style={{ color: 'rgba(245,158,11,0.85)' }} />
+                <Icon name="fingerprint" className="h-3.5 w-3.5 text-primary/80" />
                 <span className="text-[10px] font-mono">{agent.id.slice(0, 6)}</span>
               </div>
             )}

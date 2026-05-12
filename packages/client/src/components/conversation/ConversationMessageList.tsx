@@ -399,7 +399,7 @@ function LinkedConversationCard({
             <span
               className={cn(
                 'inline-flex items-center h-[16px] px-2 rounded-full text-[10px] leading-none font-semibold whitespace-nowrap',
-                isOngoing ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300' : 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
+                isOngoing ? 'bg-primary/15 text-primary' : 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
               )}
               aria-label={isOngoing ? 'Thread ongoing' : 'Thread completed'}
               title={isOngoing ? 'Ongoing' : 'Completed'}
@@ -2297,8 +2297,8 @@ export function ConversationMessageList({
                         data-message-id={message.id}
                         className={cn(
                           messageHasMatch && 'rounded-lg transition-colors',
-                          messageHasMatch && !isCurrentMatch && 'border-l-4 border-amber-500/60 bg-amber-500/5 dark:bg-amber-400/5 pl-2 -ml-2',
-                          messageHasMatch && isCurrentMatch && 'border-l-4 border-amber-500 bg-amber-500/10 dark:bg-amber-400/10 pl-2 -ml-2 ring-1 ring-amber-500/40 dark:ring-amber-400/40'
+                          messageHasMatch && !isCurrentMatch && 'border-l-4 border-primary/40 bg-primary/5 pl-2 -ml-2',
+                          messageHasMatch && isCurrentMatch && 'border-l-4 border-primary bg-primary/10 pl-2 -ml-2 ring-1 ring-primary/40'
                         )}
                       >
                         <MemoizedMessageBubble
@@ -2618,7 +2618,7 @@ function renderTextWithHighlight(text: string, term: string | undefined): ReactN
     <>
       {parts.map((part, i) =>
         part.toLowerCase() === tLower ? (
-          <mark key={i} className="bg-amber-200/70 dark:bg-amber-400/50 rounded px-0.5 font-medium">
+          <mark key={i} className="bg-primary/20 rounded px-0.5 font-medium">
             {part}
           </mark>
         ) : (

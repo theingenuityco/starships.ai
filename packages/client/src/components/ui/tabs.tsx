@@ -83,7 +83,7 @@ const TabsTrigger = React.forwardRef<HTMLButtonElement, TabsTriggerProps>(({ cla
       className={cn(
         // Make triggers behave like navigation list items (hover + selected).
         // Default style should match Settings tabs triggers.
-        'inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-xl px-3 py-1 text-[13px] font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50',
+        'inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-xl px-3 py-1 text-[13px] font-medium transition-colors focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50',
         isActive
           ? 'text-primary bg-primary/10'
           : 'text-muted-foreground hover:text-foreground hover:bg-muted',
@@ -110,7 +110,7 @@ const TabsContent = React.forwardRef<HTMLDivElement, TabsContentProps>(({ classN
     return null
   }
 
-  return <div ref={ref} className={cn('mt-2 ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2', className)} {...props} />
+  return <div ref={ref} className={cn('mt-2 focus-visible:outline-none', className)} {...props} />
 })
 TabsContent.displayName = 'TabsContent'
 

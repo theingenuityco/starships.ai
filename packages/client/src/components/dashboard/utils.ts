@@ -16,7 +16,7 @@ const AVATAR_COLOURS = [
   'bg-cyan-500',
   'bg-teal-500',
   'bg-emerald-500',
-  'bg-amber-500',
+  'bg-slate-500',
   'bg-rose-500',
   'bg-pink-500',
 ]
@@ -27,7 +27,7 @@ const CHIP_COLOURS = [
   'bg-cyan-500/10 text-cyan-400 border-cyan-500/15',
   'bg-teal-500/10 text-teal-400 border-teal-500/15',
   'bg-emerald-500/10 text-emerald-400 border-emerald-500/15',
-  'bg-amber-500/10 text-amber-400 border-amber-500/15',
+  'bg-slate-500/10 text-slate-400 border-slate-500/15',
   'bg-rose-500/10 text-rose-400 border-rose-500/15',
   'bg-pink-500/10 text-pink-400 border-pink-500/15',
 ]

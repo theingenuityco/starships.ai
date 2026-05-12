@@ -357,8 +357,8 @@
     --foreground: 0 0% 8%;
     --card: 0 0% 100%;
     --card-foreground: 0 0% 8%;
-    --primary: 38 92% 50%; /* Amber primary in light */
-    --primary-foreground: 0 0% 0%;
+    --primary: 240 5% 58%; /* Zinc primary in light */
+    --primary-foreground: 0 0% 100%;
     --secondary: 220 14% 96%;
     --secondary-foreground: 0 0% 8%;
     --muted: 220 14% 96%;
@@ -368,7 +368,7 @@
     /* Darker borders in light mode for better definition */
     --border: 220 10% 86%;
     --input: 220 10% 86%;
-    --ring: 38 92% 50%;
+    --ring: 240 5% 58%;
     --radius: 0.5rem;
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 98%;
@@ -378,7 +378,7 @@
     /* Command Deck Light - Gradient backgrounds */
     --command-bg: linear-gradient(135deg, hsl(224 30% 95%), hsl(224 20% 98%));
     --starship-accent: hsl(224 99% 53%);
-    --primary-rgb: 245 158 11;
+    --primary-rgb: 143 143 153;
 
     /* Shadow colors for light mode - border moved to frosted-glass-card */
     --shadow-frosted-lg: 0 8px 16px -3px rgba(0, 0, 0, 0.08);
@@ -403,8 +403,8 @@
     --foreground: 0 0% 95%;
     --card: 0 0% 9%;
     --card-foreground: 0 0% 95%;
-    --primary: 38 92% 54%; /* Amber primary in dark */
-    --primary-foreground: 0 0% 0%;
+    --primary: 240 5% 72%; /* Zinc primary in dark */
+    --primary-foreground: 0 0% 8%;
     --secondary: 0 0% 10%;
     --secondary-foreground: 0 0% 95%;
     --muted: 0 0% 10%;
@@ -413,7 +413,7 @@
     --accent-foreground: 0 0% 95%;
     --border: 0 0% 16%;
     --input: 0 0% 16%;
-    --ring: 38 92% 54%;
+    --ring: 240 5% 72%;
     --destructive: 0 62% 50%;
     --destructive-foreground: 0 0% 98%;
     --popover: 0 0% 9%;
@@ -423,7 +423,7 @@
     /* Command Deck Dark - Deep space gradients */
     --command-bg: linear-gradient(135deg, hsl(0 0% 3%), hsl(0 0% 2%));
     --starship-accent: hsl(280 70% 60%);
-    --primary-rgb: 245 158 11;
+    --primary-rgb: 180 180 187;
 
     /* Shadow colors for dark mode */
     --shadow-frosted-lg: 0 8px 16px -3px rgba(0, 0, 0, 0.3);
@@ -901,6 +901,10 @@
   background: transparent;
 }
 
+.ProseMirror:focus {
+  outline: none;
+}
+
 .toastui-editor-defaultUI .toastui-editor-main {
   border-top: 0;
 }
@@ -979,7 +983,7 @@
  * ====================================
  */
 .focus-visible-ring {
-  @apply focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:outline-none;
+  @apply focus-visible:outline-none focus-visible:border-primary;
 }
 
 .sr-only-focusable {

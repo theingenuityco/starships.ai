@@ -26,44 +26,41 @@ export function DeployedToolCard({ tool, onClick, onOpen, onEdit, onDelete, show
         className="frosted-glass-card shadow-frosted-lg group relative overflow-hidden transition-all duration-300 cursor-pointer border border-border/50 hover:border-primary/50 backdrop-blur-xl h-full flex flex-col"
         onClick={onClick}
       >
-        {/* Space-themed radial gradient overlay - yellow theme */}
+        {/* Space-themed radial gradient overlay */}
         <div
           className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
           style={{
             backgroundImage: [
-              // Core glow - amber/yellow (brightest)
-              'radial-gradient(ellipse 400px 300px at 50% 0%, rgba(245,158,11,0.25), transparent 60%)',
-              // Secondary layer - softer amber blend
-              'radial-gradient(ellipse 500px 350px at 50% 0%, rgba(251,191,36,0.18), transparent 65%)',
-              // Outer spread - subtle warm glow
-              'radial-gradient(ellipse 600px 400px at 50% 0%, rgba(252,211,77,0.12), transparent 70%)',
+              'radial-gradient(ellipse 400px 300px at 50% 0%, rgba(113,113,122,0.18), transparent 60%)',
+              'radial-gradient(ellipse 500px 350px at 50% 0%, rgba(113,113,122,0.12), transparent 65%)',
+              'radial-gradient(ellipse 600px 400px at 50% 0%, rgba(113,113,122,0.08), transparent 70%)',
             ].join(', '),
           }}
         />
 
-        {/* Space-themed decorative corner accent with amber gradient */}
+        {/* Space-themed decorative corner accent */}
         <div
           className="absolute top-0 right-0 w-24 h-24 rounded-bl-full opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
           style={{
-            background: 'radial-gradient(ellipse 80px 80px at top right, rgba(245,158,11,0.35), transparent 70%)',
+            background: 'radial-gradient(ellipse 80px 80px at top right, rgba(113,113,122,0.25), transparent 70%)',
           }}
         />
 
-        {/* Animated border glow on hover with amber hue */}
+        {/* Animated border glow on hover */}
         <div
           className="absolute inset-0 rounded-lg pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-300"
           style={{
             border: '2px solid transparent',
-            background: 'linear-gradient(hsl(var(--card)), hsl(var(--card))) padding-box, linear-gradient(135deg, rgba(245,158,11,0.3), rgba(251,191,36,0.4), rgba(252,211,77,0.3)) border-box',
+            background: 'linear-gradient(hsl(var(--card)), hsl(var(--card))) padding-box, linear-gradient(135deg, rgba(113,113,122,0.25), rgba(113,113,122,0.35), rgba(113,113,122,0.25)) border-box',
           }}
         />
 
-        {/* Shimmer effect on hover with amber tint */}
+        {/* Shimmer effect on hover */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div
             className="absolute inset-y-0 w-1/2 -translate-x-full group-hover:translate-x-[300%] transition-transform duration-700 ease-in-out"
             style={{
-              background: 'linear-gradient(to right, transparent, rgba(245,158,11,0.15), rgba(251,191,36,0.1), transparent)',
+              background: 'linear-gradient(to right, transparent, rgba(113,113,122,0.12), rgba(113,113,122,0.08), transparent)',
             }}
           />
         </div>
@@ -71,11 +68,11 @@ export function DeployedToolCard({ tool, onClick, onOpen, onEdit, onDelete, show
           <div className="flex items-start gap-3 mb-3">
             {/* Enhanced wrench icon */}
             <div className="relative flex-shrink-0">
-              {/* Animated amber glow ring - only on hover */}
+              {/* Animated glow ring - only on hover */}
               <motion.div
                 className="absolute inset-0 rounded-full blur-xl pointer-events-none hidden group-hover:block"
                 style={{
-                  background: 'radial-gradient(circle, rgba(245,158,11,0.4), rgba(251,191,36,0.2), transparent 70%)',
+                  background: 'radial-gradient(circle, rgba(113,113,122,0.35), rgba(113,113,122,0.15), transparent 70%)',
                 }}
                 animate={{
                   scale: [1, 1.15, 1],
@@ -94,7 +91,7 @@ export function DeployedToolCard({ tool, onClick, onOpen, onEdit, onDelete, show
             {/* Tool name and badges */}
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-2">
-                <CardTitle className="truncate text-lg font-bold transition-all duration-300 group-hover:[color:rgba(245,158,11,1)]">{tool.name}</CardTitle>
+                <CardTitle className="truncate text-lg font-bold transition-all duration-300 group-hover:text-primary">{tool.name}</CardTitle>
                 {/* Show version badge next to name */}
                 {tool.version && (
                   <Badge variant="outline" className="text-[10px] px-1.5 py-0.5 font-mono">
@@ -135,27 +132,13 @@ export function DeployedToolCard({ tool, onClick, onOpen, onEdit, onDelete, show
               <Button
                 size="sm"
                 variant="ghost"
-                className="h-9 px-3 font-medium transition-all duration-200 text-[rgba(245,158,11,0.8)]"
-                onMouseEnter={e => {
-                  e.currentTarget.style.background = 'linear-gradient(135deg, rgba(245,158,11,0.1), rgba(251,191,36,0.06))'
-                  e.currentTarget.style.borderColor = 'rgba(245,158,11,0.25)'
-                  e.currentTarget.style.boxShadow = '0 0 4px rgba(245,158,11,0.1)'
-                  e.currentTarget.style.color = 'rgba(245,158,11,0.8)'
-                  e.currentTarget.style.border = '1px solid rgba(245,158,11,0.25)'
-                }}
-                onMouseLeave={e => {
-                  e.currentTarget.style.background = ''
-                  e.currentTarget.style.borderColor = ''
-                  e.currentTarget.style.boxShadow = ''
-                  e.currentTarget.style.color = ''
-                  e.currentTarget.style.border = ''
-                }}
+                className="h-9 px-3 font-medium transition-all duration-200 text-primary/80 hover:text-primary hover:border-primary/25 hover:bg-primary/10 hover:shadow-sm"
                 onClick={e => {
                   e.stopPropagation()
                   onOpen(tool)
                 }}
               >
-                <Icon name="external-link" className="mr-1.5 h-4 w-4" style={{ color: 'rgba(245,158,11,0.85)' }} />
+                <Icon name="external-link" className="mr-1.5 h-4 w-4 text-primary/80" />
                 Open
               </Button>
             ) : null}

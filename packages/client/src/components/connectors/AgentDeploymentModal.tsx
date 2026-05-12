@@ -87,7 +87,7 @@ export function AgentDeploymentModal({ open, onOpenChange, agentName, agentRole,
             type="button"
             variant="outline"
             onClick={handleLater}
-            className="flex-1 sm:flex-none h-9 px-3 font-medium transition-all duration-200 border border-transparent text-[rgba(245,158,11,0.8)] hover:text-[rgba(245,158,11,0.8)] hover:border-[rgba(245,158,11,0.25)] hover:bg-[linear-gradient(135deg,rgba(245,158,11,0.10),rgba(251,191,36,0.06))] hover:shadow-[0_0_4px_rgba(245,158,11,0.10)] disabled:text-muted-foreground disabled:hover:text-muted-foreground disabled:hover:border-transparent disabled:hover:bg-transparent disabled:hover:shadow-none"
+            className="flex-1 sm:flex-none h-9 px-3 font-medium transition-all duration-200 border border-transparent text-primary/80 hover:text-primary hover:border-primary/25 hover:bg-primary/10 hover:shadow-sm disabled:text-muted-foreground disabled:hover:text-muted-foreground disabled:hover:border-transparent disabled:hover:bg-transparent disabled:hover:shadow-none"
           >
             Later
           </Button>

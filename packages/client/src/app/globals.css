@@ -901,6 +901,10 @@
   background: transparent;
 }
 
+.ProseMirror:focus {
+  outline: none;
+}
+
 .toastui-editor-defaultUI .toastui-editor-main {
   border-top: 0;
 }
@@ -979,7 +983,7 @@
  * ====================================
  */
 .focus-visible-ring {
-  @apply focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:outline-none;
+  @apply focus-visible:outline-none focus-visible:border-foreground;
 }
 
 .sr-only-focusable {

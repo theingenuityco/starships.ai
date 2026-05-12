@@ -2282,11 +2282,11 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           className={cn(
             // Mobile: edge-to-edge + less "cardy" (more native-feeling bar).
             // Desktop: keep the rounded composer card.
-            'relative transition-all overflow-visible bg-card shadow-sm',
+            'relative transition-colors overflow-visible bg-card shadow-sm',
             // Mobile: only a top border (flush to screen edges). Desktop: full border + rounded card.
             'border-t border-border/40 border-x-0 border-b-0 sm:border sm:border-border/40 sm:rounded-2xl rounded-none',
             // Focus state: match themed inputs (but using focus-within for TipTap).
-            'focus-within:outline-none focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 focus-within:ring-offset-background',
+            'focus-within:outline-none focus-within:border-foreground',
             disabled && 'opacity-50'
           )}
         >

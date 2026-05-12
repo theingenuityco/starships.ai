@@ -328,7 +328,7 @@ export function ScheduleConversationModal({ open, onOpenChange, starshipId, agen
             </Label>
             <textarea
               id="schedule-prompt"
-              className="block min-h-[96px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 resize-none"
+              className="block min-h-[96px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus:outline-none focus:border-foreground focus-visible:outline-none focus-visible:border-foreground resize-none"
               value={prompt}
               onChange={e => setPrompt(e.target.value)}
               disabled={submitting}
@@ -348,7 +348,7 @@ export function ScheduleConversationModal({ open, onOpenChange, starshipId, agen
             <Label htmlFor="schedule-recurrence">Repeat</Label>
             <select
               id="schedule-recurrence"
-              className="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              className="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm shadow-sm focus-visible:outline-none focus-visible:border-foreground"
               value={recurrence}
               onChange={e => setRecurrence(e.target.value as RecurrenceOption)}
               disabled={submitting}

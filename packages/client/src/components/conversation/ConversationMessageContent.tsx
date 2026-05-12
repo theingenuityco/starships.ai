@@ -340,6 +340,10 @@ interface MessageContentProps {
   contentTextClass?: string
   /** When set, highlight this search term in the message content (in-chat search). */
   highlightTerm?: string
+  /** Pre-computed plain-text copy content for the whole turn (multi-message turns only). When set, the copy button uses this instead of the DOM clone. */
+  copyAllContent?: string
+  /** Reactions node to render inside contentChunkRef so the floating action bar's bottom-0 anchor includes reactions height. */
+  reactionsNode?: ReactNode
 }
 
 type ToolResultLike = {
@@ -543,6 +547,8 @@ export function ConversationMessageContent({
   isLastMessage = false,
   contentTextClass,
   highlightTerm,
+  copyAllContent,
+  reactionsNode,
 }: MessageContentProps) {
   const resolvedContentClass = contentTextClass ?? 'text-sm leading-normal prose prose-sm font-sans'
   const { theme } = useTheme()
@@ -1121,6 +1127,11 @@ export function ConversationMessageContent({
 
   const handleCopyContent = async () => {
     try {
+      if (copyAllContent) {
+        await navigator.clipboard.writeText(copyAllContent)
+        toast.success('Copied to clipboard')
+        return
+      }
       const container = messageContainerRef.current
       if (!container) {
         await navigator.clipboard.writeText(displayContent)
@@ -1316,6 +1327,7 @@ export function ConversationMessageContent({
               ))}
               {toolPanelNode}
             </div>
+            {reactionsNode}
           </div>
         ) : null}
       </div>

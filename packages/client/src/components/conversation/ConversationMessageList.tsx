@@ -2235,6 +2235,21 @@ export function ConversationMessageList({
                   const isNextConsecutiveAssistant = Boolean(currAssistantKey && nextAssistantKey && currAssistantKey === nextAssistantKey && !hasGroupTimeGap(message, next))
                   const compactAssistantGroup = Boolean(currAssistantKey && (isConsecutiveAssistant || isNextConsecutiveAssistant))
                   const isLastInTurn = localIdx === lastLocalIdx
+                  // For multi-message turns, pre-compute combined plain text for the copy handler.
+                  // Only needs to be set on the last message (the one that shows the copy button).
+                  const turnCopyContent = isLastInTurn && turnGroup.messages.length > 1
+                    ? turnGroup.messages.map(({ message: m }) => {
+                        const parts: string[] = []
+                        const text = typeof (m as any).content === 'string' ? (m as any).content.trim() : ''
+                        if (text && text !== DELETED_MESSAGE_MARKER) parts.push(text)
+                        const tcs = Array.isArray((m as any).toolCalls) ? (m as any).toolCalls as any[] : []
+                        for (const tc of tcs) {
+                          const label = (typeof tc?.title === 'string' ? tc.title.trim() : '') || (typeof tc?.name === 'string' ? tc.name.trim() : '')
+                          if (label) parts.push(`[${label}]`)
+                        }
+                        return parts.join('\n')
+                      }).filter(Boolean).join('\n\n')
+                    : undefined
                   const startsNewGroup = (() => {
                     if (!prev) return false
                     if (message.role === 'assistant') return Boolean(showAssistantAvatar)
@@ -2357,6 +2372,7 @@ export function ConversationMessageList({
                               ]
                           )}
                           isLastInTurn={isLastInTurn}
+                          turnCopyContent={turnCopyContent}
                         />
                         {roomId && cid && pendingInvitesByMessageId.has(String(message.id)) ? (
                           <div className="ml-10 sm:ml-12">
@@ -2593,6 +2609,8 @@ interface ConversationMessageBubbleProps {
   animateUserEnter?: boolean
   /** True when this is the last message in its turn group — only this message shows the action bar and reactions. */
   isLastInTurn?: boolean
+  /** Pre-computed plain-text of all messages in the turn. Passed to the last message's copy handler for multi-message turns. */
+  turnCopyContent?: string
 }
 
 const HIGHLIGHT_TERM_MAX_LENGTH = 200
@@ -2957,6 +2975,7 @@ const MemoizedMessageBubble = memo(
     presenceRevision,
     animateUserEnter = false,
     isLastInTurn = true,
+    turnCopyContent,
   }: ConversationMessageBubbleProps) {
     void presenceRevision
     const isHero = sizeVariant === 'hero'
@@ -3463,15 +3482,16 @@ const MemoizedMessageBubble = memo(
                   isAwaitingToolResults={isAwaitingToolResults}
                   isLastMessage={isLastMessage}
                   highlightTerm={highlightTerm}
-                />
-              )}
-              {isLastInTurn && typeof starshipId === 'string' && starshipId.trim().length > 0 && !isDeletedMessage && (
-                <MessageReactions
-                  conversationId={cid}
-                  starshipId={starshipId}
-                  messageId={message.id}
-                  reactions={(message as any)?.reactions}
-                  disabled={typeof message.id !== 'string' || !cid || message.id.startsWith('temp-user-') || message.id.startsWith('stream-') || message.id.startsWith('ui-action:')}
+                  copyAllContent={isLastInTurn ? turnCopyContent : undefined}
+                  reactionsNode={isLastInTurn && typeof starshipId === 'string' && starshipId.trim().length > 0 && !isDeletedMessage ? (
+                    <MessageReactions
+                      conversationId={cid}
+                      starshipId={starshipId}
+                      messageId={message.id}
+                      reactions={(message as any)?.reactions}
+                      disabled={typeof message.id !== 'string' || !cid || message.id.startsWith('temp-user-') || message.id.startsWith('stream-') || message.id.startsWith('ui-action:')}
+                    />
+                  ) : null}
                 />
               )}
               {!suppressLinkedConversationCard && (
@@ -3607,16 +3627,17 @@ const MemoizedMessageBubble = memo(
                   isAwaitingToolResults={isAwaitingToolResults}
                   isLastMessage={isLastMessage}
                   highlightTerm={highlightTerm}
+                  copyAllContent={isLastInTurn ? turnCopyContent : undefined}
+                  reactionsNode={isLastInTurn && typeof starshipId === 'string' && starshipId.trim().length > 0 && !isDeletedMessage ? (
+                    <MessageReactions
+                      conversationId={cid}
+                      starshipId={starshipId}
+                      messageId={message.id}
+                      reactions={(message as any)?.reactions}
+                      disabled={typeof message.id !== 'string' || !cid || message.id.startsWith('temp-user-') || message.id.startsWith('stream-') || message.id.startsWith('ui-action:')}
+                    />
+                  ) : null}
                 />
-                {isLastInTurn && typeof starshipId === 'string' && starshipId.trim().length > 0 && !isDeletedMessage && (
-                  <MessageReactions
-                    conversationId={cid}
-                    starshipId={starshipId}
-                    messageId={message.id}
-                    reactions={(message as any)?.reactions}
-                    disabled={typeof message.id !== 'string' || !cid || message.id.startsWith('temp-user-') || message.id.startsWith('stream-') || message.id.startsWith('ui-action:')}
-                  />
-                )}
                 {!suppressLinkedConversationCard && (
                   <div className="flex flex-col gap-1">
                     {linkedConversationIds.map(id => (
@@ -3739,16 +3760,17 @@ const MemoizedMessageBubble = memo(
                 isAwaitingToolResults={isAwaitingToolResults}
                 isLastMessage={isLastMessage}
                 highlightTerm={highlightTerm}
+                copyAllContent={isLastInTurn ? turnCopyContent : undefined}
+                reactionsNode={isLastInTurn && typeof starshipId === 'string' && starshipId.trim().length > 0 && !isDeletedMessage ? (
+                  <MessageReactions
+                    conversationId={cid}
+                    starshipId={starshipId}
+                    messageId={message.id}
+                    reactions={(message as any)?.reactions}
+                    disabled={typeof message.id !== 'string' || !cid || message.id.startsWith('temp-user-') || message.id.startsWith('stream-') || message.id.startsWith('ui-action:')}
+                  />
+                ) : null}
               />
-              {isLastInTurn && typeof starshipId === 'string' && starshipId.trim().length > 0 && !isDeletedMessage && (
-                <MessageReactions
-                  conversationId={cid}
-                  starshipId={starshipId}
-                  messageId={message.id}
-                  reactions={(message as any)?.reactions}
-                  disabled={typeof message.id !== 'string' || !cid || message.id.startsWith('temp-user-') || message.id.startsWith('stream-') || message.id.startsWith('ui-action:')}
-                />
-              )}
               {!suppressLinkedConversationCard && (
                 <div className="flex flex-col gap-1">
                   {linkedConversationIds.map(id => (
@@ -3808,6 +3830,7 @@ const MemoizedMessageBubble = memo(
     if (Boolean(prevProps.compactAssistantGroup) !== Boolean(nextProps.compactAssistantGroup)) return false
     if (Boolean(prevProps.startsNewGroup) !== Boolean(nextProps.startsNewGroup)) return false
     if (Boolean(prevProps.isLastInTurn) !== Boolean(nextProps.isLastInTurn)) return false
+    if ((prevProps.turnCopyContent ?? '') !== (nextProps.turnCopyContent ?? '')) return false
     if ((prevProps.isFirstMessage ?? false) !== (nextProps.isFirstMessage ?? false)) return false
     if (Boolean(prevProps.suppressLinkedConversationCard) !== Boolean(nextProps.suppressLinkedConversationCard)) return false
 

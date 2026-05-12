@@ -2166,7 +2166,7 @@ export function ConversationMessageList({
         <div
           className={cn(
             'w-full bg-transparent',
-            contentWidth === 'constrained' ? 'max-w-4xl mx-auto' : 'max-w-none',
+            contentWidth === 'constrained' ? 'max-w-5xl mx-auto' : 'max-w-none',
             // Allows the timeline to sit at the bottom when short.
             'min-h-full flex flex-col'
           )}
@@ -2877,7 +2877,7 @@ const MemoizedMessageBubble = memo(
     const usageRingPadPx = 3
     const avatarClass = isHero ? 'w-10 h-10' : isDelegation ? 'w-6 h-6' : 'w-8 h-8'
     const avatarWidthClass = isHero ? 'w-10' : isDelegation ? 'w-6' : 'w-8'
-    const contentTextClass = isHero ? 'text-base leading-relaxed prose' : undefined
+    const contentTextClass = isHero ? 'text-base leading-normal prose prose-sm font-sans' : undefined
     const isUser = message.role === 'user'
     const messageTimestamp =
       typeof message.updatedAt === 'string' && message.updatedAt.trim().length > 0
@@ -3153,7 +3153,7 @@ const MemoizedMessageBubble = memo(
                           className="rounded-full object-cover"
                         />
                       ) : null}
-                      <AvatarFallback className="rounded-full bg-primary/10 text-primary text-xs font-semibold">
+                      <AvatarFallback className="rounded-full bg-primary/10 text-primary font-semibold" style={{ fontSize: 15 }}>
                         {fallbackVariant === 'user-icon' ? (
                           <Icon name="user" iconOverride={{ type: 'phosphor', component: 'User' }} weight="bold" size={isHero ? 20 : 14} className="text-primary" />
                         ) : (
@@ -3250,7 +3250,7 @@ const MemoizedMessageBubble = memo(
                           className="rounded-full object-cover"
                         />
                       ) : null}
-                      <AvatarFallback className="rounded-full bg-primary/10 text-primary text-xs font-semibold">
+                      <AvatarFallback className="rounded-full bg-primary/10 text-primary font-semibold" style={{ fontSize: 15 }}>
                         {fallbackVariant === 'user-icon' ? (
                           <Icon name="user" iconOverride={{ type: 'phosphor', component: 'User' }} weight="bold" size={isHero ? 20 : isDelegation ? 14 : 16} className="text-primary" />
                         ) : (
@@ -3287,7 +3287,7 @@ const MemoizedMessageBubble = memo(
                         className="rounded-full object-cover"
                       />
                     ) : null}
-                    <AvatarFallback className="rounded-full bg-primary/10 text-primary text-xs font-semibold">
+                    <AvatarFallback className="rounded-full bg-primary/10 text-primary font-semibold" style={{ fontSize: 15 }}>
                       {fallbackVariant === 'user-icon' ? (
                         <Icon name="user" iconOverride={{ type: 'phosphor', component: 'User' }} weight="bold" size={isHero ? 20 : isDelegation ? 14 : 16} className="text-primary" />
                       ) : (
@@ -3301,16 +3301,16 @@ const MemoizedMessageBubble = memo(
             )}
             <div className="min-w-0 flex-1 w-full pt-0.5">
               {!isConsecutiveSameUser && (
-                <div className="mb-0.5 sm:mb-0 flex min-w-0 w-full items-center gap-2">
-                  <div className="min-w-0 text-sm font-bold font-mono text-foreground leading-none">
+                <div className="flex min-w-0 w-full items-center gap-2">
+                  <div className="min-w-0 text-xs font-semibold text-primary/70 leading-none">
                     <HoverProfilePopover
                       trigger={
                         userProfileHref ? (
-                          <Link href={userProfileHref} className="block max-w-full truncate hover:underline underline-offset-2 leading-none">
+                          <Link href={userProfileHref} className="block max-w-full truncate leading-none group-hover/hover-name:underline group-hover/hover-name:text-primary underline-offset-2 transition-colors">
                             {authorLabel}
                           </Link>
                         ) : (
-                          <span className="block max-w-full truncate leading-none">{authorLabel}</span>
+                          <span className="block max-w-full truncate leading-none group-hover/hover-name:underline group-hover/hover-name:text-primary underline-offset-2 transition-colors">{authorLabel}</span>
                         )
                       }
                       content={userHoverCard}
@@ -3602,16 +3602,16 @@ const MemoizedMessageBubble = memo(
             )}
             <div className="min-w-0 flex-1 w-full pt-0.5">
               {showAssistantAvatar && (
-                <div className="mb-0.5 sm:mb-0 flex min-w-0 w-full items-center gap-2">
-                  <div className="min-w-0 text-sm font-bold text-foreground leading-none">
+                <div className="flex min-w-0 w-full items-center gap-2">
+                  <div className="min-w-0 text-xs font-semibold text-primary/70 leading-none">
                     <HoverProfilePopover
                       trigger={
                         assistantProfileHref ? (
-                          <Link href={assistantProfileHref} className="block max-w-full truncate font-mono hover:underline underline-offset-2 leading-none">
+                          <Link href={assistantProfileHref} className="block max-w-full truncate leading-none group-hover/hover-name:underline group-hover/hover-name:text-primary underline-offset-2 transition-colors">
                             {assistantDisplayName}
                           </Link>
                         ) : (
-                          <span className="block max-w-full truncate font-mono leading-none">{assistantDisplayName}</span>
+                          <span className="block max-w-full truncate leading-none group-hover/hover-name:underline group-hover/hover-name:text-primary underline-offset-2 transition-colors">{assistantDisplayName}</span>
                         )
                       }
                       content={assistantHoverCard}

@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 
 import Icon from '@/components/primitives/Icon'
-import { MobileNavToggleButton } from '@/components/navigation/MobileNavToggleButton'
+import { PageHeader } from '@/components/ui/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -255,32 +255,7 @@ export default function TablesIndexPage(): React.JSX.Element {
 
   return (
     <div className="relative flex flex-col min-h-full min-w-0">
-      <div className="sticky top-0 z-10 border-b border-border/60 bg-card">
-        <div className="px-4 pt-3.5 pb-2 md:py-2">
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex-1 min-w-0 flex flex-col justify-center gap-1">
-              <div className="flex min-w-0 w-full gap-2 items-center">
-                <span className="flex-shrink-0 self-center md:hidden">
-                  <MobileNavToggleButton className="mx-2" />
-                </span>
-                <div className="min-w-0 flex-1 flex flex-col justify-center gap-1">
-                  <div className="flex items-baseline gap-2 min-w-0 w-full">
-                    <span aria-hidden="true" className="flex-shrink-0 self-center text-foreground leading-none">
-                      <Icon name="database" weight="bold" className="h-4 w-4" />
-                    </span>
-                    <h3 className="flex-1 text-base font-medium text-foreground truncate leading-tight min-w-0">Datasets</h3>
-                  </div>
-                  <div className="min-w-0 text-xs leading-snug text-muted-foreground">
-                    <span className="block min-w-0 truncate font-medium leading-snug text-muted-foreground">
-                      Starship-scoped datasets usable by agents and humans.
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+      <PageHeader icon="database" title="Datasets" />
 
       <div className="flex-1 min-h-0 overflow-y-visible md:overflow-y-auto px-4 pt-6 pb-8 md:pb-8">
         <div className={cn('w-full bg-transparent max-w-4xl mx-auto min-h-full flex flex-col')}>

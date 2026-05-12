@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import Icon from '@/components/primitives/Icon'
+import { PageHeader } from '@/components/ui/PageHeader'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -13,7 +14,6 @@ import { cn } from '@/lib/utils'
 import { useStarshipBySlug } from '@/hooks/useStarships'
 import type { TaskBoardModel, TaskBoardDetailsResponse, TaskCardModel } from '@starships/protocol'
 import { KanbanBoard } from '@/components/tasks/KanbanBoard'
-import { MobileNavToggleButton } from '@/components/navigation/MobileNavToggleButton'
 import { toast } from 'sonner'
 import { getSafeErrorMessage } from '@/lib/error-utils'
 import api from '@/lib/api'
@@ -252,38 +252,7 @@ export default function StarshipTasksPage(): React.JSX.Element {
 
   return (
     <div className="relative flex flex-col min-h-full min-w-0">
-      <div className="sticky top-0 z-10 border-b border-border/60 bg-card">
-        <div className="px-4 pt-3.5 pb-2 md:py-2">
-          <div className="w-full">
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex-1 min-w-0 flex flex-col justify-center gap-1">
-                <div className="flex min-w-0 w-full gap-2 items-center">
-                  <span className="flex-shrink-0 self-center md:hidden">
-                    <MobileNavToggleButton className="mx-2" />
-                  </span>
-                  <div className="min-w-0 flex-1 flex flex-col justify-center gap-1">
-                    <div className="flex items-baseline gap-2 min-w-0 w-full">
-                      <span aria-hidden="true" className="flex-shrink-0 self-center text-foreground leading-none">
-                        <Icon name="list" weight="bold" className="h-4 w-4" />
-                      </span>
-                      <h3 className="flex-1 text-base font-medium text-foreground truncate leading-tight min-w-0">Tasks</h3>
-                    </div>
-
-                    <div className="min-w-0 text-xs leading-snug text-muted-foreground min-h-6">
-                      <span
-                        className="block min-w-0 truncate font-medium leading-snug text-muted-foreground"
-                        title="Kanban boards scoped to this starship, usable by agents and humans."
-                      >
-                        Kanban boards scoped to this starship, usable by agents and humans.
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+      <PageHeader icon="list" title="Tasks" />
 
       <div className="flex-1 min-h-0 overflow-y-visible md:overflow-y-auto px-4 pt-6 pb-8 md:pb-8">
         <div className={cn('w-full bg-transparent min-h-full')}>

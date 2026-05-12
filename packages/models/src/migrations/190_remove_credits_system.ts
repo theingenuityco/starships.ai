@@ -23,6 +23,9 @@ export async function up(client: PoolClient): Promise<void> {
 
   // 5. Drop wallets (balance store)
   await client.query(`DROP TABLE IF EXISTS wallets CASCADE`);
+
+  // 6. Drop promo redemption records (rewards were tied to wallet credits)
+  await client.query(`DROP TABLE IF EXISTS promo_redemptions CASCADE`);
 }
 
 export async function down(client: PoolClient): Promise<void> {
@@ -84,4 +87,20 @@ export async function down(client: PoolClient): Promise<void> {
   // Restore billing columns to usage
   await client.query(`ALTER TABLE usage ADD COLUMN IF NOT EXISTS billed_at TIMESTAMPTZ`);
   await client.query(`ALTER TABLE usage ADD COLUMN IF NOT EXISTS billed_ledger_id VARCHAR(255)`);
+
+  // Recreate promo_redemptions
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS promo_redemptions (
+      id VARCHAR(255) PRIMARY KEY DEFAULT gen_random_uuid()::text,
+      user_id VARCHAR(255) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      starship_id VARCHAR(255) NOT NULL REFERENCES starships(id) ON DELETE CASCADE,
+      promo_code VARCHAR(255) NOT NULL,
+      status VARCHAR(20) NOT NULL DEFAULT 'success',
+      reward_amount DECIMAL(18,6),
+      stripe_coupon_id VARCHAR(255),
+      stripe_promotion_id VARCHAR(255),
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
 }

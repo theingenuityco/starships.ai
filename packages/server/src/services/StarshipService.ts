@@ -65,8 +65,6 @@ export class StarshipService {
       status: 'active',
     });
 
-
-
     // Ensure every starship has a default public room (e.g. #lobby).
     // This must succeed; otherwise the starship isn't usable in the rooms-first UI.
     try {

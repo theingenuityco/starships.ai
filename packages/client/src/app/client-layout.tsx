@@ -77,15 +77,11 @@ export function ClientLayout({ children }: ClientLayoutProps) {
           const tab = parts[2]
           if (!tab) return 'Settings | Starships.ai'
           if (tab === 'my-starship') return 'Settings: My Starship | Starships.ai'
-          if (tab === 'upgrade') return 'Settings: Upgrade | Starships.ai'
           if (tab === 'usage') return 'Settings: Analytics | Starships.ai'
-          if (tab === 'billing') return 'Settings: Billing | Starships.ai'
           return 'Settings | Starships.ai'
         }
         if (section === 'management') return 'Management | Starships.ai'
         if (section === 'schedules') return 'Schedules | Starships.ai'
-
-        if (section === 'billing') return 'Billing | Starships.ai'
 
         return 'Starship | Starships.ai'
       }

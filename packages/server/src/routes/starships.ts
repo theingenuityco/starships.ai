@@ -1172,16 +1172,11 @@ router.post('/starships', jwtAuthMiddleware, async (req: Request, res: Response)
 
     const starshipService = new StarshipService();
 
-    // First workspace gets welcome credits (same as legacy ensure-default flow); invite-joiners never hit this.
-    const existing = await starshipService.getStarshipsForUser(userId);
-    const initialCredits = existing.length === 0 ? 200 : 0;
-
     console.log('[STARSHIP-CREATE] Creating starship in database...');
     const starship = await starshipService.createStarship({
       ownerId: userId,
       name: name.trim(),
       shipClass: 'scout',
-      initialCredits,
     });
     console.log('[STARSHIP-CREATE] Starship created with ID:', starship.id);
 

@@ -8,13 +8,10 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { validateData } from '@/utils/validation';
 import { IdSchema, PaginationSchema } from '@/schemas/common';
-import { WalletService } from '@/services/WalletService';
 import { verifyStarshipAccess, verifyResourceAccess } from '@/middleware/verify-starship-access';
 import { AgentService } from '@/services/AgentService';
 import { MessageService } from '@/services/MessageService';
-import { BillingService, InsufficientFundsError } from '@/services/BillingService';
 import { StarshipTurnLeaseService } from '@/services/StarshipTurnLeaseService';
-import { CREDITS_PER_USER_MESSAGE } from '@/config/credits';
 import { AttachmentService } from '@/services/AttachmentService';
 import {
   AgentRepository,
@@ -2273,7 +2270,6 @@ router.post(
         }
       }
 
-      // Resolve starship and wallet, then enforce non-zero balance
       const starship = await conversationService.getConversationStarship(conversationId);
       if (!starship) {
         sendError(res, 'RESOURCE_NOT_FOUND', 'Starship not found for conversation', 404, {
@@ -2283,40 +2279,11 @@ router.post(
         return;
       }
 
-      const requiredCredits = Number(CREDITS_PER_USER_MESSAGE) || 0;
       const willTriggerAgent = await conversationService.willTriggerAgentExecution({
         conversationId,
         content: contentForMessage,
         agentId: agentIdForExecution,
       });
-
-      let wallet: { id: string; balance: string } | null = null;
-      if (willTriggerAgent) {
-        const walletService = new WalletService();
-        wallet = await walletService.getByStarshipId(starship.id);
-
-        if (!wallet) {
-          sendError(res, 'RESOURCE_NOT_FOUND', 'Wallet not found', 404, {
-            starshipId: starship.id,
-          });
-          return;
-        }
-
-        const currentCredits = Number(wallet.balance) || 0;
-        if (currentCredits < requiredCredits) {
-          sendError(
-            res,
-            'INSUFFICIENT_FUNDS',
-            `Insufficient credits. ${requiredCredits} credits required for an agent-triggering message. Please add credits from Billing to continue.`,
-            402,
-            {
-              currentCredits: wallet.balance,
-              requiredCredits: requiredCredits.toFixed(6),
-            }
-          );
-          return;
-        }
-      }
 
       // Starship-level concurrency gate (Scout=1, Frigate=2).
       // IMPORTANT: acquire this before persisting/charging the user message.
@@ -2370,9 +2337,6 @@ router.post(
         }
       }
 
-      // Persist the user message first (we need messageId for idempotent charging).
-      // If this message will run an agent, debit fixed credits.
-      // If debit fails, delete the message and return 402 (do not start the turn).
       const messageService = new MessageService();
       // Multi-human support: persist author identity on the message so shared conversations/channels
       // can render the correct sender (not always “You”).
@@ -2410,49 +2374,6 @@ router.post(
           });
         } catch {
           // best-effort only
-        }
-      }
-
-      if (willTriggerAgent) {
-        const billingService = new BillingService();
-        try {
-          if (!wallet) throw new Error('WALLET_REQUIRED_FOR_BILLING');
-          await billingService.debitForUserMessage({
-            walletId: wallet.id,
-            starshipId: starship.id,
-            conversationId,
-            messageId: userMessage.id,
-          });
-        } catch (e) {
-          // Best-effort cleanup: remove message if we couldn't charge it.
-          try {
-            await messageService.deleteMessage(userMessage.id);
-          } catch (cleanupErr) {
-            console.error('[BILLING] Failed to delete unpaid user message after billing failure', {
-              conversationId,
-              messageId: userMessage.id,
-              starshipId: starship.id,
-              walletId: wallet?.id,
-              userId: authUserId,
-              error: cleanupErr instanceof Error ? cleanupErr.message : String(cleanupErr),
-            });
-          }
-          if (e instanceof InsufficientFundsError) {
-            sendError(res, 'INSUFFICIENT_FUNDS', 'Insufficient credits. Please add credits from Billing to continue.', 402, {
-              currentCredits: wallet?.balance ?? '0',
-              requiredCredits: requiredCredits.toFixed(6),
-            });
-            if (turnGuardAcquired) {
-              await conversationRepo.mergeState(conversationId, { turnActive: false }).catch(() => undefined);
-            }
-            if (turnLeaseId) await leaseService.release(turnLeaseId).catch(() => undefined);
-            return;
-          }
-          if (turnGuardAcquired) {
-            await conversationRepo.mergeState(conversationId, { turnActive: false }).catch(() => undefined);
-          }
-          if (turnLeaseId) await leaseService.release(turnLeaseId).catch(() => undefined);
-          throw e;
         }
       }
 

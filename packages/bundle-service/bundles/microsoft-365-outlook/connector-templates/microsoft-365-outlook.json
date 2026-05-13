@@ -1,0 +1,515 @@
+{
+  "schemaVersion": "1",
+  "kind": "connector_template",
+  "exportedAt": "2026-05-13T06:46:43.660Z",
+  "metadata": {
+    "fromProvider": "microsoft-365-outlook",
+    "fromSlug": "microsoft-365-outlook",
+    "fromId": "68R-nDn9bHjB9VfwIrU27"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "connectorTemplate": {
+      "id": "68R-nDn9bHjB9VfwIrU27",
+      "slug": "microsoft-365-outlook",
+      "provider": "microsoft-365-outlook",
+      "name": "Microsoft 365 / Outlook",
+      "description": "Unified Microsoft 365 connector for email, calendar, contacts, tasks, files, and Teams",
+      "isEnabled": true,
+      "version": "1.0.0",
+      "category": "enterprise-productivity",
+      "baseUrl": "https://graph.microsoft.com/v1.0",
+      "auth": {
+        "type": "oauth2",
+        "scopes": [
+          "Mail.Read",
+          "Mail.Send",
+          "Calendar.Read",
+          "Calendar.ReadWrite",
+          "Contacts.Read",
+          "Tasks.Read",
+          "Tasks.ReadWrite",
+          "Files.Read",
+          "Team.Read"
+        ],
+        "tokenUrl": "https://login.microsoftonline.com/common/oauth2/v2.0/token",
+        "injection": {
+          "style": "header",
+          "headerName": "Authorization",
+          "tokenPrefix": "Bearer"
+        },
+        "clientIdRef": {
+          "key": "MICROSOFT_OAUTH_CLIENT_ID",
+          "type": "platform_secret"
+        },
+        "tokenResponse": {
+          "expiresInField": "expires_in",
+          "accessTokenField": "access_token",
+          "refreshTokenField": "refresh_token"
+        },
+        "accessTokenRef": {
+          "key": "MICROSOFT_ACCESS_TOKEN",
+          "type": "connector_secret"
+        },
+        "scopeDelimiter": " ",
+        "clientSecretRef": {
+          "key": "MICROSOFT_OAUTH_CLIENT_SECRET",
+          "type": "platform_secret"
+        },
+        "refreshTokenRef": {
+          "key": "MICROSOFT_REFRESH_TOKEN",
+          "type": "connector_secret"
+        },
+        "authorizationUrl": "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
+        "extraAuthorizeParams": {
+          "prompt": "select_account"
+        }
+      },
+      "rateLimit": {
+        "burstLimit": 100,
+        "requestsPerMinute": 2000
+      },
+      "metadataSchema": {
+        "type": "object",
+        "required": [],
+        "properties": {
+          "tenant_id": {
+            "type": "string",
+            "description": "Optional Microsoft tenant ID for multi-tenant scenarios"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "actions": [
+      {
+        "name": "list_files",
+        "description": "List OneDrive files in user's root directory",
+        "method": "GET",
+        "path": "/me/drive/root/children",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "top": {
+              "type": "number",
+              "description": "Number of files to return"
+            },
+            "filter": {
+              "type": "string",
+              "description": "OData filter expression"
+            }
+          }
+        },
+        "mapping": {
+          "query": {
+            "$top": "{{ String(args.top || 10) }}",
+            "$filter": "{{ args.filter }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "list_teams",
+        "description": "List Teams the user is a member of",
+        "method": "GET",
+        "path": "/me/memberOf/microsoft.graph.team",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "top": {
+              "type": "number",
+              "description": "Number of teams to return"
+            }
+          }
+        },
+        "mapping": {
+          "query": {
+            "$top": "{{ String(args.top || 10) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "get_file",
+        "description": "Get file details by file ID",
+        "method": "GET",
+        "path": "/me/drive/items/{file_id}",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "file_id"
+          ],
+          "properties": {
+            "file_id": {
+              "type": "string",
+              "description": "The file ID"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "file_id": "{{ String(args.file_id) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "get_task",
+        "description": "Get task details by list ID and task ID",
+        "method": "GET",
+        "path": "/me/todo/lists/{list_id}/tasks/{task_id}",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "list_id",
+            "task_id"
+          ],
+          "properties": {
+            "list_id": {
+              "type": "string",
+              "description": "The task list ID"
+            },
+            "task_id": {
+              "type": "string",
+              "description": "The task ID"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "list_id": "{{ String(args.list_id) }}",
+            "task_id": "{{ String(args.task_id) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "list_tasks",
+        "description": "List task lists for the user",
+        "method": "GET",
+        "path": "/me/todo/lists",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "top": {
+              "type": "number",
+              "description": "Number of task lists to return"
+            }
+          }
+        },
+        "mapping": {
+          "query": {
+            "$top": "{{ String(args.top || 10) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "get_contact",
+        "description": "Get contact details by contact ID",
+        "method": "GET",
+        "path": "/me/contacts/{contact_id}",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "contact_id"
+          ],
+          "properties": {
+            "contact_id": {
+              "type": "string",
+              "description": "The contact ID"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "contact_id": "{{ String(args.contact_id) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "list_contacts",
+        "description": "List user contacts",
+        "method": "GET",
+        "path": "/me/contacts",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "top": {
+              "type": "number",
+              "description": "Number of contacts to return"
+            },
+            "filter": {
+              "type": "string",
+              "description": "OData filter expression"
+            }
+          }
+        },
+        "mapping": {
+          "query": {
+            "$top": "{{ String(args.top || 10) }}",
+            "$filter": "{{ args.filter }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "create_event",
+        "description": "Create a new calendar event",
+        "method": "POST",
+        "path": "/me/events",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "subject",
+            "start_time",
+            "end_time"
+          ],
+          "properties": {
+            "subject": {
+              "type": "string",
+              "description": "Event subject"
+            },
+            "end_time": {
+              "type": "string",
+              "description": "End time in ISO 8601 format"
+            },
+            "attendees": {
+              "type": "array",
+              "description": "Array of attendee email addresses"
+            },
+            "start_time": {
+              "type": "string",
+              "description": "Start time in ISO 8601 format"
+            },
+            "description": {
+              "type": "string",
+              "description": "Event description"
+            }
+          }
+        },
+        "mapping": {
+          "body": {
+            "end": {
+              "dateTime": "{{ String(args.end_time) }}",
+              "timeZone": "UTC"
+            },
+            "start": {
+              "dateTime": "{{ String(args.start_time) }}",
+              "timeZone": "UTC"
+            },
+            "subject": "{{ String(args.subject) }}",
+            "attendees": "{{ args.attendees }}",
+            "bodyPreview": "{{ String(args.description || '') }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "get_event",
+        "description": "Get calendar event details by event ID",
+        "method": "GET",
+        "path": "/me/events/{event_id}",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "event_id"
+          ],
+          "properties": {
+            "event_id": {
+              "type": "string",
+              "description": "The event ID"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "event_id": "{{ String(args.event_id) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "list_events",
+        "description": "List calendar events with optional filtering",
+        "method": "GET",
+        "path": "/me/calendar/events",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "top": {
+              "type": "number",
+              "description": "Number of events to return"
+            },
+            "filter": {
+              "type": "string",
+              "description": "OData filter expression"
+            }
+          }
+        },
+        "mapping": {
+          "query": {
+            "$top": "{{ String(args.top || 10) }}",
+            "$filter": "{{ args.filter }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "get_calendar",
+        "description": "Get calendar details by calendar ID",
+        "method": "GET",
+        "path": "/me/calendars/{calendar_id}",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "calendar_id"
+          ],
+          "properties": {
+            "calendar_id": {
+              "type": "string",
+              "description": "The calendar ID"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "calendar_id": "{{ String(args.calendar_id) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "list_calendars",
+        "description": "List all calendars for the user",
+        "method": "GET",
+        "path": "/me/calendars",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "top": {
+              "type": "number",
+              "description": "Number of calendars to return"
+            }
+          }
+        },
+        "mapping": {
+          "query": {
+            "$top": "{{ String(args.top || 10) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "send_email",
+        "description": "Send email with recipients and content",
+        "method": "POST",
+        "path": "/me/sendMail",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "to_recipients",
+            "subject",
+            "body"
+          ],
+          "properties": {
+            "body": {
+              "type": "string",
+              "description": "Email body content"
+            },
+            "subject": {
+              "type": "string",
+              "description": "Email subject"
+            },
+            "cc_recipients": {
+              "type": "array",
+              "description": "CC recipient addresses"
+            },
+            "to_recipients": {
+              "type": "array",
+              "description": "Array of recipient email addresses"
+            },
+            "bcc_recipients": {
+              "type": "array",
+              "description": "BCC recipient addresses"
+            }
+          }
+        },
+        "mapping": {
+          "body": {
+            "message": {
+              "body": {
+                "content": "{{ String(args.body) }}",
+                "contentType": "HTML"
+              },
+              "subject": "{{ String(args.subject) }}",
+              "ccRecipients": "{{ args.cc_recipients }}",
+              "toRecipients": "{{ args.to_recipients }}",
+              "bccRecipients": "{{ args.bcc_recipients }}"
+            }
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "list_emails",
+        "description": "List inbox emails with optional filtering",
+        "method": "GET",
+        "path": "/me/messages",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "top": {
+              "type": "number",
+              "description": "Number of emails to return (max 999)"
+            },
+            "skip": {
+              "type": "number",
+              "description": "Number of emails to skip for pagination"
+            },
+            "filter": {
+              "type": "string",
+              "description": "OData filter expression"
+            }
+          }
+        },
+        "mapping": {
+          "query": {
+            "$top": "{{ String(args.top || 10) }}",
+            "$skip": "{{ String(args.skip || 0) }}",
+            "$filter": "{{ args.filter }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "get_email",
+        "description": "Get email details by message ID",
+        "method": "GET",
+        "path": "/me/messages/{message_id}",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "message_id"
+          ],
+          "properties": {
+            "message_id": {
+              "type": "string",
+              "description": "The message ID"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "message_id": "{{ String(args.message_id) }}"
+          }
+        },
+        "timeoutMs": 15000
+      }
+    ]
+  }
+}

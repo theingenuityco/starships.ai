@@ -1,0 +1,9 @@
+{
+  "name": "LinkedIn",
+  "description": "Connect a LinkedIn account to enable tools that create and manage posts using the LinkedIn API.",
+  "version": "1.0.0",
+  "tags": [
+    "connector"
+  ],
+  "kind": "connector"
+}

@@ -1,0 +1,226 @@
+{
+  "schemaVersion": "1",
+  "kind": "connector_template",
+  "exportedAt": "2026-05-13T06:46:43.660Z",
+  "metadata": {
+    "fromProvider": "square",
+    "fromSlug": "square",
+    "fromId": "qdq_Gwr7T9fFAM0poncxT"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "connectorTemplate": {
+      "id": "qdq_Gwr7T9fFAM0poncxT",
+      "slug": "square",
+      "provider": "square",
+      "name": "Square",
+      "description": "Payment processor for managing locations, customers, orders, payments, invoices, and catalogs.",
+      "isEnabled": true,
+      "version": "1.0.0",
+      "category": "finance",
+      "baseUrl": "https://connect.squareup.com/v2",
+      "auth": {
+        "type": "oauth2",
+        "scopes": [
+          "MERCHANT_PROFILE_READ",
+          "CUSTOMERS_READ",
+          "CUSTOMERS_WRITE",
+          "ORDERS_READ",
+          "ORDERS_WRITE",
+          "PAYMENTS_READ",
+          "PAYMENTS_WRITE",
+          "INVOICES_READ",
+          "INVOICES_WRITE",
+          "CATALOG_READ",
+          "CATALOG_WRITE"
+        ],
+        "tokenUrl": "https://connect.squareup.com/oauth2/token",
+        "injection": {
+          "style": "header",
+          "headerName": "Authorization",
+          "tokenPrefix": "Bearer"
+        },
+        "clientIdRef": {
+          "key": "SQUARE_OAUTH_CLIENT_ID",
+          "type": "platform_secret"
+        },
+        "tokenResponse": {
+          "expiresInField": "expires_in",
+          "accessTokenField": "access_token",
+          "refreshTokenField": "refresh_token"
+        },
+        "accessTokenRef": {
+          "key": "SQUARE_ACCESS_TOKEN",
+          "type": "connector_secret"
+        },
+        "scopeDelimiter": " ",
+        "clientSecretRef": {
+          "key": "SQUARE_OAUTH_CLIENT_SECRET",
+          "type": "platform_secret"
+        },
+        "refreshTokenRef": {
+          "key": "SQUARE_REFRESH_TOKEN",
+          "type": "connector_secret"
+        },
+        "authorizationUrl": "https://connect.squareup.com/oauth2/authorize"
+      },
+      "rateLimit": {
+        "burstLimit": 10,
+        "requestsPerMinute": 600
+      }
+    },
+    "actions": [
+      {
+        "name": "get_order",
+        "description": "Get order details by ID",
+        "method": "GET",
+        "path": "/orders/{order_id}",
+        "mapping": {
+          "path": {
+            "order_id": "{{ String(args.order_id) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "list_payments",
+        "description": "List all payments",
+        "method": "GET",
+        "path": "/payments",
+        "mapping": {
+          "query": {
+            "limit": "{{ String(args.limit || 100) }}",
+            "cursor": "{{ String(args.cursor || '') }}",
+            "end_time": "{{ String(args.end_time || '') }}",
+            "begin_time": "{{ String(args.begin_time || '') }}",
+            "sort_order": "{{ String(args.sort_order || 'DESC') }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "get_customer",
+        "description": "Get customer details by ID",
+        "method": "GET",
+        "path": "/customers/{customer_id}",
+        "mapping": {
+          "path": {
+            "customer_id": "{{ String(args.customer_id) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "get_location",
+        "description": "Get location details by ID",
+        "method": "GET",
+        "path": "/locations/{location_id}",
+        "mapping": {
+          "path": {
+            "location_id": "{{ String(args.location_id) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "list_locations",
+        "description": "List all merchant locations",
+        "method": "GET",
+        "path": "/locations",
+        "timeoutMs": 15000
+      },
+      {
+        "name": "list_catalogs",
+        "description": "List product catalogs",
+        "method": "GET",
+        "path": "/catalogs/list",
+        "mapping": {
+          "query": {
+            "cursor": "{{ String(args.cursor || '') }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "get_catalog",
+        "description": "Get catalog details by ID",
+        "method": "GET",
+        "path": "/catalogs/{catalog_id}",
+        "mapping": {
+          "path": {
+            "catalog_id": "{{ String(args.catalog_id) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "get_invoice",
+        "description": "Get invoice details by ID",
+        "method": "GET",
+        "path": "/invoices/{invoice_id}",
+        "mapping": {
+          "path": {
+            "invoice_id": "{{ String(args.invoice_id) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "list_invoices",
+        "description": "List all invoices",
+        "method": "GET",
+        "path": "/invoices",
+        "mapping": {
+          "query": {
+            "limit": "{{ String(args.limit || 100) }}",
+            "cursor": "{{ String(args.cursor || '') }}",
+            "location_id": "{{ String(args.location_id) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "get_payment",
+        "description": "Get payment details by ID",
+        "method": "GET",
+        "path": "/payments/{payment_id}",
+        "mapping": {
+          "path": {
+            "payment_id": "{{ String(args.payment_id) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "list_customers",
+        "description": "List all customers",
+        "method": "GET",
+        "path": "/customers",
+        "mapping": {
+          "query": {
+            "limit": "{{ String(args.limit || 100) }}",
+            "cursor": "{{ String(args.cursor || '') }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "list_orders",
+        "description": "List all orders",
+        "method": "GET",
+        "path": "/orders",
+        "mapping": {
+          "query": {
+            "limit": "{{ String(args.limit || 100) }}",
+            "cursor": "{{ String(args.cursor || '') }}",
+            "location_id": "{{ String(args.location_id) }}"
+          }
+        },
+        "timeoutMs": 15000
+      }
+    ]
+  }
+}

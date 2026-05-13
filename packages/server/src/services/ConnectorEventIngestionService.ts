@@ -8,9 +8,9 @@ import {
   ConnectorEventRepository,
   ConnectorRepository,
   ConnectorSecretRepository,
-  ConnectorTemplateRepository,
   ConnectorWebhookBindingRepository,
 } from '@starships/models';
+import { ConnectorTemplateRegistryClient } from './ConnectorTemplateRegistryClient';
 import { PlatformSecretService } from '@/services/PlatformSecretService';
 import { getAutopilotAutomationQueue } from '@/queues/autopilotAutomationQueue';
 import { logger } from '@/utils/logger';
@@ -187,7 +187,7 @@ function resolveField(source: WebhookFieldSource | undefined, req: Request, pars
 
 export class ConnectorEventIngestionService {
   private connectorRepo = new ConnectorRepository();
-  private templateRepo = new ConnectorTemplateRepository();
+  private templateRegistry = new ConnectorTemplateRegistryClient();
   private connectorEventRepo = new ConnectorEventRepository();
   private awaitRepo = new AutopilotAwaitRepository();
   private awaitFiringRepo = new AutopilotAwaitFiringRepository();
@@ -260,7 +260,7 @@ export class ConnectorEventIngestionService {
     const provider = String(args.provider || '').trim();
     if (!provider) throw new ValidationError('provider is required', 'provider');
 
-    const template = await this.templateRepo.findByProvider(provider as unknown as ConnectorProvider);
+    const template = await this.templateRegistry.findByProvider(provider as unknown as ConnectorProvider);
     if (!template) {
       throw new NotFoundError('connector_template', provider);
     }

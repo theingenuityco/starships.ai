@@ -1,0 +1,9 @@
+{
+  "name": "Facebook Pages",
+  "description": "Connect to Facebook Pages API to manage page posts, comments, and engagement. Publish text posts, read page feed, update",
+  "version": "1.0.0",
+  "tags": [
+    "social"
+  ],
+  "kind": "connector"
+}

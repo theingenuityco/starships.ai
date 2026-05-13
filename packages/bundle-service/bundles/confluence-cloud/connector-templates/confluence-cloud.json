@@ -1,0 +1,123 @@
+{
+  "schemaVersion": "1",
+  "kind": "connector_template",
+  "exportedAt": "2026-05-13T06:46:43.660Z",
+  "metadata": {
+    "fromProvider": "confluence-cloud",
+    "fromSlug": "confluence-cloud",
+    "fromId": "hWYBtTG2VYvzCjk75tPCN"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "connectorTemplate": {
+      "id": "hWYBtTG2VYvzCjk75tPCN",
+      "slug": "confluence-cloud",
+      "provider": "confluence-cloud",
+      "name": "Confluence Cloud",
+      "description": "Confluence Cloud connector with essential operations",
+      "isEnabled": true,
+      "version": "1.0.0",
+      "category": "documentation",
+      "baseUrl": "https://api.atlassian.com/ex/confluence/{{ String(metadata.cloudId) }}/wiki/api/v2",
+      "auth": {
+        "type": "oauth2",
+        "scopes": [
+          "read:confluence-content.all",
+          "write:confluence-content.all",
+          "read:confluence-space.summary"
+        ],
+        "tokenUrl": "https://auth.atlassian.com/oauth/token",
+        "injection": {
+          "style": "header",
+          "headerName": "Authorization",
+          "tokenPrefix": "Bearer"
+        },
+        "clientIdRef": {
+          "key": "JIRA_OAUTH_CLIENT_ID",
+          "type": "platform_secret"
+        },
+        "accessTokenRef": {
+          "key": "CONFLUENCE_ACCESS_TOKEN",
+          "type": "connector_secret"
+        },
+        "scopeDelimiter": " ",
+        "clientSecretRef": {
+          "key": "JIRA_OAUTH_CLIENT_SECRET",
+          "type": "platform_secret"
+        },
+        "refreshTokenRef": {
+          "key": "CONFLUENCE_REFRESH_TOKEN",
+          "type": "connector_secret"
+        },
+        "authorizationUrl": "https://auth.atlassian.com/authorize",
+        "extraAuthorizeParams": {
+          "prompt": "consent",
+          "audience": "api.atlassian.com"
+        }
+      },
+      "metadataSchema": {
+        "type": "object",
+        "required": [
+          "cloudId"
+        ],
+        "properties": {
+          "cloudId": {
+            "type": "string",
+            "description": "Confluence Cloud ID (same as Jira)"
+          }
+        }
+      }
+    },
+    "actions": [
+      {
+        "name": "get-page",
+        "description": "Get a page by ID",
+        "method": "GET",
+        "path": "/pages/{{ String(args.pageId) }}"
+      },
+      {
+        "name": "list-spaces",
+        "description": "List all Confluence spaces",
+        "method": "GET",
+        "path": "/spaces",
+        "mapping": {
+          "query": {
+            "limit": "{{ String(args.limit || 25) }}"
+          }
+        }
+      },
+      {
+        "name": "create-page",
+        "description": "Create a new page",
+        "method": "POST",
+        "path": "/pages",
+        "mapping": {
+          "body": {
+            "body": {
+              "value": "{{ String(args.content) }}",
+              "representation": "storage"
+            },
+            "title": "{{ String(args.title) }}",
+            "status": "current",
+            "spaceId": "{{ String(args.spaceId) }}"
+          }
+        }
+      },
+      {
+        "name": "search-content",
+        "description": "Search Confluence content using CQL",
+        "method": "GET",
+        "path": "/pages",
+        "mapping": {
+          "query": {
+            "cql": "{{ String(args.cql) }}",
+            "limit": "{{ String(args.limit || 25) }}"
+          }
+        }
+      }
+    ]
+  }
+}

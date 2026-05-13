@@ -1,0 +1,9 @@
+{
+  "name": "Context7",
+  "description": "Context7 API for searching code libraries and fetching up-to-date documentation programmatically. Search libraries by na",
+  "version": "1.0.1",
+  "tags": [
+    "connector"
+  ],
+  "kind": "connector"
+}

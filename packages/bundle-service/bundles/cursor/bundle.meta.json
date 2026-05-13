@@ -1,0 +1,9 @@
+{
+  "name": "Cursor",
+  "description": "Programmatically launch and manage cloud agents that work on your repositories via the Cursor Cloud Agents API.",
+  "version": "2.0.0",
+  "tags": [
+    "connector"
+  ],
+  "kind": "connector"
+}

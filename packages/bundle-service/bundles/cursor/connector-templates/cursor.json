@@ -1,0 +1,412 @@
+{
+  "schemaVersion": "1",
+  "kind": "connector_template",
+  "exportedAt": "2026-05-13T06:46:43.660Z",
+  "metadata": {
+    "fromProvider": "cursor",
+    "fromSlug": "cursor",
+    "fromId": "FIK9wnhK9jf0ejzmyNaEl"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "connectorTemplate": {
+      "id": "FIK9wnhK9jf0ejzmyNaEl",
+      "slug": "cursor",
+      "provider": "cursor",
+      "name": "Cursor",
+      "description": "Programmatically launch and manage cloud agents that work on your repositories via the Cursor Cloud Agents API.",
+      "isEnabled": true,
+      "version": "2.0.0",
+      "category": "connector",
+      "baseUrl": "https://api.cursor.com",
+      "auth": {
+        "type": "basic",
+        "usernameRef": {
+          "key": "CURSOR_API_KEY",
+          "type": "connector_secret"
+        }
+      },
+      "variables": [],
+      "rateLimit": {
+        "tier": "standard",
+        "burstLimit": 10,
+        "requestsPerMinute": 60
+      },
+      "metadataSchema": {
+        "type": "object",
+        "properties": {
+          "instructions": {
+            "type": "string",
+            "description": "SETUP: Store your raw Cursor API key in the CURSOR_API_KEY secret. The platform will automatically encode it as base64(API_KEY:) for Basic authentication. Do NOT manually encode the key."
+          }
+        }
+      }
+    },
+    "actions": [
+      {
+        "name": "list-agents",
+        "description": "List all cloud agents for the authenticated user. Supports pagination with cursor.",
+        "method": "GET",
+        "path": "/v0/agents",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "limit": {
+              "type": "number",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Number of cloud agents to return. Default: 20, Max: 100"
+            },
+            "cursor": {
+              "type": "string",
+              "description": "Pagination cursor from the previous response"
+            }
+          }
+        },
+        "mapping": {
+          "query": {
+            "limit": "{{ args.limit ? String(args.limit) : undefined }}",
+            "cursor": "{{ args.cursor ? String(args.cursor) : undefined }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "get-agent-status",
+        "description": "Retrieve the current status and results of a cloud agent by ID.",
+        "method": "GET",
+        "path": "/v0/agents/{id}",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "id"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "Unique identifier for the cloud agent (e.g., bc_abc123)"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "id": "{{ String(args.id) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "get-agent-conversation",
+        "description": "Retrieve the conversation history of a cloud agent, including all user prompts and assistant responses. Note: Cannot access conversations of deleted agents.",
+        "method": "GET",
+        "path": "/v0/agents/{id}/conversation",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "id"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "Unique identifier for the cloud agent (e.g., bc_abc123)"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "id": "{{ String(args.id) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "launch-agent",
+        "description": "Start a new cloud agent to work on your repository. Requires prompt with text and source repository information.",
+        "method": "POST",
+        "path": "/v0/agents",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "prompt",
+            "source"
+          ],
+          "properties": {
+            "model": {
+              "type": "string",
+              "description": "The LLM to use (e.g., claude-4-sonnet). If not provided, we'll pick the most appropriate model"
+            },
+            "prompt": {
+              "type": "object",
+              "required": [
+                "text"
+              ],
+              "properties": {
+                "text": {
+                  "type": "string",
+                  "description": "The instruction text for the agent"
+                },
+                "images": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "data",
+                      "dimension"
+                    ],
+                    "properties": {
+                      "data": {
+                        "type": "string",
+                        "description": "Base64-encoded image data"
+                      },
+                      "dimension": {
+                        "type": "object",
+                        "required": [
+                          "width",
+                          "height"
+                        ],
+                        "properties": {
+                          "width": {
+                            "type": "number"
+                          },
+                          "height": {
+                            "type": "number"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "maxItems": 5,
+                  "description": "Array of image objects with base64 data and dimensions (max 5)"
+                }
+              }
+            },
+            "source": {
+              "type": "object",
+              "required": [
+                "repository"
+              ],
+              "properties": {
+                "ref": {
+                  "type": "string",
+                  "description": "Git ref (branch name, tag, or commit hash) to use as the base branch"
+                },
+                "repository": {
+                  "type": "string",
+                  "description": "GitHub repository URL (e.g., https://github.com/your-org/your-repo)"
+                }
+              }
+            },
+            "target": {
+              "type": "object",
+              "properties": {
+                "branchName": {
+                  "type": "string",
+                  "description": "Custom branch name for the agent to create"
+                },
+                "autoCreatePr": {
+                  "type": "boolean",
+                  "description": "Whether to automatically create a pull request when the agent completes. Default: false"
+                },
+                "skipReviewerRequest": {
+                  "type": "boolean",
+                  "description": "Whether to skip adding the user as a reviewer to the pull request. Only applies if autoCreatePr is true and the PR is opened as the Cursor GitHub App. Default: false"
+                },
+                "openAsCursorGithubApp": {
+                  "type": "boolean",
+                  "description": "Whether to open the pull request as the Cursor GitHub App instead of as the user. Only applies if autoCreatePr is true. Default: false"
+                }
+              }
+            },
+            "webhook": {
+              "type": "object",
+              "required": [
+                "url"
+              ],
+              "properties": {
+                "url": {
+                  "type": "string",
+                  "description": "URL to receive webhook notifications about agent status changes"
+                },
+                "secret": {
+                  "type": "string",
+                  "minLength": 32,
+                  "description": "Secret key for webhook payload verification (minimum 32 characters)"
+                }
+              }
+            }
+          }
+        },
+        "mapping": {
+          "body": {
+            "model": "{{ args.model || undefined }}",
+            "prompt": "{{ args.prompt }}",
+            "source": "{{ args.source }}",
+            "target": "{{ args.target || undefined }}",
+            "webhook": "{{ args.webhook || undefined }}"
+          }
+        },
+        "timeoutMs": 30000
+      },
+      {
+        "name": "add-followup",
+        "description": "Add a follow-up instruction to an existing cloud agent. If the agent is stopped, it will resume running.",
+        "method": "POST",
+        "path": "/v0/agents/{id}/followup",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "id",
+            "prompt"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "Unique identifier for the cloud agent (e.g., bc_abc123)"
+            },
+            "prompt": {
+              "type": "object",
+              "required": [
+                "text"
+              ],
+              "properties": {
+                "text": {
+                  "type": "string",
+                  "description": "The follow-up instruction text for the agent"
+                },
+                "images": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "data",
+                      "dimension"
+                    ],
+                    "properties": {
+                      "data": {
+                        "type": "string",
+                        "description": "Base64-encoded image data"
+                      },
+                      "dimension": {
+                        "type": "object",
+                        "required": [
+                          "width",
+                          "height"
+                        ],
+                        "properties": {
+                          "width": {
+                            "type": "number"
+                          },
+                          "height": {
+                            "type": "number"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "maxItems": 5,
+                  "description": "Array of image objects with base64 data and dimensions (max 5)"
+                }
+              }
+            }
+          }
+        },
+        "mapping": {
+          "body": {
+            "prompt": "{{ args.prompt }}"
+          },
+          "path": {
+            "id": "{{ String(args.id) }}"
+          }
+        },
+        "timeoutMs": 30000
+      },
+      {
+        "name": "stop-agent",
+        "description": "Stop a running cloud agent. This pauses execution without deleting it. Can only stop agents that are currently running.",
+        "method": "POST",
+        "path": "/v0/agents/{id}/stop",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "id"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "Unique identifier for the cloud agent (e.g., bc_abc123)"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "id": "{{ String(args.id) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "delete-agent",
+        "description": "Delete a cloud agent. This action is permanent and cannot be undone.",
+        "method": "DELETE",
+        "path": "/v0/agents/{id}",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "id"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "Unique identifier for the cloud agent (e.g., bc_abc123)"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "id": "{{ String(args.id) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "get-api-key-info",
+        "description": "Retrieve information about the API key being used for authentication.",
+        "method": "GET",
+        "path": "/v0/me",
+        "parameters": {
+          "type": "object",
+          "properties": {}
+        },
+        "mapping": {},
+        "timeoutMs": 10000
+      },
+      {
+        "name": "list-models",
+        "description": "Retrieve a list of recommended models for cloud agents. Recommended to have an 'Auto' option where no model is specified.",
+        "method": "GET",
+        "path": "/v0/models",
+        "parameters": {
+          "type": "object",
+          "properties": {}
+        },
+        "mapping": {},
+        "timeoutMs": 10000
+      },
+      {
+        "name": "list-repositories",
+        "description": "Retrieve a list of GitHub repositories accessible to the authenticated user. Has strict rate limits: 1/user/minute and 30/user/hour. May take tens of seconds for users with many repos.",
+        "method": "GET",
+        "path": "/v0/repositories",
+        "parameters": {
+          "type": "object",
+          "properties": {}
+        },
+        "mapping": {},
+        "timeoutMs": 60000
+      }
+    ]
+  }
+}

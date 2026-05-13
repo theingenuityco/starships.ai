@@ -1,0 +1,751 @@
+{
+  "schemaVersion": "1",
+  "kind": "connector_template",
+  "exportedAt": "2026-05-13T06:46:43.660Z",
+  "metadata": {
+    "fromProvider": "instagram",
+    "fromSlug": "instagram",
+    "fromId": "vvKw_e7IQB8UcorMKsHRW"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "connectorTemplate": {
+      "id": "vvKw_e7IQB8UcorMKsHRW",
+      "slug": "instagram",
+      "provider": "instagram",
+      "name": "Instagram",
+      "description": "Instagram Graph API connector for managing posts, stories, comments, and insights. Supports content publishing, engageme",
+      "isEnabled": true,
+      "version": "1.0.0",
+      "category": "social",
+      "baseUrl": "https://graph.instagram.com",
+      "auth": {
+        "type": "oauth2",
+        "scopes": [
+          "instagram_business_basic",
+          "instagram_business_content_publish",
+          "instagram_business_manage_messages",
+          "instagram_business_manage_comments"
+        ],
+        "tokenUrl": "https://api.instagram.com/oauth/access_token",
+        "injection": {
+          "style": "header",
+          "headerName": "Authorization",
+          "tokenPrefix": "Bearer"
+        },
+        "clientIdRef": {
+          "key": "INSTAGRAM_CLIENT_ID",
+          "type": "platform_secret"
+        },
+        "tokenResponse": {
+          "scopeField": "scope",
+          "expiresInField": "expires_in",
+          "tokenTypeField": "token_type",
+          "metadataMapping": {
+            "user_id": "data[0].user_id"
+          },
+          "accessTokenField": "access_token",
+          "refreshTokenField": "refresh_token"
+        },
+        "accessTokenRef": {
+          "key": "INSTAGRAM_ACCESS_TOKEN",
+          "type": "connector_secret"
+        },
+        "scopeDelimiter": ",",
+        "clientSecretRef": {
+          "key": "INSTAGRAM_CLIENT_SECRET",
+          "type": "platform_secret"
+        },
+        "authorizationUrl": "https://api.instagram.com/oauth/authorize"
+      },
+      "variables": [],
+      "rateLimit": {
+        "tier": "standard",
+        "burstLimit": 50,
+        "requestsPerMinute": 200
+      },
+      "metadataSchema": {
+        "type": "object",
+        "required": [
+          "user_id"
+        ],
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "description": "Instagram User ID (obtained from OAuth token response, required for all API calls)"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "actions": [
+      {
+        "name": "get-stories",
+        "description": "Get all active stories for the Instagram account. Stories expire after 24 hours.",
+        "method": "GET",
+        "path": "/{instagram_account_id}/stories",
+        "parameters": {
+          "type": "object",
+          "required": [],
+          "properties": {
+            "fields": {
+              "type": "string",
+              "description": "Comma-separated list of fields to retrieve"
+            }
+          },
+          "additionalProperties": false
+        },
+        "mapping": {
+          "path": {
+            "instagram_account_id": "{{ String(metadata.user_id) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "me-media",
+        "description": "List media for the currently authenticated Instagram user.",
+        "method": "GET",
+        "path": "/me/media",
+        "parameters": {
+          "type": "object",
+          "required": [],
+          "properties": {
+            "after": {
+              "type": "string",
+              "description": "Cursor"
+            },
+            "limit": {
+              "type": "number",
+              "description": "Max items"
+            },
+            "fields": {
+              "type": "string",
+              "description": "Comma-separated fields"
+            }
+          },
+          "additionalProperties": false
+        },
+        "mapping": {
+          "query": {
+            "after": "{{ args.after ? String(args.after) : '' }}",
+            "limit": "{{ String(args.limit || 25) }}",
+            "fields": "{{ String(args.fields || 'id,caption,media_type,media_url,permalink,timestamp') }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "get-me",
+        "description": "Get the connected Instagram user (via Instagram Graph host).",
+        "method": "GET",
+        "path": "/me",
+        "baseUrlOverride": "https://graph.instagram.com",
+        "mapping": {
+          "query": {
+            "fields": "id,name"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "create-media-container",
+        "description": "Create a media container for photo, video, or carousel. This is step 1 of publishing - creates a container that can be published later.",
+        "method": "POST",
+        "path": "/{instagram_account_id}/media",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "mediaType"
+          ],
+          "properties": {
+            "caption": {
+              "type": "string",
+              "description": "Caption for the post (max 2200 characters)"
+            },
+            "children": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Array of media container IDs for carousel"
+            },
+            "imageUrl": {
+              "type": "string",
+              "description": "URL of image to publish (for IMAGE or CAROUSEL_ITEM)"
+            },
+            "videoUrl": {
+              "type": "string",
+              "description": "URL of video to publish (for VIDEO)"
+            },
+            "mediaType": {
+              "enum": [
+                "IMAGE",
+                "VIDEO",
+                "CAROUSEL"
+              ],
+              "type": "string",
+              "default": "IMAGE",
+              "description": "Type of media"
+            },
+            "locationId": {
+              "type": "string",
+              "description": "Location Page ID to tag"
+            },
+            "thumbOffset": {
+              "type": "number",
+              "description": "Video thumbnail offset in milliseconds (VIDEO only)"
+            },
+            "isCarouselItem": {
+              "type": "boolean",
+              "description": "Set true when creating carousel children"
+            }
+          },
+          "additionalProperties": false
+        },
+        "mapping": {
+          "body": {
+            "caption": "{{ String(args.caption) }}",
+            "image_url": "{{ String(args.imageUrl) }}",
+            "video_url": "{{ String(args.videoUrl) }}",
+            "media_type": "{{ String(args.mediaType) }}"
+          },
+          "path": {
+            "instagram_account_id": "{{ String(metadata.user_id) }}"
+          }
+        },
+        "timeoutMs": 30000
+      },
+      {
+        "name": "search-hashtag",
+        "description": "Search for a hashtag ID by name. Returns the hashtag ID which can be used to get recent media.",
+        "method": "GET",
+        "path": "/ig_hashtag_search",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "hashtag"
+          ],
+          "properties": {
+            "hashtag": {
+              "type": "string",
+              "description": "Hashtag name to search (without # symbol)"
+            },
+            "user_id": {
+              "type": "string",
+              "description": "Optional: Instagram Business Account ID for context"
+            }
+          },
+          "additionalProperties": false
+        },
+        "mapping": {
+          "query": {
+            "q": "{{ String(args.hashtag) }}",
+            "user_id": "{{ String(metadata.user_id) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "get-account-insights",
+        "description": "Get insights (analytics) for the Instagram account. Supports metrics like impressions, reach, profile views, and follower demographics.",
+        "method": "GET",
+        "path": "/{instagram_account_id}/insights",
+        "parameters": {
+          "type": "object",
+          "required": [],
+          "properties": {
+            "since": {
+              "type": "string",
+              "description": "Start date (Unix timestamp)"
+            },
+            "until": {
+              "type": "string",
+              "description": "End date (Unix timestamp)"
+            },
+            "period": {
+              "enum": [
+                "day",
+                "week",
+                "days_28",
+                "lifetime"
+              ],
+              "type": "string",
+              "default": "day",
+              "description": "Time period for metrics"
+            },
+            "metrics": {
+              "type": "string",
+              "description": "Comma-separated list of metrics"
+            }
+          },
+          "additionalProperties": false
+        },
+        "mapping": {
+          "path": {
+            "instagram_account_id": "{{ String(metadata.user_id) }}"
+          },
+          "query": {
+            "metric": "{{ String(args.metrics || 'reach,follower_count,profile_views,follower_demographics') }}",
+            "period": "{{ String(args.period || 'day') }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "get-hashtag-top-media",
+        "description": "Get top/trending media objects for a specific hashtag. Returns the most engaged media tagged with the hashtag.",
+        "method": "GET",
+        "path": "/{hashtag_id}/top_media",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "hashtagId"
+          ],
+          "properties": {
+            "fields": {
+              "type": "string",
+              "default": "id,caption,media_type,media_url,permalink,timestamp,like_count,comments_count",
+              "description": "Comma-separated list of fields to return"
+            },
+            "hashtagId": {
+              "type": "string",
+              "description": "Hashtag ID from search-hashtag endpoint"
+            }
+          },
+          "additionalProperties": false
+        },
+        "mapping": {
+          "path": {
+            "hashtag_id": "{{ String(args.hashtagId) }}"
+          },
+          "query": {
+            "fields": "{{ String(args.fields || 'id,caption,media_type,media_url,permalink,timestamp,like_count,comments_count') }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "list-media",
+        "description": "Get a list of all media objects (posts, stories, reels) for the Instagram account.",
+        "method": "GET",
+        "path": "/{instagram_account_id}/media",
+        "parameters": {
+          "type": "object",
+          "required": [],
+          "properties": {
+            "after": {
+              "type": "string",
+              "description": "Cursor for next page of results"
+            },
+            "limit": {
+              "type": "number",
+              "default": 25,
+              "description": "Number of media objects to return (max 100)"
+            },
+            "before": {
+              "type": "string",
+              "description": "Cursor for previous page of results"
+            },
+            "fields": {
+              "type": "string",
+              "description": "Comma-separated list of fields to retrieve"
+            }
+          },
+          "additionalProperties": false
+        },
+        "mapping": {
+          "path": {
+            "instagram_account_id": "{{ String(metadata.user_id) }}"
+          },
+          "query": {
+            "after": "{{ args.after }}",
+            "limit": "{{ String(args.limit || '25') }}",
+            "before": "{{ args.before }}",
+            "fields": "{{ String(args.fields || 'id,caption,media_type,media_url,permalink,timestamp,like_count,comments_count') }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "discover-account-id",
+        "description": "Discover Instagram Business Account ID(s) via /me/accounts (Facebook Graph). Returns pages with instagram_business_account field when available.",
+        "method": "GET",
+        "path": "/me/accounts",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "fields": {
+              "type": "string",
+              "description": "Comma-separated list of fields to retrieve (default: id,name,instagram_business_account)"
+            }
+          },
+          "additionalProperties": false
+        },
+        "mapping": {
+          "query": {
+            "fields": "{{ String(args.fields || 'id,name,instagram_business_account') }}"
+          }
+        },
+        "response": {
+          "select": "{{ body.data }}"
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "reply-to-comment",
+        "description": "Reply to a comment on your media. Creates a threaded reply under the original comment.",
+        "method": "POST",
+        "path": "/{comment_id}/replies",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "commentId",
+            "message"
+          ],
+          "properties": {
+            "message": {
+              "type": "string",
+              "description": "Reply text"
+            },
+            "commentId": {
+              "type": "string",
+              "description": "Instagram comment ID to reply to"
+            }
+          },
+          "additionalProperties": false
+        },
+        "mapping": {
+          "path": {
+            "comment_id": "{{ String(args.commentId) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "get-account-info",
+        "description": "Get information about the Instagram Business Account including username, followers, media count, and profile picture.",
+        "method": "GET",
+        "path": "/{instagram_account_id}",
+        "parameters": {
+          "type": "object",
+          "required": [],
+          "properties": {
+            "fields": {
+              "type": "string",
+              "description": "Comma-separated list of fields to retrieve"
+            }
+          },
+          "additionalProperties": false
+        },
+        "mapping": {
+          "path": {
+            "instagram_account_id": "{{ String(metadata.user_id) }}"
+          },
+          "query": {
+            "fields": "{{ String(args.fields || 'id,username,biography,profile_picture_url,followers_count,follows_count,media_count,website') }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "delete-comment",
+        "description": "Delete a comment on your media. Can delete any comment on your posts, or your own comments on other posts.",
+        "method": "DELETE",
+        "path": "/{comment_id}",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "commentId"
+          ],
+          "properties": {
+            "commentId": {
+              "type": "string",
+              "description": "Instagram comment ID to delete"
+            }
+          },
+          "additionalProperties": false
+        },
+        "mapping": {
+          "path": {
+            "comment_id": "{{ String(args.commentId) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "get-user-tags",
+        "description": "Get all media in which the Instagram user has been tagged by other users. Useful for brand monitoring and user-generated content tracking.",
+        "method": "GET",
+        "path": "/{user_id}/tags",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "userId"
+          ],
+          "properties": {
+            "limit": {
+              "type": "number",
+              "default": 25,
+              "description": "Number of media objects to return"
+            },
+            "fields": {
+              "type": "string",
+              "default": "id,caption,media_type,media_url,permalink,timestamp,like_count,comments_count,username",
+              "description": "Comma-separated list of fields to return"
+            },
+            "userId": {
+              "type": "string",
+              "description": "Instagram user ID (typically from get-account-info)"
+            }
+          },
+          "additionalProperties": false
+        },
+        "mapping": {
+          "path": {
+            "user_id": "{{ String(args.userId) }}"
+          },
+          "query": {
+            "limit": "{{ String(args.limit || '25') }}",
+            "fields": "{{ String(args.fields || 'id,caption,media_type,media_url,permalink,timestamp,like_count,comments_count,username') }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "get-media",
+        "description": "Get details about a specific media object (post, story, reel) including engagement metrics and metadata.",
+        "method": "GET",
+        "path": "/{media_id}",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "mediaId"
+          ],
+          "properties": {
+            "fields": {
+              "type": "string",
+              "description": "Comma-separated list of fields to retrieve"
+            },
+            "mediaId": {
+              "type": "string",
+              "description": "Instagram media ID"
+            }
+          },
+          "additionalProperties": false
+        },
+        "mapping": {
+          "path": {
+            "media_id": "{{ String(args.mediaId) }}"
+          },
+          "query": {
+            "fields": "{{ String(args.fields || 'id,caption,media_type,media_url,permalink,timestamp,like_count,comments_count') }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "delete-media",
+        "description": "Delete a media object (post, story, reel). Only works for media created via the API.",
+        "method": "DELETE",
+        "path": "/{media_id}",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "mediaId"
+          ],
+          "properties": {
+            "mediaId": {
+              "type": "string",
+              "description": "Instagram media ID to delete"
+            }
+          },
+          "additionalProperties": false
+        },
+        "mapping": {
+          "path": {
+            "media_id": "{{ String(args.mediaId) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "get-comments",
+        "description": "Get all comments on a media object. Returns comment ID, text, timestamp, username, and like count.",
+        "method": "GET",
+        "path": "/{media_id}/comments",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "mediaId"
+          ],
+          "properties": {
+            "limit": {
+              "type": "number",
+              "default": 50,
+              "description": "Number of comments to return"
+            },
+            "fields": {
+              "type": "string",
+              "description": "Comma-separated list of fields"
+            },
+            "mediaId": {
+              "type": "string",
+              "description": "Instagram media ID"
+            }
+          },
+          "additionalProperties": false
+        },
+        "mapping": {
+          "path": {
+            "media_id": "{{ String(args.mediaId) }}"
+          },
+          "query": {
+            "fields": "{{ String(args.fields || 'id,text,timestamp,username,like_count') }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "update-media-caption",
+        "description": "Update the caption of an existing media object. Only works for media created via the API.",
+        "method": "POST",
+        "path": "/{media_id}",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "mediaId",
+            "caption",
+            "comment_enabled"
+          ],
+          "properties": {
+            "caption": {
+              "type": "string",
+              "description": "New caption text (max 2200 characters)"
+            },
+            "mediaId": {
+              "type": "string",
+              "description": "Instagram media ID"
+            },
+            "comment_enabled": {
+              "type": "boolean",
+              "default": true,
+              "description": "Whether comments are enabled on this media"
+            }
+          },
+          "additionalProperties": false
+        },
+        "mapping": {
+          "body": {
+            "caption": "{{ String(args.caption) }}",
+            "comment_enabled": "{{ Boolean(args.comment_enabled !== false) }}"
+          },
+          "path": {
+            "media_id": "{{ String(args.mediaId) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "publish-media",
+        "description": "Publish a media container to Instagram. This is step 2 of publishing - publishes a previously created container.",
+        "method": "POST",
+        "path": "/{instagram_account_id}/media_publish",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "creationId"
+          ],
+          "properties": {
+            "creationId": {
+              "type": "string",
+              "description": "Media container ID from create-media-container"
+            }
+          },
+          "additionalProperties": false
+        },
+        "mapping": {
+          "path": {
+            "instagram_account_id": "{{ String(metadata.user_id) }}"
+          },
+          "query": {
+            "creation_id": "{{ String(args.creationId) }}"
+          }
+        },
+        "timeoutMs": 30000
+      },
+      {
+        "name": "get-hashtag-recent-media",
+        "description": "Get recent media objects that have been tagged with a specific hashtag.",
+        "method": "GET",
+        "path": "/{hashtag_id}/recent_media",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "hashtagId"
+          ],
+          "properties": {
+            "limit": {
+              "type": "number",
+              "default": 25,
+              "description": "Number of media objects to return"
+            },
+            "fields": {
+              "type": "string",
+              "description": "Comma-separated list of fields"
+            },
+            "hashtagId": {
+              "type": "string",
+              "description": "Hashtag ID from search-hashtag"
+            }
+          },
+          "additionalProperties": false
+        },
+        "mapping": {
+          "path": {
+            "hashtag_id": "{{ String(args.hashtagId) }}"
+          },
+          "query": {
+            "fields": "{{ String(args.fields || 'id,caption,media_type,media_url,permalink,timestamp,like_count,comments_count') }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "get-media-insights",
+        "description": "Get insights (analytics) for a specific media object. Includes engagement, impressions, reach, saved, and video views.",
+        "method": "GET",
+        "path": "/{media_id}/insights",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "mediaId"
+          ],
+          "properties": {
+            "mediaId": {
+              "type": "string",
+              "description": "Instagram media ID"
+            },
+            "metrics": {
+              "type": "string",
+              "description": "Comma-separated list of metrics (engagement,impressions,reach,saved,video_views)"
+            }
+          },
+          "additionalProperties": false
+        },
+        "mapping": {
+          "path": {
+            "media_id": "{{ String(args.mediaId) }}"
+          },
+          "query": {
+            "metric": "{{ String(args.metrics || 'likes,comments,saved,reach') }}"
+          }
+        },
+        "timeoutMs": 15000
+      }
+    ]
+  }
+}

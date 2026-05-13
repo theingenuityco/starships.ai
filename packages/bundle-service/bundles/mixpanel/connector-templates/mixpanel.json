@@ -1,0 +1,269 @@
+{
+  "schemaVersion": "1",
+  "kind": "connector_template",
+  "exportedAt": "2026-05-13T06:46:43.660Z",
+  "metadata": {
+    "fromProvider": "mixpanel",
+    "fromSlug": "mixpanel",
+    "fromId": "i61MnZRmxEeVKWnYcUN54"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "connectorTemplate": {
+      "id": "i61MnZRmxEeVKWnYcUN54",
+      "slug": "mixpanel",
+      "provider": "mixpanel",
+      "name": "Mixpanel",
+      "description": "Analytics platform for tracking user behavior and querying event data.",
+      "isEnabled": true,
+      "version": "1.0.0",
+      "category": "connector",
+      "baseUrl": "https://data.mixpanel.com/api/2.0",
+      "auth": {
+        "type": "api_key",
+        "apiKeyRef": {
+          "key": "MIXPANEL_API_KEY",
+          "type": "connector_secret"
+        },
+        "injection": {
+          "style": "query",
+          "queryParamName": "api_key"
+        }
+      },
+      "rateLimit": {
+        "burstLimit": 10,
+        "requestsPerMinute": 60
+      },
+      "metadataSchema": {
+        "type": "object",
+        "required": [],
+        "properties": {
+          "project_id": {
+            "type": "string",
+            "description": "Mixpanel project ID"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "actions": [
+      {
+        "name": "export_data",
+        "description": "Export Mixpanel event or user data to cloud storage",
+        "method": "POST",
+        "path": "/export",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "from_date"
+          ],
+          "properties": {
+            "events": {
+              "type": "string",
+              "description": "Event names to export"
+            },
+            "to_date": {
+              "type": "string",
+              "description": "End date (YYYY-MM-DD)"
+            },
+            "from_date": {
+              "type": "string",
+              "description": "Start date (YYYY-MM-DD)"
+            },
+            "monoschema": {
+              "enum": [
+                "monoschema",
+                "multischema"
+              ],
+              "type": "string"
+            },
+            "data_source": {
+              "enum": [
+                "events",
+                "people"
+              ],
+              "type": "string"
+            }
+          }
+        },
+        "mapping": {
+          "query": {
+            "events": "{{ String(args.events || '') }}",
+            "to_date": "{{ String(args.to_date || '') }}",
+            "from_date": "{{ String(args.from_date) }}",
+            "monoschema": "{{ String(args.monoschema || 'multischema') }}",
+            "data_source": "{{ String(args.data_source || 'events') }}"
+          }
+        },
+        "timeoutMs": 30000
+      },
+      {
+        "name": "get_retention",
+        "description": "Query cohort retention and returning user data",
+        "method": "GET",
+        "path": "/query/retention",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "from_date",
+            "to_date"
+          ],
+          "properties": {
+            "unit": {
+              "enum": [
+                "day",
+                "week",
+                "month"
+              ],
+              "type": "string"
+            },
+            "event": {
+              "type": "string",
+              "description": "Event to track for retention"
+            },
+            "to_date": {
+              "type": "string",
+              "description": "End date (YYYY-MM-DD)"
+            },
+            "interval": {
+              "type": "string",
+              "description": "Interval count"
+            },
+            "from_date": {
+              "type": "string",
+              "description": "Start date (YYYY-MM-DD)"
+            },
+            "born_event": {
+              "type": "string",
+              "description": "Initial event for cohort"
+            },
+            "retention_type": {
+              "enum": [
+                "birth",
+                "compounded"
+              ],
+              "type": "string"
+            }
+          }
+        },
+        "mapping": {
+          "query": {
+            "unit": "{{ String(args.unit || 'day') }}",
+            "event": "{{ String(args.event || '') }}",
+            "to_date": "{{ String(args.to_date) }}",
+            "interval": "{{ String(args.interval || '1') }}",
+            "from_date": "{{ String(args.from_date) }}",
+            "born_event": "{{ String(args.born_event || '') }}",
+            "retention_type": "{{ String(args.retention_type || 'birth') }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "track_event",
+        "description": "Send event data to Mixpanel for analysis",
+        "method": "POST",
+        "path": "/track",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "event",
+            "properties"
+          ],
+          "properties": {
+            "event": {
+              "type": "string",
+              "description": "Event name"
+            },
+            "properties": {
+              "type": "object",
+              "description": "Event properties including distinct_id, time, etc"
+            }
+          }
+        },
+        "mapping": {
+          "body": {
+            "event": "{{ String(args.event) }}",
+            "properties": "{{ args.properties }}"
+          }
+        },
+        "timeoutMs": 10000
+      },
+      {
+        "name": "get_project",
+        "description": "Get details for a specific Mixpanel project",
+        "method": "GET",
+        "path": "/projects/{project_id}",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "project_id"
+          ],
+          "properties": {
+            "project_id": {
+              "type": "string",
+              "description": "Project ID"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "project_id": "{{ String(args.project_id) }}"
+          }
+        },
+        "timeoutMs": 10000
+      },
+      {
+        "name": "get_events",
+        "description": "Query event data with filtering and segmentation",
+        "method": "GET",
+        "path": "/query/events",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "event",
+            "from_date",
+            "to_date"
+          ],
+          "properties": {
+            "event": {
+              "type": "string",
+              "description": "Event name to query"
+            },
+            "where": {
+              "type": "string",
+              "description": "Filter expression"
+            },
+            "to_date": {
+              "type": "string",
+              "description": "End date (YYYY-MM-DD)"
+            },
+            "from_date": {
+              "type": "string",
+              "description": "Start date (YYYY-MM-DD)"
+            }
+          }
+        },
+        "mapping": {
+          "query": {
+            "event": "{{ String(args.event) }}",
+            "where": "{{ String(args.where || '') }}",
+            "to_date": "{{ String(args.to_date) }}",
+            "from_date": "{{ String(args.from_date) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "list_projects",
+        "description": "List all Mixpanel projects in the account",
+        "method": "GET",
+        "path": "/projects",
+        "timeoutMs": 10000
+      }
+    ]
+  }
+}

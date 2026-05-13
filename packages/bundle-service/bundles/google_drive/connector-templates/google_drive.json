@@ -1,0 +1,490 @@
+{
+  "schemaVersion": "1",
+  "kind": "connector_template",
+  "exportedAt": "2026-05-13T06:46:43.660Z",
+  "metadata": {
+    "fromProvider": "google_drive",
+    "fromSlug": "google_drive",
+    "fromId": "google_drive"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "connectorTemplate": {
+      "id": "google_drive",
+      "slug": "google_drive",
+      "provider": "google_drive",
+      "name": "Google Drive",
+      "description": "Connect a Google Drive account to enable tools that list, read, and write files via the Google Drive API.",
+      "isEnabled": true,
+      "version": "1.0.0",
+      "category": "connector",
+      "baseUrl": "https://www.googleapis.com",
+      "auth": {
+        "type": "oauth2",
+        "scopes": [
+          "https://www.googleapis.com/auth/drive"
+        ],
+        "tokenUrl": "https://oauth2.googleapis.com/token",
+        "injection": {
+          "style": "header",
+          "headerName": "Authorization",
+          "tokenPrefix": "Bearer"
+        },
+        "clientIdRef": {
+          "key": "GOOGLE_DRIVE_CLIENT_ID",
+          "type": "platform_secret"
+        },
+        "accessTokenRef": {
+          "key": "GOOGLE_DRIVE_ACCESS_TOKEN",
+          "type": "connector_secret"
+        },
+        "scopeDelimiter": " ",
+        "clientSecretRef": {
+          "key": "GOOGLE_DRIVE_CLIENT_SECRET",
+          "type": "platform_secret"
+        },
+        "refreshTokenRef": {
+          "key": "GOOGLE_DRIVE_REFRESH_TOKEN",
+          "type": "connector_secret"
+        },
+        "authorizationUrl": "https://accounts.google.com/o/oauth2/v2/auth",
+        "extraAuthorizeParams": {
+          "prompt": "consent",
+          "accessType": "offline"
+        }
+      },
+      "variables": []
+    },
+    "actions": [
+      {
+        "name": "list-files",
+        "description": "List files and folders in Google Drive. Supports filtering by query, page size, and ordering.",
+        "method": "GET",
+        "path": "/drive/v3/files",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "q": {
+              "type": "string",
+              "description": "Query string for filtering files (e.g., \"name contains 'report'\" or \"mimeType='application/pdf'\")"
+            },
+            "fields": {
+              "type": "string",
+              "description": "Fields to include in response"
+            },
+            "orderBy": {
+              "type": "string",
+              "description": "Sort order (e.g., 'createdTime', 'modifiedTime', 'name')"
+            },
+            "pageSize": {
+              "type": "number",
+              "description": "Maximum number of files to return (1-1000, default 100)"
+            },
+            "pageToken": {
+              "type": "string",
+              "description": "Token for the next page of results"
+            }
+          }
+        },
+        "mapping": {
+          "query": {
+            "q": "{{ args.q ? String(args.q) : undefined }}",
+            "fields": "{{ String(args.fields || 'nextPageToken, files(id, name, mimeType, createdTime, modifiedTime, size, parents, webViewLink)') }}",
+            "orderBy": "{{ args.orderBy ? String(args.orderBy) : undefined }}",
+            "pageSize": "{{ String(args.pageSize || '100') }}",
+            "pageToken": "{{ args.pageToken ? String(args.pageToken) : undefined }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "get-file",
+        "description": "Get metadata for a specific file by ID",
+        "method": "GET",
+        "path": "/drive/v3/files/{fileId}",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "fileId"
+          ],
+          "properties": {
+            "fields": {
+              "type": "string",
+              "description": "Fields to include in response"
+            },
+            "fileId": {
+              "type": "string",
+              "description": "The ID of the file"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "fileId": "{{ String(args.fileId) }}"
+          },
+          "query": {
+            "fields": "{{ String(args.fields || 'id, name, mimeType, createdTime, modifiedTime, size, parents, webViewLink, description') }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "download-file",
+        "description": "Download file content by ID. For Google Docs/Sheets/Slides, use export-file instead.",
+        "method": "GET",
+        "path": "/drive/v3/files/{fileId}",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "fileId"
+          ],
+          "properties": {
+            "fileId": {
+              "type": "string",
+              "description": "The ID of the file to download"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "fileId": "{{ String(args.fileId) }}"
+          },
+          "query": {
+            "alt": "media"
+          }
+        },
+        "timeoutMs": 30000
+      },
+      {
+        "name": "export-file",
+        "description": "Export a Google Workspace document (Docs, Sheets, Slides) to a specific MIME type",
+        "method": "GET",
+        "path": "/drive/v3/files/{fileId}/export",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "fileId",
+            "mimeType"
+          ],
+          "properties": {
+            "fileId": {
+              "type": "string",
+              "description": "The ID of the Google Workspace file"
+            },
+            "mimeType": {
+              "type": "string",
+              "description": "Export MIME type (e.g., 'application/pdf', 'text/plain', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document')"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "fileId": "{{ String(args.fileId) }}"
+          },
+          "query": {
+            "mimeType": "{{ String(args.mimeType) }}"
+          }
+        },
+        "timeoutMs": 30000
+      },
+      {
+        "name": "create-file",
+        "description": "Create a new file or folder with metadata only (no content upload)",
+        "method": "POST",
+        "path": "/drive/v3/files",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "name"
+          ],
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "Name of the file or folder"
+            },
+            "parents": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Parent folder IDs"
+            },
+            "mimeType": {
+              "type": "string",
+              "description": "MIME type (use 'application/vnd.google-apps.folder' for folders)"
+            },
+            "description": {
+              "type": "string",
+              "description": "Optional file description"
+            }
+          }
+        },
+        "mapping": {
+          "body": {
+            "name": "{{ String(args.name) }}",
+            "parents": "{{ args.parents }}",
+            "mimeType": "{{ String(args.mimeType || 'application/octet-stream') }}",
+            "description": "{{ args.description ? String(args.description) : undefined }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "upload-file",
+        "description": "Upload a file with content using multipart upload",
+        "method": "POST",
+        "path": "/upload/drive/v3/files",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "name",
+            "file"
+          ],
+          "properties": {
+            "file": {
+              "type": "object",
+              "description": "File object with base64 content: { base64: string, filename?: string, contentType?: string }"
+            },
+            "name": {
+              "type": "string",
+              "description": "Name of the file"
+            },
+            "parents": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Parent folder IDs"
+            },
+            "mimeType": {
+              "type": "string",
+              "description": "MIME type of the file"
+            },
+            "description": {
+              "type": "string",
+              "description": "Optional file description"
+            }
+          }
+        },
+        "mapping": {
+          "query": {
+            "uploadType": "multipart"
+          },
+          "multipart": {
+            "parts": [
+              {
+                "kind": "field",
+                "name": "metadata",
+                "value": "{{ JSON.stringify({ name: args.name, mimeType: args.mimeType, parents: args.parents, description: args.description }) }}",
+                "contentType": "application/json"
+              },
+              {
+                "file": "{{ args.file }}",
+                "kind": "file",
+                "name": "file",
+                "filename": "{{ String(args.name) }}",
+                "contentType": "{{ String(args.mimeType || 'application/octet-stream') }}"
+              }
+            ]
+          }
+        },
+        "timeoutMs": 60000
+      },
+      {
+        "name": "update-file",
+        "description": "Update file metadata (name, description, etc.)",
+        "method": "PATCH",
+        "path": "/drive/v3/files/{fileId}",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "fileId"
+          ],
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "New name for the file"
+            },
+            "fileId": {
+              "type": "string",
+              "description": "The ID of the file to update"
+            },
+            "mimeType": {
+              "type": "string",
+              "description": "New MIME type"
+            },
+            "description": {
+              "type": "string",
+              "description": "New description"
+            }
+          }
+        },
+        "mapping": {
+          "body": {
+            "name": "{{ args.name ? String(args.name) : undefined }}",
+            "mimeType": "{{ args.mimeType ? String(args.mimeType) : undefined }}",
+            "description": "{{ args.description ? String(args.description) : undefined }}"
+          },
+          "path": {
+            "fileId": "{{ String(args.fileId) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "delete-file",
+        "description": "Delete a file or folder by ID (moves to trash by default)",
+        "method": "DELETE",
+        "path": "/drive/v3/files/{fileId}",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "fileId"
+          ],
+          "properties": {
+            "fileId": {
+              "type": "string",
+              "description": "The ID of the file to delete"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "fileId": "{{ String(args.fileId) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "copy-file",
+        "description": "Create a copy of a file",
+        "method": "POST",
+        "path": "/drive/v3/files/{fileId}/copy",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "fileId"
+          ],
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "Name for the copied file"
+            },
+            "fileId": {
+              "type": "string",
+              "description": "The ID of the file to copy"
+            },
+            "parents": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Parent folder IDs for the copy"
+            }
+          }
+        },
+        "mapping": {
+          "body": {
+            "name": "{{ String(args.name) }}",
+            "parents": "{{ args.parents }}"
+          },
+          "path": {
+            "fileId": "{{ String(args.fileId) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "search-files",
+        "description": "Search files using Google Drive query syntax. Helper endpoint with common search patterns.",
+        "method": "GET",
+        "path": "/drive/v3/files",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "query"
+          ],
+          "properties": {
+            "query": {
+              "type": "string",
+              "description": "Search query (e.g., \"name contains 'report' and mimeType='application/pdf'\")"
+            },
+            "fields": {
+              "type": "string",
+              "description": "Fields to include in response"
+            },
+            "pageSize": {
+              "type": "number",
+              "description": "Maximum number of results (default 20)"
+            }
+          }
+        },
+        "mapping": {
+          "query": {
+            "q": "{{ String(args.query) }}",
+            "fields": "{{ String(args.fields || 'files(id, name, mimeType, modifiedTime, webViewLink)') }}",
+            "pageSize": "{{ String(args.pageSize || '20') }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "create-folder",
+        "description": "Create a new folder in Google Drive",
+        "method": "POST",
+        "path": "/drive/v3/files",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "name"
+          ],
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "Name of the folder"
+            },
+            "parents": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Parent folder IDs (omit for root)"
+            }
+          }
+        },
+        "mapping": {
+          "body": {
+            "name": "{{ String(args.name) }}",
+            "parents": "{{ args.parents }}",
+            "mimeType": "application/vnd.google-apps.folder"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "get-about",
+        "description": "Get information about the user's Drive account (storage quota, user info)",
+        "method": "GET",
+        "path": "/drive/v3/about",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "fields": {
+              "type": "string",
+              "description": "Fields to include (e.g., 'user, storageQuota')"
+            }
+          }
+        },
+        "mapping": {
+          "query": {
+            "fields": "{{ String(args.fields || 'user, storageQuota') }}"
+          }
+        },
+        "timeoutMs": 15000
+      }
+    ]
+  }
+}

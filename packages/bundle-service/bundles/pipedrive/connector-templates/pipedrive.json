@@ -1,0 +1,520 @@
+{
+  "schemaVersion": "1",
+  "kind": "connector_template",
+  "exportedAt": "2026-05-13T06:46:43.660Z",
+  "metadata": {
+    "fromProvider": "pipedrive",
+    "fromSlug": "pipedrive",
+    "fromId": "6X_2GxXiwv2t_j8xohLlG"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "connectorTemplate": {
+      "id": "6X_2GxXiwv2t_j8xohLlG",
+      "slug": "pipedrive",
+      "provider": "pipedrive",
+      "name": "Pipedrive",
+      "description": "Pipedrive is a web-based sales CRM with a comprehensive REST API for managing deals, persons, organizations, activities,",
+      "isEnabled": true,
+      "version": "1.0.0",
+      "category": "crm",
+      "baseUrl": "https://api.pipedrive.com/v1",
+      "auth": {
+        "type": "oauth2",
+        "scopes": [
+          "deals:read",
+          "deals:full",
+          "persons:read",
+          "persons:full",
+          "organizations:read",
+          "organizations:full",
+          "activities:read",
+          "activities:full",
+          "pipelines:read",
+          "stages:read",
+          "users:read",
+          "products:read"
+        ],
+        "tokenUrl": "https://oauth.pipedrive.com/oauth/token",
+        "injection": {
+          "style": "header",
+          "headerName": "Authorization",
+          "tokenPrefix": "Bearer"
+        },
+        "clientIdRef": {
+          "key": "PIPEDRIVE_OAUTH_CLIENT_ID",
+          "type": "platform_secret"
+        },
+        "tokenResponse": {
+          "expiresInField": "expires_in",
+          "accessTokenField": "access_token",
+          "refreshTokenField": "refresh_token"
+        },
+        "accessTokenRef": {
+          "key": "PIPEDRIVE_ACCESS_TOKEN",
+          "type": "connector_secret"
+        },
+        "scopeDelimiter": " ",
+        "clientSecretRef": {
+          "key": "PIPEDRIVE_OAUTH_CLIENT_SECRET",
+          "type": "platform_secret"
+        },
+        "refreshTokenRef": {
+          "key": "PIPEDRIVE_REFRESH_TOKEN",
+          "type": "connector_secret"
+        },
+        "authorizationUrl": "https://oauth.pipedrive.com/oauth/authorize"
+      },
+      "rateLimit": {
+        "burstLimit": 10,
+        "requestsPerMinute": 120
+      }
+    },
+    "actions": [
+      {
+        "name": "list-persons",
+        "description": "Retrieves all persons with optional filtering by owner, organization, or update time",
+        "method": "GET",
+        "path": "/persons",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "org_id": {
+              "type": "integer",
+              "description": "Filter by organization ID"
+            },
+            "owner_id": {
+              "type": "integer",
+              "description": "Filter by owner user ID"
+            },
+            "filter_id": {
+              "type": "integer",
+              "description": "Use a saved filter"
+            }
+          }
+        },
+        "mapping": {
+          "query": {
+            "org_id": "{{ args.org_id }}",
+            "owner_id": "{{ args.owner_id }}",
+            "filter_id": "{{ args.filter_id }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "create-deal",
+        "description": "Creates a new deal in Pipedrive",
+        "method": "POST",
+        "path": "/deals",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "title"
+          ],
+          "properties": {
+            "title": {
+              "type": "string",
+              "description": "The title of the deal"
+            },
+            "value": {
+              "type": "number",
+              "description": "The value of the deal"
+            },
+            "org_id": {
+              "type": "integer",
+              "description": "The ID of the associated organization"
+            },
+            "currency": {
+              "type": "string",
+              "description": "The currency (e.g., USD, EUR)"
+            },
+            "owner_id": {
+              "type": "integer",
+              "description": "The ID of the deal owner"
+            },
+            "stage_id": {
+              "type": "integer",
+              "description": "The ID of the stage"
+            },
+            "person_id": {
+              "type": "integer",
+              "description": "The ID of the associated person"
+            },
+            "pipeline_id": {
+              "type": "integer",
+              "description": "The ID of the pipeline"
+            }
+          }
+        },
+        "mapping": {
+          "body": {
+            "title": "{{ String(args.title) }}",
+            "value": "{{ args.value }}",
+            "org_id": "{{ args.org_id }}",
+            "currency": "{{ args.currency }}",
+            "owner_id": "{{ args.owner_id }}",
+            "stage_id": "{{ args.stage_id }}",
+            "person_id": "{{ args.person_id }}",
+            "pipeline_id": "{{ args.pipeline_id }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "list-deals",
+        "description": "Retrieves all active deals with optional filtering by owner, person, organization, pipeline, and stage",
+        "method": "GET",
+        "path": "/deals",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "org_id": {
+              "type": "integer",
+              "description": "Filter by organization ID"
+            },
+            "owner_id": {
+              "type": "integer",
+              "description": "Filter by owner user ID"
+            },
+            "stage_id": {
+              "type": "integer",
+              "description": "Filter by stage ID"
+            },
+            "filter_id": {
+              "type": "integer",
+              "description": "Use a saved filter"
+            },
+            "person_id": {
+              "type": "integer",
+              "description": "Filter by person ID"
+            },
+            "pipeline_id": {
+              "type": "integer",
+              "description": "Filter by pipeline ID"
+            }
+          }
+        },
+        "mapping": {
+          "query": {
+            "org_id": "{{ args.org_id }}",
+            "owner_id": "{{ args.owner_id }}",
+            "stage_id": "{{ args.stage_id }}",
+            "filter_id": "{{ args.filter_id }}",
+            "person_id": "{{ args.person_id }}",
+            "pipeline_id": "{{ args.pipeline_id }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "create-stage",
+        "description": "Creates a new stage in a pipeline",
+        "method": "POST",
+        "path": "/stages",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "name",
+            "pipeline_id"
+          ],
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "The name of the stage"
+            },
+            "pipeline_id": {
+              "type": "integer",
+              "description": "The ID of the pipeline"
+            },
+            "deal_probability": {
+              "type": "integer",
+              "description": "Success probability percentage (0-100)"
+            }
+          }
+        },
+        "mapping": {
+          "body": {
+            "name": "{{ String(args.name) }}",
+            "pipeline_id": "{{ args.pipeline_id }}",
+            "deal_probability": "{{ args.deal_probability }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "list-organizations",
+        "description": "Retrieves all organizations with optional filtering",
+        "method": "GET",
+        "path": "/organizations",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "owner_id": {
+              "type": "integer",
+              "description": "Filter by owner user ID"
+            },
+            "filter_id": {
+              "type": "integer",
+              "description": "Use a saved filter"
+            }
+          }
+        },
+        "mapping": {
+          "query": {
+            "owner_id": "{{ args.owner_id }}",
+            "filter_id": "{{ args.filter_id }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "list-stages",
+        "description": "Retrieves all stages for a specific pipeline",
+        "method": "GET",
+        "path": "/stages",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "pipeline_id": {
+              "type": "integer",
+              "description": "Filter stages by pipeline ID"
+            }
+          }
+        },
+        "mapping": {
+          "query": {
+            "pipeline_id": "{{ args.pipeline_id }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "list-pipelines",
+        "description": "Retrieves all pipelines in the Pipedrive account",
+        "method": "GET",
+        "path": "/pipelines",
+        "timeoutMs": 15000
+      },
+      {
+        "name": "create-activity",
+        "description": "Creates a new activity (call, meeting, task, etc.) in Pipedrive",
+        "method": "POST",
+        "path": "/activities",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "subject",
+            "type"
+          ],
+          "properties": {
+            "note": {
+              "type": "string",
+              "description": "Activity note"
+            },
+            "type": {
+              "enum": [
+                "call",
+                "meeting",
+                "task",
+                "email"
+              ],
+              "type": "string",
+              "description": "The type of activity"
+            },
+            "org_id": {
+              "type": "integer",
+              "description": "The ID of the associated organization"
+            },
+            "deal_id": {
+              "type": "integer",
+              "description": "The ID of the associated deal"
+            },
+            "subject": {
+              "type": "string",
+              "description": "The subject of the activity"
+            },
+            "due_date": {
+              "type": "string",
+              "description": "Due date (YYYY-MM-DD format)"
+            },
+            "due_time": {
+              "type": "string",
+              "description": "Due time (HH:MM:SS format)"
+            },
+            "owner_id": {
+              "type": "integer",
+              "description": "The ID of the owner"
+            },
+            "person_id": {
+              "type": "integer",
+              "description": "The ID of the associated person"
+            }
+          }
+        },
+        "mapping": {
+          "body": {
+            "note": "{{ args.note }}",
+            "type": "{{ String(args.type) }}",
+            "org_id": "{{ args.org_id }}",
+            "deal_id": "{{ args.deal_id }}",
+            "subject": "{{ String(args.subject) }}",
+            "due_date": "{{ args.due_date }}",
+            "due_time": "{{ args.due_time }}",
+            "owner_id": "{{ args.owner_id }}",
+            "person_id": "{{ args.person_id }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "list-activities",
+        "description": "Retrieves all activities with optional filtering by owner, deal, person, or lead",
+        "method": "GET",
+        "path": "/activities",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "deal_id": {
+              "type": "integer",
+              "description": "Filter by deal ID"
+            },
+            "owner_id": {
+              "type": "integer",
+              "description": "Filter by owner user ID"
+            },
+            "filter_id": {
+              "type": "integer",
+              "description": "Use a saved filter"
+            },
+            "person_id": {
+              "type": "integer",
+              "description": "Filter by person ID"
+            }
+          }
+        },
+        "mapping": {
+          "query": {
+            "deal_id": "{{ args.deal_id }}",
+            "owner_id": "{{ args.owner_id }}",
+            "filter_id": "{{ args.filter_id }}",
+            "person_id": "{{ args.person_id }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "create-organization",
+        "description": "Creates a new organization in Pipedrive",
+        "method": "POST",
+        "path": "/organizations",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "name"
+          ],
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "The name of the organization"
+            },
+            "address": {
+              "type": "string",
+              "description": "The address of the organization"
+            },
+            "owner_id": {
+              "type": "integer",
+              "description": "The ID of the owner"
+            }
+          }
+        },
+        "mapping": {
+          "body": {
+            "name": "{{ String(args.name) }}",
+            "address": "{{ args.address }}",
+            "owner_id": "{{ args.owner_id }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "list-products",
+        "description": "Retrieves all products with optional filtering and pagination",
+        "method": "GET",
+        "path": "/products",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "owner_id": {
+              "type": "integer",
+              "description": "Filter by owner user ID"
+            },
+            "filter_id": {
+              "type": "integer",
+              "description": "Use a saved filter"
+            },
+            "search_term": {
+              "type": "string",
+              "description": "Search by product name or code"
+            }
+          }
+        },
+        "mapping": {
+          "query": {
+            "owner_id": "{{ args.owner_id }}",
+            "filter_id": "{{ args.filter_id }}",
+            "search_term": "{{ args.search_term }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "create-person",
+        "description": "Creates a new person in Pipedrive",
+        "method": "POST",
+        "path": "/persons",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "name"
+          ],
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "The name of the person"
+            },
+            "email": {
+              "type": "string",
+              "description": "Email address"
+            },
+            "phone": {
+              "type": "string",
+              "description": "Phone number"
+            },
+            "org_id": {
+              "type": "integer",
+              "description": "The ID of the associated organization"
+            },
+            "owner_id": {
+              "type": "integer",
+              "description": "The ID of the owner"
+            }
+          }
+        },
+        "mapping": {
+          "body": {
+            "name": "{{ String(args.name) }}",
+            "email": "{{ args.email }}",
+            "phone": "{{ args.phone }}",
+            "org_id": "{{ args.org_id }}",
+            "owner_id": "{{ args.owner_id }}"
+          }
+        },
+        "timeoutMs": 15000
+      }
+    ]
+  }
+}

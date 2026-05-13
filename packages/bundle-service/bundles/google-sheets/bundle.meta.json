@@ -1,0 +1,9 @@
+{
+  "name": "Google Sheets",
+  "description": "Append, read, and manage rows in Google Sheets for lead storage and management",
+  "version": "1.0.0",
+  "tags": [
+    "connector"
+  ],
+  "kind": "connector"
+}

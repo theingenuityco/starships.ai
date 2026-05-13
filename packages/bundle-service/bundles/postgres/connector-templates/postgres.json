@@ -1,0 +1,161 @@
+{
+  "schemaVersion": "1",
+  "kind": "connector_template",
+  "exportedAt": "2026-05-13T06:46:43.660Z",
+  "metadata": {
+    "fromProvider": "postgres",
+    "fromSlug": "postgres",
+    "fromId": "postgres"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "connectorTemplate": {
+      "id": "postgres",
+      "slug": "postgres",
+      "provider": "postgres",
+      "name": "Postgres",
+      "description": "Connect a Postgres database to enable native SQL actions (read-only by default).",
+      "isEnabled": true,
+      "version": "1.0.0",
+      "category": "connector",
+      "baseUrl": "https://db.invalid",
+      "auth": {
+        "type": "basic",
+        "headerName": "Authorization",
+        "passwordRef": {
+          "key": "POSTGRES_PASSWORD",
+          "type": "connector_secret"
+        },
+        "usernameRef": {
+          "key": "POSTGRES_USER",
+          "type": "connector_secret"
+        }
+      },
+      "metadataSchema": {
+        "type": "object",
+        "required": [
+          "host",
+          "database"
+        ],
+        "properties": {
+          "ssl": {
+            "type": "boolean",
+            "title": "SSL",
+            "default": false
+          },
+          "host": {
+            "type": "string",
+            "title": "Host",
+            "description": "Database hostname (publicly reachable)"
+          },
+          "port": {
+            "type": "integer",
+            "title": "Port",
+            "default": 5432
+          },
+          "database": {
+            "type": "string",
+            "title": "Database"
+          }
+        },
+        "additionalProperties": true
+      }
+    },
+    "actions": [
+      {
+        "kind": "sql",
+        "name": "query",
+        "description": "Execute a read-only SQL query (single statement).",
+        "driver": "postgres",
+        "sql": "{{ String(args.sql ?? \"\") }}",
+        "mode": "query",
+        "rowLimit": 1000,
+        "readOnly": true,
+        "parameters": {
+          "type": "object",
+          "required": [
+            "sql"
+          ],
+          "properties": {
+            "sql": {
+              "type": "string",
+              "description": "SQL statement (read-only; single statement only)"
+            },
+            "params": {
+              "type": "array",
+              "description": "Positional parameters array for $1..$n"
+            }
+          },
+          "additionalProperties": true
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "kind": "sql",
+        "name": "list-tables",
+        "description": "List tables in non-system schemas.",
+        "driver": "postgres",
+        "sql": "\n          SELECT table_schema, table_name\n          FROM information_schema.tables\n          WHERE table_type = 'BASE TABLE'\n            AND table_schema NOT IN ('pg_catalog', 'information_schema')\n          ORDER BY table_schema, table_name\n        ",
+        "mode": "query",
+        "rowLimit": 5000,
+        "readOnly": true,
+        "timeoutMs": 15000
+      },
+      {
+        "kind": "sql",
+        "name": "list-columns",
+        "description": "List columns for a table. Provide params: [schema, table].",
+        "driver": "postgres",
+        "sql": "\n          SELECT column_name, data_type, is_nullable, column_default, ordinal_position\n          FROM information_schema.columns\n          WHERE table_schema = $1 AND table_name = $2\n          ORDER BY ordinal_position\n        ",
+        "mode": "query",
+        "rowLimit": 5000,
+        "readOnly": true,
+        "parameters": {
+          "type": "object",
+          "required": [
+            "params"
+          ],
+          "properties": {
+            "params": {
+              "type": "array",
+              "description": "Must be [schema, table]"
+            }
+          },
+          "additionalProperties": true
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "kind": "sql",
+        "name": "execute",
+        "description": "Execute a SQL statement that may write (DDL/DML; single statement).",
+        "driver": "postgres",
+        "sql": "{{ String(args.sql ?? \"\") }}",
+        "mode": "execute",
+        "rowLimit": 1000,
+        "readOnly": false,
+        "parameters": {
+          "type": "object",
+          "required": [
+            "sql"
+          ],
+          "properties": {
+            "sql": {
+              "type": "string",
+              "description": "SQL statement (may write; single statement only)"
+            },
+            "params": {
+              "type": "array",
+              "description": "Positional parameters array for $1..$n"
+            }
+          },
+          "additionalProperties": true
+        },
+        "timeoutMs": 30000
+      }
+    ]
+  }
+}

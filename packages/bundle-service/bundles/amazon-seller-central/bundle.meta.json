@@ -1,0 +1,9 @@
+{
+  "name": "Amazon Seller Central",
+  "description": "Amazon Selling Partner API for orders, inventory, products, and reports.",
+  "version": "1.0.0",
+  "tags": [
+    "connector"
+  ],
+  "kind": "connector"
+}

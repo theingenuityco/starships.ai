@@ -1,0 +1,264 @@
+{
+  "schemaVersion": "1",
+  "kind": "connector_template",
+  "exportedAt": "2026-05-13T06:46:43.660Z",
+  "metadata": {
+    "fromProvider": "stripe",
+    "fromSlug": "stripe",
+    "fromId": "TdR-TvI3tyIRQx06KUUj7"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "connectorTemplate": {
+      "id": "TdR-TvI3tyIRQx06KUUj7",
+      "slug": "stripe",
+      "provider": "stripe",
+      "name": "Stripe",
+      "description": "Stripe payment processing and billing platform. Create charges, manage customers, handle invoices, and manage subscripti",
+      "isEnabled": true,
+      "version": "1.0.0",
+      "category": "payments",
+      "baseUrl": "https://api.stripe.com/v1",
+      "auth": {
+        "type": "api_key",
+        "apiKeyRef": {
+          "key": "STRIPE_API_KEY",
+          "type": "connector_secret"
+        },
+        "injection": {
+          "style": "header",
+          "headerName": "Authorization",
+          "tokenPrefix": "Bearer"
+        }
+      },
+      "variables": [],
+      "rateLimit": {
+        "burstLimit": 20,
+        "requestsPerMinute": 100
+      }
+    },
+    "actions": [
+      {
+        "name": "create-invoice",
+        "description": "Create an invoice for a customer",
+        "method": "POST",
+        "path": "/invoices",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "customer"
+          ],
+          "properties": {
+            "customer": {
+              "type": "string",
+              "description": "Customer ID"
+            },
+            "metadata": {
+              "type": "object",
+              "description": "Custom metadata key-value pairs"
+            },
+            "description": {
+              "type": "string",
+              "description": "Description for the invoice"
+            },
+            "auto_advance": {
+              "type": "boolean",
+              "description": "Whether to auto-finalize the invoice"
+            },
+            "days_until_due": {
+              "type": "number",
+              "description": "Number of days until invoice is due (for send_invoice method)"
+            },
+            "collection_method": {
+              "enum": [
+                "charge_automatically",
+                "send_invoice"
+              ],
+              "type": "string",
+              "description": "Collection method for the invoice"
+            }
+          }
+        },
+        "mapping": {
+          "body": {
+            "customer": "{{ args.customer }}",
+            "metadata": "{{ args.metadata }}",
+            "description": "{{ args.description }}",
+            "auto_advance": "{{ args.auto_advance }}",
+            "days_until_due": "{{ args.days_until_due }}",
+            "collection_method": "{{ args.collection_method }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "retrieve-customer",
+        "description": "Retrieve a customer by ID",
+        "method": "GET",
+        "path": "/customers/{customer_id}",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "customer_id"
+          ],
+          "properties": {
+            "customer_id": {
+              "type": "string",
+              "description": "The customer ID"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "customer_id": "{{ args.customer_id }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "create-customer",
+        "description": "Create a new customer record",
+        "method": "POST",
+        "path": "/customers",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "Customer name"
+            },
+            "email": {
+              "type": "string",
+              "description": "Customer email address"
+            },
+            "phone": {
+              "type": "string",
+              "description": "Customer phone number"
+            },
+            "metadata": {
+              "type": "object",
+              "description": "Custom metadata key-value pairs"
+            },
+            "description": {
+              "type": "string",
+              "description": "Description for the customer"
+            }
+          }
+        },
+        "mapping": {
+          "body": {
+            "name": "{{ args.name }}",
+            "email": "{{ args.email }}",
+            "phone": "{{ args.phone }}",
+            "metadata": "{{ args.metadata }}",
+            "description": "{{ args.description }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "create-charge",
+        "description": "Create a charge to process a payment",
+        "method": "POST",
+        "path": "/charges",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "amount",
+            "currency"
+          ],
+          "properties": {
+            "amount": {
+              "type": "number",
+              "description": "Amount in cents (e.g., 1000 for $10.00)"
+            },
+            "source": {
+              "type": "string",
+              "description": "Payment source token or card ID"
+            },
+            "currency": {
+              "type": "string",
+              "description": "3-letter currency code (e.g., 'usd')"
+            },
+            "customer": {
+              "type": "string",
+              "description": "Customer ID to charge"
+            },
+            "metadata": {
+              "type": "object",
+              "description": "Custom metadata key-value pairs"
+            },
+            "description": {
+              "type": "string",
+              "description": "Description for the charge"
+            }
+          }
+        },
+        "mapping": {
+          "body": {
+            "amount": "{{ args.amount }}",
+            "source": "{{ args.source }}",
+            "currency": "{{ args.currency }}",
+            "customer": "{{ args.customer }}",
+            "metadata": "{{ args.metadata }}",
+            "description": "{{ args.description }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "create-subscription",
+        "description": "Create a subscription for a customer",
+        "method": "POST",
+        "path": "/subscriptions",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "customer",
+            "items"
+          ],
+          "properties": {
+            "items": {
+              "type": "array",
+              "description": "Array of subscription items with price IDs"
+            },
+            "customer": {
+              "type": "string",
+              "description": "Customer ID"
+            },
+            "metadata": {
+              "type": "object",
+              "description": "Custom metadata key-value pairs"
+            },
+            "payment_behavior": {
+              "type": "string",
+              "description": "Payment behavior (e.g., 'default_incomplete', 'allow_incomplete')"
+            },
+            "trial_period_days": {
+              "type": "number",
+              "description": "Number of trial days"
+            },
+            "billing_cycle_anchor": {
+              "type": "number",
+              "description": "Unix timestamp for billing cycle anchor"
+            }
+          }
+        },
+        "mapping": {
+          "body": {
+            "items": "{{ args.items }}",
+            "customer": "{{ args.customer }}",
+            "metadata": "{{ args.metadata }}",
+            "payment_behavior": "{{ args.payment_behavior }}",
+            "trial_period_days": "{{ args.trial_period_days }}",
+            "billing_cycle_anchor": "{{ args.billing_cycle_anchor }}"
+          }
+        },
+        "timeoutMs": 15000
+      }
+    ]
+  }
+}

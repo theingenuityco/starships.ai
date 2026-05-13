@@ -1,0 +1,9 @@
+{
+  "name": "Google Calendar",
+  "description": "Google Calendar API connector for managing events, calendars, and scheduling. Supports creating, reading, updating, and ",
+  "version": "1.0.0",
+  "tags": [
+    "connector"
+  ],
+  "kind": "connector"
+}

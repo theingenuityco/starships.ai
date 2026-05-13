@@ -1,0 +1,74 @@
+{
+  "schemaVersion": "1",
+  "kind": "connector_template",
+  "exportedAt": "2026-05-13T06:46:43.660Z",
+  "metadata": {
+    "fromProvider": "google-calendar",
+    "fromSlug": "google-calendar",
+    "fromId": "QloApwLSeP0Zo5UH_oOKa"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "connectorTemplate": {
+      "id": "QloApwLSeP0Zo5UH_oOKa",
+      "slug": "google-calendar",
+      "provider": "google-calendar",
+      "name": "Google Calendar",
+      "description": "Google Calendar API connector for managing events, calendars, and scheduling. Supports creating, reading, updating, and ",
+      "isEnabled": true,
+      "version": "1.0.0",
+      "category": "connector",
+      "baseUrl": "https://www.googleapis.com/calendar/v3",
+      "auth": {
+        "type": "oauth2",
+        "scopes": [
+          "https://www.googleapis.com/auth/calendar",
+          "https://www.googleapis.com/auth/calendar.events"
+        ],
+        "tokenUrl": "https://oauth2.googleapis.com/token",
+        "injection": {
+          "style": "header",
+          "headerName": "Authorization",
+          "tokenPrefix": "Bearer"
+        },
+        "clientIdRef": {
+          "key": "GOOGLE_CALENDAR_CLIENT_ID",
+          "type": "platform_secret"
+        },
+        "accessTokenRef": {
+          "key": "GOOGLE_CALENDAR_ACCESS_TOKEN",
+          "type": "connector_secret"
+        },
+        "scopeDelimiter": " ",
+        "clientSecretRef": {
+          "key": "GOOGLE_CALENDAR_CLIENT_SECRET",
+          "type": "platform_secret"
+        },
+        "refreshTokenRef": {
+          "key": "GOOGLE_CALENDAR_REFRESH_TOKEN",
+          "type": "connector_secret"
+        },
+        "authorizationUrl": "https://accounts.google.com/o/oauth2/v2/auth"
+      },
+      "rateLimit": {
+        "burstLimit": 100,
+        "requestsPerMinute": 1000
+      },
+      "metadataSchema": {
+        "type": "object",
+        "required": [],
+        "properties": {
+          "defaultCalendarId": {
+            "type": "string",
+            "description": "Default calendar ID to use for operations (defaults to 'primary')"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "actions": []
+  }
+}

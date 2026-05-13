@@ -1,0 +1,190 @@
+{
+  "schemaVersion": "1",
+  "kind": "connector_template",
+  "exportedAt": "2026-05-13T06:46:43.660Z",
+  "metadata": {
+    "fromProvider": "segment",
+    "fromSlug": "segment",
+    "fromId": "fuIC03nqlCCIi78TFN0AK"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "connectorTemplate": {
+      "id": "fuIC03nqlCCIi78TFN0AK",
+      "slug": "segment",
+      "provider": "segment",
+      "name": "Segment",
+      "description": "CDP platform for managing customer data, sources, and destinations.",
+      "isEnabled": true,
+      "version": "1.0.0",
+      "category": "connector",
+      "baseUrl": "https://api.segment.com/v1",
+      "auth": {
+        "type": "api_key",
+        "apiKeyRef": {
+          "key": "SEGMENT_API_KEY",
+          "type": "connector_secret"
+        },
+        "injection": {
+          "style": "header",
+          "headerName": "Authorization",
+          "tokenPrefix": "Bearer"
+        }
+      },
+      "rateLimit": {
+        "requestsPerMinute": 120
+      },
+      "metadataSchema": {
+        "type": "object",
+        "required": [],
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    "actions": [
+      {
+        "name": "get_source",
+        "description": "Get details for a specific data source",
+        "method": "GET",
+        "path": "/sources/{source_id}",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "source_id"
+          ],
+          "properties": {
+            "source_id": {
+              "type": "string",
+              "description": "The source ID"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "source_id": "{{ String(args.source_id) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "track_event",
+        "description": "Send a tracking event to Segment",
+        "method": "POST",
+        "path": "/track",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "userId",
+            "event"
+          ],
+          "properties": {
+            "event": {
+              "type": "string",
+              "description": "The event name"
+            },
+            "userId": {
+              "type": "string",
+              "description": "The user ID"
+            },
+            "timestamp": {
+              "type": "string",
+              "description": "ISO 8601 timestamp (default: now)"
+            },
+            "properties": {
+              "type": "object",
+              "description": "Event properties"
+            }
+          }
+        },
+        "mapping": {
+          "body": {
+            "event": "{{ String(args.event) }}",
+            "userId": "{{ String(args.userId) }}",
+            "timestamp": "{{ String(args.timestamp || '') }}",
+            "properties": "{{ args.properties || {} }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "list_sources",
+        "description": "List all data sources in your workspace",
+        "method": "GET",
+        "path": "/sources",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "limit": {
+              "type": "integer",
+              "description": "Number of sources to return (default: 100)"
+            },
+            "offset": {
+              "type": "integer",
+              "description": "Number of sources to skip (default: 0)"
+            }
+          }
+        },
+        "mapping": {
+          "query": {
+            "limit": "{{ String(args.limit || 100) }}",
+            "offset": "{{ String(args.offset || 0) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "get_destination",
+        "description": "Get details for a specific destination",
+        "method": "GET",
+        "path": "/destinations/{destination_id}",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "destination_id"
+          ],
+          "properties": {
+            "destination_id": {
+              "type": "string",
+              "description": "The destination ID"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "destination_id": "{{ String(args.destination_id) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "list_destinations",
+        "description": "List all destinations in your workspace",
+        "method": "GET",
+        "path": "/destinations",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "limit": {
+              "type": "integer",
+              "description": "Number of destinations to return (default: 100)"
+            },
+            "offset": {
+              "type": "integer",
+              "description": "Number of destinations to skip (default: 0)"
+            }
+          }
+        },
+        "mapping": {
+          "query": {
+            "limit": "{{ String(args.limit || 100) }}",
+            "offset": "{{ String(args.offset || 0) }}"
+          }
+        },
+        "timeoutMs": 15000
+      }
+    ]
+  }
+}

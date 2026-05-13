@@ -1,0 +1,1285 @@
+{
+  "schemaVersion": "1",
+  "kind": "connector_template",
+  "exportedAt": "2026-05-13T06:46:43.660Z",
+  "metadata": {
+    "fromProvider": "linkedin",
+    "fromSlug": "linkedin",
+    "fromId": "linkedin"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "connectorTemplate": {
+      "id": "linkedin",
+      "slug": "linkedin",
+      "provider": "linkedin",
+      "name": "LinkedIn",
+      "description": "Connect a LinkedIn account to enable tools that create and manage posts using the LinkedIn API.",
+      "isEnabled": true,
+      "version": "1.0.0",
+      "category": "connector",
+      "baseUrl": "https://api.linkedin.com",
+      "auth": {
+        "type": "oauth2",
+        "scopes": [
+          "r_member_postAnalytics",
+          "r_organization_followers",
+          "r_organization_social",
+          "rw_organization_admin",
+          "r_organization_social_feed",
+          "w_member_social",
+          "r_member_profileAnalytics",
+          "w_organization_social",
+          "r_basicprofile",
+          "w_organization_social_feed",
+          "w_member_social_feed",
+          "r_1st_connections_size"
+        ],
+        "tokenUrl": "https://www.linkedin.com/oauth/v2/accessToken",
+        "injection": {
+          "style": "header",
+          "headerName": "Authorization",
+          "tokenPrefix": "Bearer"
+        },
+        "clientIdRef": {
+          "key": "LINKEDIN_CLIENT_ID",
+          "type": "platform_secret"
+        },
+        "accessTokenRef": {
+          "key": "LINKEDIN_ACCESS_TOKEN",
+          "type": "connector_secret"
+        },
+        "scopeDelimiter": " ",
+        "clientSecretRef": {
+          "key": "LINKEDIN_CLIENT_SECRET",
+          "type": "platform_secret"
+        },
+        "authorizationUrl": "https://www.linkedin.com/oauth/v2/authorization"
+      },
+      "variables": []
+    },
+    "actions": [
+      {
+        "name": "initialize-image-upload",
+        "description": "Initialize image upload using the modern LinkedIn /rest/images API (LinkedIn-Version: 202511). Returns urn:li:image:... URN and uploadUrl. Use this for both member and org posts with the modern /rest/posts API.",
+        "method": "POST",
+        "path": "/rest/images",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "owner"
+          ],
+          "properties": {
+            "owner": {
+              "type": "string",
+              "description": "Owner URN (urn:li:person:... for member uploads, even when posting to an org)"
+            }
+          },
+          "additionalProperties": false
+        },
+        "mapping": {
+          "body": {
+            "initializeUploadRequest": "{{ ({ owner: String(args.owner) }) }}"
+          },
+          "query": {
+            "action": "initializeUpload"
+          },
+          "headers": {
+            "LinkedIn-Version": "202511",
+            "X-Restli-Protocol-Version": "2.0.0"
+          }
+        }
+      },
+      {
+        "name": "create-member-post",
+        "description": "Create a new post as member (person) with optional media or article, via LinkedIn /rest/posts (LinkedIn-Version: 202511).",
+        "method": "POST",
+        "path": "/rest/posts",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "author"
+          ],
+          "properties": {
+            "author": {
+              "type": "string",
+              "description": "Author URN (person URN, e.g., urn:li:person:12345)"
+            },
+            "imageUrls": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Array of direct image URLs (alternative to attachmentIds)"
+            },
+            "commentary": {
+              "type": "string",
+              "description": "Text content for the post"
+            },
+            "visibility": {
+              "enum": [
+                "PUBLIC",
+                "CONNECTIONS"
+              ],
+              "type": "string",
+              "default": "PUBLIC",
+              "description": "Post visibility"
+            },
+            "attachmentIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Array of attachment IDs from media registration (e.g., ['G0DfipyVULzvya3_5_1Q0'])"
+            }
+          },
+          "additionalProperties": false
+        },
+        "mapping": {
+          "body": {
+            "author": "{{ args.author }}",
+            "content": "{{ (() => { const hasMedia = Array.isArray(args.attachmentIds) && args.attachmentIds.length > 0 && String(args.attachmentIds[0] || '').trim(); const hasArticle = args.content && typeof args.content === 'object'; if (hasArticle) return args.content; if (hasMedia) return { media: { id: String(args.attachmentIds[0]) } }; return undefined; })() }}",
+            "commentary": "{{ args.commentary }}",
+            "visibility": "{{ args.visibility || 'PUBLIC' }}",
+            "distribution": {
+              "targetEntities": [],
+              "feedDistribution": "MAIN_FEED",
+              "thirdPartyDistributionChannels": []
+            },
+            "lifecycleState": "PUBLISHED",
+            "isReshareDisabledByAuthor": false
+          },
+          "headers": {
+            "LinkedIn-Version": "202511",
+            "X-Restli-Protocol-Version": "2.0.0"
+          }
+        }
+      },
+      {
+        "name": "register-organization-image-upload",
+        "description": "Register an image upload for organization posts. The upload must be registered with a member URN (uploadOwner), but the resulting attachment can be used in organization posts.",
+        "method": "POST",
+        "path": "/rest/assets",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "uploadOwner"
+          ],
+          "properties": {
+            "uploadOwner": {
+              "type": "string",
+              "description": "Member URN (urn:li:person:...) that will own the asset registration. Required for organization image posts due to LinkedIn API constraints."
+            },
+            "serviceRelationshipIdentifier": {
+              "type": "string",
+              "default": "urn:li:userGeneratedContent",
+              "description": "Service relationship identifier"
+            }
+          },
+          "additionalProperties": false
+        },
+        "mapping": {
+          "body": {
+            "registerUploadRequest": "{{ ({ owner: String(args.uploadOwner), recipes: ['urn:li:digitalmediaRecipe:feedshare-image'], serviceRelationships: [{ identifier: String(args.serviceRelationshipIdentifier || 'urn:li:userGeneratedContent'), relationshipType: 'OWNER' }], supportedUploadMechanism: ['SYNCHRONOUS_UPLOAD'] }) }}"
+          },
+          "query": {
+            "action": "registerUpload"
+          },
+          "headers": {
+            "LinkedIn-Version": "202511",
+            "X-Restli-Protocol-Version": "2.0.0"
+          }
+        }
+      },
+      {
+        "name": "register-organization-video-upload",
+        "description": "Register a video upload for organization posts. The upload must be registered with a member URN (uploadOwner), but the resulting attachment can be used in organization posts.",
+        "method": "POST",
+        "path": "/rest/assets",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "uploadOwner"
+          ],
+          "properties": {
+            "uploadOwner": {
+              "type": "string",
+              "description": "Member URN (urn:li:person:...) that will own the asset registration. Required for organization video posts due to LinkedIn API constraints."
+            },
+            "serviceRelationshipIdentifier": {
+              "type": "string",
+              "default": "urn:li:userGeneratedContent",
+              "description": "Service relationship identifier"
+            }
+          },
+          "additionalProperties": false
+        },
+        "mapping": {
+          "body": {
+            "registerUploadRequest": "{{ ({ owner: String(args.uploadOwner), recipes: ['urn:li:digitalmediaRecipe:feedshare-video'], serviceRelationships: [{ identifier: String(args.serviceRelationshipIdentifier || 'urn:li:userGeneratedContent'), relationshipType: 'OWNER' }], supportedUploadMechanism: ['SYNCHRONOUS_UPLOAD'] }) }}"
+          },
+          "query": {
+            "action": "registerUpload"
+          },
+          "headers": {
+            "LinkedIn-Version": "202511",
+            "X-Restli-Protocol-Version": "2.0.0"
+          }
+        }
+      },
+      {
+        "name": "get-organization",
+        "description": "Get organization details by ID (requires ADMINISTRATOR role)",
+        "method": "GET",
+        "path": "/rest/organization/{organizationId}",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "organizationId"
+          ],
+          "properties": {
+            "organizationId": {
+              "type": "string",
+              "description": "Organization ID (numeric, e.g., 12345)"
+            }
+          },
+          "additionalProperties": false
+        },
+        "mapping": {
+          "path": {
+            "organizationId": "{{ args.organizationId }}"
+          },
+          "headers": {
+            "LinkedIn-Version": "202511",
+            "X-Restli-Protocol-Version": "2.0.0"
+          }
+        }
+      },
+      {
+        "name": "get-organization-by-vanity",
+        "description": "Find organization by vanity name",
+        "method": "GET",
+        "path": "/rest/organizations",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "vanityName"
+          ],
+          "properties": {
+            "vanityName": {
+              "type": "string",
+              "description": "Organization vanity name (e.g., linkedin, microsoft)"
+            }
+          },
+          "additionalProperties": false
+        },
+        "mapping": {
+          "query": {
+            "q": "vanityName",
+            "vanityName": "{{ args.vanityName }}"
+          },
+          "headers": {
+            "LinkedIn-Version": "202511",
+            "X-Restli-Protocol-Version": "2.0.0"
+          }
+        }
+      },
+      {
+        "name": "create-organization-post",
+        "description": "Create a new post as organization with optional media attachments. Use attachmentIds from register-organization-image-upload or register-organization-video-upload endpoints.",
+        "method": "POST",
+        "path": "/rest/posts",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "author"
+          ],
+          "properties": {
+            "author": {
+              "type": "string",
+              "description": "Organization URN (e.g., urn:li:organization:12345)"
+            },
+            "imageUrls": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Array of direct image URLs (alternative to attachmentIds)"
+            },
+            "commentary": {
+              "type": "string",
+              "description": "Text content for the post"
+            },
+            "visibility": {
+              "enum": [
+                "PUBLIC",
+                "CONNECTIONS"
+              ],
+              "type": "string",
+              "default": "PUBLIC",
+              "description": "Post visibility"
+            },
+            "attachmentIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Array of attachment IDs from media registration (e.g., ['G0DfipyVULzvya3_5_1Q0'])"
+            }
+          },
+          "additionalProperties": false
+        },
+        "mapping": {
+          "body": {
+            "author": "{{ args.author }}",
+            "content": "{{ args.attachmentIds && args.attachmentIds.length > 0 ? { media: { id: args.attachmentIds[0] } } : undefined }}",
+            "commentary": "{{ args.commentary }}",
+            "visibility": "{{ args.visibility || 'PUBLIC' }}",
+            "distribution": {
+              "targetEntities": [],
+              "feedDistribution": "MAIN_FEED",
+              "thirdPartyDistributionChannels": []
+            },
+            "lifecycleState": "PUBLISHED",
+            "isReshareDisabledByAuthor": false
+          },
+          "headers": {
+            "LinkedIn-Version": "202511",
+            "X-Restli-Protocol-Version": "2.0.0"
+          }
+        }
+      },
+      {
+        "name": "get-organization-follower-count",
+        "description": "Get organization's follower count",
+        "method": "GET",
+        "path": "/rest/networkSizes/{organizationUrn}",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "organizationUrn"
+          ],
+          "properties": {
+            "organizationUrn": {
+              "type": "string",
+              "description": "Organization URN (e.g., urn:li:organization:12345)"
+            }
+          },
+          "additionalProperties": false
+        },
+        "mapping": {
+          "path": {
+            "organizationUrn": "{{ args.organizationUrn }}"
+          },
+          "query": {
+            "edgeType": "COMPANY_FOLLOWED_BY_MEMBER"
+          },
+          "headers": {
+            "LinkedIn-Version": "202511",
+            "X-Restli-Protocol-Version": "2.0.0"
+          }
+        }
+      },
+      {
+        "name": "get-organization-followers",
+        "description": "Get list of organization's followers",
+        "method": "GET",
+        "path": "/rest/dmaOrganizationalPageFollows",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "organizationUrn"
+          ],
+          "properties": {
+            "count": {
+              "type": "number",
+              "default": 10,
+              "description": "Number of results per page"
+            },
+            "organizationUrn": {
+              "type": "string",
+              "description": "Organization URN (e.g., urn:li:organizationalPage:12345)"
+            }
+          },
+          "additionalProperties": false
+        },
+        "mapping": {
+          "query": {
+            "q": "followee",
+            "count": "{{ args.count || 10 }}",
+            "edgeType": "MEMBER_FOLLOWS_ORGANIZATIONAL_PAGE",
+            "followee": "{{ args.organizationUrn }}"
+          },
+          "headers": {
+            "LinkedIn-Version": "202511",
+            "X-Restli-Protocol-Version": "2.0.0"
+          }
+        }
+      },
+      {
+        "name": "create-comment",
+        "description": "Create a comment on a post. The postUrn is placed in the path according to LinkedIn's REST API specification.",
+        "method": "POST",
+        "path": "/rest/socialActions/{postUrn}/comments",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "postUrn",
+            "actor",
+            "object",
+            "text"
+          ],
+          "properties": {
+            "text": {
+              "type": "string",
+              "description": "Comment text content"
+            },
+            "actor": {
+              "type": "string",
+              "description": "Actor URN creating the comment (e.g., urn:li:person:abc123 or urn:li:organization:123456)"
+            },
+            "object": {
+              "type": "string",
+              "description": "Object URN - typically the activity URN associated with the post (e.g., urn:li:activity:123456)"
+            },
+            "postUrn": {
+              "type": "string",
+              "description": "Post URN to comment on (e.g., urn:li:ugcPost:123456 or urn:li:share:123456). Will be URL-encoded automatically when placed in the path."
+            }
+          },
+          "additionalProperties": false
+        },
+        "mapping": {
+          "body": {
+            "actor": "{{ String(args.actor) }}",
+            "object": "{{ String(args.object) }}",
+            "message": "{{ ({ text: String(args.text) }) }}"
+          },
+          "path": {
+            "postUrn": "{{ String(args.postUrn) }}"
+          },
+          "headers": {
+            "LinkedIn-Version": "202511",
+            "X-Restli-Protocol-Version": "2.0.0"
+          }
+        }
+      },
+      {
+        "name": "delete-comment",
+        "description": "Delete a comment from a post. The postUrn and commentId are placed in the path according to LinkedIn's REST API specification.",
+        "method": "DELETE",
+        "path": "/rest/socialActions/{postUrn}/comments/{commentId}",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "postUrn",
+            "commentId"
+          ],
+          "properties": {
+            "actor": {
+              "type": "string",
+              "description": "Optional: Actor URN when deleting as organization"
+            },
+            "postUrn": {
+              "type": "string",
+              "description": "Post URN (e.g., urn:li:ugcPost:12345)"
+            },
+            "commentId": {
+              "type": "string",
+              "description": "Comment ID"
+            }
+          },
+          "additionalProperties": false
+        },
+        "mapping": {
+          "path": {
+            "postUrn": "{{ args.postUrn }}",
+            "commentId": "{{ args.commentId }}"
+          },
+          "query": {
+            "actor": "{{ args.actor }}"
+          },
+          "headers": {
+            "LinkedIn-Version": "202511",
+            "X-Restli-Protocol-Version": "2.0.0"
+          }
+        }
+      },
+      {
+        "name": "create-like",
+        "description": "Like a post or comment. Creates a like on the specified LinkedIn social action (share, UGC post, or comment).",
+        "method": "POST",
+        "path": "/rest/socialActions/{postUrn}/likes",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "postUrn",
+            "actor"
+          ],
+          "properties": {
+            "actor": {
+              "type": "string",
+              "description": "Actor URN (e.g., urn:li:person:abc123 or urn:li:organization:123456)"
+            },
+            "postUrn": {
+              "type": "string",
+              "description": "Post URN to like (e.g., urn:li:ugcPost:123456 or urn:li:share:123456). Will be URL-encoded automatically when placed in the path."
+            }
+          },
+          "additionalProperties": false
+        },
+        "mapping": {
+          "body": {
+            "actor": "{{ args.actor }}",
+            "object": "{{ args.postUrn }}"
+          },
+          "path": {
+            "postUrn": "{{ args.postUrn }}"
+          },
+          "headers": {
+            "LinkedIn-Version": "202511",
+            "X-Restli-Protocol-Version": "2.0.0"
+          }
+        }
+      },
+      {
+        "name": "delete-like",
+        "description": "Unlike a post or comment. Removes a like from the specified LinkedIn social action (share, UGC post, or comment). The actor must be the same entity that created the like.",
+        "method": "DELETE",
+        "path": "/rest/socialActions/{postUrn}/likes/{actorUrn}",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "postUrn",
+            "actorUrn"
+          ],
+          "properties": {
+            "postUrn": {
+              "type": "string",
+              "description": "Post URN that was liked (e.g., urn:li:ugcPost:123456 or urn:li:share:123456). Will be URL-encoded automatically when placed in the path."
+            },
+            "actorUrn": {
+              "type": "string",
+              "description": "Actor URN that created the like (e.g., urn:li:person:abc123 or urn:li:organization:123456). Must be the same entity that created the like. Will be URL-encoded automatically when placed in the path."
+            }
+          },
+          "additionalProperties": false
+        },
+        "mapping": {
+          "path": {
+            "postUrn": "{{ args.postUrn }}",
+            "actorUrn": "{{ args.actorUrn }}"
+          },
+          "query": {
+            "actor": "{{ args.actorUrn }}"
+          },
+          "headers": {
+            "LinkedIn-Version": "202511",
+            "X-Restli-Protocol-Version": "2.0.0"
+          }
+        }
+      },
+      {
+        "name": "get-post-likes",
+        "description": "Get list of likes on a post",
+        "method": "GET",
+        "path": "/rest/socialActions/{postUrn}/likes",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "postUrn"
+          ],
+          "properties": {
+            "count": {
+              "type": "number",
+              "default": 100,
+              "description": "Number of items per page"
+            },
+            "postUrn": {
+              "type": "string",
+              "description": "Post URN"
+            }
+          },
+          "additionalProperties": false
+        },
+        "mapping": {
+          "path": {
+            "postUrn": "{{ args.postUrn }}"
+          },
+          "query": {
+            "count": "{{ args.count || 100 }}"
+          },
+          "headers": {
+            "LinkedIn-Version": "202511",
+            "X-Restli-Protocol-Version": "2.0.0"
+          }
+        }
+      },
+      {
+        "name": "get-post-comments",
+        "description": "Get comments for a post. The post URN is placed in the path according to LinkedIn's REST API specification.",
+        "method": "GET",
+        "path": "/rest/socialActions/{postUrn}/comments",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "postUrn"
+          ],
+          "properties": {
+            "count": {
+              "type": "number",
+              "default": 100,
+              "description": "Number of comments per page (recommended < 200 to prevent timeouts)"
+            },
+            "postUrn": {
+              "type": "string",
+              "description": "Post URN (e.g., urn:li:ugcPost:7096759617162018816 or urn:li:share:123456). Will be URL-encoded automatically."
+            }
+          },
+          "additionalProperties": false
+        },
+        "mapping": {
+          "path": {
+            "postUrn": "{{ args.postUrn }}"
+          },
+          "query": {
+            "count": "{{ args.count || 100 }}"
+          },
+          "headers": {
+            "LinkedIn-Version": "202511",
+            "X-Restli-Protocol-Version": "2.0.0"
+          }
+        }
+      },
+      {
+        "name": "get-social-actions",
+        "description": "Batch retrieve engagement summaries (like and comment counts) for multiple posts in a single request. Returns aggregated metrics without full comment/like details.",
+        "method": "GET",
+        "path": "/rest/socialActions",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "postUrns"
+          ],
+          "properties": {
+            "postUrns": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Array of post URNs (e.g., ['urn:li:ugcPost:123', 'urn:li:share:456']). Maximum recommended: 100 URNs per request."
+            }
+          },
+          "additionalProperties": false
+        },
+        "mapping": {
+          "query": {
+            "ids": "List({{ args.postUrns.join(',') }})"
+          },
+          "headers": {
+            "LinkedIn-Version": "202511",
+            "X-Restli-Protocol-Version": "2.0.0"
+          }
+        }
+      },
+      {
+        "name": "get-post-analytics",
+        "description": "Retrieve analytics for a specific MEMBER post (individual user posts only, NOT organization posts). Supports both modern share URNs (urn:li:share:ID) and legacy UGC post URNs (urn:li:ugcPost:ID). Returns metrics including impressions, members reached, reshares, reactions, and comments.\n\n**Important: MEMBER POSTS ONLY**\n- This endpoint uses the Member Post Analytics API (/rest/memberCreatorPostAnalytics)\n- Only works for posts created by individual members (users)\n- Does NOT work for organization/company page posts\n- For organization post analytics, use get-organization-share-statistics instead\n\n**Requirements:**\n- The authenticated member must own the post\n- Required OAuth scope: r_member_postAnalytics\n- Post analytics typically have a 365-day retention period\n\n**Supported URN Formats:**\n- Modern: urn:li:share:7413389093902106624 (member post)\n- Legacy: urn:li:ugcPost:7413389093902106624 (member UGC post)\n\n**Troubleshooting:**\n- 500 errors typically indicate you don't own the post\n- This endpoint will NOT work for organization posts - use get-organization-share-statistics for those\n- Very old posts (>365 days) may not have analytics available",
+        "method": "GET",
+        "path": "/rest/memberCreatorPostAnalytics",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "postUrn",
+            "queryType"
+          ],
+          "properties": {
+            "postUrn": {
+              "type": "string",
+              "description": "The LinkedIn post URN in plain format (e.g., 'urn:li:share:7413389093902106624' or 'urn:li:ugcPost:7413389093902106624'). The connector will automatically transform this to LinkedIn's REST.li entity parameter format. You must have ownership or admin access to this post to retrieve analytics."
+            },
+            "queryType": {
+              "enum": [
+                "IMPRESSION",
+                "MEMBERS_REACHED",
+                "RESHARE",
+                "REACTION",
+                "COMMENT"
+              ],
+              "type": "string",
+              "description": "Metric type to retrieve (IMPRESSION, MEMBERS_REACHED, RESHARE, REACTION, or COMMENT)"
+            },
+            "aggregation": {
+              "enum": [
+                "DAILY",
+                "TOTAL"
+              ],
+              "type": "string",
+              "default": "TOTAL",
+              "description": "Aggregation type (DAILY or TOTAL)"
+            }
+          },
+          "additionalProperties": false
+        },
+        "mapping": {
+          "query": {
+            "q": "entity",
+            "entity": {
+              "value": "{{ args.postUrn.includes('share:') ? '(share:' + encodeURIComponent(args.postUrn) + ')' : '(ugc:' + encodeURIComponent(args.postUrn) + ')' }}",
+              "encoding": "none"
+            },
+            "queryType": "{{ args.queryType }}",
+            "aggregation": "{{ args.aggregation || 'TOTAL' }}"
+          },
+          "headers": {
+            "Linkedin-Version": "202511",
+            "X-Restli-Protocol-Version": "2.0.0"
+          }
+        },
+        "response": {
+          "select": "{{ body.elements }}"
+        }
+      },
+      {
+        "name": "get-aggregated-post-analytics",
+        "description": "Get aggregated post analytics for authenticated member",
+        "method": "GET",
+        "path": "/rest/memberCreatorPostAnalytics",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "queryType"
+          ],
+          "properties": {
+            "queryType": {
+              "enum": [
+                "IMPRESSION",
+                "MEMBERS_REACHED",
+                "RESHARE",
+                "REACTION",
+                "COMMENT"
+              ],
+              "type": "string",
+              "description": "Metric type"
+            },
+            "aggregation": {
+              "enum": [
+                "DAILY",
+                "TOTAL"
+              ],
+              "type": "string",
+              "default": "TOTAL",
+              "description": "Aggregation type"
+            },
+            "dateRangeEnd": {
+              "type": "object",
+              "properties": {
+                "day": {
+                  "type": "number"
+                },
+                "year": {
+                  "type": "number"
+                },
+                "month": {
+                  "type": "number"
+                }
+              },
+              "description": "End date (year, month, day)"
+            },
+            "dateRangeStart": {
+              "type": "object",
+              "properties": {
+                "day": {
+                  "type": "number"
+                },
+                "year": {
+                  "type": "number"
+                },
+                "month": {
+                  "type": "number"
+                }
+              },
+              "description": "Start date (year, month, day)"
+            }
+          },
+          "additionalProperties": false
+        },
+        "mapping": {
+          "query": {
+            "q": "me",
+            "dateRange": "{{ args.dateRangeStart ? '(start:(day:' + args.dateRangeStart.day + ',month:' + args.dateRangeStart.month + ',year:' + args.dateRangeStart.year + ')' + (args.dateRangeEnd ? ',end:(day:' + args.dateRangeEnd.day + ',month:' + args.dateRangeEnd.month + ',year:' + args.dateRangeEnd.year + ')' : '') + ')' : '' }}",
+            "queryType": "{{ args.queryType }}",
+            "aggregation": "{{ args.aggregation || 'TOTAL' }}"
+          },
+          "headers": {
+            "LinkedIn-Version": "202511",
+            "X-Restli-Protocol-Version": "2.0.0"
+          },
+          "queryEncoding": "none"
+        }
+      },
+      {
+        "name": "get-follower-count",
+        "description": "Get member's follower count",
+        "method": "GET",
+        "path": "/memberFollowersCount",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "q": {
+              "enum": [
+                "me",
+                "dateRange"
+              ],
+              "type": "string",
+              "default": "me",
+              "description": "Query type"
+            }
+          },
+          "additionalProperties": false
+        },
+        "mapping": {
+          "query": {
+            "q": "{{ args.q || 'me' }}"
+          },
+          "headers": {
+            "LinkedIn-Version": "202511",
+            "X-Restli-Protocol-Version": "2.0.0"
+          }
+        }
+      },
+      {
+        "name": "register-image-upload",
+        "description": "Register an image upload and get upload URL",
+        "method": "POST",
+        "path": "/rest/assets",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "owner"
+          ],
+          "properties": {
+            "owner": {
+              "type": "string",
+              "description": "Owner URN (person or organization)"
+            },
+            "serviceRelationshipIdentifier": {
+              "type": "string",
+              "default": "urn:li:userGeneratedContent",
+              "description": "Service relationship identifier"
+            }
+          },
+          "additionalProperties": false
+        },
+        "mapping": {
+          "body": {
+            "registerUploadRequest": "{{ ({ owner: String(args.owner), recipes: ['urn:li:digitalmediaRecipe:feedshare-image'], serviceRelationships: [{ identifier: String(args.serviceRelationshipIdentifier || 'urn:li:userGeneratedContent'), relationshipType: 'OWNER' }], supportedUploadMechanism: ['SYNCHRONOUS_UPLOAD'] }) }}"
+          },
+          "query": {
+            "action": "registerUpload"
+          },
+          "headers": {
+            "LinkedIn-Version": "202511",
+            "X-Restli-Protocol-Version": "2.0.0"
+          }
+        }
+      },
+      {
+        "name": "register-video-upload",
+        "description": "Register a video upload and get upload URL",
+        "method": "POST",
+        "path": "/rest/assets",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "owner"
+          ],
+          "properties": {
+            "owner": {
+              "type": "string",
+              "description": "Owner URN (person or organization)"
+            },
+            "fileSize": {
+              "type": "number",
+              "description": "Video file size in bytes"
+            },
+            "uploadMechanism": {
+              "enum": [
+                "SINGLE_REQUEST_UPLOAD",
+                "MULTIPART_UPLOAD"
+              ],
+              "type": "string",
+              "default": "SINGLE_REQUEST_UPLOAD",
+              "description": "Upload mechanism type"
+            },
+            "serviceRelationshipIdentifier": {
+              "type": "string",
+              "default": "urn:li:userGeneratedContent",
+              "description": "Service relationship identifier"
+            }
+          },
+          "additionalProperties": false
+        },
+        "mapping": {
+          "body": {
+            "registerUploadRequest": {
+              "owner": "{{ args.owner }}",
+              "recipes": [
+                "urn:li:digitalmediaRecipe:feedshare-video"
+              ],
+              "fileSize": "{{ args.fileSize }}",
+              "serviceRelationships": [
+                {
+                  "identifier": "{{ args.serviceRelationshipIdentifier || 'urn:li:userGeneratedContent' }}",
+                  "relationshipType": "OWNER"
+                }
+              ],
+              "supportedUploadMechanism": [
+                "{{ args.uploadMechanism || 'SINGLE_REQUEST_UPLOAD' }}"
+              ]
+            }
+          },
+          "query": {
+            "action": "registerUpload"
+          },
+          "headers": {
+            "LinkedIn-Version": "202511",
+            "X-Restli-Protocol-Version": "2.0.0"
+          }
+        }
+      },
+      {
+        "name": "create-reshare",
+        "description": "Reshare an existing post",
+        "method": "POST",
+        "path": "/rest/posts",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "author",
+            "parentPostUrn"
+          ],
+          "properties": {
+            "author": {
+              "type": "string",
+              "description": "Author URN (person or organization)"
+            },
+            "commentary": {
+              "type": "string",
+              "description": "Optional commentary for the reshare"
+            },
+            "visibility": {
+              "enum": [
+                "PUBLIC",
+                "CONNECTIONS"
+              ],
+              "type": "string",
+              "default": "PUBLIC",
+              "description": "Post visibility"
+            },
+            "parentPostUrn": {
+              "type": "string",
+              "description": "URN of the post to reshare (e.g., urn:li:share:123 or urn:li:ugcPost:456)"
+            }
+          },
+          "additionalProperties": false
+        },
+        "mapping": {
+          "body": {
+            "author": "{{ args.author }}",
+            "commentary": "{{ args.commentary }}",
+            "visibility": "{{ args.visibility || 'PUBLIC' }}",
+            "distribution": {
+              "targetEntities": [],
+              "feedDistribution": "MAIN_FEED",
+              "thirdPartyDistributionChannels": []
+            },
+            "lifecycleState": "PUBLISHED",
+            "reshareContext": {
+              "parent": "{{ args.parentPostUrn }}"
+            },
+            "isReshareDisabledByAuthor": false
+          },
+          "headers": {
+            "LinkedIn-Version": "202511",
+            "X-Restli-Protocol-Version": "2.0.0"
+          }
+        }
+      },
+      {
+        "name": "get-post-by-urn",
+        "description": "Get a single post by its URN using the modern Posts API",
+        "method": "GET",
+        "path": "/rest/posts/{postUrn}",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "postUrn"
+          ],
+          "properties": {
+            "postUrn": {
+              "type": "string",
+              "description": "Post URN (URL-encoded, e.g., urn:li:share:12345 or urn:li:ugcPost:12345)"
+            },
+            "viewContext": {
+              "enum": [
+                "READER",
+                "AUTHOR"
+              ],
+              "type": "string",
+              "default": "READER",
+              "description": "READER for published version, AUTHOR for latest draft"
+            }
+          },
+          "additionalProperties": false
+        },
+        "mapping": {
+          "path": {
+            "postUrn": "{{ args.postUrn }}"
+          },
+          "query": {
+            "viewContext": "{{ args.viewContext || 'READER' }}"
+          },
+          "headers": {
+            "LinkedIn-Version": "202511",
+            "X-Restli-Protocol-Version": "2.0.0"
+          }
+        }
+      },
+      {
+        "name": "get-posts-for-author",
+        "description": "Get all posts for a given author using the modern Posts API (v202301+, recommended)",
+        "method": "GET",
+        "path": "/rest/posts",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "author"
+          ],
+          "properties": {
+            "count": {
+              "type": "number",
+              "default": 10,
+              "description": "Number of posts per page (max 100)"
+            },
+            "start": {
+              "type": "number",
+              "default": 0,
+              "description": "Starting index for pagination"
+            },
+            "author": {
+              "type": "string",
+              "description": "Author URN (person or organization, e.g., urn:li:person:12345)"
+            },
+            "sortBy": {
+              "enum": [
+                "LAST_MODIFIED",
+                "CREATED"
+              ],
+              "type": "string",
+              "default": "LAST_MODIFIED",
+              "description": "Sort order"
+            },
+            "viewContext": {
+              "enum": [
+                "READER",
+                "AUTHOR"
+              ],
+              "type": "string",
+              "default": "READER",
+              "description": "View context (READER for published version, AUTHOR for latest)"
+            }
+          },
+          "additionalProperties": false
+        },
+        "mapping": {
+          "query": {
+            "q": "author",
+            "count": "{{ args.count || 10 }}",
+            "start": "{{ args.start || 0 }}",
+            "author": "{{ args.author }}",
+            "sortBy": "{{ args.sortBy || 'LAST_MODIFIED' }}",
+            "viewContext": "{{ args.viewContext || 'READER' }}"
+          },
+          "headers": {
+            "LinkedIn-Version": "202511",
+            "X-Restli-Protocol-Version": "2.0.0"
+          }
+        }
+      },
+      {
+        "name": "delete-post",
+        "description": "Delete a post (member or organization) using the modern Posts API",
+        "method": "DELETE",
+        "path": "/rest/posts/{postUrn}",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "postUrn"
+          ],
+          "properties": {
+            "postUrn": {
+              "type": "string",
+              "description": "Post URN (URL-encoded, e.g., urn:li:share:12345 or urn:li:ugcPost:12345)"
+            }
+          },
+          "additionalProperties": false
+        },
+        "mapping": {
+          "path": {
+            "postUrn": "{{ args.postUrn }}"
+          },
+          "headers": {
+            "LinkedIn-Version": "202511",
+            "X-Restli-Protocol-Version": "2.0.0"
+          }
+        }
+      },
+      {
+        "name": "get-organization-follower-statistics",
+        "description": "Retrieve daily follower growth statistics for an organization. Track organic vs paid follower gains over time. Provides both lifetime and time-bound follower statistics.\n\n**What You Get:**\n- Daily follower gains (organic and paid breakdown)\n- Time-bound follower growth trends\n- Historical follower data\n\n**Requirements:**\n- Required OAuth scope: rw_organization_admin (included in this connector)\n- Authenticated member must have ADMINISTRATOR role for the organization\n- Data available within specified time range\n\n**Use Cases:**\n- Track follower growth campaigns\n- Measure organic vs paid acquisition\n- Analyze follower trends over time\n- Generate growth reports",
+        "method": "GET",
+        "path": "/rest/organizationalEntityFollowerStatistics",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "organizationalEntity",
+            "timeGranularityType",
+            "timeRangeStart",
+            "timeRangeEnd"
+          ],
+          "properties": {
+            "timeRangeEnd": {
+              "type": "number",
+              "description": "End timestamp in milliseconds (e.g., 1536796800000)"
+            },
+            "timeRangeStart": {
+              "type": "number",
+              "description": "Start timestamp in milliseconds (e.g., 1536364800000)"
+            },
+            "timeGranularityType": {
+              "enum": [
+                "DAY"
+              ],
+              "type": "string",
+              "default": "DAY",
+              "description": "Time granularity for statistics (currently only DAY is supported)"
+            },
+            "organizationalEntity": {
+              "type": "string",
+              "description": "Organization URN (e.g., 'urn:li:organization:2414183')"
+            }
+          },
+          "additionalProperties": false
+        },
+        "mapping": {
+          "query": {
+            "q": "organizationalEntity",
+            "timeIntervals": {
+              "value": "{{ '(timeRange:(start:' + args.timeRangeStart + ',end:' + args.timeRangeEnd + '),timeGranularityType:' + (args.timeGranularityType || 'DAY') + ')' }}",
+              "encoding": "none"
+            },
+            "organizationalEntity": "{{ args.organizationalEntity }}"
+          },
+          "headers": {
+            "LinkedIn-Version": "202511",
+            "X-Restli-Protocol-Version": "2.0.0"
+          }
+        },
+        "response": {
+          "select": "{{ body }}"
+        }
+      },
+      {
+        "name": "get-organization-share-statistics",
+        "description": "Retrieve lifetime performance statistics for organization posts (company page posts). Get detailed metrics including clicks, comments, likes, shares, impressions, and engagement rates.\n\n**What You Get (per post):**\n- Click count - Number of clicks on the post\n- Comment count - Number of comments\n- Like count - Number of likes\n- Share count - Number of reshares\n- Impression count - Number of times post was viewed\n- Engagement rate - Overall engagement percentage\n\n**Important Notes:**\n- ✅ Works for ORGANIZATION posts only (company pages)\n- ✅ Lifetime statistics (not time-bound)\n- ⚠️ Rolling 12-month window - data older than 12 months unavailable\n- ⚠️ Posts with zero actions/impressions are excluded from results\n- ⚠️ Can query multiple posts in one request (up to 100)\n\n**Requirements:**\n- Required OAuth scope: rw_organization_admin (included in this connector)\n- Authenticated member must have ADMINISTRATOR role for the organization\n- Must use UGC Post URNs (urn:li:ugcPost:*)\n\n**For Member Posts:**\n- Use get-post-analytics endpoint instead (requires r_member_postAnalytics scope)",
+        "method": "GET",
+        "path": "/rest/organizationalEntityShareStatistics",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "organizationalEntity",
+            "ugcPosts"
+          ],
+          "properties": {
+            "ugcPosts": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "maxItems": 100,
+              "minItems": 1,
+              "description": "Array of UGC Post URNs to retrieve statistics for (e.g., ['urn:li:ugcPost:1000000', 'urn:li:ugcPost:1000001']). Maximum 100 posts per request."
+            },
+            "organizationalEntity": {
+              "type": "string",
+              "description": "Organization URN (e.g., 'urn:li:organization:2414183')"
+            }
+          },
+          "additionalProperties": false
+        },
+        "mapping": {
+          "query": {
+            "q": "organizationalEntity",
+            "ugcPosts": "{{ args.ugcPosts }}",
+            "organizationalEntity": "{{ args.organizationalEntity }}"
+          },
+          "headers": {
+            "LinkedIn-Version": "202511",
+            "X-Restli-Protocol-Version": "2.0.0"
+          }
+        },
+        "response": {
+          "select": "{{ body }}"
+        }
+      },
+      {
+        "name": "get-profile",
+        "description": "Get the authenticated member's basic profile information (Lite Profile). Returns ID, first name, last name, and profile picture. This is the REST equivalent of the deprecated v2/me endpoint. Requires r_liteprofile or openid+profile scope.",
+        "method": "GET",
+        "path": "/v2/me",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "projection": {
+              "type": "string",
+              "description": "Optional field projection to specify which fields to retrieve. Example: '(id,firstName,lastName,profilePicture(displayImage~:playableStreams))'"
+            }
+          }
+        },
+        "response": {
+          "select": "$"
+        }
+      },
+      {
+        "name": "get-connections-count",
+        "description": "Get the number of 1st-degree connections for the authenticated member. Returns the firstDegreeSize count. This replaces the deprecated v2/connections/{memberUrn} endpoint. Requires r_1st_connections_size scope. Note: Only works for the currently authenticated member, not other members.",
+        "method": "GET",
+        "path": "/v2/connections/{memberUrn}",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "memberUrn"
+          ],
+          "properties": {
+            "memberUrn": {
+              "type": "string",
+              "description": "The Person URN of the authenticated member (format: urn:li:person:{personId}). You can get the personId by calling get-profile with projection=(id) first."
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "memberUrn": "{{args.memberUrn}}"
+          }
+        },
+        "response": {
+          "select": "$"
+        }
+      }
+    ]
+  }
+}

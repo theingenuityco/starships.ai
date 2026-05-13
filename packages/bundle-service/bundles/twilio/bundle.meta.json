@@ -1,0 +1,9 @@
+{
+  "name": "Twilio",
+  "description": "Twilio is a cloud communications platform providing APIs for SMS, voice calls, phone number management, and messaging se",
+  "version": "1.0.0",
+  "tags": [
+    "connector"
+  ],
+  "kind": "connector"
+}

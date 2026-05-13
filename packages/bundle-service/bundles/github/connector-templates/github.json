@@ -1,0 +1,972 @@
+{
+  "schemaVersion": "1",
+  "kind": "connector_template",
+  "exportedAt": "2026-05-13T06:46:43.660Z",
+  "metadata": {
+    "fromProvider": "github",
+    "fromSlug": "github",
+    "fromId": "github"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "connectorTemplate": {
+      "id": "github",
+      "slug": "github",
+      "provider": "github",
+      "name": "GitHub",
+      "description": "Connect a GitHub App installation to enable tools that read and write repositories, issues, and pull requests via the Gi",
+      "isEnabled": true,
+      "version": "1.0.0",
+      "category": "connector",
+      "baseUrl": "https://api.github.com",
+      "auth": {
+        "type": "oauth2",
+        "scopes": [
+          "repo",
+          "read:org"
+        ],
+        "tokenUrl": "https://github.com/login/oauth/access_token",
+        "injection": {
+          "style": "header",
+          "headerName": "Authorization",
+          "tokenPrefix": "Bearer"
+        },
+        "clientIdRef": {
+          "key": "GH_APP_CLIENT_ID",
+          "type": "platform_secret"
+        },
+        "accessTokenRef": {
+          "key": "GH_APP_ACCESS_TOKEN",
+          "type": "connector_secret"
+        },
+        "scopeDelimiter": " ",
+        "clientSecretRef": {
+          "key": "GH_APP_CLIENT_SECRET",
+          "type": "platform_secret"
+        },
+        "refreshTokenRef": {
+          "key": "GH_APP_REFRESH_TOKEN",
+          "type": "connector_secret"
+        },
+        "authorizationUrl": "https://github.com/login/oauth/authorize"
+      }
+    },
+    "actions": [
+      {
+        "name": "get-user",
+        "description": "Get the authenticated user's GitHub profile. Verifies authentication and returns user information.",
+        "method": "GET",
+        "path": "/user",
+        "parameters": {
+          "type": "object",
+          "properties": {}
+        },
+        "mapping": {
+          "headers": {
+            "Accept": "application/vnd.github+json"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "list-user-repos",
+        "description": "List repositories for the authenticated user. Returns repos the user owns, collaborates on, or is a member of.",
+        "method": "GET",
+        "path": "/user/repos",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "page": {
+              "type": "number",
+              "minimum": 1,
+              "description": "The page number of the results to fetch"
+            },
+            "sort": {
+              "enum": [
+                "created",
+                "updated",
+                "pushed",
+                "full_name"
+              ],
+              "type": "string",
+              "description": "The property to sort the results by"
+            },
+            "type": {
+              "enum": [
+                "all",
+                "owner",
+                "public",
+                "private",
+                "member"
+              ],
+              "type": "string",
+              "description": "Limit results to repositories of the specified type"
+            },
+            "per_page": {
+              "type": "number",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "The number of results per page (max 100)"
+            },
+            "direction": {
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string",
+              "description": "The order to sort by"
+            },
+            "visibility": {
+              "enum": [
+                "all",
+                "public",
+                "private"
+              ],
+              "type": "string",
+              "description": "Limit results to repositories with the specified visibility"
+            },
+            "affiliation": {
+              "type": "string",
+              "description": "Comma-separated list of values. Can include: owner, collaborator, organization_member"
+            }
+          }
+        },
+        "mapping": {
+          "query": {
+            "page": "{{ args.page ? String(args.page) : undefined }}",
+            "sort": "{{ args.sort ? String(args.sort) : undefined }}",
+            "type": "{{ args.type ? String(args.type) : undefined }}",
+            "per_page": "{{ args.per_page ? String(args.per_page) : undefined }}",
+            "direction": "{{ args.direction ? String(args.direction) : undefined }}",
+            "visibility": "{{ args.visibility ? String(args.visibility) : undefined }}",
+            "affiliation": "{{ args.affiliation ? String(args.affiliation) : undefined }}"
+          },
+          "headers": {
+            "Accept": "application/vnd.github+json"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "get-repo",
+        "description": "Get details of a specific repository including description, stars, forks, language, and permissions.",
+        "method": "GET",
+        "path": "/repos/{owner}/{repo}",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "owner",
+            "repo"
+          ],
+          "properties": {
+            "repo": {
+              "type": "string",
+              "description": "The name of the repository without the .git extension. The name is not case sensitive."
+            },
+            "owner": {
+              "type": "string",
+              "description": "The account owner of the repository. The name is not case sensitive."
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "repo": "{{ String(args.repo) }}",
+            "owner": "{{ String(args.owner) }}"
+          },
+          "headers": {
+            "Accept": "application/vnd.github+json"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "get-repo-contents",
+        "description": "Get contents of a file or directory in a repository. Files are returned with base64-encoded content.",
+        "method": "GET",
+        "path": "/repos/{owner}/{repo}/contents/{path}",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "owner",
+            "repo",
+            "path"
+          ],
+          "properties": {
+            "ref": {
+              "type": "string",
+              "description": "The name of the commit/branch/tag. Default: the repository's default branch"
+            },
+            "path": {
+              "type": "string",
+              "description": "The file or directory path in the repository"
+            },
+            "repo": {
+              "type": "string",
+              "description": "The name of the repository"
+            },
+            "owner": {
+              "type": "string",
+              "description": "The account owner of the repository"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "path": "{{ String(args.path) }}",
+            "repo": "{{ String(args.repo) }}",
+            "owner": "{{ String(args.owner) }}"
+          },
+          "query": {
+            "ref": "{{ args.ref ? String(args.ref) : undefined }}"
+          },
+          "headers": {
+            "Accept": "application/vnd.github+json"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "list-repo-issues",
+        "description": "List issues in a repository. Note: GitHub's REST API considers every pull request an issue, but not every issue is a pull request.",
+        "method": "GET",
+        "path": "/repos/{owner}/{repo}/issues",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "owner",
+            "repo"
+          ],
+          "properties": {
+            "page": {
+              "type": "number",
+              "minimum": 1,
+              "description": "The page number of the results to fetch"
+            },
+            "repo": {
+              "type": "string",
+              "description": "The name of the repository"
+            },
+            "sort": {
+              "enum": [
+                "created",
+                "updated",
+                "comments"
+              ],
+              "type": "string",
+              "description": "What to sort results by"
+            },
+            "owner": {
+              "type": "string",
+              "description": "The account owner of the repository"
+            },
+            "since": {
+              "type": "string",
+              "description": "Only show results updated after the given time (ISO 8601 format: YYYY-MM-DDTHH:MM:SSZ)"
+            },
+            "state": {
+              "enum": [
+                "open",
+                "closed",
+                "all"
+              ],
+              "type": "string",
+              "description": "Indicates the state of the issues to return"
+            },
+            "labels": {
+              "type": "string",
+              "description": "A list of comma separated label names. Example: bug,ui,@high"
+            },
+            "per_page": {
+              "type": "number",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "The number of results per page (max 100)"
+            },
+            "direction": {
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string",
+              "description": "The direction to sort the results by"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "repo": "{{ String(args.repo) }}",
+            "owner": "{{ String(args.owner) }}"
+          },
+          "query": {
+            "page": "{{ args.page ? String(args.page) : undefined }}",
+            "sort": "{{ args.sort ? String(args.sort) : undefined }}",
+            "since": "{{ args.since ? String(args.since) : undefined }}",
+            "state": "{{ args.state ? String(args.state) : undefined }}",
+            "labels": "{{ args.labels ? String(args.labels) : undefined }}",
+            "per_page": "{{ args.per_page ? String(args.per_page) : undefined }}",
+            "direction": "{{ args.direction ? String(args.direction) : undefined }}"
+          },
+          "headers": {
+            "Accept": "application/vnd.github+json"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "get-issue",
+        "description": "Get a specific issue by its number. Returns full issue details including title, body, labels, assignees, and comments count.",
+        "method": "GET",
+        "path": "/repos/{owner}/{repo}/issues/{issue_number}",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "owner",
+            "repo",
+            "issue_number"
+          ],
+          "properties": {
+            "repo": {
+              "type": "string",
+              "description": "The name of the repository"
+            },
+            "owner": {
+              "type": "string",
+              "description": "The account owner of the repository"
+            },
+            "issue_number": {
+              "type": "number",
+              "description": "The number that identifies the issue"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "repo": "{{ String(args.repo) }}",
+            "owner": "{{ String(args.owner) }}",
+            "issue_number": "{{ String(args.issue_number) }}"
+          },
+          "headers": {
+            "Accept": "application/vnd.github+json"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "create-issue",
+        "description": "Create a new issue in a repository. Any user with pull access can create an issue.",
+        "method": "POST",
+        "path": "/repos/{owner}/{repo}/issues",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "owner",
+            "repo",
+            "title"
+          ],
+          "properties": {
+            "body": {
+              "type": "string",
+              "description": "The contents of the issue"
+            },
+            "repo": {
+              "type": "string",
+              "description": "The name of the repository"
+            },
+            "owner": {
+              "type": "string",
+              "description": "The account owner of the repository"
+            },
+            "title": {
+              "type": "string",
+              "description": "The title of the issue"
+            },
+            "labels": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Labels to associate with this issue"
+            },
+            "assignees": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Logins for Users to assign to this issue"
+            }
+          }
+        },
+        "mapping": {
+          "body": {
+            "body": "{{ args.body ? String(args.body) : undefined }}",
+            "title": "{{ String(args.title) }}",
+            "labels": "{{ args.labels }}",
+            "assignees": "{{ args.assignees }}"
+          },
+          "path": {
+            "repo": "{{ String(args.repo) }}",
+            "owner": "{{ String(args.owner) }}"
+          },
+          "headers": {
+            "Accept": "application/vnd.github+json"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "update-issue",
+        "description": "Update an existing issue. Users with push access can update issues.",
+        "method": "PATCH",
+        "path": "/repos/{owner}/{repo}/issues/{issue_number}",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "owner",
+            "repo",
+            "issue_number"
+          ],
+          "properties": {
+            "body": {
+              "type": "string",
+              "description": "The contents of the issue"
+            },
+            "repo": {
+              "type": "string",
+              "description": "The name of the repository"
+            },
+            "owner": {
+              "type": "string",
+              "description": "The account owner of the repository"
+            },
+            "state": {
+              "enum": [
+                "open",
+                "closed"
+              ],
+              "type": "string",
+              "description": "The state of the issue"
+            },
+            "title": {
+              "type": "string",
+              "description": "The title of the issue"
+            },
+            "labels": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Labels to associate with this issue"
+            },
+            "assignees": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Logins for Users to assign to this issue"
+            },
+            "issue_number": {
+              "type": "number",
+              "description": "The number that identifies the issue"
+            }
+          }
+        },
+        "mapping": {
+          "body": {
+            "body": "{{ args.body ? String(args.body) : undefined }}",
+            "state": "{{ args.state ? String(args.state) : undefined }}",
+            "title": "{{ args.title ? String(args.title) : undefined }}",
+            "labels": "{{ args.labels }}",
+            "assignees": "{{ args.assignees }}"
+          },
+          "path": {
+            "repo": "{{ String(args.repo) }}",
+            "owner": "{{ String(args.owner) }}",
+            "issue_number": "{{ String(args.issue_number) }}"
+          },
+          "headers": {
+            "Accept": "application/vnd.github+json"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "list-pull-requests",
+        "description": "List pull requests in a repository. By default, only open pull requests are returned.",
+        "method": "GET",
+        "path": "/repos/{owner}/{repo}/pulls",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "owner",
+            "repo"
+          ],
+          "properties": {
+            "base": {
+              "type": "string",
+              "description": "Filter pulls by base branch name"
+            },
+            "head": {
+              "type": "string",
+              "description": "Filter pulls by head user or head organization and branch name in the format user:ref-name or organization:ref-name"
+            },
+            "page": {
+              "type": "number",
+              "minimum": 1,
+              "description": "The page number of the results to fetch"
+            },
+            "repo": {
+              "type": "string",
+              "description": "The name of the repository"
+            },
+            "sort": {
+              "enum": [
+                "created",
+                "updated",
+                "popularity",
+                "long-running"
+              ],
+              "type": "string",
+              "description": "What to sort results by"
+            },
+            "owner": {
+              "type": "string",
+              "description": "The account owner of the repository"
+            },
+            "state": {
+              "enum": [
+                "open",
+                "closed",
+                "all"
+              ],
+              "type": "string",
+              "description": "Either open, closed, or all to filter by state"
+            },
+            "per_page": {
+              "type": "number",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "The number of results per page (max 100)"
+            },
+            "direction": {
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string",
+              "description": "The direction to sort the results by"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "repo": "{{ String(args.repo) }}",
+            "owner": "{{ String(args.owner) }}"
+          },
+          "query": {
+            "base": "{{ args.base ? String(args.base) : undefined }}",
+            "head": "{{ args.head ? String(args.head) : undefined }}",
+            "page": "{{ args.page ? String(args.page) : undefined }}",
+            "sort": "{{ args.sort ? String(args.sort) : undefined }}",
+            "state": "{{ args.state ? String(args.state) : undefined }}",
+            "per_page": "{{ args.per_page ? String(args.per_page) : undefined }}",
+            "direction": "{{ args.direction ? String(args.direction) : undefined }}"
+          },
+          "headers": {
+            "Accept": "application/vnd.github+json"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "get-pull-request",
+        "description": "Get a specific pull request by its number. Returns full PR details including title, body, state, commits, and merge status.",
+        "method": "GET",
+        "path": "/repos/{owner}/{repo}/pulls/{pull_number}",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "owner",
+            "repo",
+            "pull_number"
+          ],
+          "properties": {
+            "repo": {
+              "type": "string",
+              "description": "The name of the repository"
+            },
+            "owner": {
+              "type": "string",
+              "description": "The account owner of the repository"
+            },
+            "pull_number": {
+              "type": "number",
+              "description": "The number that identifies the pull request"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "repo": "{{ String(args.repo) }}",
+            "owner": "{{ String(args.owner) }}",
+            "pull_number": "{{ String(args.pull_number) }}"
+          },
+          "headers": {
+            "Accept": "application/vnd.github+json"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "create-pull-request",
+        "description": "Create a new pull request. Requires push access to the repository.",
+        "method": "POST",
+        "path": "/repos/{owner}/{repo}/pulls",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "owner",
+            "repo",
+            "title",
+            "head",
+            "base"
+          ],
+          "properties": {
+            "base": {
+              "type": "string",
+              "description": "The name of the branch you want the changes pulled into"
+            },
+            "body": {
+              "type": "string",
+              "description": "The contents of the pull request"
+            },
+            "head": {
+              "type": "string",
+              "description": "The name of the branch where your changes are implemented"
+            },
+            "repo": {
+              "type": "string",
+              "description": "The name of the repository"
+            },
+            "draft": {
+              "type": "boolean",
+              "description": "Indicates whether the pull request is a draft"
+            },
+            "owner": {
+              "type": "string",
+              "description": "The account owner of the repository"
+            },
+            "title": {
+              "type": "string",
+              "description": "The title of the pull request"
+            },
+            "maintainer_can_modify": {
+              "type": "boolean",
+              "description": "Indicates whether maintainers can modify the pull request"
+            }
+          }
+        },
+        "mapping": {
+          "body": {
+            "base": "{{ String(args.base) }}",
+            "body": "{{ args.body ? String(args.body) : undefined }}",
+            "head": "{{ String(args.head) }}",
+            "draft": "{{ args.draft }}",
+            "title": "{{ String(args.title) }}",
+            "maintainer_can_modify": "{{ args.maintainer_can_modify }}"
+          },
+          "path": {
+            "repo": "{{ String(args.repo) }}",
+            "owner": "{{ String(args.owner) }}"
+          },
+          "headers": {
+            "Accept": "application/vnd.github+json"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "update-pull-request",
+        "description": "Update a pull request. Users with push access can update pull requests.",
+        "method": "PATCH",
+        "path": "/repos/{owner}/{repo}/pulls/{pull_number}",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "owner",
+            "repo",
+            "pull_number"
+          ],
+          "properties": {
+            "base": {
+              "type": "string",
+              "description": "The name of the branch you want the changes pulled into"
+            },
+            "body": {
+              "type": "string",
+              "description": "The contents of the pull request"
+            },
+            "repo": {
+              "type": "string",
+              "description": "The name of the repository"
+            },
+            "owner": {
+              "type": "string",
+              "description": "The account owner of the repository"
+            },
+            "state": {
+              "enum": [
+                "open",
+                "closed"
+              ],
+              "type": "string",
+              "description": "The state of the pull request"
+            },
+            "title": {
+              "type": "string",
+              "description": "The title of the pull request"
+            },
+            "pull_number": {
+              "type": "number",
+              "description": "The number that identifies the pull request"
+            }
+          }
+        },
+        "mapping": {
+          "body": {
+            "base": "{{ args.base ? String(args.base) : undefined }}",
+            "body": "{{ args.body ? String(args.body) : undefined }}",
+            "state": "{{ args.state ? String(args.state) : undefined }}",
+            "title": "{{ args.title ? String(args.title) : undefined }}"
+          },
+          "path": {
+            "repo": "{{ String(args.repo) }}",
+            "owner": "{{ String(args.owner) }}",
+            "pull_number": "{{ String(args.pull_number) }}"
+          },
+          "headers": {
+            "Accept": "application/vnd.github+json"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "merge-pull-request",
+        "description": "Merge a pull request. Users with push access can merge pull requests.",
+        "method": "PUT",
+        "path": "/repos/{owner}/{repo}/pulls/{pull_number}/merge",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "owner",
+            "repo",
+            "pull_number"
+          ],
+          "properties": {
+            "repo": {
+              "type": "string",
+              "description": "The name of the repository"
+            },
+            "owner": {
+              "type": "string",
+              "description": "The account owner of the repository"
+            },
+            "pull_number": {
+              "type": "number",
+              "description": "The number that identifies the pull request"
+            },
+            "commit_title": {
+              "type": "string",
+              "description": "Title for the automatic commit message"
+            },
+            "merge_method": {
+              "enum": [
+                "merge",
+                "squash",
+                "rebase"
+              ],
+              "type": "string",
+              "description": "The merge method to use"
+            },
+            "commit_message": {
+              "type": "string",
+              "description": "Extra detail to append to automatic commit message"
+            }
+          }
+        },
+        "mapping": {
+          "body": {
+            "commit_title": "{{ args.commit_title ? String(args.commit_title) : undefined }}",
+            "merge_method": "{{ args.merge_method ? String(args.merge_method) : undefined }}",
+            "commit_message": "{{ args.commit_message ? String(args.commit_message) : undefined }}"
+          },
+          "path": {
+            "repo": "{{ String(args.repo) }}",
+            "owner": "{{ String(args.owner) }}",
+            "pull_number": "{{ String(args.pull_number) }}"
+          },
+          "headers": {
+            "Accept": "application/vnd.github+json"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "list-issue-comments",
+        "description": "List comments on an issue. Issue comments are ordered by ascending ID. This endpoint works for both issues and pull requests.",
+        "method": "GET",
+        "path": "/repos/{owner}/{repo}/issues/{issue_number}/comments",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "owner",
+            "repo",
+            "issue_number"
+          ],
+          "properties": {
+            "page": {
+              "type": "number",
+              "minimum": 1,
+              "description": "The page number of the results to fetch"
+            },
+            "repo": {
+              "type": "string",
+              "description": "The name of the repository"
+            },
+            "owner": {
+              "type": "string",
+              "description": "The account owner of the repository"
+            },
+            "since": {
+              "type": "string",
+              "description": "Only show results updated after the given time (ISO 8601 format: YYYY-MM-DDTHH:MM:SSZ)"
+            },
+            "per_page": {
+              "type": "number",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "The number of results per page (max 100)"
+            },
+            "issue_number": {
+              "type": "number",
+              "description": "The number that identifies the issue"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "repo": "{{ String(args.repo) }}",
+            "owner": "{{ String(args.owner) }}",
+            "issue_number": "{{ String(args.issue_number) }}"
+          },
+          "query": {
+            "page": "{{ args.page ? String(args.page) : undefined }}",
+            "since": "{{ args.since ? String(args.since) : undefined }}",
+            "per_page": "{{ args.per_page ? String(args.per_page) : undefined }}"
+          },
+          "headers": {
+            "Accept": "application/vnd.github+json"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "create-issue-comment",
+        "description": "Create a comment on an issue. This endpoint works for both issues and pull requests.",
+        "method": "POST",
+        "path": "/repos/{owner}/{repo}/issues/{issue_number}/comments",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "owner",
+            "repo",
+            "issue_number",
+            "body"
+          ],
+          "properties": {
+            "body": {
+              "type": "string",
+              "description": "The contents of the comment"
+            },
+            "repo": {
+              "type": "string",
+              "description": "The name of the repository"
+            },
+            "owner": {
+              "type": "string",
+              "description": "The account owner of the repository"
+            },
+            "issue_number": {
+              "type": "number",
+              "description": "The number that identifies the issue"
+            }
+          }
+        },
+        "mapping": {
+          "body": {
+            "body": "{{ String(args.body) }}"
+          },
+          "path": {
+            "repo": "{{ String(args.repo) }}",
+            "owner": "{{ String(args.owner) }}",
+            "issue_number": "{{ String(args.issue_number) }}"
+          },
+          "headers": {
+            "Accept": "application/vnd.github+json"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "update-issue-comment",
+        "description": "Update a comment on an issue. Users can only edit their own comments.",
+        "method": "PATCH",
+        "path": "/repos/{owner}/{repo}/issues/comments/{comment_id}",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "owner",
+            "repo",
+            "comment_id",
+            "body"
+          ],
+          "properties": {
+            "body": {
+              "type": "string",
+              "description": "The contents of the comment"
+            },
+            "repo": {
+              "type": "string",
+              "description": "The name of the repository"
+            },
+            "owner": {
+              "type": "string",
+              "description": "The account owner of the repository"
+            },
+            "comment_id": {
+              "type": "number",
+              "description": "The unique identifier of the comment"
+            }
+          }
+        },
+        "mapping": {
+          "body": {
+            "body": "{{ String(args.body) }}"
+          },
+          "path": {
+            "repo": "{{ String(args.repo) }}",
+            "owner": "{{ String(args.owner) }}",
+            "comment_id": "{{ String(args.comment_id) }}"
+          },
+          "headers": {
+            "Accept": "application/vnd.github+json"
+          }
+        },
+        "timeoutMs": 15000
+      }
+    ]
+  }
+}

@@ -1,0 +1,269 @@
+{
+  "schemaVersion": "1",
+  "kind": "connector_template",
+  "exportedAt": "2026-05-13T06:46:43.660Z",
+  "metadata": {
+    "fromProvider": "notion",
+    "fromSlug": "notion",
+    "fromId": "FZluByRv7YUjjjoE3vin_"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "connectorTemplate": {
+      "id": "FZluByRv7YUjjjoE3vin_",
+      "slug": "notion",
+      "provider": "notion",
+      "name": "Notion",
+      "description": "Connect a Notion workspace to enable tools that create, read, and manage pages, databases, and content via the Notion AP",
+      "isEnabled": true,
+      "version": "1.0.0",
+      "category": "connector",
+      "baseUrl": "https://api.notion.com/v1",
+      "auth": {
+        "type": "oauth2",
+        "scopes": [],
+        "tokenUrl": "https://api.notion.com/v1/oauth/token",
+        "injection": {
+          "style": "header",
+          "headerName": "Authorization",
+          "tokenPrefix": "Bearer"
+        },
+        "clientIdRef": {
+          "key": "NOTION_CLIENT_ID",
+          "type": "platform_secret"
+        },
+        "accessTokenRef": {
+          "key": "NOTION_ACCESS_TOKEN",
+          "type": "connector_secret"
+        },
+        "scopeDelimiter": " ",
+        "clientSecretRef": {
+          "key": "NOTION_CLIENT_SECRET",
+          "type": "platform_secret"
+        },
+        "authorizationUrl": "https://api.notion.com/v1/oauth/authorize",
+        "tokenAuthStyle": "basic"
+      }
+    },
+    "actions": [
+      {
+        "name": "search",
+        "description": "Search all pages and databases the integration has access to",
+        "method": "POST",
+        "path": "/search",
+        "mapping": {
+          "body": {
+            "sort": "{{args.sort}}",
+            "query": "{{args.query}}",
+            "filter": "{{args.filter}}",
+            "page_size": "{{args.pageSize}}",
+            "start_cursor": "{{args.startCursor}}"
+          },
+          "headers": {
+            "Content-Type": "application/json",
+            "Notion-Version": "2022-06-28"
+          }
+        }
+      },
+      {
+        "name": "get-page",
+        "description": "Retrieve page metadata and properties",
+        "method": "GET",
+        "path": "/pages/{pageId}",
+        "mapping": {
+          "path": {
+            "pageId": "{{args.pageId}}"
+          },
+          "headers": {
+            "Notion-Version": "2022-06-28"
+          }
+        }
+      },
+      {
+        "name": "get-page-blocks",
+        "description": "Retrieve the content blocks of a page",
+        "method": "GET",
+        "path": "/blocks/{blockId}/children",
+        "mapping": {
+          "path": {
+            "blockId": "{{args.blockId}}"
+          },
+          "query": {
+            "page_size": "{{args.pageSize}}",
+            "start_cursor": "{{args.startCursor}}"
+          },
+          "headers": {
+            "Notion-Version": "2022-06-28"
+          }
+        }
+      },
+      {
+        "name": "create-page",
+        "description": "Create a new page in a database or as a child of another page",
+        "method": "POST",
+        "path": "/pages",
+        "mapping": {
+          "body": {
+            "icon": "{{args.icon}}",
+            "cover": "{{args.cover}}",
+            "parent": "{{args.parent}}",
+            "children": "{{args.children}}",
+            "properties": "{{args.properties}}"
+          },
+          "headers": {
+            "Content-Type": "application/json",
+            "Notion-Version": "2022-06-28"
+          }
+        }
+      },
+      {
+        "name": "update-page",
+        "description": "Update page properties",
+        "method": "PATCH",
+        "path": "/pages/{pageId}",
+        "mapping": {
+          "body": {
+            "icon": "{{args.icon}}",
+            "cover": "{{args.cover}}",
+            "archived": "{{args.archived}}",
+            "properties": "{{args.properties}}"
+          },
+          "path": {
+            "pageId": "{{args.pageId}}"
+          },
+          "headers": {
+            "Content-Type": "application/json",
+            "Notion-Version": "2022-06-28"
+          }
+        }
+      },
+      {
+        "name": "append-block-children",
+        "description": "Append new content blocks to a page or block",
+        "method": "PATCH",
+        "path": "/blocks/{blockId}/children",
+        "mapping": {
+          "body": {
+            "after": "{{args.after}}",
+            "children": "{{args.children}}"
+          },
+          "path": {
+            "blockId": "{{args.blockId}}"
+          },
+          "headers": {
+            "Content-Type": "application/json",
+            "Notion-Version": "2022-06-28"
+          }
+        }
+      },
+      {
+        "name": "get-database",
+        "description": "Retrieve database schema and properties",
+        "method": "GET",
+        "path": "/databases/{databaseId}",
+        "mapping": {
+          "path": {
+            "databaseId": "{{args.databaseId}}"
+          },
+          "headers": {
+            "Notion-Version": "2022-06-28"
+          }
+        }
+      },
+      {
+        "name": "query-database",
+        "description": "Query database entries with filters and sorting",
+        "method": "POST",
+        "path": "/databases/{databaseId}/query",
+        "mapping": {
+          "body": {
+            "sorts": "{{args.sorts}}",
+            "filter": "{{args.filter}}",
+            "page_size": "{{args.pageSize}}",
+            "start_cursor": "{{args.startCursor}}"
+          },
+          "path": {
+            "databaseId": "{{args.databaseId}}"
+          },
+          "headers": {
+            "Content-Type": "application/json",
+            "Notion-Version": "2022-06-28"
+          }
+        }
+      },
+      {
+        "name": "create-database",
+        "description": "Create a new database",
+        "method": "POST",
+        "path": "/databases",
+        "mapping": {
+          "body": {
+            "icon": "{{args.icon}}",
+            "cover": "{{args.cover}}",
+            "title": "{{args.title}}",
+            "parent": "{{args.parent}}",
+            "properties": "{{args.properties}}"
+          },
+          "headers": {
+            "Content-Type": "application/json",
+            "Notion-Version": "2022-06-28"
+          }
+        }
+      },
+      {
+        "name": "update-database",
+        "description": "Update database properties and schema",
+        "method": "PATCH",
+        "path": "/databases/{databaseId}",
+        "mapping": {
+          "body": {
+            "icon": "{{args.icon}}",
+            "cover": "{{args.cover}}",
+            "title": "{{args.title}}",
+            "archived": "{{args.archived}}",
+            "properties": "{{args.properties}}"
+          },
+          "path": {
+            "databaseId": "{{args.databaseId}}"
+          },
+          "headers": {
+            "Content-Type": "application/json",
+            "Notion-Version": "2022-06-28"
+          }
+        }
+      },
+      {
+        "name": "get-user",
+        "description": "Retrieve user information",
+        "method": "GET",
+        "path": "/users/{userId}",
+        "mapping": {
+          "path": {
+            "userId": "{{args.userId}}"
+          },
+          "headers": {
+            "Notion-Version": "2022-06-28"
+          }
+        }
+      },
+      {
+        "name": "list-users",
+        "description": "List all users in the workspace",
+        "method": "GET",
+        "path": "/users",
+        "mapping": {
+          "query": {
+            "page_size": "{{args.pageSize}}",
+            "start_cursor": "{{args.startCursor}}"
+          },
+          "headers": {
+            "Notion-Version": "2022-06-28"
+          }
+        }
+      }
+    ]
+  }
+}

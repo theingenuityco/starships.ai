@@ -1,0 +1,193 @@
+{
+  "schemaVersion": "1",
+  "kind": "connector_template",
+  "exportedAt": "2026-05-13T06:46:43.660Z",
+  "metadata": {
+    "fromProvider": "supabase",
+    "fromSlug": "supabase",
+    "fromId": "riT7Mc0I6qixg3SSNmGO0"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "connectorTemplate": {
+      "id": "riT7Mc0I6qixg3SSNmGO0",
+      "slug": "supabase",
+      "provider": "supabase",
+      "name": "Supabase",
+      "description": "PostgreSQL platform with Auth, Storage, Edge Functions, and Real-time APIs",
+      "isEnabled": true,
+      "version": "1.0.0",
+      "category": "connector",
+      "baseUrl": "https://api.supabase.com/v1",
+      "auth": {
+        "type": "api_key",
+        "apiKeyRef": {
+          "key": "SUPABASE_API_KEY",
+          "type": "connector_secret"
+        },
+        "injection": {
+          "style": "header",
+          "headerName": "Authorization",
+          "tokenPrefix": "Bearer"
+        }
+      },
+      "rateLimit": {
+        "tier": "default",
+        "burstLimit": 10,
+        "requestsPerMinute": 60
+      },
+      "metadataSchema": {
+        "type": "object",
+        "required": [],
+        "properties": {
+          "project_ref": {
+            "type": "string",
+            "description": "Supabase project reference ID"
+          }
+        }
+      }
+    },
+    "actions": [
+      {
+        "name": "list-api-keys",
+        "description": "List all API keys for a project",
+        "method": "GET",
+        "path": "/projects/{ref}/api-keys",
+        "mapping": {
+          "path": {
+            "ref": "{{ String(args.ref) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "update-auth-config",
+        "description": "Update authentication settings for a project",
+        "method": "PATCH",
+        "path": "/projects/{ref}/config/auth",
+        "mapping": {
+          "body": {
+            "jwt_exp": "{{ args.jwt_exp }}",
+            "disable_signup": "{{ args.disable_signup }}",
+            "password_min_length": "{{ args.password_min_length }}",
+            "external_google_enabled": "{{ args.external_google_enabled }}"
+          },
+          "path": {
+            "ref": "{{ String(args.ref) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "list-projects",
+        "description": "List all Supabase projects",
+        "method": "GET",
+        "path": "/projects",
+        "timeoutMs": 15000
+      },
+      {
+        "name": "get-edge-function",
+        "description": "Get a specific Edge Function by slug",
+        "method": "GET",
+        "path": "/projects/{ref}/functions/{function_slug}",
+        "mapping": {
+          "path": {
+            "ref": "{{ String(args.ref) }}",
+            "function_slug": "{{ String(args.function_slug) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "get-project",
+        "description": "Get project details including database endpoints and configuration",
+        "method": "GET",
+        "path": "/projects/{ref}",
+        "mapping": {
+          "path": {
+            "ref": "{{ String(args.ref) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "get-auth-config",
+        "description": "Get authentication configuration for a project",
+        "method": "GET",
+        "path": "/projects/{ref}/config/auth",
+        "mapping": {
+          "path": {
+            "ref": "{{ String(args.ref) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "get-storage-config",
+        "description": "Get storage configuration for a project",
+        "method": "GET",
+        "path": "/projects/{ref}/config/storage",
+        "mapping": {
+          "path": {
+            "ref": "{{ String(args.ref) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "execute-database-query",
+        "description": "Execute a SQL query against the project database",
+        "method": "POST",
+        "path": "/projects/{ref}/database/query",
+        "mapping": {
+          "body": {
+            "query": "{{ String(args.query) }}"
+          },
+          "path": {
+            "ref": "{{ String(args.ref) }}"
+          }
+        },
+        "timeoutMs": 30000
+      },
+      {
+        "name": "list-storage-buckets",
+        "description": "List all storage buckets for a project",
+        "method": "GET",
+        "path": "/projects/{ref}/storage/buckets",
+        "mapping": {
+          "path": {
+            "ref": "{{ String(args.ref) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "list-edge-functions",
+        "description": "List all Edge Functions for a project",
+        "method": "GET",
+        "path": "/projects/{ref}/functions",
+        "mapping": {
+          "path": {
+            "ref": "{{ String(args.ref) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "get-database-backups",
+        "description": "Get database backup information for a project",
+        "method": "GET",
+        "path": "/projects/{ref}/database/backups",
+        "mapping": {
+          "path": {
+            "ref": "{{ String(args.ref) }}"
+          }
+        },
+        "timeoutMs": 15000
+      }
+    ]
+  }
+}

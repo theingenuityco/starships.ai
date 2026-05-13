@@ -1,0 +1,9 @@
+{
+  "name": "Klaviyo",
+  "description": "Customer data and marketing automation platform for personalized campaigns.",
+  "version": "1.0.0",
+  "tags": [
+    "connector"
+  ],
+  "kind": "connector"
+}

@@ -1,0 +1,9 @@
+{
+  "name": "Freshdesk",
+  "description": "Customer support helpdesk platform for managing tickets, contacts, and agents.",
+  "version": "1.0.0",
+  "tags": [
+    "connector"
+  ],
+  "kind": "connector"
+}

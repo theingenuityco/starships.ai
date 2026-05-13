@@ -1,0 +1,385 @@
+{
+  "schemaVersion": "1",
+  "kind": "connector_template",
+  "exportedAt": "2026-05-13T06:46:43.660Z",
+  "metadata": {
+    "fromProvider": "semrush",
+    "fromSlug": "semrush",
+    "fromId": "7TThn6yzK_TAabyRPSSHK"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "connectorTemplate": {
+      "id": "7TThn6yzK_TAabyRPSSHK",
+      "slug": "semrush",
+      "provider": "semrush",
+      "name": "Semrush",
+      "description": "SEO, PPC, and market intelligence data via Semrush API",
+      "isEnabled": true,
+      "version": "1.0.0",
+      "category": "connector",
+      "baseUrl": "https://api.semrush.com",
+      "auth": {
+        "type": "api_key",
+        "apiKeyRef": {
+          "key": "SEMRUSH_API_KEY",
+          "type": "connector_secret"
+        },
+        "injection": {
+          "style": "query",
+          "queryParamName": "key"
+        }
+      },
+      "rateLimit": {
+        "requestsPerMinute": 600
+      },
+      "metadataSchema": {
+        "type": "object",
+        "required": [],
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    "actions": [
+      {
+        "name": "get_domain_organic_keywords",
+        "description": "Get organic keywords driving traffic to domain",
+        "method": "GET",
+        "path": "/",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "domain"
+          ],
+          "properties": {
+            "limit": {
+              "type": "number",
+              "default": 10,
+              "description": "Results limit"
+            },
+            "domain": {
+              "type": "string",
+              "description": "Domain to analyze"
+            },
+            "database": {
+              "type": "string",
+              "default": "us",
+              "description": "Database (us, uk, ca, etc)"
+            }
+          }
+        },
+        "mapping": {
+          "query": {
+            "type": "domain_organic",
+            "domain": "{{ String(args.domain) }}",
+            "database": "{{ String(args.database || 'us') }}",
+            "display_limit": "{{ String(args.limit || 10) }}",
+            "export_columns": "Ph,Po,Pp,Pd,Nq,Cp,Ur,Tr,Tc,Co,Nr,Td"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "get_backlinks",
+        "description": "Get backlink data for a domain",
+        "method": "GET",
+        "path": "/",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "target"
+          ],
+          "properties": {
+            "limit": {
+              "type": "number",
+              "default": 10,
+              "description": "Results limit"
+            },
+            "target": {
+              "type": "string",
+              "description": "Target domain or URL"
+            },
+            "target_type": {
+              "type": "string",
+              "default": "domain",
+              "description": "domain or url"
+            }
+          }
+        },
+        "mapping": {
+          "query": {
+            "type": "backlinks",
+            "target": "{{ String(args.target) }}",
+            "target_type": "{{ String(args.target_type || 'domain') }}",
+            "display_limit": "{{ String(args.limit || 10) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "get_competitor_analysis",
+        "description": "Get competitor analysis and comparison",
+        "method": "GET",
+        "path": "/",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "domain"
+          ],
+          "properties": {
+            "limit": {
+              "type": "number",
+              "default": 5,
+              "description": "Results limit"
+            },
+            "domain": {
+              "type": "string",
+              "description": "Domain to analyze"
+            },
+            "database": {
+              "type": "string",
+              "default": "us",
+              "description": "Database (us, uk, ca, etc)"
+            }
+          }
+        },
+        "mapping": {
+          "query": {
+            "type": "domain_organic",
+            "domain": "{{ String(args.domain) }}",
+            "database": "{{ String(args.database || 'us') }}",
+            "display_limit": "{{ String(args.limit || 5) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "get_traffic_analytics",
+        "description": "Get traffic analytics and statistics",
+        "method": "GET",
+        "path": "/",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "domain"
+          ],
+          "properties": {
+            "domain": {
+              "type": "string",
+              "description": "Domain to analyze"
+            },
+            "database": {
+              "type": "string",
+              "default": "us",
+              "description": "Database (us, uk, ca, etc)"
+            }
+          }
+        },
+        "mapping": {
+          "query": {
+            "type": "traffic_analytics",
+            "domain": "{{ String(args.domain) }}",
+            "database": "{{ String(args.database || 'us') }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "get_site_audit",
+        "description": "Get site audit results and issues",
+        "method": "GET",
+        "path": "/",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "domain"
+          ],
+          "properties": {
+            "domain": {
+              "type": "string",
+              "description": "Domain to audit"
+            }
+          }
+        },
+        "mapping": {
+          "query": {
+            "type": "site_audit",
+            "domain": "{{ String(args.domain) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "get_domain_paid_keywords",
+        "description": "Get paid keywords for domain",
+        "method": "GET",
+        "path": "/",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "domain"
+          ],
+          "properties": {
+            "limit": {
+              "type": "number",
+              "default": 10,
+              "description": "Results limit"
+            },
+            "domain": {
+              "type": "string",
+              "description": "Domain to analyze"
+            },
+            "database": {
+              "type": "string",
+              "default": "us",
+              "description": "Database (us, uk, ca, etc)"
+            }
+          }
+        },
+        "mapping": {
+          "query": {
+            "type": "domain_paid",
+            "domain": "{{ String(args.domain) }}",
+            "database": "{{ String(args.database || 'us') }}",
+            "display_limit": "{{ String(args.limit || 10) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "get_top_pages",
+        "description": "Get top performing pages by traffic",
+        "method": "GET",
+        "path": "/",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "domain"
+          ],
+          "properties": {
+            "limit": {
+              "type": "number",
+              "default": 10,
+              "description": "Results limit"
+            },
+            "domain": {
+              "type": "string",
+              "description": "Domain to analyze"
+            },
+            "database": {
+              "type": "string",
+              "default": "us",
+              "description": "Database (us, uk, ca, etc)"
+            }
+          }
+        },
+        "mapping": {
+          "query": {
+            "type": "domain_pages",
+            "domain": "{{ String(args.domain) }}",
+            "database": "{{ String(args.database || 'us') }}",
+            "display_limit": "{{ String(args.limit || 10) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "get_domain_overview",
+        "description": "Get domain metrics including ranks, traffic, visibility",
+        "method": "GET",
+        "path": "/",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "domain"
+          ],
+          "properties": {
+            "domain": {
+              "type": "string",
+              "description": "Domain to analyze"
+            },
+            "database": {
+              "type": "string",
+              "default": "us",
+              "description": "Database (us, uk, ca, etc)"
+            }
+          }
+        },
+        "mapping": {
+          "query": {
+            "type": "domain_ranks",
+            "domain": "{{ String(args.domain) }}",
+            "database": "{{ String(args.database || 'us') }}",
+            "export_columns": "Db,Dn,Rk,Or,Ot,Oc,Ad,At,Ac,Sh,Sv"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "get_keyword_difficulty",
+        "description": "Get keyword difficulty score",
+        "method": "GET",
+        "path": "/",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "keyword"
+          ],
+          "properties": {
+            "keyword": {
+              "type": "string",
+              "description": "Keyword to check"
+            },
+            "database": {
+              "type": "string",
+              "default": "us",
+              "description": "Database (us, uk, ca, etc)"
+            }
+          }
+        },
+        "mapping": {
+          "query": {
+            "type": "keyword_difficulty",
+            "keyword": "{{ String(args.keyword) }}",
+            "database": "{{ String(args.database || 'us') }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "get_keyword_volume",
+        "description": "Get search volume for keywords",
+        "method": "GET",
+        "path": "/",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "keyword"
+          ],
+          "properties": {
+            "keyword": {
+              "type": "string",
+              "description": "Keyword to check"
+            },
+            "database": {
+              "type": "string",
+              "default": "us",
+              "description": "Database (us, uk, ca, etc)"
+            }
+          }
+        },
+        "mapping": {
+          "query": {
+            "type": "keyword_volume",
+            "keyword": "{{ String(args.keyword) }}",
+            "database": "{{ String(args.database || 'us') }}"
+          }
+        },
+        "timeoutMs": 15000
+      }
+    ]
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "name": "Microsoft Teams",
+  "description": "Microsoft Teams connector for sending messages, managing conversations, and accessing team/channel information through M",
+  "version": "1.0.0",
+  "tags": [
+    "connector"
+  ],
+  "kind": "connector"
+}

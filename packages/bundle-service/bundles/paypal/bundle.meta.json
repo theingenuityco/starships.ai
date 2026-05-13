@@ -1,0 +1,9 @@
+{
+  "name": "PayPal",
+  "description": "PayPal connector for managing orders, payments, authorizations, captures, and refunds. Supports OAuth2 authentication fo",
+  "version": "1.0.0",
+  "tags": [
+    "connector"
+  ],
+  "kind": "connector"
+}

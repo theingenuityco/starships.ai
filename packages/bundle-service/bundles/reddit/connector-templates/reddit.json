@@ -1,0 +1,270 @@
+{
+  "schemaVersion": "1",
+  "kind": "connector_template",
+  "exportedAt": "2026-05-13T06:46:43.660Z",
+  "metadata": {
+    "fromProvider": "reddit",
+    "fromSlug": "reddit",
+    "fromId": "Zq0d0aSr1SXSt8-0CmNIr"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "connectorTemplate": {
+      "id": "Zq0d0aSr1SXSt8-0CmNIr",
+      "slug": "reddit",
+      "provider": "reddit",
+      "name": "Reddit",
+      "description": "Connect to Reddit to read posts, submit content, search subreddits, and interact with the Reddit community via the Reddi",
+      "isEnabled": true,
+      "version": "1.0.0",
+      "category": "connector",
+      "baseUrl": "https://oauth.reddit.com",
+      "auth": {
+        "type": "oauth2",
+        "scopes": [
+          "identity",
+          "read",
+          "submit",
+          "edit",
+          "mysubreddits",
+          "vote",
+          "privatemessages"
+        ],
+        "tokenUrl": "https://www.reddit.com/api/v1/access_token",
+        "injection": {
+          "style": "header",
+          "headerName": "Authorization",
+          "tokenPrefix": "Bearer"
+        },
+        "clientIdRef": {
+          "key": "REDDIT_CLIENT_ID",
+          "type": "platform_secret"
+        },
+        "accessTokenRef": {
+          "key": "REDDIT_ACCESS_TOKEN",
+          "type": "connector_secret"
+        },
+        "scopeDelimiter": " ",
+        "clientSecretRef": {
+          "key": "REDDIT_CLIENT_SECRET",
+          "type": "platform_secret"
+        },
+        "refreshTokenRef": {
+          "key": "REDDIT_REFRESH_TOKEN",
+          "type": "connector_secret"
+        },
+        "authorizationUrl": "https://www.reddit.com/api/v1/authorize",
+        "extraAuthorizeParams": {
+          "duration": "permanent"
+        }
+      },
+      "rateLimit": {
+        "burstLimit": 10,
+        "requestsPerMinute": 60
+      }
+    },
+    "actions": [
+      {
+        "name": "get_me",
+        "description": "Get the authenticated user's account information",
+        "method": "GET",
+        "path": "/api/v1/me",
+        "mapping": {
+          "headers": {
+            "User-Agent": "Starships:reddit-connector:v1.0.0"
+          }
+        }
+      },
+      {
+        "name": "get_subreddit_hot",
+        "description": "Get hot posts from a subreddit",
+        "method": "GET",
+        "path": "/r/{subreddit}/hot",
+        "mapping": {
+          "path": {
+            "subreddit": "{args.subreddit}"
+          },
+          "query": {
+            "after": "{args.after}",
+            "limit": "{args.limit}",
+            "before": "{args.before}"
+          },
+          "headers": {
+            "User-Agent": "Starships:reddit-connector:v1.0.0"
+          }
+        }
+      },
+      {
+        "name": "get_subreddit_new",
+        "description": "Get new posts from a subreddit",
+        "method": "GET",
+        "path": "/r/{subreddit}/new",
+        "mapping": {
+          "path": {
+            "subreddit": "{args.subreddit}"
+          },
+          "query": {
+            "after": "{args.after}",
+            "limit": "{args.limit}",
+            "before": "{args.before}"
+          },
+          "headers": {
+            "User-Agent": "Starships:reddit-connector:v1.0.0"
+          }
+        }
+      },
+      {
+        "name": "get_subreddit_top",
+        "description": "Get top posts from a subreddit",
+        "method": "GET",
+        "path": "/r/{subreddit}/top",
+        "mapping": {
+          "path": {
+            "subreddit": "{args.subreddit}"
+          },
+          "query": {
+            "t": "{args.time}",
+            "after": "{args.after}",
+            "limit": "{args.limit}",
+            "before": "{args.before}"
+          },
+          "headers": {
+            "User-Agent": "Starships:reddit-connector:v1.0.0"
+          }
+        }
+      },
+      {
+        "name": "get_post",
+        "description": "Get information about a post by ID",
+        "method": "GET",
+        "path": "/api/info",
+        "mapping": {
+          "query": {
+            "id": "{args.id}"
+          },
+          "headers": {
+            "User-Agent": "Starships:reddit-connector:v1.0.0"
+          }
+        }
+      },
+      {
+        "name": "search",
+        "description": "Search Reddit for posts",
+        "method": "GET",
+        "path": "/api/search",
+        "mapping": {
+          "query": {
+            "q": "{args.query}",
+            "t": "{args.time}",
+            "sort": "{args.sort}",
+            "limit": "{args.limit}",
+            "subreddit": "{args.subreddit}",
+            "restrict_sr": "{args.restrict_sr}"
+          },
+          "headers": {
+            "User-Agent": "Starships:reddit-connector:v1.0.0"
+          }
+        }
+      },
+      {
+        "name": "submit_post",
+        "description": "Submit a new post to a subreddit",
+        "method": "POST",
+        "path": "/api/submit",
+        "mapping": {
+          "body": {
+            "sr": "{args.subreddit}",
+            "url": "{args.url}",
+            "kind": "{args.kind}",
+            "text": "{args.text}",
+            "title": "{args.title}",
+            "resubmit": "{args.resubmit}",
+            "sendreplies": "{args.sendreplies}"
+          },
+          "headers": {
+            "User-Agent": "Starships:reddit-connector:v1.0.0",
+            "Content-Type": "application/x-www-form-urlencoded"
+          }
+        }
+      },
+      {
+        "name": "submit_comment",
+        "description": "Submit a comment on a post or reply to a comment",
+        "method": "POST",
+        "path": "/api/comment",
+        "mapping": {
+          "body": {
+            "text": "{args.text}",
+            "parent": "{args.parent}"
+          },
+          "headers": {
+            "User-Agent": "Starships:reddit-connector:v1.0.0",
+            "Content-Type": "application/x-www-form-urlencoded"
+          }
+        }
+      },
+      {
+        "name": "vote",
+        "description": "Vote on a post or comment (1=upvote, 0=unvote, -1=downvote)",
+        "method": "POST",
+        "path": "/api/vote",
+        "mapping": {
+          "body": {
+            "id": "{args.id}",
+            "dir": "{args.direction}"
+          },
+          "headers": {
+            "User-Agent": "Starships:reddit-connector:v1.0.0",
+            "Content-Type": "application/x-www-form-urlencoded"
+          }
+        }
+      },
+      {
+        "name": "get_user_subreddits",
+        "description": "Get subreddits the authenticated user is subscribed to",
+        "method": "GET",
+        "path": "/subreddits/mine/subscriber",
+        "mapping": {
+          "query": {
+            "after": "{args.after}",
+            "limit": "{args.limit}"
+          },
+          "headers": {
+            "User-Agent": "Starships:reddit-connector:v1.0.0"
+          }
+        }
+      },
+      {
+        "name": "get_subreddit_about",
+        "description": "Get information about a subreddit",
+        "method": "GET",
+        "path": "/r/{subreddit}/about",
+        "mapping": {
+          "path": {
+            "subreddit": "{args.subreddit}"
+          },
+          "headers": {
+            "User-Agent": "Starships:reddit-connector:v1.0.0"
+          }
+        }
+      },
+      {
+        "name": "get_user_info",
+        "description": "Get information about a Reddit user",
+        "method": "GET",
+        "path": "/user/{username}/about",
+        "mapping": {
+          "path": {
+            "username": "{args.username}"
+          },
+          "headers": {
+            "User-Agent": "Starships:reddit-connector:v1.0.0"
+          }
+        }
+      }
+    ]
+  }
+}

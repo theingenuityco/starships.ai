@@ -1,0 +1,9 @@
+{
+  "name": "Square",
+  "description": "Payment processor for managing locations, customers, orders, payments, invoices, and catalogs.",
+  "version": "1.0.0",
+  "tags": [
+    "finance"
+  ],
+  "kind": "connector"
+}

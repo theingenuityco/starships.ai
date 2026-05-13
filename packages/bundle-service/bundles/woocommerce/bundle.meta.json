@@ -1,0 +1,9 @@
+{
+  "name": "WooCommerce",
+  "description": "E-commerce platform for managing products, orders, customers, and categories.",
+  "version": "1.0.0",
+  "tags": [
+    "E-commerce & Marketplace"
+  ],
+  "kind": "connector"
+}

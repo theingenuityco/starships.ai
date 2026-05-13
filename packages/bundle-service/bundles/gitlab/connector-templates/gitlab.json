@@ -1,0 +1,494 @@
+{
+  "schemaVersion": "1",
+  "kind": "connector_template",
+  "exportedAt": "2026-05-13T06:46:43.660Z",
+  "metadata": {
+    "fromProvider": "gitlab",
+    "fromSlug": "gitlab",
+    "fromId": "LV5ocYzcQ_zAqnVEjGUHR"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "connectorTemplate": {
+      "id": "LV5ocYzcQ_zAqnVEjGUHR",
+      "slug": "gitlab",
+      "provider": "gitlab",
+      "name": "GitLab",
+      "description": "GitLab DevOps platform for version control, CI/CD, project management, and deployment.",
+      "isEnabled": true,
+      "version": "1.0.0",
+      "category": "version-control",
+      "baseUrl": "https://gitlab.com/api/v4",
+      "auth": {
+        "type": "oauth2",
+        "scopes": [
+          "api",
+          "read_user",
+          "read_repository"
+        ],
+        "tokenUrl": "https://gitlab.com/oauth/token",
+        "injection": {
+          "style": "header",
+          "headerName": "Authorization",
+          "tokenPrefix": "Bearer"
+        },
+        "clientIdRef": {
+          "key": "GITLAB_OAUTH_CLIENT_ID",
+          "type": "platform_secret"
+        },
+        "tokenResponse": {
+          "accessTokenField": "access_token",
+          "refreshTokenField": "refresh_token"
+        },
+        "accessTokenRef": {
+          "key": "GITLAB_ACCESS_TOKEN",
+          "type": "connector_secret"
+        },
+        "scopeDelimiter": " ",
+        "clientSecretRef": {
+          "key": "GITLAB_OAUTH_CLIENT_SECRET",
+          "type": "platform_secret"
+        },
+        "refreshTokenRef": {
+          "key": "GITLAB_REFRESH_TOKEN",
+          "type": "connector_secret"
+        },
+        "authorizationUrl": "https://gitlab.com/oauth/authorize"
+      },
+      "rateLimit": {
+        "burstLimit": 100,
+        "requestsPerMinute": 600
+      }
+    },
+    "actions": [
+      {
+        "name": "list_merge_requests",
+        "description": "Get merge requests for a project",
+        "method": "GET",
+        "path": "/projects/{id}/merge_requests",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "id"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "Project ID or path"
+            },
+            "page": {
+              "type": "integer",
+              "description": "Page number"
+            },
+            "state": {
+              "enum": [
+                "opened",
+                "closed",
+                "merged",
+                "all"
+              ],
+              "type": "string",
+              "description": "Filter by state"
+            },
+            "per_page": {
+              "type": "integer",
+              "description": "Items per page"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "id": "{{ String(args.id) }}"
+          },
+          "query": {
+            "page": "{{ String(args.page || 1) }}",
+            "state": "{{ args.state || 'opened' }}",
+            "per_page": "{{ String(args.per_page || 20) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "list_projects",
+        "description": "Get all projects accessible to the authenticated user",
+        "method": "GET",
+        "path": "/projects",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "page": {
+              "type": "integer",
+              "description": "Page number (default: 1)"
+            },
+            "archived": {
+              "type": "boolean",
+              "description": "Filter archived projects"
+            },
+            "per_page": {
+              "type": "integer",
+              "description": "Items per page (default: 20)"
+            }
+          }
+        },
+        "mapping": {
+          "query": {
+            "page": "{{ String(args.page || 1) }}",
+            "archived": "{{ args.archived }}",
+            "per_page": "{{ String(args.per_page || 20) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "get_project",
+        "description": "Get details for a specific project by ID",
+        "method": "GET",
+        "path": "/projects/{id}",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "id"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "Project ID or path"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "id": "{{ String(args.id) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "list_issues",
+        "description": "Get issues for a project",
+        "method": "GET",
+        "path": "/projects/{id}/issues",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "id"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "Project ID or path"
+            },
+            "page": {
+              "type": "integer",
+              "description": "Page number"
+            },
+            "state": {
+              "enum": [
+                "opened",
+                "closed",
+                "all"
+              ],
+              "type": "string",
+              "description": "Filter by state"
+            },
+            "per_page": {
+              "type": "integer",
+              "description": "Items per page"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "id": "{{ String(args.id) }}"
+          },
+          "query": {
+            "page": "{{ String(args.page || 1) }}",
+            "state": "{{ args.state || 'opened' }}",
+            "per_page": "{{ String(args.per_page || 20) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "get_user",
+        "description": "Get details for a specific user by ID",
+        "method": "GET",
+        "path": "/users/{id}",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "id"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "User ID or username"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "id": "{{ String(args.id) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "list_deployments",
+        "description": "Get all deployments for a project",
+        "method": "GET",
+        "path": "/projects/{id}/deployments",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "id"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "Project ID or path"
+            },
+            "page": {
+              "type": "integer",
+              "description": "Page number"
+            },
+            "status": {
+              "enum": [
+                "created",
+                "running",
+                "success",
+                "failed",
+                "canceled"
+              ],
+              "type": "string",
+              "description": "Filter by status"
+            },
+            "per_page": {
+              "type": "integer",
+              "description": "Items per page"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "id": "{{ String(args.id) }}"
+          },
+          "query": {
+            "page": "{{ String(args.page || 1) }}",
+            "status": "{{ args.status }}",
+            "per_page": "{{ String(args.per_page || 20) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "list_users",
+        "description": "Get all users in the GitLab instance",
+        "method": "GET",
+        "path": "/users",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "page": {
+              "type": "integer",
+              "description": "Page number"
+            },
+            "active": {
+              "type": "boolean",
+              "description": "Filter active users"
+            },
+            "per_page": {
+              "type": "integer",
+              "description": "Items per page"
+            }
+          }
+        },
+        "mapping": {
+          "query": {
+            "page": "{{ String(args.page || 1) }}",
+            "active": "{{ args.active }}",
+            "per_page": "{{ String(args.per_page || 20) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "get_pipeline",
+        "description": "Get details for a specific pipeline",
+        "method": "GET",
+        "path": "/projects/{id}/pipelines/{pipeline_id}",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "id",
+            "pipeline_id"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "Project ID or path"
+            },
+            "pipeline_id": {
+              "type": "string",
+              "description": "Pipeline ID"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "id": "{{ String(args.id) }}",
+            "pipeline_id": "{{ String(args.pipeline_id) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "list_pipelines",
+        "description": "Get all pipelines for a project",
+        "method": "GET",
+        "path": "/projects/{id}/pipelines",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "id"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "Project ID or path"
+            },
+            "page": {
+              "type": "integer",
+              "description": "Page number"
+            },
+            "status": {
+              "enum": [
+                "created",
+                "waiting_for_resource",
+                "preparing",
+                "pending",
+                "running",
+                "success",
+                "failed",
+                "canceled",
+                "skipped",
+                "manual"
+              ],
+              "type": "string",
+              "description": "Filter by status"
+            },
+            "per_page": {
+              "type": "integer",
+              "description": "Items per page"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "id": "{{ String(args.id) }}"
+          },
+          "query": {
+            "page": "{{ String(args.page || 1) }}",
+            "status": "{{ args.status }}",
+            "per_page": "{{ String(args.per_page || 20) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "create_merge_request",
+        "description": "Create a new merge request in a project",
+        "method": "POST",
+        "path": "/projects/{id}/merge_requests",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "id",
+            "source_branch",
+            "target_branch",
+            "title"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "Project ID or path"
+            },
+            "title": {
+              "type": "string",
+              "description": "MR title"
+            },
+            "description": {
+              "type": "string",
+              "description": "MR description"
+            },
+            "source_branch": {
+              "type": "string",
+              "description": "Source branch name"
+            },
+            "target_branch": {
+              "type": "string",
+              "description": "Target branch name"
+            }
+          }
+        },
+        "mapping": {
+          "body": {
+            "title": "{{ String(args.title) }}",
+            "description": "{{ String(args.description || '') }}",
+            "source_branch": "{{ String(args.source_branch) }}",
+            "target_branch": "{{ String(args.target_branch) }}"
+          },
+          "path": {
+            "id": "{{ String(args.id) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "create_issue",
+        "description": "Create a new issue in a project",
+        "method": "POST",
+        "path": "/projects/{id}/issues",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "id",
+            "title"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "Project ID or path"
+            },
+            "title": {
+              "type": "string",
+              "description": "Issue title"
+            },
+            "labels": {
+              "type": "string",
+              "description": "Comma-separated labels"
+            },
+            "description": {
+              "type": "string",
+              "description": "Issue description"
+            }
+          }
+        },
+        "mapping": {
+          "body": {
+            "title": "{{ String(args.title) }}",
+            "labels": "{{ String(args.labels || '') }}",
+            "description": "{{ String(args.description || '') }}"
+          },
+          "path": {
+            "id": "{{ String(args.id) }}"
+          }
+        },
+        "timeoutMs": 15000
+      }
+    ]
+  }
+}

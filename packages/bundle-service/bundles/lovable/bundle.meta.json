@@ -1,0 +1,9 @@
+{
+  "name": "Lovable",
+  "description": "Lovable is a full-stack AI development platform that enables teams to build, iterate on, and deploy production-grade web",
+  "version": "1.0.0",
+  "tags": [
+    "development"
+  ],
+  "kind": "connector"
+}

@@ -44,7 +44,7 @@ describe('ConnectorEventIngestionService (global webhooks)', () => {
 
     // Monkeypatch internals (private fields/methods).
     const anySvc = svc as unknown as Record<string, unknown>;
-    anySvc.templateRepo = templateRepo;
+    anySvc.templateRegistry = templateRepo;
     anySvc.bindingRepo = bindingRepo;
     anySvc.connectorRepo = connectorRepo;
     anySvc.connectorEventRepo = connectorEventRepo;

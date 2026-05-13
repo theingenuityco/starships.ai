@@ -1,0 +1,9 @@
+{
+  "name": "Pinterest",
+  "description": "Pinterest API connector for social media management. Create and publish pins, manage boards, track engagement metrics, a",
+  "version": "1.0.0",
+  "tags": [
+    "social"
+  ],
+  "kind": "connector"
+}

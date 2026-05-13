@@ -12,13 +12,13 @@ import type {
   SecretRefType,
 } from '@starships/protocol';
 import {
-  ConnectorTemplateRepository,
   ConnectorRepository,
   ConnectorSecretRepository,
   StarshipRepository,
   ConnectorTemplateEntity,
   ConnectorWebhookBindingRepository,
 } from '@starships/models';
+import { ConnectorTemplateRegistryClient } from './ConnectorTemplateRegistryClient';
 import { ConnectorSecretService } from './ConnectorSecretService';
 import { getEnvConfig } from '@starships/env';
 import axios from 'axios';
@@ -34,7 +34,7 @@ import { AppError } from '@starships/errors';
  */
 export class ConnectorService {
   private connectorRepository: ConnectorRepository;
-  private connectorTemplateRepository: ConnectorTemplateRepository;
+  private connectorTemplateRegistry: ConnectorTemplateRegistryClient;
   private connectorSecretRepository: ConnectorSecretRepository;
   private connectorSecretService: ConnectorSecretService;
   private starshipRepository: StarshipRepository;
@@ -43,7 +43,7 @@ export class ConnectorService {
 
   constructor() {
     this.connectorRepository = new ConnectorRepository();
-    this.connectorTemplateRepository = new ConnectorTemplateRepository();
+    this.connectorTemplateRegistry = new ConnectorTemplateRegistryClient();
     this.connectorSecretRepository = new ConnectorSecretRepository();
     this.connectorSecretService = new ConnectorSecretService();
     this.starshipRepository = new StarshipRepository();
@@ -128,11 +128,11 @@ export class ConnectorService {
    * Load a connector template for a provider or throw a descriptive error.
    */
   private async loadTemplateOrThrow(provider: ConnectorProvider): Promise<ConnectorTemplateEntity> {
-    const template = await this.connectorTemplateRepository.findByProvider(provider);
+    const template = await this.connectorTemplateRegistry.findByProvider(provider);
     if (!template) {
       throw new Error(`Connector template not found for provider: ${provider}`);
     }
-    return template;
+    return template as unknown as ConnectorTemplateEntity;
   }
 
   /**
@@ -168,7 +168,6 @@ export class ConnectorService {
         status,
         metadata,
         lastError: lastError ?? undefined,
-        templateId: template.id,
         version: template.version,
       }));
 
@@ -267,7 +266,7 @@ export class ConnectorService {
    * Source of truth is the DB-backed connector_templates table.
    */
   async getConnectorCatalog(): Promise<ConnectorCatalogItem[]> {
-    const templates = await this.connectorTemplateRepository.list();
+    const templates = await this.connectorTemplateRegistry.list();
     const dbCatalog = templates
       .filter((tpl) => tpl.isEnabled !== false)
       .map((tpl): ConnectorCatalogItem => {
@@ -499,29 +498,28 @@ export class ConnectorService {
 
     const resolvedTokenUrl = this.resolveUrlTemplate(auth.tokenUrl, mergedMetadata, 'auth.tokenUrl');
 
-    const tokenPayload = {
-      grant_type: 'authorization_code',
-      code,
-      redirect_uri: redirectUri,
-      client_id: clientId,
-      client_secret: clientSecret,
-    };
+    const useBasicAuth = (auth as unknown as { tokenAuthStyle?: string }).tokenAuthStyle === 'basic';
 
-    // Most OAuth2 token endpoints expect
-    // `application/x-www-form-urlencoded` for the token exchange.
     const tokenForm = new URLSearchParams();
-    for (const [key, value] of Object.entries(tokenPayload)) {
-      tokenForm.set(key, String(value));
+    tokenForm.set('grant_type', 'authorization_code');
+    tokenForm.set('code', code);
+    tokenForm.set('redirect_uri', redirectUri);
+    if (!useBasicAuth) {
+      tokenForm.set('client_id', clientId);
+      tokenForm.set('client_secret', clientSecret);
+    }
+
+    const tokenHeaders: Record<string, string> = {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      Accept: 'application/json',
+    };
+    if (useBasicAuth) {
+      tokenHeaders['Authorization'] = `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString('base64')}`;
     }
 
     let tokenResponse;
     try {
-      tokenResponse = await axios.post(resolvedTokenUrl, tokenForm, {
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          Accept: 'application/json',
-        },
-      });
+      tokenResponse = await axios.post(resolvedTokenUrl, tokenForm, { headers: tokenHeaders });
     } catch (err) {
       if (axios.isAxiosError(err)) {
         // Keep error logs minimal and safe (no code/state/client_secret leakage).
@@ -614,7 +612,7 @@ export class ConnectorService {
    */
   async listStarshipConnectors(starshipId: string): Promise<ConnectorListItem[]> {
     const [templates, connectors] = await Promise.all([
-      this.connectorTemplateRepository.list(),
+      this.connectorTemplateRegistry.list(),
       this.connectorRepository.findByStarship(starshipId),
     ]);
     const byProvider = new Map(connectors.map((c) => [c.provider, c]));
@@ -666,10 +664,7 @@ export class ConnectorService {
       }
 
       // Virtual connector entry for providers without a persisted record yet.
-      // For Starships, treat the connector as always available for the current
-      // starship; it reuses the platform's JWT + SERVER_URL and does not
-      // require additional managed env vars.
-      const status = template.provider === 'starships' ? 'connected' : 'disconnected';
+      const status = 'disconnected' as const;
       const scopes =
         templateAuthType === 'oauth2'
           ? (template.authJson as ConnectorAuthOAuth2V2).type === 'oauth2'

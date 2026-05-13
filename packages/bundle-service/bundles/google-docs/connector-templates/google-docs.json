@@ -1,0 +1,80 @@
+{
+  "schemaVersion": "1",
+  "kind": "connector_template",
+  "exportedAt": "2026-05-13T06:46:43.660Z",
+  "metadata": {
+    "fromProvider": "google-docs",
+    "fromSlug": "google-docs",
+    "fromId": "NF0UrTWR04kj05Zi-_zB0"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "connectorTemplate": {
+      "id": "NF0UrTWR04kj05Zi-_zB0",
+      "slug": "google-docs",
+      "provider": "google-docs",
+      "name": "Google Docs",
+      "description": "Google Docs connector for creating, reading, and updating documents using the Google Docs API",
+      "isEnabled": true,
+      "version": "1.0.0",
+      "category": "connector",
+      "baseUrl": "https://docs.googleapis.com/v1",
+      "auth": {
+        "type": "oauth2",
+        "scopes": [
+          "https://www.googleapis.com/auth/documents",
+          "https://www.googleapis.com/auth/drive"
+        ],
+        "tokenUrl": "https://oauth2.googleapis.com/token",
+        "injection": {
+          "style": "header",
+          "headerName": "Authorization",
+          "tokenPrefix": "Bearer"
+        },
+        "clientIdRef": {
+          "key": "GOOGLE_DOCS_CLIENT_ID",
+          "type": "platform_secret"
+        },
+        "tokenResponse": {
+          "expiresInField": "expires_in",
+          "tokenTypeField": "token_type",
+          "accessTokenField": "access_token",
+          "refreshTokenField": "refresh_token"
+        },
+        "accessTokenRef": {
+          "key": "GOOGLE_DOCS_ACCESS_TOKEN",
+          "type": "connector_secret"
+        },
+        "scopeDelimiter": " ",
+        "clientSecretRef": {
+          "key": "GOOGLE_DOCS_CLIENT_SECRET",
+          "type": "platform_secret"
+        },
+        "refreshTokenRef": {
+          "key": "GOOGLE_DOCS_REFRESH_TOKEN",
+          "type": "connector_secret"
+        },
+        "authorizationUrl": "https://accounts.google.com/o/oauth2/v2/auth"
+      },
+      "rateLimit": {
+        "burstLimit": 10,
+        "requestsPerMinute": 60
+      },
+      "metadataSchema": {
+        "type": "object",
+        "required": [],
+        "properties": {
+          "defaultFolder": {
+            "type": "string",
+            "description": "Optional default Google Drive folder ID for organizing documents"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "actions": []
+  }
+}

@@ -3,6 +3,7 @@ import { ensureLobbyRoomForStarship } from '@/utils/default-room';
 import { ConflictError, NotFoundError } from '@starships/errors';
 import {
   AgentRepository,
+  ConnectorRepository,
   StarshipMemberRepository,
   StarshipRepository,
   UserRepository,
@@ -35,12 +36,14 @@ export class StarshipService {
   private agentRepository: AgentRepository;
   private userRepository: UserRepository;
   private starshipMemberRepository: StarshipMemberRepository;
+  private connectorRepository: ConnectorRepository;
 
   constructor() {
     this.starshipRepository = new StarshipRepository();
     this.agentRepository = new AgentRepository();
     this.userRepository = new UserRepository();
     this.starshipMemberRepository = new StarshipMemberRepository();
+    this.connectorRepository = new ConnectorRepository();
   }
 
   private async ensureBaselineStarshipToolsAllowed(_starshipId: string): Promise<void> {
@@ -81,6 +84,21 @@ export class StarshipService {
         /* ignore */
       }
       throw err;
+    }
+
+    // Auto-connect the built-in starships connector (platform_jwt — always available).
+    try {
+      await this.connectorRepository.create({
+        starshipId: starship.id,
+        provider: 'starships' as any,
+        status: 'connected',
+        metadata: {},
+      });
+    } catch (err) {
+      logger.error('[StarshipService] Failed to auto-connect starships connector', {
+        starshipId: starship.id,
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
 
     // Ensure required baseline tools are deployed and allowed at the starship level.

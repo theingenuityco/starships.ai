@@ -1,0 +1,9 @@
+{
+  "name": "Segment",
+  "description": "CDP platform for managing customer data, sources, and destinations.",
+  "version": "1.0.0",
+  "tags": [
+    "connector"
+  ],
+  "kind": "connector"
+}

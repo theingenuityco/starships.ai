@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "1",
+  "kind": "bundle",
+  "exportedAt": "2026-05-13T06:46:43.660Z",
+  "entities": {
+    "connectorTemplates": [
+      {
+        "kind": "connector_template",
+        "fromSlug": "starships",
+        "file": "connector-templates/starships.json"
+      }
+    ]
+  }
+}

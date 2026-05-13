@@ -1,0 +1,522 @@
+{
+  "schemaVersion": "1",
+  "kind": "connector_template",
+  "exportedAt": "2026-05-13T06:46:43.660Z",
+  "metadata": {
+    "fromProvider": "bitbucket",
+    "fromSlug": "bitbucket",
+    "fromId": "-JkQZTTr-9mr3hV4qy6jX"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "connectorTemplate": {
+      "id": "-JkQZTTr-9mr3hV4qy6jX",
+      "slug": "bitbucket",
+      "provider": "bitbucket",
+      "name": "Bitbucket Cloud",
+      "description": "Bitbucket Cloud REST API connector for managing repositories, pull requests, issues, commits, and deployments.",
+      "isEnabled": true,
+      "version": "1.0.0",
+      "category": "version_control",
+      "baseUrl": "https://api.bitbucket.org/2.0",
+      "auth": {
+        "type": "oauth2",
+        "scopes": [
+          "repository",
+          "pullrequest",
+          "issue"
+        ],
+        "tokenUrl": "https://bitbucket.org/site/oauth2/access_token",
+        "injection": {
+          "style": "header",
+          "headerName": "Authorization",
+          "tokenPrefix": "Bearer"
+        },
+        "clientIdRef": {
+          "key": "BITBUCKET_OAUTH_CLIENT_ID",
+          "type": "platform_secret"
+        },
+        "tokenResponse": {
+          "scopeField": "scope",
+          "expiresInField": "expires_in",
+          "tokenTypeField": "token_type",
+          "accessTokenField": "access_token",
+          "refreshTokenField": "refresh_token"
+        },
+        "accessTokenRef": {
+          "key": "BITBUCKET_ACCESS_TOKEN",
+          "type": "connector_secret"
+        },
+        "scopeDelimiter": " ",
+        "clientSecretRef": {
+          "key": "BITBUCKET_OAUTH_CLIENT_SECRET",
+          "type": "platform_secret"
+        },
+        "refreshTokenRef": {
+          "key": "BITBUCKET_REFRESH_TOKEN",
+          "type": "connector_secret"
+        },
+        "authorizationUrl": "https://bitbucket.org/site/oauth2/authorize"
+      },
+      "rateLimit": {
+        "burstLimit": 10,
+        "requestsPerMinute": 60
+      },
+      "metadataSchema": {
+        "type": "object",
+        "required": [],
+        "properties": {
+          "workspace": {
+            "type": "string",
+            "description": "Default workspace identifier for API calls"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "actions": [
+      {
+        "name": "list_issues",
+        "description": "List issues in a repository",
+        "method": "GET",
+        "path": "/repositories/{workspace}/{repo_slug}/issues",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "workspace",
+            "repo_slug"
+          ],
+          "properties": {
+            "page": {
+              "type": "integer",
+              "description": "Page number"
+            },
+            "state": {
+              "enum": [
+                "new",
+                "on hold",
+                "resolved",
+                "duplicate",
+                "wontfix"
+              ],
+              "type": "string",
+              "description": "Filter by issue state"
+            },
+            "pagelen": {
+              "type": "integer",
+              "description": "Number of results per page"
+            },
+            "repo_slug": {
+              "type": "string",
+              "description": "Repository slug"
+            },
+            "workspace": {
+              "type": "string",
+              "description": "Workspace identifier"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "repo_slug": "{{ String(args.repo_slug) }}",
+            "workspace": "{{ String(args.workspace || metadata.workspace) }}"
+          },
+          "query": {
+            "page": "{{ String(args.page || 1) }}",
+            "state": "{{ String(args.state || 'new') }}",
+            "pagelen": "{{ String(args.pagelen || 10) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "get_workspace",
+        "description": "Get workspace information",
+        "method": "GET",
+        "path": "/workspaces/{workspace}",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "workspace"
+          ],
+          "properties": {
+            "workspace": {
+              "type": "string",
+              "description": "Workspace identifier"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "workspace": "{{ String(args.workspace || metadata.workspace) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "create_issue",
+        "description": "Create a new issue in a repository",
+        "method": "POST",
+        "path": "/repositories/{workspace}/{repo_slug}/issues",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "workspace",
+            "repo_slug",
+            "title"
+          ],
+          "properties": {
+            "state": {
+              "type": "string",
+              "description": "Issue state"
+            },
+            "title": {
+              "type": "string",
+              "description": "Issue title"
+            },
+            "content": {
+              "type": "string",
+              "description": "Issue description"
+            },
+            "priority": {
+              "enum": [
+                "trivial",
+                "minor",
+                "major",
+                "critical"
+              ],
+              "type": "string",
+              "description": "Issue priority"
+            },
+            "repo_slug": {
+              "type": "string",
+              "description": "Repository slug"
+            },
+            "workspace": {
+              "type": "string",
+              "description": "Workspace identifier"
+            }
+          }
+        },
+        "mapping": {
+          "body": {
+            "state": "{{ String(args.state || 'new') }}",
+            "title": "{{ String(args.title) }}",
+            "content": "{{ String(args.content || '') }}",
+            "priority": "{{ String(args.priority || 'major') }}"
+          },
+          "path": {
+            "repo_slug": "{{ String(args.repo_slug) }}",
+            "workspace": "{{ String(args.workspace || metadata.workspace) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "list_deploy_keys",
+        "description": "List deployment keys for a repository",
+        "method": "GET",
+        "path": "/repositories/{workspace}/{repo_slug}/deploy-keys",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "workspace",
+            "repo_slug"
+          ],
+          "properties": {
+            "page": {
+              "type": "integer",
+              "description": "Page number"
+            },
+            "pagelen": {
+              "type": "integer",
+              "description": "Number of results per page"
+            },
+            "repo_slug": {
+              "type": "string",
+              "description": "Repository slug"
+            },
+            "workspace": {
+              "type": "string",
+              "description": "Workspace identifier"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "repo_slug": "{{ String(args.repo_slug) }}",
+            "workspace": "{{ String(args.workspace || metadata.workspace) }}"
+          },
+          "query": {
+            "page": "{{ String(args.page || 1) }}",
+            "pagelen": "{{ String(args.pagelen || 10) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "get_commit",
+        "description": "Get details of a specific commit",
+        "method": "GET",
+        "path": "/repositories/{workspace}/{repo_slug}/commit/{commit}",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "workspace",
+            "repo_slug",
+            "commit"
+          ],
+          "properties": {
+            "commit": {
+              "type": "string",
+              "description": "Commit hash or revision"
+            },
+            "repo_slug": {
+              "type": "string",
+              "description": "Repository slug"
+            },
+            "workspace": {
+              "type": "string",
+              "description": "Workspace identifier"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "commit": "{{ String(args.commit) }}",
+            "repo_slug": "{{ String(args.repo_slug) }}",
+            "workspace": "{{ String(args.workspace || metadata.workspace) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "get_repository",
+        "description": "Get details of a specific repository",
+        "method": "GET",
+        "path": "/repositories/{workspace}/{repo_slug}",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "workspace",
+            "repo_slug"
+          ],
+          "properties": {
+            "repo_slug": {
+              "type": "string",
+              "description": "Repository slug"
+            },
+            "workspace": {
+              "type": "string",
+              "description": "Workspace identifier"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "repo_slug": "{{ String(args.repo_slug) }}",
+            "workspace": "{{ String(args.workspace || metadata.workspace) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "list_repositories",
+        "description": "List all repositories in a workspace",
+        "method": "GET",
+        "path": "/repositories/{workspace}",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "workspace"
+          ],
+          "properties": {
+            "page": {
+              "type": "integer",
+              "description": "Page number"
+            },
+            "pagelen": {
+              "type": "integer",
+              "description": "Number of results per page"
+            },
+            "workspace": {
+              "type": "string",
+              "description": "Workspace identifier"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "workspace": "{{ String(args.workspace || metadata.workspace) }}"
+          },
+          "query": {
+            "page": "{{ String(args.page || 1) }}",
+            "pagelen": "{{ String(args.pagelen || 10) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "list_commits",
+        "description": "List commits in a repository",
+        "method": "GET",
+        "path": "/repositories/{workspace}/{repo_slug}/commits",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "workspace",
+            "repo_slug"
+          ],
+          "properties": {
+            "page": {
+              "type": "integer",
+              "description": "Page number"
+            },
+            "pagelen": {
+              "type": "integer",
+              "description": "Number of results per page"
+            },
+            "repo_slug": {
+              "type": "string",
+              "description": "Repository slug"
+            },
+            "workspace": {
+              "type": "string",
+              "description": "Workspace identifier"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "repo_slug": "{{ String(args.repo_slug) }}",
+            "workspace": "{{ String(args.workspace || metadata.workspace) }}"
+          },
+          "query": {
+            "page": "{{ String(args.page || 1) }}",
+            "pagelen": "{{ String(args.pagelen || 10) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "create_pull_request",
+        "description": "Create a new pull request",
+        "method": "POST",
+        "path": "/repositories/{workspace}/{repo_slug}/pullrequests",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "workspace",
+            "repo_slug",
+            "title",
+            "source_branch",
+            "destination_branch"
+          ],
+          "properties": {
+            "title": {
+              "type": "string",
+              "description": "PR title"
+            },
+            "repo_slug": {
+              "type": "string",
+              "description": "Repository slug"
+            },
+            "workspace": {
+              "type": "string",
+              "description": "Workspace identifier"
+            },
+            "description": {
+              "type": "string",
+              "description": "PR description"
+            },
+            "source_branch": {
+              "type": "string",
+              "description": "Source branch"
+            },
+            "destination_branch": {
+              "type": "string",
+              "description": "Destination branch"
+            }
+          }
+        },
+        "mapping": {
+          "body": {
+            "title": "{{ String(args.title) }}",
+            "source": {
+              "branch": {
+                "name": "{{ String(args.source_branch) }}"
+              }
+            },
+            "description": "{{ String(args.description || '') }}",
+            "destination": {
+              "branch": {
+                "name": "{{ String(args.destination_branch) }}"
+              }
+            }
+          },
+          "path": {
+            "repo_slug": "{{ String(args.repo_slug) }}",
+            "workspace": "{{ String(args.workspace || metadata.workspace) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "list_pull_requests",
+        "description": "List pull requests in a repository",
+        "method": "GET",
+        "path": "/repositories/{workspace}/{repo_slug}/pullrequests",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "workspace",
+            "repo_slug"
+          ],
+          "properties": {
+            "page": {
+              "type": "integer",
+              "description": "Page number"
+            },
+            "state": {
+              "enum": [
+                "OPEN",
+                "MERGED",
+                "DECLINED",
+                "SUPERSEDED"
+              ],
+              "type": "string",
+              "description": "Filter by PR state"
+            },
+            "pagelen": {
+              "type": "integer",
+              "description": "Number of results per page"
+            },
+            "repo_slug": {
+              "type": "string",
+              "description": "Repository slug"
+            },
+            "workspace": {
+              "type": "string",
+              "description": "Workspace identifier"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "repo_slug": "{{ String(args.repo_slug) }}",
+            "workspace": "{{ String(args.workspace || metadata.workspace) }}"
+          },
+          "query": {
+            "page": "{{ String(args.page || 1) }}",
+            "state": "{{ String(args.state || 'OPEN') }}",
+            "pagelen": "{{ String(args.pagelen || 10) }}"
+          }
+        },
+        "timeoutMs": 15000
+      }
+    ]
+  }
+}

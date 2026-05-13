@@ -1,0 +1,1027 @@
+{
+  "schemaVersion": "1",
+  "kind": "connector_template",
+  "exportedAt": "2026-05-13T06:46:43.660Z",
+  "metadata": {
+    "fromProvider": "gmail",
+    "fromSlug": "gmail",
+    "fromId": "uYOJSKociTQE13gJfnAhg"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "connectorTemplate": {
+      "id": "uYOJSKociTQE13gJfnAhg",
+      "slug": "gmail",
+      "provider": "gmail",
+      "name": "Gmail",
+      "description": "Connect a Gmail account to send, read, and manage emails via the Gmail API.",
+      "isEnabled": true,
+      "version": "1.0.0",
+      "category": "connector",
+      "baseUrl": "https://www.googleapis.com",
+      "auth": {
+        "type": "oauth2",
+        "scopes": [
+          "https://www.googleapis.com/auth/gmail.modify",
+          "https://www.googleapis.com/auth/gmail.compose",
+          "https://www.googleapis.com/auth/gmail.send"
+        ],
+        "tokenUrl": "https://oauth2.googleapis.com/token",
+        "injection": {
+          "style": "header",
+          "headerName": "Authorization",
+          "tokenPrefix": "Bearer"
+        },
+        "clientIdRef": {
+          "key": "GMAIL_CLIENT_ID",
+          "type": "platform_secret"
+        },
+        "accessTokenRef": {
+          "key": "GMAIL_ACCESS_TOKEN",
+          "type": "connector_secret"
+        },
+        "scopeDelimiter": " ",
+        "clientSecretRef": {
+          "key": "GMAIL_CLIENT_SECRET",
+          "type": "platform_secret"
+        },
+        "refreshTokenRef": {
+          "key": "GMAIL_REFRESH_TOKEN",
+          "type": "connector_secret"
+        },
+        "authorizationUrl": "https://accounts.google.com/o/oauth2/v2/auth",
+        "extraAuthorizeParams": {
+          "prompt": "consent",
+          "access_type": "offline"
+        }
+      }
+    },
+    "actions": [
+      {
+        "name": "list-messages",
+        "description": "List messages in the user's mailbox. Supports filtering by query string, labels, and pagination. Returns message IDs and thread IDs only - use get-message for full details.",
+        "method": "GET",
+        "path": "/gmail/v1/users/me/messages",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "q": {
+              "type": "string",
+              "description": "Query string to filter messages (e.g., 'from:user@example.com is:unread')"
+            },
+            "labelIds": {
+              "type": "string",
+              "description": "Comma-separated label IDs to filter by"
+            },
+            "pageToken": {
+              "type": "string",
+              "description": "Token to retrieve a specific page of results"
+            },
+            "maxResults": {
+              "type": "number",
+              "maximum": 500,
+              "minimum": 1,
+              "description": "Maximum number of messages to return (1-500, default 100)"
+            },
+            "includeSpamTrash": {
+              "type": "boolean",
+              "description": "Include messages from SPAM and TRASH folders"
+            }
+          }
+        },
+        "mapping": {
+          "query": {
+            "q": "{{ args.q ? String(args.q) : undefined }}",
+            "labelIds": "{{ args.labelIds ? String(args.labelIds) : undefined }}",
+            "pageToken": "{{ args.pageToken ? String(args.pageToken) : undefined }}",
+            "maxResults": "{{ args.maxResults ? String(args.maxResults) : undefined }}",
+            "includeSpamTrash": "{{ args.includeSpamTrash ? String(args.includeSpamTrash) : undefined }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "get-message",
+        "description": "Get a specific message by ID. Returns full message details including headers, body, and attachments based on the format parameter.",
+        "method": "GET",
+        "path": "/gmail/v1/users/me/messages/{id}",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "id"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "The ID of the message to retrieve"
+            },
+            "format": {
+              "enum": [
+                "minimal",
+                "full",
+                "raw",
+                "metadata"
+              ],
+              "type": "string",
+              "description": "The format to return the message in (default: full)"
+            },
+            "metadataHeaders": {
+              "type": "string",
+              "description": "Comma-separated list of headers to include when format is 'metadata'"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "id": "{{ String(args.id) }}"
+          },
+          "query": {
+            "format": "{{ args.format ? String(args.format) : undefined }}",
+            "metadataHeaders": "{{ args.metadataHeaders ? String(args.metadataHeaders) : undefined }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "send-message",
+        "description": "Send an email message. The message must be a raw RFC 2822 formatted and base64url encoded string. Use this to send emails to recipients specified in To, Cc, and Bcc headers.",
+        "method": "POST",
+        "path": "/gmail/v1/users/me/messages/send",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "raw"
+          ],
+          "properties": {
+            "raw": {
+              "type": "string",
+              "description": "The entire email message in RFC 2822 format, base64url encoded string"
+            }
+          }
+        },
+        "mapping": {
+          "body": {
+            "raw": "{{ String(args.raw) }}"
+          }
+        },
+        "timeoutMs": 30000
+      },
+      {
+        "name": "delete-message",
+        "description": "Immediately and permanently delete a message. This operation cannot be undone. To move a message to trash instead, use trash-message.",
+        "method": "DELETE",
+        "path": "/gmail/v1/users/me/messages/{id}",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "id"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "The ID of the message to permanently delete"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "id": "{{ String(args.id) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "trash-message",
+        "description": "Move a message to the trash. The message can be recovered from trash before it's permanently deleted.",
+        "method": "POST",
+        "path": "/gmail/v1/users/me/messages/{id}/trash",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "id"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "The ID of the message to move to trash"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "id": "{{ String(args.id) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "untrash-message",
+        "description": "Remove a message from the trash, restoring it to the inbox or its original location.",
+        "method": "POST",
+        "path": "/gmail/v1/users/me/messages/{id}/untrash",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "id"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "The ID of the message to remove from trash"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "id": "{{ String(args.id) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "modify-message",
+        "description": "Modify the labels on a message. Add or remove labels like INBOX, UNREAD, STARRED, etc.",
+        "method": "POST",
+        "path": "/gmail/v1/users/me/messages/{id}/modify",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "id"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "The ID of the message to modify"
+            },
+            "addLabelIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "List of label IDs to add to the message"
+            },
+            "removeLabelIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "List of label IDs to remove from the message"
+            }
+          }
+        },
+        "mapping": {
+          "body": {
+            "addLabelIds": "{{ args.addLabelIds }}",
+            "removeLabelIds": "{{ args.removeLabelIds }}"
+          },
+          "path": {
+            "id": "{{ String(args.id) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "batch-delete-messages",
+        "description": "Delete multiple messages by ID in a single request. This is more efficient than deleting messages one by one.",
+        "method": "POST",
+        "path": "/gmail/v1/users/me/messages/batchDelete",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "ids"
+          ],
+          "properties": {
+            "ids": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "List of message IDs to delete (max 1000)"
+            }
+          }
+        },
+        "mapping": {
+          "body": {
+            "ids": "{{ args.ids }}"
+          }
+        },
+        "timeoutMs": 30000
+      },
+      {
+        "name": "batch-modify-messages",
+        "description": "Modify labels on multiple messages in a single request. More efficient than modifying messages individually.",
+        "method": "POST",
+        "path": "/gmail/v1/users/me/messages/batchModify",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "ids"
+          ],
+          "properties": {
+            "ids": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "List of message IDs to modify (max 1000)"
+            },
+            "addLabelIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "List of label IDs to add"
+            },
+            "removeLabelIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "List of label IDs to remove"
+            }
+          }
+        },
+        "mapping": {
+          "body": {
+            "ids": "{{ args.ids }}",
+            "addLabelIds": "{{ args.addLabelIds }}",
+            "removeLabelIds": "{{ args.removeLabelIds }}"
+          }
+        },
+        "timeoutMs": 30000
+      },
+      {
+        "name": "list-labels",
+        "description": "List all labels in the user's mailbox, including system labels (INBOX, SENT, TRASH) and custom labels.",
+        "method": "GET",
+        "path": "/gmail/v1/users/me/labels",
+        "timeoutMs": 15000
+      },
+      {
+        "name": "get-label",
+        "description": "Get details about a specific label by ID.",
+        "method": "GET",
+        "path": "/gmail/v1/users/me/labels/{id}",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "id"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "The ID of the label to retrieve"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "id": "{{ String(args.id) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "create-label",
+        "description": "Create a new custom label in the user's mailbox.",
+        "method": "POST",
+        "path": "/gmail/v1/users/me/labels",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "name"
+          ],
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "The display name of the label"
+            },
+            "labelListVisibility": {
+              "enum": [
+                "labelShow",
+                "labelShowIfUnread",
+                "labelHide"
+              ],
+              "type": "string",
+              "description": "Visibility of label in the label list"
+            },
+            "messageListVisibility": {
+              "enum": [
+                "show",
+                "hide"
+              ],
+              "type": "string",
+              "description": "Visibility of messages with this label in the message list"
+            }
+          }
+        },
+        "mapping": {
+          "body": {
+            "name": "{{ String(args.name) }}",
+            "labelListVisibility": "{{ args.labelListVisibility ? String(args.labelListVisibility) : undefined }}",
+            "messageListVisibility": "{{ args.messageListVisibility ? String(args.messageListVisibility) : undefined }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "update-label",
+        "description": "Update an existing label's properties.",
+        "method": "PATCH",
+        "path": "/gmail/v1/users/me/labels/{id}",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "id"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "The ID of the label to update"
+            },
+            "name": {
+              "type": "string",
+              "description": "The new display name of the label"
+            },
+            "labelListVisibility": {
+              "enum": [
+                "labelShow",
+                "labelShowIfUnread",
+                "labelHide"
+              ],
+              "type": "string",
+              "description": "Visibility of label in the label list"
+            },
+            "messageListVisibility": {
+              "enum": [
+                "show",
+                "hide"
+              ],
+              "type": "string",
+              "description": "Visibility of messages with this label"
+            }
+          }
+        },
+        "mapping": {
+          "body": {
+            "name": "{{ args.name ? String(args.name) : undefined }}",
+            "labelListVisibility": "{{ args.labelListVisibility ? String(args.labelListVisibility) : undefined }}",
+            "messageListVisibility": "{{ args.messageListVisibility ? String(args.messageListVisibility) : undefined }}"
+          },
+          "path": {
+            "id": "{{ String(args.id) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "delete-label",
+        "description": "Delete a custom label. System labels cannot be deleted.",
+        "method": "DELETE",
+        "path": "/gmail/v1/users/me/labels/{id}",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "id"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "The ID of the label to delete"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "id": "{{ String(args.id) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "list-threads",
+        "description": "List conversation threads in the user's mailbox. Threads group related messages together.",
+        "method": "GET",
+        "path": "/gmail/v1/users/me/threads",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "q": {
+              "type": "string",
+              "description": "Query string to filter threads"
+            },
+            "labelIds": {
+              "type": "string",
+              "description": "Comma-separated label IDs to filter by"
+            },
+            "pageToken": {
+              "type": "string",
+              "description": "Token to retrieve a specific page of results"
+            },
+            "maxResults": {
+              "type": "number",
+              "maximum": 500,
+              "minimum": 1,
+              "description": "Maximum number of threads to return (1-500, default 100)"
+            },
+            "includeSpamTrash": {
+              "type": "boolean",
+              "description": "Include threads from SPAM and TRASH"
+            }
+          }
+        },
+        "mapping": {
+          "query": {
+            "q": "{{ args.q ? String(args.q) : undefined }}",
+            "labelIds": "{{ args.labelIds ? String(args.labelIds) : undefined }}",
+            "pageToken": "{{ args.pageToken ? String(args.pageToken) : undefined }}",
+            "maxResults": "{{ args.maxResults ? String(args.maxResults) : undefined }}",
+            "includeSpamTrash": "{{ args.includeSpamTrash ? String(args.includeSpamTrash) : undefined }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "get-thread",
+        "description": "Get a specific thread by ID, including all messages in the conversation.",
+        "method": "GET",
+        "path": "/gmail/v1/users/me/threads/{id}",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "id"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "The ID of the thread to retrieve"
+            },
+            "format": {
+              "enum": [
+                "minimal",
+                "full",
+                "metadata"
+              ],
+              "type": "string",
+              "description": "The format to return messages in (default: full)"
+            },
+            "metadataHeaders": {
+              "type": "string",
+              "description": "Comma-separated list of headers to include when format is 'metadata'"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "id": "{{ String(args.id) }}"
+          },
+          "query": {
+            "format": "{{ args.format ? String(args.format) : undefined }}",
+            "metadataHeaders": "{{ args.metadataHeaders ? String(args.metadataHeaders) : undefined }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "delete-thread",
+        "description": "Immediately and permanently delete a thread and all messages in it.",
+        "method": "DELETE",
+        "path": "/gmail/v1/users/me/threads/{id}",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "id"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "The ID of the thread to delete"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "id": "{{ String(args.id) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "trash-thread",
+        "description": "Move a thread and all its messages to the trash.",
+        "method": "POST",
+        "path": "/gmail/v1/users/me/threads/{id}/trash",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "id"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "The ID of the thread to trash"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "id": "{{ String(args.id) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "untrash-thread",
+        "description": "Remove a thread from the trash.",
+        "method": "POST",
+        "path": "/gmail/v1/users/me/threads/{id}/untrash",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "id"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "The ID of the thread to untrash"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "id": "{{ String(args.id) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "modify-thread",
+        "description": "Modify the labels on all messages in a thread.",
+        "method": "POST",
+        "path": "/gmail/v1/users/me/threads/{id}/modify",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "id"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "The ID of the thread to modify"
+            },
+            "addLabelIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "List of label IDs to add"
+            },
+            "removeLabelIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "List of label IDs to remove"
+            }
+          }
+        },
+        "mapping": {
+          "body": {
+            "addLabelIds": "{{ args.addLabelIds }}",
+            "removeLabelIds": "{{ args.removeLabelIds }}"
+          },
+          "path": {
+            "id": "{{ String(args.id) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "list-drafts",
+        "description": "List all draft messages in the user's mailbox.",
+        "method": "GET",
+        "path": "/gmail/v1/users/me/drafts",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "q": {
+              "type": "string",
+              "description": "Query string to filter drafts"
+            },
+            "pageToken": {
+              "type": "string",
+              "description": "Token to retrieve a specific page of results"
+            },
+            "maxResults": {
+              "type": "number",
+              "maximum": 500,
+              "minimum": 1,
+              "description": "Maximum number of drafts to return (1-500, default 100)"
+            }
+          }
+        },
+        "mapping": {
+          "query": {
+            "q": "{{ args.q ? String(args.q) : undefined }}",
+            "pageToken": "{{ args.pageToken ? String(args.pageToken) : undefined }}",
+            "maxResults": "{{ args.maxResults ? String(args.maxResults) : undefined }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "get-draft",
+        "description": "Get a specific draft by ID.",
+        "method": "GET",
+        "path": "/gmail/v1/users/me/drafts/{id}",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "id"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "The ID of the draft to retrieve"
+            },
+            "format": {
+              "enum": [
+                "minimal",
+                "full",
+                "raw",
+                "metadata"
+              ],
+              "type": "string",
+              "description": "The format to return the draft in (default: full)"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "id": "{{ String(args.id) }}"
+          },
+          "query": {
+            "format": "{{ args.format ? String(args.format) : undefined }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "create-draft",
+        "description": "Create a new draft message. The message should be in RFC 2822 format and base64url encoded.",
+        "method": "POST",
+        "path": "/gmail/v1/users/me/drafts",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "message"
+          ],
+          "properties": {
+            "message": {
+              "type": "object",
+              "description": "Message object with 'raw' field containing base64url encoded RFC 2822 message"
+            }
+          }
+        },
+        "mapping": {
+          "body": {
+            "message": "{{ args.message }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "update-draft",
+        "description": "Update an existing draft. Replaces the draft's message content.",
+        "method": "PUT",
+        "path": "/gmail/v1/users/me/drafts/{id}",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "id",
+            "message"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "The ID of the draft to update"
+            },
+            "message": {
+              "type": "object",
+              "description": "Message object with 'raw' field containing base64url encoded RFC 2822 message"
+            }
+          }
+        },
+        "mapping": {
+          "body": {
+            "message": "{{ args.message }}"
+          },
+          "path": {
+            "id": "{{ String(args.id) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "delete-draft",
+        "description": "Delete a draft message permanently.",
+        "method": "DELETE",
+        "path": "/gmail/v1/users/me/drafts/{id}",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "id"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "The ID of the draft to delete"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "id": "{{ String(args.id) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "send-draft",
+        "description": "Send an existing draft message. The draft is sent and then deleted.",
+        "method": "POST",
+        "path": "/gmail/v1/users/me/drafts/send",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "id"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "The ID of the draft to send"
+            }
+          }
+        },
+        "mapping": {
+          "body": {
+            "id": "{{ String(args.id) }}"
+          }
+        },
+        "timeoutMs": 30000
+      },
+      {
+        "name": "get-profile",
+        "description": "Get the user's Gmail profile information including email address, total message count, and threads count.",
+        "method": "GET",
+        "path": "/gmail/v1/users/me/profile",
+        "timeoutMs": 15000
+      },
+      {
+        "name": "list-history",
+        "description": "List the history of all changes to the user's mailbox since a specific history ID. Used for incremental sync.",
+        "method": "GET",
+        "path": "/gmail/v1/users/me/history",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "startHistoryId"
+          ],
+          "properties": {
+            "labelId": {
+              "type": "string",
+              "description": "Only return messages with a label matching this ID"
+            },
+            "pageToken": {
+              "type": "string",
+              "description": "Token to retrieve a specific page of results"
+            },
+            "maxResults": {
+              "type": "number",
+              "maximum": 500,
+              "minimum": 1,
+              "description": "Maximum number of history records to return (1-500)"
+            },
+            "historyTypes": {
+              "type": "string",
+              "description": "Comma-separated list of history types to return (messageAdded, messageDeleted, labelAdded, labelRemoved)"
+            },
+            "startHistoryId": {
+              "type": "string",
+              "description": "Returns history records after the specified historyId"
+            }
+          }
+        },
+        "mapping": {
+          "query": {
+            "labelId": "{{ args.labelId ? String(args.labelId) : undefined }}",
+            "pageToken": "{{ args.pageToken ? String(args.pageToken) : undefined }}",
+            "maxResults": "{{ args.maxResults ? String(args.maxResults) : undefined }}",
+            "historyTypes": "{{ args.historyTypes ? String(args.historyTypes) : undefined }}",
+            "startHistoryId": "{{ String(args.startHistoryId) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "get-attachment",
+        "description": "Get a specific attachment from a message. Returns the attachment data in base64url encoded format.",
+        "method": "GET",
+        "path": "/gmail/v1/users/me/messages/{messageId}/attachments/{id}",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "messageId",
+            "id"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "The ID of the attachment"
+            },
+            "messageId": {
+              "type": "string",
+              "description": "The ID of the message containing the attachment"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "id": "{{ String(args.id) }}",
+            "messageId": "{{ String(args.messageId) }}"
+          }
+        },
+        "timeoutMs": 30000
+      },
+      {
+        "name": "import-message",
+        "description": "Import a message into the mailbox with standard email delivery scanning. Similar to receiving via SMTP.",
+        "method": "POST",
+        "path": "/gmail/v1/users/me/messages/import",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "raw"
+          ],
+          "properties": {
+            "raw": {
+              "type": "string",
+              "description": "The entire email message in RFC 2822 format, base64url encoded"
+            },
+            "internalDateSource": {
+              "enum": [
+                "dateHeader",
+                "receivedTime"
+              ],
+              "type": "string",
+              "description": "Source for internal date of the message (default: receivedTime)"
+            }
+          }
+        },
+        "mapping": {
+          "body": {
+            "raw": "{{ String(args.raw) }}",
+            "internalDateSource": "{{ args.internalDateSource ? String(args.internalDateSource) : undefined }}"
+          }
+        },
+        "timeoutMs": 30000
+      },
+      {
+        "name": "insert-message",
+        "description": "Insert a message directly into the mailbox, similar to IMAP APPEND. Bypasses most scanning and classification.",
+        "method": "POST",
+        "path": "/gmail/v1/users/me/messages",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "raw"
+          ],
+          "properties": {
+            "raw": {
+              "type": "string",
+              "description": "The entire email message in RFC 2822 format, base64url encoded"
+            },
+            "internalDateSource": {
+              "enum": [
+                "dateHeader",
+                "receivedTime"
+              ],
+              "type": "string",
+              "description": "Source for internal date of the message (default: receivedTime)"
+            }
+          }
+        },
+        "mapping": {
+          "body": {
+            "raw": "{{ String(args.raw) }}",
+            "internalDateSource": "{{ args.internalDateSource ? String(args.internalDateSource) : undefined }}"
+          }
+        },
+        "timeoutMs": 30000
+      }
+    ]
+  }
+}

@@ -1,0 +1,287 @@
+{
+  "schemaVersion": "1",
+  "kind": "connector_template",
+  "exportedAt": "2026-05-13T06:46:43.660Z",
+  "metadata": {
+    "fromProvider": "aws",
+    "fromSlug": "aws",
+    "fromId": "Ctbg6oXg_kSd9rSBtj-Gz"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "connectorTemplate": {
+      "id": "Ctbg6oXg_kSd9rSBtj-Gz",
+      "slug": "aws",
+      "provider": "aws",
+      "name": "AWS",
+      "description": "Amazon Web Services connector for S3, DynamoDB, Lambda, CloudWatch, SNS, SQS, EC2, IAM, and Secrets Manager",
+      "isEnabled": true,
+      "version": "1.0.0",
+      "category": "connector",
+      "baseUrl": "https://{{region}}.amazonaws.com",
+      "auth": {
+        "type": "api_key",
+        "apiKeyRef": {
+          "key": "AWS_ACCESS_KEY_ID",
+          "type": "connector_secret"
+        },
+        "injection": {
+          "style": "header",
+          "headerName": "Authorization",
+          "tokenPrefix": "AWS4-HMAC-SHA256"
+        }
+      },
+      "rateLimit": {
+        "tier": "enterprise",
+        "burstLimit": 100,
+        "requestsPerMinute": 1000
+      },
+      "metadataSchema": {
+        "type": "object",
+        "required": [
+          "region"
+        ],
+        "properties": {
+          "region": {
+            "type": "string",
+            "default": "us-east-1",
+            "description": "AWS region (e.g., us-east-1, eu-west-1)"
+          },
+          "secretAccessKey": {
+            "type": "string",
+            "description": "AWS Secret Access Key (stored securely)"
+          }
+        }
+      }
+    },
+    "actions": [
+      {
+        "name": "s3_list_buckets",
+        "description": "List all S3 buckets",
+        "method": "GET",
+        "path": "/",
+        "baseUrlOverride": "https://s3.{{region}}.amazonaws.com",
+        "mapping": {
+          "query": {
+            "list-type": "2"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "sqs_send_message",
+        "description": "Send SQS message",
+        "method": "POST",
+        "path": "/",
+        "baseUrlOverride": "https://sqs.{{region}}.amazonaws.com",
+        "mapping": {
+          "query": {
+            "Action": "SendMessage",
+            "Version": "2012-11-05",
+            "QueueUrl": "{{ String(args.queueUrl) }}",
+            "MessageBody": "{{ String(args.messageBody) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "secrets_manager_get_secret",
+        "description": "Retrieve secret from Secrets Manager",
+        "method": "POST",
+        "path": "/",
+        "baseUrlOverride": "https://secretsmanager.{{region}}.amazonaws.com",
+        "mapping": {
+          "body": {
+            "SecretId": "{{ String(args.secretId) }}"
+          },
+          "headers": {
+            "Content-Type": "application/x-amz-json-1.1",
+            "X-Amz-Target": "secretsmanager.GetSecretValue"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "sns_list_topics",
+        "description": "List SNS topics",
+        "method": "POST",
+        "path": "/",
+        "baseUrlOverride": "https://sns.{{region}}.amazonaws.com",
+        "mapping": {
+          "query": {
+            "Action": "ListTopics",
+            "Version": "2010-03-31"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "sns_publish_message",
+        "description": "Send SNS message",
+        "method": "POST",
+        "path": "/",
+        "baseUrlOverride": "https://sns.{{region}}.amazonaws.com",
+        "mapping": {
+          "query": {
+            "Action": "Publish",
+            "Message": "{{ String(args.message) }}",
+            "Version": "2010-03-31",
+            "TopicArn": "{{ String(args.topicArn) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "cloudwatch_get_metric_statistics",
+        "description": "Get CloudWatch metric statistics",
+        "method": "POST",
+        "path": "/",
+        "baseUrlOverride": "https://monitoring.{{region}}.amazonaws.com",
+        "mapping": {
+          "query": {
+            "Action": "GetMetricStatistics",
+            "Period": "{{ String(args.period) }}",
+            "EndTime": "{{ String(args.endTime) }}",
+            "Version": "2010-08-01",
+            "Namespace": "{{ String(args.namespace) }}",
+            "StartTime": "{{ String(args.startTime) }}",
+            "MetricName": "{{ String(args.metricName) }}",
+            "Statistics.member.1": "Average"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "lambda_list_functions",
+        "description": "List Lambda functions",
+        "method": "GET",
+        "path": "/2015-03-31/functions",
+        "baseUrlOverride": "https://lambda.{{region}}.amazonaws.com",
+        "mapping": {
+          "query": {
+            "MaxItems": "{{ String(args.maxItems || 50) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "lambda_invoke_function",
+        "description": "Invoke Lambda function",
+        "method": "POST",
+        "path": "/2015-03-31/functions/{functionName}/invocations",
+        "baseUrlOverride": "https://lambda.{{region}}.amazonaws.com",
+        "mapping": {
+          "body": "{{ args.payload }}",
+          "path": {
+            "functionName": "{{ String(args.functionName) }}"
+          }
+        },
+        "timeoutMs": 30000
+      },
+      {
+        "name": "dynamodb_get_item",
+        "description": "Retrieve item from DynamoDB by key",
+        "method": "POST",
+        "path": "/",
+        "baseUrlOverride": "https://dynamodb.{{region}}.amazonaws.com",
+        "mapping": {
+          "body": {
+            "Key": "{{ args.key }}",
+            "TableName": "{{ String(args.tableName) }}"
+          },
+          "headers": {
+            "Content-Type": "application/x-amz-json-1.0",
+            "X-Amz-Target": "DynamoDB_20120810.GetItem"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "dynamodb_put_item",
+        "description": "Insert or update item in DynamoDB",
+        "method": "POST",
+        "path": "/",
+        "baseUrlOverride": "https://dynamodb.{{region}}.amazonaws.com",
+        "mapping": {
+          "body": {
+            "Item": "{{ args.item }}",
+            "TableName": "{{ String(args.tableName) }}"
+          },
+          "headers": {
+            "Content-Type": "application/x-amz-json-1.0",
+            "X-Amz-Target": "DynamoDB_20120810.PutItem"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "dynamodb_query_table",
+        "description": "Query DynamoDB table",
+        "method": "POST",
+        "path": "/",
+        "baseUrlOverride": "https://dynamodb.{{region}}.amazonaws.com",
+        "mapping": {
+          "body": {
+            "TableName": "{{ String(args.tableName) }}",
+            "KeyConditionExpression": "{{ String(args.keyCondition) }}"
+          },
+          "headers": {
+            "Content-Type": "application/x-amz-json-1.0",
+            "X-Amz-Target": "DynamoDB_20120810.Query"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "s3_list_objects",
+        "description": "List objects in an S3 bucket",
+        "method": "GET",
+        "path": "/{bucket}",
+        "baseUrlOverride": "https://s3.{{region}}.amazonaws.com",
+        "mapping": {
+          "path": {
+            "bucket": "{{ String(args.bucket) }}"
+          },
+          "query": {
+            "prefix": "{{ String(args.prefix || '') }}",
+            "list-type": "2"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "sqs_receive_message",
+        "description": "Receive SQS message",
+        "method": "POST",
+        "path": "/",
+        "baseUrlOverride": "https://sqs.{{region}}.amazonaws.com",
+        "mapping": {
+          "query": {
+            "Action": "ReceiveMessage",
+            "Version": "2012-11-05",
+            "QueueUrl": "{{ String(args.queueUrl) }}",
+            "MaxNumberOfMessages": "{{ String(args.maxMessages || 1) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "ec2_list_instances",
+        "description": "List EC2 instances",
+        "method": "POST",
+        "path": "/",
+        "baseUrlOverride": "https://ec2.{{region}}.amazonaws.com",
+        "mapping": {
+          "query": {
+            "Action": "DescribeInstances",
+            "Version": "2016-11-15"
+          }
+        },
+        "timeoutMs": 15000
+      }
+    ]
+  }
+}

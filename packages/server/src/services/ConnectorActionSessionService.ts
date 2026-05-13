@@ -3,16 +3,13 @@ import type {
   ConnectorHttpEndpointV2,
   ConnectorProvider,
   ConnectorSessionV2,
-  ConnectorSqlEndpointV2,
   ConnectorTemplateRuntimeFieldsV2,
-  HttpMethod,
-  JsonSchemaObject,
-  RequestStyle,
   SecretRef,
 } from '@starships/protocol';
-import { ConnectorRepository, ConnectorTemplateActionRepository, ConnectorTemplateRepository } from '@starships/models';
+import { ConnectorRepository } from '@starships/models';
 import { ConnectorSecretService } from './ConnectorSecretService';
 import { PlatformSecretService } from './PlatformSecretService';
+import { ConnectorTemplateRegistryClient } from './ConnectorTemplateRegistryClient';
 import { generateJWT } from '@/utils/jwt';
 import { buildBasicAuthHeaderValue } from '@/utils/basicAuth';
 
@@ -25,8 +22,7 @@ export interface ConnectorActionSessionBundle {
 }
 
 export class ConnectorActionSessionService {
-  private templateRepo = new ConnectorTemplateRepository();
-  private actionRepo = new ConnectorTemplateActionRepository();
+  private templateRegistry = new ConnectorTemplateRegistryClient();
   private connectorRepo = new ConnectorRepository();
   private connectorSecrets = new ConnectorSecretService();
   private platformSecrets = new PlatformSecretService();
@@ -103,12 +99,8 @@ export class ConnectorActionSessionService {
     };
   }
 
-  private isJsonObject(v: unknown): v is JsonSchemaObject {
-    return v !== null && typeof v === 'object' && !Array.isArray(v);
-  }
-
   async build(starshipId: string, authUserId: string): Promise<ConnectorActionSessionBundle> {
-    const templates = await this.templateRepo.list();
+    const templates = await this.templateRegistry.list();
     const connectorRows = await this.connectorRepo.findByStarship(starshipId);
     const byProvider = new Map(connectorRows.map((c) => [c.provider, c]));
 
@@ -126,56 +118,6 @@ export class ConnectorActionSessionService {
       // best-effort
     }
 
-    // Preload all action catalogs for enabled templates in one query.
-    const enabledTemplateIds = templates.filter((t) => t.isEnabled !== false).map((t) => t.id);
-    const actionRows = await this.actionRepo.listActionRowsByTemplateIds(enabledTemplateIds);
-    const endpointsByTemplateId = new Map<string, ConnectorTemplateRuntimeFieldsV2['endpoints']>();
-    for (const row of actionRows) {
-      const list = endpointsByTemplateId.get(row.template_id) ?? [];
-      const kind = String(row.kind ?? 'http')
-        .trim()
-        .toLowerCase();
-
-      const parameters = this.isJsonObject(row.parameters_json) ? row.parameters_json : undefined;
-      const response = this.isJsonObject(row.response_json) ? row.response_json : undefined;
-
-      if (kind === 'sql') {
-        const endpoint: ConnectorSqlEndpointV2 = {
-          kind: 'sql',
-          name: row.action_name,
-          description: row.description ?? undefined,
-          driver: typeof row.driver === 'string' && row.driver.trim() ? row.driver.trim() : 'postgres',
-          sql: typeof row.sql_text === 'string' ? row.sql_text : '',
-          mode: row.sql_mode === 'execute' || row.sql_mode === 'query' ? row.sql_mode : undefined,
-          rowLimit: typeof row.row_limit === 'number' ? row.row_limit : undefined,
-          readOnly: typeof row.read_only === 'boolean' ? row.read_only : undefined,
-          parameters,
-          response,
-          timeoutMs: row.timeout_ms ?? undefined,
-        };
-        list.push(endpoint);
-      } else {
-        const mapping = this.isJsonObject(row.mapping_json)
-          ? (row.mapping_json as unknown as ConnectorHttpEndpointV2['mapping'])
-          : undefined;
-        const requestStyle = row.request_style ? (row.request_style as RequestStyle) : undefined;
-        const endpoint: ConnectorHttpEndpointV2 = {
-          name: row.action_name,
-          description: row.description ?? undefined,
-          method: row.method as HttpMethod,
-          path: row.path,
-          baseUrlOverride: row.base_url_override ?? undefined,
-          parameters,
-          requestStyle,
-          mapping,
-          response,
-          timeoutMs: row.timeout_ms ?? undefined,
-        };
-        list.push(endpoint);
-      }
-      endpointsByTemplateId.set(row.template_id, list);
-    }
-
     const connectorTemplates: Record<string, ConnectorTemplateRuntimeFieldsV2> = {};
     const connectorSessions: Record<string, ConnectorSession> = {};
     const connectorMetadata: Record<string, Record<string, unknown>> = {};
@@ -188,7 +130,7 @@ export class ConnectorActionSessionService {
         baseUrl: tpl.baseUrl,
         auth: tpl.authJson,
         variables: tpl.variablesJson,
-        endpoints: endpointsByTemplateId.get(tpl.id) ?? [],
+        endpoints: tpl.endpoints,
         rateLimit: tpl.rateLimitJson,
         metadataSchema: tpl.metadataSchemaJson,
       };

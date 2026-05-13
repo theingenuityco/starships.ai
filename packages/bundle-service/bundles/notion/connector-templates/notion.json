@@ -1,0 +1,718 @@
+{
+  "schemaVersion": "1",
+  "kind": "connector_template",
+  "exportedAt": "2026-05-13T06:46:43.660Z",
+  "metadata": {
+    "fromProvider": "notion",
+    "fromSlug": "notion",
+    "fromId": "FZluByRv7YUjjjoE3vin_"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "connectorTemplate": {
+      "id": "FZluByRv7YUjjjoE3vin_",
+      "slug": "notion",
+      "provider": "notion",
+      "name": "Notion",
+      "description": "Connect a Notion workspace to enable tools that create, read, and manage pages, databases, and content via the Notion API",
+      "isEnabled": true,
+      "version": "1.0.0",
+      "category": "connector",
+      "baseUrl": "https://api.notion.com/v1",
+      "auth": {
+        "type": "oauth2",
+        "scopes": [],
+        "tokenUrl": "https://api.notion.com/v1/oauth/token",
+        "injection": {
+          "style": "header",
+          "headerName": "Authorization",
+          "tokenPrefix": "Bearer"
+        },
+        "clientIdRef": {
+          "key": "NOTION_CLIENT_ID",
+          "type": "platform_secret"
+        },
+        "accessTokenRef": {
+          "key": "NOTION_ACCESS_TOKEN",
+          "type": "connector_secret"
+        },
+        "scopeDelimiter": " ",
+        "clientSecretRef": {
+          "key": "NOTION_CLIENT_SECRET",
+          "type": "platform_secret"
+        },
+        "authorizationUrl": "https://api.notion.com/v1/oauth/authorize",
+        "tokenAuthStyle": "basic"
+      },
+      "rateLimit": {
+        "burstLimit": 10,
+        "requestsPerMinute": 60
+      },
+      "metadataSchema": {
+        "type": "object",
+        "required": [],
+        "properties": {
+          "workspace_name": {
+            "type": "string",
+            "description": "Optional Notion workspace name for reference."
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "actions": [
+      {
+        "name": "search",
+        "description": "Search all pages and databases the integration has access to",
+        "method": "POST",
+        "path": "/search",
+        "requestStyle": "json",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "query": {
+              "type": "string",
+              "description": "Text to search for. Omit to return all shared pages and databases."
+            },
+            "filter": {
+              "type": "object",
+              "description": "Limit results to a specific object type. E.g. { \"property\": \"object\", \"value\": \"page\" }"
+            },
+            "sort": {
+              "type": "object",
+              "description": "Sort order. E.g. { \"timestamp\": \"last_edited_time\", \"direction\": \"descending\" }"
+            },
+            "pageSize": {
+              "type": "number",
+              "description": "Number of results to return (1–100). Defaults to 10."
+            },
+            "startCursor": {
+              "type": "string",
+              "description": "Pagination cursor from a previous response."
+            }
+          }
+        },
+        "mapping": {
+          "body": {
+            "query": "{{ args.query || undefined }}",
+            "filter": "{{ args.filter || undefined }}",
+            "sort": "{{ args.sort || undefined }}",
+            "page_size": "{{ args.pageSize || undefined }}",
+            "start_cursor": "{{ args.startCursor || undefined }}"
+          },
+          "headers": {
+            "Content-Type": "application/json",
+            "Notion-Version": "2022-06-28"
+          }
+        },
+        "timeoutMs": 30000
+      },
+      {
+        "name": "get-page",
+        "description": "Retrieve page metadata and properties by page ID",
+        "method": "GET",
+        "path": "/pages/{pageId}",
+        "parameters": {
+          "type": "object",
+          "required": ["pageId"],
+          "properties": {
+            "pageId": {
+              "type": "string",
+              "description": "The ID of the Notion page to retrieve."
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "pageId": "{{ String(args.pageId) }}"
+          },
+          "headers": {
+            "Notion-Version": "2022-06-28"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "get-page-blocks",
+        "description": "Retrieve the content blocks of a page (first-level children only)",
+        "method": "GET",
+        "path": "/blocks/{blockId}/children",
+        "parameters": {
+          "type": "object",
+          "required": ["blockId"],
+          "properties": {
+            "blockId": {
+              "type": "string",
+              "description": "The ID of the page or block whose children to retrieve."
+            },
+            "pageSize": {
+              "type": "number",
+              "description": "Number of blocks to return (1–100). Defaults to 100."
+            },
+            "startCursor": {
+              "type": "string",
+              "description": "Pagination cursor from a previous response."
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "blockId": "{{ String(args.blockId) }}"
+          },
+          "query": {
+            "page_size": "{{ String(args.pageSize || 100) }}",
+            "start_cursor": "{{ String(args.startCursor || '') }}"
+          },
+          "headers": {
+            "Notion-Version": "2022-06-28"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "create-page",
+        "description": "Create a new page as a child of another page or inside a database",
+        "method": "POST",
+        "path": "/pages",
+        "requestStyle": "json",
+        "parameters": {
+          "type": "object",
+          "required": ["parent", "properties"],
+          "properties": {
+            "parent": {
+              "type": "object",
+              "description": "Parent location. Use { \"page_id\": \"<id>\" } for a page parent or { \"database_id\": \"<id>\" } for a database parent."
+            },
+            "properties": {
+              "type": "object",
+              "description": "Page properties. For a page parent only \"title\" is valid. For a database parent, properties must match the database schema."
+            },
+            "children": {
+              "type": "array",
+              "description": "Initial content blocks (up to 100). Each item must be a valid Notion block object."
+            },
+            "icon": {
+              "type": "object",
+              "description": "Page icon. E.g. { \"type\": \"emoji\", \"emoji\": \"📝\" }"
+            },
+            "cover": {
+              "type": "object",
+              "description": "Page cover image. E.g. { \"type\": \"external\", \"external\": { \"url\": \"https://...\" } }"
+            }
+          }
+        },
+        "mapping": {
+          "body": {
+            "parent": "{{ args.parent }}",
+            "properties": "{{ args.properties }}",
+            "children": "{{ args.children || undefined }}",
+            "icon": "{{ args.icon || undefined }}",
+            "cover": "{{ args.cover || undefined }}"
+          },
+          "headers": {
+            "Content-Type": "application/json",
+            "Notion-Version": "2022-06-28"
+          }
+        },
+        "timeoutMs": 30000
+      },
+      {
+        "name": "update-page",
+        "description": "Update page properties, icon, cover, or archive status",
+        "method": "PATCH",
+        "path": "/pages/{pageId}",
+        "requestStyle": "json",
+        "parameters": {
+          "type": "object",
+          "required": ["pageId"],
+          "properties": {
+            "pageId": {
+              "type": "string",
+              "description": "The ID of the page to update."
+            },
+            "properties": {
+              "type": "object",
+              "description": "Properties to update. Only the provided properties are changed."
+            },
+            "icon": {
+              "type": "object",
+              "description": "New page icon. E.g. { \"type\": \"emoji\", \"emoji\": \"✅\" }"
+            },
+            "cover": {
+              "type": "object",
+              "description": "New cover image. E.g. { \"type\": \"external\", \"external\": { \"url\": \"https://...\" } }"
+            },
+            "archived": {
+              "type": "boolean",
+              "description": "Set to true to archive the page, false to unarchive."
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "pageId": "{{ String(args.pageId) }}"
+          },
+          "body": {
+            "properties": "{{ args.properties || undefined }}",
+            "icon": "{{ args.icon || undefined }}",
+            "cover": "{{ args.cover || undefined }}",
+            "archived": "{{ args.archived !== undefined ? args.archived : undefined }}"
+          },
+          "headers": {
+            "Content-Type": "application/json",
+            "Notion-Version": "2022-06-28"
+          }
+        },
+        "timeoutMs": 30000
+      },
+      {
+        "name": "archive-page",
+        "description": "Archive (soft-delete) a page by ID",
+        "method": "PATCH",
+        "path": "/pages/{pageId}",
+        "requestStyle": "json",
+        "parameters": {
+          "type": "object",
+          "required": ["pageId"],
+          "properties": {
+            "pageId": {
+              "type": "string",
+              "description": "The ID of the page to archive."
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "pageId": "{{ String(args.pageId) }}"
+          },
+          "body": {
+            "archived": "{{ true }}"
+          },
+          "headers": {
+            "Content-Type": "application/json",
+            "Notion-Version": "2022-06-28"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "append-block-children",
+        "description": "Append new content blocks to a page or block",
+        "method": "PATCH",
+        "path": "/blocks/{blockId}/children",
+        "requestStyle": "json",
+        "parameters": {
+          "type": "object",
+          "required": ["blockId", "children"],
+          "properties": {
+            "blockId": {
+              "type": "string",
+              "description": "The ID of the page or block to append children to."
+            },
+            "children": {
+              "type": "array",
+              "description": "Array of block objects to append (max 100 per request)."
+            },
+            "after": {
+              "type": "string",
+              "description": "ID of an existing block to insert the new children after."
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "blockId": "{{ String(args.blockId) }}"
+          },
+          "body": {
+            "children": "{{ args.children }}",
+            "after": "{{ args.after || undefined }}"
+          },
+          "headers": {
+            "Content-Type": "application/json",
+            "Notion-Version": "2022-06-28"
+          }
+        },
+        "timeoutMs": 30000
+      },
+      {
+        "name": "get-block",
+        "description": "Retrieve a single block by its ID",
+        "method": "GET",
+        "path": "/blocks/{blockId}",
+        "parameters": {
+          "type": "object",
+          "required": ["blockId"],
+          "properties": {
+            "blockId": {
+              "type": "string",
+              "description": "The ID of the block to retrieve."
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "blockId": "{{ String(args.blockId) }}"
+          },
+          "headers": {
+            "Notion-Version": "2022-06-28"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "update-block",
+        "description": "Update the content or archive status of a block",
+        "method": "PATCH",
+        "path": "/blocks/{blockId}",
+        "requestStyle": "json",
+        "parameters": {
+          "type": "object",
+          "required": ["blockId"],
+          "properties": {
+            "blockId": {
+              "type": "string",
+              "description": "The ID of the block to update."
+            },
+            "archived": {
+              "type": "boolean",
+              "description": "Set to true to archive (delete) the block."
+            },
+            "paragraph": {
+              "type": "object",
+              "description": "Updated paragraph content. Only include the field matching the block's type."
+            },
+            "heading_1": {
+              "type": "object",
+              "description": "Updated heading_1 content."
+            },
+            "heading_2": {
+              "type": "object",
+              "description": "Updated heading_2 content."
+            },
+            "heading_3": {
+              "type": "object",
+              "description": "Updated heading_3 content."
+            },
+            "bulleted_list_item": {
+              "type": "object",
+              "description": "Updated bulleted list item content."
+            },
+            "numbered_list_item": {
+              "type": "object",
+              "description": "Updated numbered list item content."
+            },
+            "to_do": {
+              "type": "object",
+              "description": "Updated to-do block content."
+            },
+            "toggle": {
+              "type": "object",
+              "description": "Updated toggle block content."
+            },
+            "code": {
+              "type": "object",
+              "description": "Updated code block content."
+            },
+            "callout": {
+              "type": "object",
+              "description": "Updated callout block content."
+            },
+            "quote": {
+              "type": "object",
+              "description": "Updated quote block content."
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "blockId": "{{ String(args.blockId) }}"
+          },
+          "body": {
+            "archived": "{{ args.archived !== undefined ? args.archived : undefined }}",
+            "paragraph": "{{ args.paragraph || undefined }}",
+            "heading_1": "{{ args.heading_1 || undefined }}",
+            "heading_2": "{{ args.heading_2 || undefined }}",
+            "heading_3": "{{ args.heading_3 || undefined }}",
+            "bulleted_list_item": "{{ args.bulleted_list_item || undefined }}",
+            "numbered_list_item": "{{ args.numbered_list_item || undefined }}",
+            "to_do": "{{ args.to_do || undefined }}",
+            "toggle": "{{ args.toggle || undefined }}",
+            "code": "{{ args.code || undefined }}",
+            "callout": "{{ args.callout || undefined }}",
+            "quote": "{{ args.quote || undefined }}"
+          },
+          "headers": {
+            "Content-Type": "application/json",
+            "Notion-Version": "2022-06-28"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "delete-block",
+        "description": "Delete (move to trash) a block by its ID",
+        "method": "DELETE",
+        "path": "/blocks/{blockId}",
+        "parameters": {
+          "type": "object",
+          "required": ["blockId"],
+          "properties": {
+            "blockId": {
+              "type": "string",
+              "description": "The ID of the block to delete."
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "blockId": "{{ String(args.blockId) }}"
+          },
+          "headers": {
+            "Notion-Version": "2022-06-28"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "get-database",
+        "description": "Retrieve database schema and properties",
+        "method": "GET",
+        "path": "/databases/{databaseId}",
+        "parameters": {
+          "type": "object",
+          "required": ["databaseId"],
+          "properties": {
+            "databaseId": {
+              "type": "string",
+              "description": "The ID of the Notion database to retrieve."
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "databaseId": "{{ String(args.databaseId) }}"
+          },
+          "headers": {
+            "Notion-Version": "2022-06-28"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "query-database",
+        "description": "Query database entries with optional filters, sorts, and pagination",
+        "method": "POST",
+        "path": "/databases/{databaseId}/query",
+        "requestStyle": "json",
+        "parameters": {
+          "type": "object",
+          "required": ["databaseId"],
+          "properties": {
+            "databaseId": {
+              "type": "string",
+              "description": "The ID of the database to query."
+            },
+            "filter": {
+              "type": "object",
+              "description": "Filter conditions. Supports \"and\"/\"or\" compound filters and property-specific conditions."
+            },
+            "sorts": {
+              "type": "array",
+              "description": "Sort order. E.g. [{ \"property\": \"Name\", \"direction\": \"ascending\" }]"
+            },
+            "pageSize": {
+              "type": "number",
+              "description": "Number of results to return (1–100). Defaults to 10."
+            },
+            "startCursor": {
+              "type": "string",
+              "description": "Pagination cursor from a previous response."
+            },
+            "filterProperties": {
+              "type": "array",
+              "description": "List of property names to include in the response (improves speed for large databases).",
+              "items": { "type": "string" }
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "databaseId": "{{ String(args.databaseId) }}"
+          },
+          "query": {
+            "filter_properties": "{{ args.filterProperties || undefined }}"
+          },
+          "body": {
+            "filter": "{{ args.filter || undefined }}",
+            "sorts": "{{ args.sorts || undefined }}",
+            "page_size": "{{ args.pageSize || undefined }}",
+            "start_cursor": "{{ args.startCursor || undefined }}"
+          },
+          "headers": {
+            "Content-Type": "application/json",
+            "Notion-Version": "2022-06-28"
+          }
+        },
+        "timeoutMs": 30000
+      },
+      {
+        "name": "create-database",
+        "description": "Create a new database as a child of a page",
+        "method": "POST",
+        "path": "/databases",
+        "requestStyle": "json",
+        "parameters": {
+          "type": "object",
+          "required": ["parent", "title", "properties"],
+          "properties": {
+            "parent": {
+              "type": "object",
+              "description": "Parent page. E.g. { \"type\": \"page_id\", \"page_id\": \"<id>\" }"
+            },
+            "title": {
+              "type": "array",
+              "description": "Database title as a rich text array. E.g. [{ \"type\": \"text\", \"text\": { \"content\": \"My DB\" } }]"
+            },
+            "properties": {
+              "type": "object",
+              "description": "Property schema for the database. Must include a title property."
+            },
+            "icon": {
+              "type": "object",
+              "description": "Database icon. E.g. { \"type\": \"emoji\", \"emoji\": \"📋\" }"
+            },
+            "cover": {
+              "type": "object",
+              "description": "Database cover image."
+            }
+          }
+        },
+        "mapping": {
+          "body": {
+            "parent": "{{ args.parent }}",
+            "title": "{{ args.title }}",
+            "properties": "{{ args.properties }}",
+            "icon": "{{ args.icon || undefined }}",
+            "cover": "{{ args.cover || undefined }}"
+          },
+          "headers": {
+            "Content-Type": "application/json",
+            "Notion-Version": "2022-06-28"
+          }
+        },
+        "timeoutMs": 30000
+      },
+      {
+        "name": "update-database",
+        "description": "Update database title, properties schema, icon, cover, or archive status",
+        "method": "PATCH",
+        "path": "/databases/{databaseId}",
+        "requestStyle": "json",
+        "parameters": {
+          "type": "object",
+          "required": ["databaseId"],
+          "properties": {
+            "databaseId": {
+              "type": "string",
+              "description": "The ID of the database to update."
+            },
+            "title": {
+              "type": "array",
+              "description": "New database title as a rich text array."
+            },
+            "properties": {
+              "type": "object",
+              "description": "Updated property schema. Existing properties not included are unchanged."
+            },
+            "icon": {
+              "type": "object",
+              "description": "New database icon."
+            },
+            "cover": {
+              "type": "object",
+              "description": "New database cover image."
+            },
+            "archived": {
+              "type": "boolean",
+              "description": "Set to true to archive the database."
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "databaseId": "{{ String(args.databaseId) }}"
+          },
+          "body": {
+            "title": "{{ args.title || undefined }}",
+            "properties": "{{ args.properties || undefined }}",
+            "icon": "{{ args.icon || undefined }}",
+            "cover": "{{ args.cover || undefined }}",
+            "archived": "{{ args.archived !== undefined ? args.archived : undefined }}"
+          },
+          "headers": {
+            "Content-Type": "application/json",
+            "Notion-Version": "2022-06-28"
+          }
+        },
+        "timeoutMs": 30000
+      },
+      {
+        "name": "get-user",
+        "description": "Retrieve information about a specific user",
+        "method": "GET",
+        "path": "/users/{userId}",
+        "parameters": {
+          "type": "object",
+          "required": ["userId"],
+          "properties": {
+            "userId": {
+              "type": "string",
+              "description": "The ID of the user to retrieve."
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "userId": "{{ String(args.userId) }}"
+          },
+          "headers": {
+            "Notion-Version": "2022-06-28"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "list-users",
+        "description": "List all users in the workspace",
+        "method": "GET",
+        "path": "/users",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "pageSize": {
+              "type": "number",
+              "description": "Number of users to return (1–100). Defaults to 100."
+            },
+            "startCursor": {
+              "type": "string",
+              "description": "Pagination cursor from a previous response."
+            }
+          }
+        },
+        "mapping": {
+          "query": {
+            "page_size": "{{ String(args.pageSize || 100) }}",
+            "start_cursor": "{{ String(args.startCursor || '') }}"
+          },
+          "headers": {
+            "Notion-Version": "2022-06-28"
+          }
+        },
+        "timeoutMs": 15000
+      }
+    ]
+  }
+}

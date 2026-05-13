@@ -1,0 +1,9 @@
+{
+  "name": "AWS",
+  "description": "Amazon Web Services connector for S3, DynamoDB, Lambda, CloudWatch, SNS, SQS, EC2, IAM, and Secrets Manager",
+  "version": "1.0.0",
+  "tags": [
+    "connector"
+  ],
+  "kind": "connector"
+}

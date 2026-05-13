@@ -1,0 +1,9 @@
+{
+  "name": "HubSpot",
+  "description": "HubSpot CRM connector for managing contacts, companies, deals, and automating sales and marketing workflows",
+  "version": "1.0.0",
+  "tags": [
+    "crm"
+  ],
+  "kind": "connector"
+}

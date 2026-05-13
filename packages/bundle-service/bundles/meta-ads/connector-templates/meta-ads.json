@@ -1,0 +1,1818 @@
+{
+  "schemaVersion": "1",
+  "kind": "connector_template",
+  "exportedAt": "2026-05-13T06:46:43.660Z",
+  "metadata": {
+    "fromProvider": "meta-ads",
+    "fromSlug": "meta-ads",
+    "fromId": "CuD0DOLRijZAqS5TlVU9f"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "connectorTemplate": {
+      "id": "CuD0DOLRijZAqS5TlVU9f",
+      "slug": "meta-ads",
+      "provider": "meta-ads",
+      "name": "Meta Ads",
+      "description": "Connect to Meta Marketing API to manage Facebook and Instagram advertising campaigns, ad accounts, and insights across M",
+      "isEnabled": true,
+      "version": "1.0.0",
+      "category": "marketing",
+      "baseUrl": "https://graph.facebook.com/v24.0",
+      "auth": {
+        "type": "oauth2",
+        "scopes": [
+          "ads_management",
+          "ads_read",
+          "business_management"
+        ],
+        "tokenUrl": "https://graph.facebook.com/v24.0/oauth/access_token",
+        "injection": {
+          "style": "header",
+          "headerName": "Authorization",
+          "tokenPrefix": "Bearer"
+        },
+        "clientIdRef": {
+          "key": "META_CLIENT_ID",
+          "type": "platform_secret"
+        },
+        "tokenResponse": {
+          "expiresInField": "expires_in",
+          "tokenTypeField": "token_type",
+          "accessTokenField": "access_token",
+          "refreshTokenField": "refresh_token"
+        },
+        "accessTokenRef": {
+          "key": "META_ADS_ACCESS_TOKEN",
+          "type": "connector_secret"
+        },
+        "scopeDelimiter": ",",
+        "clientSecretRef": {
+          "key": "META_CLIENT_SECRET",
+          "type": "platform_secret"
+        },
+        "refreshTokenRef": {
+          "key": "META_ADS_REFRESH_TOKEN",
+          "type": "connector_secret"
+        },
+        "authorizationUrl": "https://www.facebook.com/v24.0/dialog/oauth",
+        "extraAuthorizeParams": {}
+      },
+      "rateLimit": {
+        "tier": "standard",
+        "burstLimit": 50,
+        "requestsPerMinute": 200
+      },
+      "metadataSchema": {
+        "type": "object",
+        "required": [],
+        "properties": {
+          "business_id": {
+            "type": "string",
+            "description": "Default Business Manager ID to use for API calls"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "actions": [
+      {
+        "name": "list-ad-accounts",
+        "description": "Retrieves ad accounts owned by a SPECIFIC Business Manager. This endpoint requires a business_id parameter. If you don't know the business_id, use 'list-my-businesses' first to discover available businesses, OR use 'list-user-ad-accounts' or 'list-my-ad-accounts' to get all accessible ad accounts without specifying a business. This endpoint is useful when you want to filter ad accounts by a specific business.",
+        "method": "GET",
+        "path": "/{business_id}/owned_ad_accounts",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "business_id"
+          ],
+          "properties": {
+            "fields": {
+              "type": "string",
+              "default": "id,name,account_status,currency,timezone_name",
+              "description": "Comma-separated list of fields to retrieve (e.g., 'id,name,account_status,currency,timezone_name,business_id,permitted_tasks,access_type,owner,amount_spent,spend_cap')"
+            },
+            "business_id": {
+              "type": "string",
+              "description": "The ID of the Business Manager. Use 'list-my-businesses' to discover available business IDs, or use 'list-user-ad-accounts'/'list-my-ad-accounts' to get all ad accounts without filtering by business."
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "business_id": "{{ String(args.business_id) }}"
+          },
+          "query": {
+            "fields": "{{ String(args.fields || 'id,name,account_status,currency,timezone_name') }}"
+          }
+        },
+        "response": {
+          "select": "{{ body }}"
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "list-campaigns",
+        "description": "Retrieves a list of all campaigns associated with an ad account. By default returns only non-archived and non-deleted campaigns. Supports filtering by effective status and date ranges.",
+        "method": "GET",
+        "path": "/act_{account_id}/campaigns",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "ad_account_id"
+          ],
+          "properties": {
+            "fields": {
+              "type": "string",
+              "default": "id,name,objective,status",
+              "description": "Comma-separated list of fields to retrieve (e.g., 'id,name,objective,status,effective_status,daily_budget,lifetime_budget,created_time')"
+            },
+            "date_preset": {
+              "enum": [
+                "today",
+                "yesterday",
+                "this_month",
+                "last_month",
+                "this_quarter",
+                "last_3d",
+                "last_7d",
+                "last_14d",
+                "last_28d",
+                "last_30d",
+                "last_90d",
+                "last_week_mon_sun",
+                "last_week_sun_sat",
+                "last_quarter",
+                "last_year",
+                "this_week_mon_today",
+                "this_week_sun_today",
+                "this_year"
+              ],
+              "type": "string",
+              "description": "Predefined date range for aggregating insights metrics"
+            },
+            "ad_account_id": {
+              "type": "string",
+              "description": "The ID of the ad account (without 'act_' prefix)"
+            },
+            "effective_status": {
+              "type": "array",
+              "items": {
+                "enum": [
+                  "ACTIVE",
+                  "PAUSED",
+                  "DELETED",
+                  "PENDING_REVIEW",
+                  "DISAPPROVED",
+                  "PREAPPROVED",
+                  "PENDING_BILLING_INFO",
+                  "CAMPAIGN_PAUSED",
+                  "ARCHIVED",
+                  "ADSET_PAUSED",
+                  "IN_PROCESS",
+                  "WITH_ISSUES"
+                ],
+                "type": "string"
+              },
+              "description": "Filter campaigns by effective status"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "account_id": "{{ String(args.ad_account_id) }}"
+          },
+          "query": {
+            "fields": "{{ String(args.fields || 'id,name,objective,status') }}"
+          }
+        },
+        "response": {
+          "select": "{{ body }}"
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "list-campaign-adsets",
+        "description": "Retrieves a list of ad sets associated with a specific campaign. Ad sets define budget, schedule, targeting, and optimization settings for a group of ads.",
+        "method": "GET",
+        "path": "/{campaign_id}/adsets",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "campaign_id"
+          ],
+          "properties": {
+            "fields": {
+              "type": "string",
+              "default": "id,name,status,daily_budget,lifetime_budget,start_time,end_time",
+              "description": "Comma-separated list of fields to retrieve (e.g., 'id,name,status,daily_budget,lifetime_budget,start_time,end_time,optimization_goal,billing_event')"
+            },
+            "campaign_id": {
+              "type": "string",
+              "description": "The ID of the campaign"
+            },
+            "date_preset": {
+              "enum": [
+                "today",
+                "yesterday",
+                "this_month",
+                "last_month",
+                "this_quarter",
+                "last_3d",
+                "last_7d",
+                "last_14d",
+                "last_28d",
+                "last_30d",
+                "last_90d",
+                "last_week_mon_sun",
+                "last_week_sun_sat",
+                "last_quarter",
+                "last_year",
+                "this_week_mon_today",
+                "this_week_sun_today",
+                "this_year"
+              ],
+              "type": "string",
+              "description": "Preset date range for aggregating insights metrics"
+            },
+            "is_completed": {
+              "type": "boolean",
+              "description": "Filter ad sets by completed status"
+            },
+            "effective_status": {
+              "type": "array",
+              "items": {
+                "enum": [
+                  "ACTIVE",
+                  "PAUSED",
+                  "DELETED",
+                  "PENDING_REVIEW",
+                  "DISAPPROVED",
+                  "PREAPPROVED",
+                  "PENDING_BILLING_INFO",
+                  "CAMPAIGN_PAUSED",
+                  "ARCHIVED",
+                  "ADSET_PAUSED",
+                  "IN_PROCESS",
+                  "WITH_ISSUES"
+                ],
+                "type": "string"
+              },
+              "description": "Filter ad sets by effective status"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "campaign_id": "{{ String(args.campaign_id) }}"
+          },
+          "query": {
+            "fields": "{{ String(args.fields || 'id,name,status,daily_budget,lifetime_budget,start_time,end_time') }}"
+          }
+        },
+        "response": {
+          "select": "{{ body }}"
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "list-adset-ads",
+        "description": "Retrieves all ads associated with a specific ad set. Ads contain the creative content and measurement information displayed to users.",
+        "method": "GET",
+        "path": "/{adset_id}/ads",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "adset_id"
+          ],
+          "properties": {
+            "fields": {
+              "type": "string",
+              "default": "id,name,status,effective_status,creative",
+              "description": "Comma-separated list of fields to retrieve (e.g., 'id,name,status,effective_status,creative,adset_id,campaign_id,bid_amount')"
+            },
+            "adset_id": {
+              "type": "string",
+              "description": "The ID of the ad set"
+            },
+            "time_range": {
+              "type": "object",
+              "properties": {
+                "since": {
+                  "type": "string",
+                  "description": "Start date in YYYY-MM-DD format"
+                },
+                "until": {
+                  "type": "string",
+                  "description": "End date in YYYY-MM-DD format"
+                }
+              },
+              "description": "Custom time range for insights metrics"
+            },
+            "date_preset": {
+              "enum": [
+                "today",
+                "yesterday",
+                "this_month",
+                "last_month",
+                "this_quarter",
+                "last_3d",
+                "last_7d",
+                "last_14d",
+                "last_28d",
+                "last_30d",
+                "last_90d",
+                "last_week_mon_sun",
+                "last_week_sun_sat",
+                "last_quarter",
+                "last_year",
+                "this_week_mon_today",
+                "this_week_sun_today",
+                "this_year"
+              ],
+              "type": "string",
+              "description": "Preset date range for aggregating insights metrics"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "adset_id": "{{ String(args.adset_id) }}"
+          },
+          "query": {
+            "fields": "{{ String(args.fields || 'id,name,status,effective_status,creative') }}"
+          }
+        },
+        "response": {
+          "select": "{{ body }}"
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "get-account-insights",
+        "description": "Retrieves performance insights and analytics for an ad account. Returns metrics like impressions, clicks, spend, reach, and conversions. Supports aggregation at account, campaign, adset, or ad level with various breakdowns.",
+        "method": "GET",
+        "path": "/act_{ad_account_id}/insights",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "ad_account_id"
+          ],
+          "properties": {
+            "level": {
+              "enum": [
+                "account",
+                "campaign",
+                "adset",
+                "ad"
+              ],
+              "type": "string",
+              "default": "account",
+              "description": "The level at which to retrieve insights (account, campaign, adset, or ad)"
+            },
+            "fields": {
+              "type": "string",
+              "default": "impressions,clicks,spend,reach,frequency,cpm,cpc,ctr",
+              "description": "Comma-separated list of metrics to retrieve (e.g., 'impressions,clicks,spend,reach,actions,action_values,cpm,cpc,ctr,frequency')"
+            },
+            "breakdowns": {
+              "type": "string",
+              "description": "Comma-separated list of dimensions to break down insights by (e.g., 'publisher_platform,platform_position,age,gender')"
+            },
+            "time_range": {
+              "type": "object",
+              "properties": {
+                "since": {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                  "description": "Start date in YYYY-MM-DD format"
+                },
+                "until": {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                  "description": "End date in YYYY-MM-DD format"
+                }
+              },
+              "description": "Custom time range for insights (overrides date_preset)"
+            },
+            "date_preset": {
+              "enum": [
+                "today",
+                "yesterday",
+                "this_month",
+                "last_month",
+                "this_quarter",
+                "maximum",
+                "last_3d",
+                "last_7d",
+                "last_14d",
+                "last_28d",
+                "last_30d",
+                "last_90d",
+                "last_week_mon_sun",
+                "last_week_sun_sat",
+                "last_quarter",
+                "last_year",
+                "this_week_mon_today",
+                "this_week_sun_today",
+                "this_year"
+              ],
+              "type": "string",
+              "description": "Predefined date range for insights"
+            },
+            "ad_account_id": {
+              "type": "string",
+              "description": "The ID of the ad account (without 'act_' prefix)"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "ad_account_id": "{{ String(args.ad_account_id) }}"
+          },
+          "query": {
+            "level": "{{ String(args.level || 'account') }}",
+            "fields": "{{ String(args.fields || 'impressions,clicks,spend,reach,frequency,cpm,cpc,ctr') }}",
+            "breakdowns": "{{ args.breakdowns ? String(args.breakdowns) : undefined }}",
+            "time_range": "{{ args.time_range ? JSON.stringify(args.time_range) : undefined }}",
+            "date_preset": "{{ args.date_preset ? String(args.date_preset) : undefined }}"
+          }
+        },
+        "response": {
+          "select": "{{ body }}"
+        },
+        "timeoutMs": 30000
+      },
+      {
+        "name": "get-campaign-insights",
+        "description": "Retrieves performance insights for a specific campaign. Returns detailed metrics including impressions, clicks, spend, conversions, and actions. Supports various breakdowns for detailed analysis.",
+        "method": "GET",
+        "path": "/{campaign_id}/insights",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "campaign_id"
+          ],
+          "properties": {
+            "fields": {
+              "type": "string",
+              "default": "impressions,clicks,spend,reach,actions,action_values",
+              "description": "Comma-separated list of metrics to retrieve (e.g., 'impressions,clicks,spend,reach,cpm,cpc,ctr,actions,action_values,conversions')"
+            },
+            "breakdowns": {
+              "type": "string",
+              "description": "Comma-separated list of dimensions to break down insights by (e.g., 'publisher_platform,platform_position,age,gender,country')"
+            },
+            "time_range": {
+              "type": "object",
+              "properties": {
+                "since": {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                  "description": "Start date in YYYY-MM-DD format"
+                },
+                "until": {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                  "description": "End date in YYYY-MM-DD format"
+                }
+              },
+              "description": "Custom time range for insights (overrides date_preset)"
+            },
+            "campaign_id": {
+              "type": "string",
+              "description": "The ID of the campaign"
+            },
+            "date_preset": {
+              "enum": [
+                "today",
+                "yesterday",
+                "this_month",
+                "last_month",
+                "this_quarter",
+                "maximum",
+                "last_3d",
+                "last_7d",
+                "last_14d",
+                "last_28d",
+                "last_30d",
+                "last_90d",
+                "last_week_mon_sun",
+                "last_week_sun_sat",
+                "last_quarter",
+                "last_year",
+                "this_week_mon_today",
+                "this_week_sun_today",
+                "this_year"
+              ],
+              "type": "string",
+              "description": "Predefined date range for insights"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "campaign_id": "{{ String(args.campaign_id) }}"
+          },
+          "query": {
+            "fields": "{{ String(args.fields || 'impressions,clicks,spend,reach,actions,action_values') }}",
+            "breakdowns": "{{ args.breakdowns ? String(args.breakdowns) : undefined }}",
+            "time_range": "{{ args.time_range ? JSON.stringify(args.time_range) : undefined }}",
+            "date_preset": "{{ args.date_preset ? String(args.date_preset) : undefined }}"
+          }
+        },
+        "response": {
+          "select": "{{ body }}"
+        },
+        "timeoutMs": 30000
+      },
+      {
+        "name": "get-adset-insights",
+        "description": "Retrieves performance insights for a specific ad set. Returns detailed metrics including impressions, clicks, spend, conversions, and actions. Supports various breakdowns for detailed analysis by platform, position, demographics, and more.",
+        "method": "GET",
+        "path": "/{adset_id}/insights",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "adset_id"
+          ],
+          "properties": {
+            "fields": {
+              "type": "string",
+              "default": "impressions,clicks,spend,reach,actions,action_values",
+              "description": "Comma-separated list of metrics to retrieve (e.g., 'impressions,clicks,spend,reach,cpm,cpc,ctr,actions,action_values,conversions')"
+            },
+            "adset_id": {
+              "type": "string",
+              "description": "The ID of the ad set"
+            },
+            "breakdowns": {
+              "type": "string",
+              "description": "Comma-separated list of dimensions to break down insights by (e.g., 'publisher_platform,platform_position,age,gender,country')"
+            },
+            "time_range": {
+              "type": "object",
+              "properties": {
+                "since": {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                  "description": "Start date in YYYY-MM-DD format"
+                },
+                "until": {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                  "description": "End date in YYYY-MM-DD format"
+                }
+              },
+              "description": "Custom time range for insights (overrides date_preset)"
+            },
+            "date_preset": {
+              "enum": [
+                "today",
+                "yesterday",
+                "this_month",
+                "last_month",
+                "this_quarter",
+                "maximum",
+                "last_3d",
+                "last_7d",
+                "last_14d",
+                "last_28d",
+                "last_30d",
+                "last_90d",
+                "last_week_mon_sun",
+                "last_week_sun_sat",
+                "last_quarter",
+                "last_year",
+                "this_week_mon_today",
+                "this_week_sun_today",
+                "this_year"
+              ],
+              "type": "string",
+              "description": "Predefined date range for insights"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "adset_id": "{{ String(args.adset_id) }}"
+          },
+          "query": {
+            "fields": "{{ String(args.fields || 'impressions,clicks,spend,reach,actions,action_values') }}",
+            "breakdowns": "{{ args.breakdowns ? String(args.breakdowns) : undefined }}",
+            "time_range": "{{ args.time_range ? JSON.stringify(args.time_range) : undefined }}",
+            "date_preset": "{{ args.date_preset ? String(args.date_preset) : undefined }}"
+          }
+        },
+        "response": {
+          "select": "{{ body }}"
+        },
+        "timeoutMs": 30000
+      },
+      {
+        "name": "get-ad-insights",
+        "description": "Retrieves performance insights for a specific ad. Returns detailed metrics including impressions, clicks, spend, conversions, cost metrics (CPM, CPC, CTR), and actions. Supports various breakdowns for granular analysis by platform, position, demographics, and device.",
+        "method": "GET",
+        "path": "/{ad_id}/insights",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "ad_id"
+          ],
+          "properties": {
+            "ad_id": {
+              "type": "string",
+              "description": "The ID of the ad"
+            },
+            "fields": {
+              "type": "string",
+              "default": "impressions,clicks,spend,reach,actions,action_values,cpm,cpc,ctr",
+              "description": "Comma-separated list of metrics to retrieve (e.g., 'impressions,clicks,spend,reach,cpm,cpc,ctr,actions,action_values,conversions,frequency')"
+            },
+            "breakdowns": {
+              "type": "string",
+              "description": "Comma-separated list of dimensions to break down insights by (e.g., 'publisher_platform,platform_position,age,gender,country,device_platform')"
+            },
+            "time_range": {
+              "type": "object",
+              "properties": {
+                "since": {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                  "description": "Start date in YYYY-MM-DD format"
+                },
+                "until": {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                  "description": "End date in YYYY-MM-DD format"
+                }
+              },
+              "description": "Custom time range for insights (overrides date_preset)"
+            },
+            "date_preset": {
+              "enum": [
+                "today",
+                "yesterday",
+                "this_month",
+                "last_month",
+                "this_quarter",
+                "maximum",
+                "last_3d",
+                "last_7d",
+                "last_14d",
+                "last_28d",
+                "last_30d",
+                "last_90d",
+                "last_week_mon_sun",
+                "last_week_sun_sat",
+                "last_quarter",
+                "last_year",
+                "this_week_mon_today",
+                "this_week_sun_today",
+                "this_year"
+              ],
+              "type": "string",
+              "description": "Predefined date range for insights"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "ad_id": "{{ String(args.ad_id) }}"
+          },
+          "query": {
+            "fields": "{{ String(args.fields || 'impressions,clicks,spend,reach,actions,action_values,cpm,cpc,ctr') }}",
+            "breakdowns": "{{ args.breakdowns ? String(args.breakdowns) : undefined }}",
+            "time_range": "{{ args.time_range ? JSON.stringify(args.time_range) : undefined }}",
+            "date_preset": "{{ args.date_preset ? String(args.date_preset) : undefined }}"
+          }
+        },
+        "response": {
+          "select": "{{ body }}"
+        },
+        "timeoutMs": 30000
+      },
+      {
+        "name": "get-campaign",
+        "description": "Retrieves detailed information about a specific campaign by ID. Returns campaign configuration including name, objective, status, budget settings, and timestamps.",
+        "method": "GET",
+        "path": "/{campaign_id}",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "campaign_id"
+          ],
+          "properties": {
+            "fields": {
+              "type": "string",
+              "default": "id,name,objective,status,effective_status,daily_budget,lifetime_budget,created_time,updated_time",
+              "description": "Comma-separated list of fields to retrieve (e.g., 'id,name,objective,status,effective_status,daily_budget,lifetime_budget,bid_strategy,special_ad_categories,created_time,updated_time,start_time,stop_time')"
+            },
+            "campaign_id": {
+              "type": "string",
+              "description": "The ID of the campaign"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "campaign_id": "{{ String(args.campaign_id) }}"
+          },
+          "query": {
+            "fields": "{{ String(args.fields || 'id,name,objective,status,effective_status,daily_budget,lifetime_budget,created_time,updated_time') }}"
+          }
+        },
+        "response": {
+          "select": "{{ body }}"
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "update-campaign",
+        "description": "Updates an existing campaign's settings including name, status, objective, budget, and bid strategy. Returns success status. Note: Some fields like objective have restrictions on when they can be changed.",
+        "method": "POST",
+        "path": "/{campaign_id}",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "campaign_id"
+          ],
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "New name for the campaign"
+            },
+            "status": {
+              "enum": [
+                "ACTIVE",
+                "PAUSED",
+                "DELETED",
+                "ARCHIVED"
+              ],
+              "type": "string",
+              "description": "New status for the campaign"
+            },
+            "objective": {
+              "enum": [
+                "OUTCOME_APP_PROMOTION",
+                "OUTCOME_AWARENESS",
+                "OUTCOME_ENGAGEMENT",
+                "OUTCOME_LEADS",
+                "OUTCOME_SALES",
+                "OUTCOME_TRAFFIC"
+              ],
+              "type": "string",
+              "description": "New objective for the campaign (note: changing objectives has restrictions)"
+            },
+            "campaign_id": {
+              "type": "string",
+              "description": "The ID of the campaign to update"
+            },
+            "bid_strategy": {
+              "enum": [
+                "LOWEST_COST_WITHOUT_CAP",
+                "LOWEST_COST_WITH_BID_CAP",
+                "COST_CAP",
+                "LOWEST_COST_WITH_MIN_ROAS"
+              ],
+              "type": "string",
+              "description": "Bid strategy for the campaign"
+            },
+            "daily_budget": {
+              "type": "integer",
+              "description": "New daily budget in the smallest currency unit (e.g., cents for USD). Minimum varies by currency."
+            },
+            "lifetime_budget": {
+              "type": "integer",
+              "description": "New lifetime budget in the smallest currency unit (e.g., cents for USD)"
+            },
+            "special_ad_categories": {
+              "type": "array",
+              "items": {
+                "enum": [
+                  "NONE",
+                  "EMPLOYMENT",
+                  "HOUSING",
+                  "CREDIT",
+                  "ISSUES_ELECTIONS_POLITICS"
+                ],
+                "type": "string"
+              },
+              "description": "Special ad categories for compliance (e.g., housing, employment, credit)"
+            }
+          }
+        },
+        "mapping": {
+          "body": {
+            "name": "{{ args.name ? String(args.name) : undefined }}",
+            "status": "{{ args.status ? String(args.status) : undefined }}",
+            "objective": "{{ args.objective ? String(args.objective) : undefined }}",
+            "bid_strategy": "{{ args.bid_strategy ? String(args.bid_strategy) : undefined }}",
+            "daily_budget": "{{ args.daily_budget ? Number(args.daily_budget) : undefined }}",
+            "lifetime_budget": "{{ args.lifetime_budget ? Number(args.lifetime_budget) : undefined }}",
+            "special_ad_categories": "{{ args.special_ad_categories ? JSON.stringify(args.special_ad_categories) : undefined }}"
+          },
+          "path": {
+            "campaign_id": "{{ String(args.campaign_id) }}"
+          }
+        },
+        "response": {
+          "select": "{{ body }}"
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "create-campaign",
+        "description": "Creates a new advertising campaign in the specified ad account. Returns the campaign ID upon successful creation. Campaign is created in PAUSED status by default for safety. You must specify the objective and can optionally set budget and special ad categories for compliance.",
+        "method": "POST",
+        "path": "/act_{ad_account_id}/campaigns",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "ad_account_id",
+            "name",
+            "objective"
+          ],
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "Name for the campaign"
+            },
+            "status": {
+              "enum": [
+                "ACTIVE",
+                "PAUSED"
+              ],
+              "type": "string",
+              "default": "PAUSED",
+              "description": "Initial status of the campaign. Recommended to start with PAUSED."
+            },
+            "objective": {
+              "enum": [
+                "OUTCOME_APP_PROMOTION",
+                "OUTCOME_AWARENESS",
+                "OUTCOME_ENGAGEMENT",
+                "OUTCOME_LEADS",
+                "OUTCOME_SALES",
+                "OUTCOME_TRAFFIC",
+                "LINK_CLICKS",
+                "PAGE_LIKES",
+                "POST_ENGAGEMENT",
+                "CONVERSIONS",
+                "VIDEO_VIEWS",
+                "REACH",
+                "BRAND_AWARENESS",
+                "LEAD_GENERATION",
+                "MESSAGES",
+                "APP_INSTALLS",
+                "STORE_VISITS"
+              ],
+              "type": "string",
+              "description": "Campaign objective (e.g., OUTCOME_TRAFFIC, OUTCOME_SALES, LINK_CLICKS)"
+            },
+            "bid_strategy": {
+              "enum": [
+                "LOWEST_COST_WITHOUT_CAP",
+                "LOWEST_COST_WITH_BID_CAP",
+                "COST_CAP",
+                "LOWEST_COST_WITH_MIN_ROAS"
+              ],
+              "type": "string",
+              "description": "Bid strategy for the campaign"
+            },
+            "daily_budget": {
+              "type": "integer",
+              "minimum": 100,
+              "description": "Daily budget in the smallest currency unit (e.g., cents for USD). Minimum $1.00 USD or equivalent."
+            },
+            "ad_account_id": {
+              "type": "string",
+              "description": "The ID of the ad account (without 'act_' prefix)"
+            },
+            "lifetime_budget": {
+              "type": "integer",
+              "minimum": 100,
+              "description": "Lifetime budget in the smallest currency unit (e.g., cents for USD). Cannot be used with daily_budget."
+            },
+            "special_ad_categories": {
+              "type": "array",
+              "items": {
+                "enum": [
+                  "NONE",
+                  "EMPLOYMENT",
+                  "HOUSING",
+                  "CREDIT",
+                  "ISSUES_ELECTIONS_POLITICS",
+                  "ONLINE_GAMBLING_AND_GAMING",
+                  "FINANCIAL_PRODUCTS_SERVICES"
+                ],
+                "type": "string"
+              },
+              "default": [],
+              "description": "Special ad categories for compliance. Use empty array [] or ['NONE'] for standard campaigns."
+            },
+            "special_ad_category_country": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^[A-Z]{2}$"
+              },
+              "description": "Country codes where special ad categories apply (e.g., ['US', 'CA'])"
+            }
+          }
+        },
+        "mapping": {
+          "body": {
+            "name": "{{ String(args.name) }}",
+            "status": "{{ String(args.status || 'PAUSED') }}",
+            "objective": "{{ String(args.objective) }}",
+            "bid_strategy": "{{ args.bid_strategy ? String(args.bid_strategy) : undefined }}",
+            "daily_budget": "{{ args.daily_budget ? Number(args.daily_budget) : undefined }}",
+            "lifetime_budget": "{{ args.lifetime_budget ? Number(args.lifetime_budget) : undefined }}",
+            "special_ad_categories": "{{ JSON.stringify(args.special_ad_categories || []) }}",
+            "special_ad_category_country": "{{ args.special_ad_category_country ? JSON.stringify(args.special_ad_category_country) : undefined }}"
+          },
+          "path": {
+            "ad_account_id": "{{ String(args.ad_account_id) }}"
+          }
+        },
+        "response": {
+          "select": "{{ body }}"
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "get-adset",
+        "description": "Retrieves detailed information about a specific ad set by ID. Returns ad set configuration including name, status, budget settings, optimization goal, billing event, targeting, and schedule.",
+        "method": "GET",
+        "path": "/{adset_id}",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "adset_id"
+          ],
+          "properties": {
+            "fields": {
+              "type": "string",
+              "default": "id,name,status,effective_status,campaign_id,daily_budget,lifetime_budget,optimization_goal,billing_event,start_time,end_time",
+              "description": "Comma-separated list of fields to retrieve (e.g., 'id,name,status,effective_status,campaign_id,daily_budget,lifetime_budget,optimization_goal,billing_event,targeting,bid_amount,created_time,updated_time')"
+            },
+            "adset_id": {
+              "type": "string",
+              "description": "The ID of the ad set"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "adset_id": "{{ String(args.adset_id) }}"
+          },
+          "query": {
+            "fields": "{{ String(args.fields || 'id,name,status,effective_status,campaign_id,daily_budget,lifetime_budget,optimization_goal,billing_event,start_time,end_time') }}"
+          }
+        },
+        "response": {
+          "select": "{{ body }}"
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "get-ad",
+        "description": "Retrieves detailed information about a specific ad by ID. Returns ad configuration including name, status, creative, bid amount, associated ad set and campaign, and timestamps.",
+        "method": "GET",
+        "path": "/{ad_id}",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "ad_id"
+          ],
+          "properties": {
+            "ad_id": {
+              "type": "string",
+              "description": "The ID of the ad"
+            },
+            "fields": {
+              "type": "string",
+              "default": "id,name,status,effective_status,adset_id,campaign_id,creative,bid_amount,created_time,updated_time",
+              "description": "Comma-separated list of fields to retrieve (e.g., 'id,name,status,effective_status,adset_id,campaign_id,creative,tracking_specs,conversion_specs,bid_amount,created_time,updated_time')"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "ad_id": "{{ String(args.ad_id) }}"
+          },
+          "query": {
+            "fields": "{{ String(args.fields || 'id,name,status,effective_status,adset_id,campaign_id,creative,bid_amount,created_time,updated_time') }}"
+          }
+        },
+        "response": {
+          "select": "{{ body }}"
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "delete-campaign",
+        "description": "Permanently deletes an ad campaign. This action is irreversible and cannot be undone. Returns success status. Warning: Always verify the campaign ID before deletion to avoid accidental data loss.",
+        "method": "DELETE",
+        "path": "/{campaign_id}",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "campaign_id"
+          ],
+          "properties": {
+            "campaign_id": {
+              "type": "string",
+              "description": "The ID of the campaign to delete"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "campaign_id": "{{ String(args.campaign_id) }}"
+          }
+        },
+        "response": {
+          "select": "{{ body }}"
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "create-adset",
+        "description": "Creates a new ad set within a campaign. Ad set defines targeting (WHO sees ads), placement (WHERE ads appear), schedule (WHEN ads run), budget (HOW MUCH to spend), and optimization (WHAT to optimize for). Returns the ad set ID upon successful creation. Must specify either daily_budget or lifetime_budget.",
+        "method": "POST",
+        "path": "/act_{ad_account_id}/adsets",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "ad_account_id",
+            "name",
+            "campaign_id",
+            "optimization_goal",
+            "billing_event",
+            "targeting"
+          ],
+          "properties": {
+            "name": "{{ String(args.name) }}",
+            "status": {
+              "enum": [
+                "ACTIVE",
+                "PAUSED"
+              ],
+              "type": "string",
+              "default": "PAUSED",
+              "description": "Initial status of the ad set. Recommended to start with PAUSED."
+            },
+            "end_time": {
+              "type": "string",
+              "format": "date-time",
+              "description": "End time in ISO 8601 format or Unix timestamp. Required if using lifetime_budget."
+            },
+            "targeting": {
+              "type": "object",
+              "required": [
+                "geo_locations"
+              ],
+              "properties": {
+                "age_max": {
+                  "type": "integer",
+                  "maximum": 65,
+                  "minimum": 13,
+                  "description": "Maximum age (13-65)"
+                },
+                "age_min": {
+                  "type": "integer",
+                  "maximum": 65,
+                  "minimum": 13,
+                  "description": "Minimum age (13-65)"
+                },
+                "genders": {
+                  "type": "array",
+                  "items": {
+                    "enum": [
+                      1,
+                      2
+                    ],
+                    "type": "integer"
+                  },
+                  "description": "Gender targeting: 1=male, 2=female"
+                },
+                "behaviors": {
+                  "type": "array",
+                  "items": {
+                    "type": "object"
+                  },
+                  "description": "Behavior targeting IDs"
+                },
+                "interests": {
+                  "type": "array",
+                  "items": {
+                    "type": "object"
+                  },
+                  "description": "Interest targeting IDs"
+                },
+                "geo_locations": {
+                  "type": "object",
+                  "required": [
+                    "countries"
+                  ],
+                  "properties": {
+                    "cities": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      },
+                      "description": "City targeting with keys"
+                    },
+                    "regions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      },
+                      "description": "Region targeting with keys"
+                    },
+                    "countries": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "Country codes (e.g., ['US', 'CA', 'UK'])"
+                    },
+                    "location_types": {
+                      "type": "array",
+                      "items": {
+                        "enum": [
+                          "home",
+                          "recent"
+                        ],
+                        "type": "string"
+                      },
+                      "description": "Location types"
+                    }
+                  },
+                  "description": "Geographic location targeting. Countries is required."
+                },
+                "custom_audiences": {
+                  "type": "array",
+                  "items": {
+                    "type": "object"
+                  },
+                  "description": "Custom audience targeting"
+                },
+                "device_platforms": {
+                  "type": "array",
+                  "items": {
+                    "enum": [
+                      "mobile",
+                      "desktop"
+                    ],
+                    "type": "string"
+                  },
+                  "description": "Device platforms to target"
+                },
+                "facebook_positions": {
+                  "type": "array",
+                  "items": {
+                    "enum": [
+                      "feed",
+                      "right_hand_column",
+                      "instant_article",
+                      "marketplace",
+                      "video_feeds",
+                      "story",
+                      "search"
+                    ],
+                    "type": "string"
+                  },
+                  "description": "Facebook placement positions"
+                },
+                "publisher_platforms": {
+                  "type": "array",
+                  "items": {
+                    "enum": [
+                      "facebook",
+                      "instagram",
+                      "audience_network",
+                      "messenger"
+                    ],
+                    "type": "string"
+                  },
+                  "description": "Publisher platforms to target"
+                },
+                "excluded_custom_audiences": {
+                  "type": "array",
+                  "items": {
+                    "type": "object"
+                  },
+                  "description": "Custom audiences to exclude"
+                }
+              },
+              "description": "Targeting specification. geo_locations with countries is required."
+            },
+            "bid_amount": {
+              "type": "integer",
+              "description": "Bid amount in smallest currency unit. Required if bid_strategy is LOWEST_COST_WITH_BID_CAP or COST_CAP."
+            },
+            "start_time": {
+              "type": "string",
+              "format": "date-time",
+              "description": "Start time in ISO 8601 format or Unix timestamp (e.g., '2026-01-15T10:00:00+0000')"
+            },
+            "campaign_id": {
+              "type": "string",
+              "description": "The ID of the campaign this ad set belongs to"
+            },
+            "bid_strategy": {
+              "enum": [
+                "LOWEST_COST_WITHOUT_CAP",
+                "LOWEST_COST_WITH_BID_CAP",
+                "COST_CAP"
+              ],
+              "type": "string",
+              "description": "Bid strategy for the ad set"
+            },
+            "daily_budget": {
+              "type": "integer",
+              "minimum": 100,
+              "description": "Daily budget in smallest currency unit (e.g., cents). Cannot be used with lifetime_budget. Minimum $1 USD or equivalent."
+            },
+            "ad_account_id": {
+              "type": "string",
+              "description": "The ID of the ad account (without 'act_' prefix)"
+            },
+            "billing_event": {
+              "enum": [
+                "APP_INSTALLS",
+                "CLICKS",
+                "IMPRESSIONS",
+                "LINK_CLICKS",
+                "NONE",
+                "OFFER_CLAIMS",
+                "PAGE_LIKES",
+                "POST_ENGAGEMENT",
+                "THRUPLAY",
+                "PURCHASE",
+                "LISTING_INTERACTION"
+              ],
+              "type": "string",
+              "description": "The billing event - when you pay (e.g., IMPRESSIONS, LINK_CLICKS)"
+            },
+            "lifetime_budget": {
+              "type": "integer",
+              "minimum": 100,
+              "description": "Lifetime budget in smallest currency unit. Cannot be used with daily_budget. Requires end_time."
+            },
+            "promoted_object": {
+              "type": "object",
+              "properties": {
+                "page_id": {
+                  "type": "string",
+                  "description": "Facebook Page ID"
+                },
+                "pixel_id": {
+                  "type": "string",
+                  "description": "Pixel ID for conversion tracking"
+                },
+                "application_id": {
+                  "type": "string",
+                  "description": "App ID for app install campaigns"
+                },
+                "product_set_id": {
+                  "type": "string",
+                  "description": "Product set ID for catalog sales"
+                },
+                "object_store_url": {
+                  "type": "string",
+                  "description": "App store URL"
+                },
+                "custom_event_type": {
+                  "enum": [
+                    "RATE",
+                    "TUTORIAL_COMPLETION",
+                    "CONTACT",
+                    "CUSTOMIZE_PRODUCT",
+                    "DONATE",
+                    "FIND_LOCATION",
+                    "SCHEDULE",
+                    "START_TRIAL",
+                    "SUBMIT_APPLICATION",
+                    "SUBSCRIBE",
+                    "ADD_TO_CART",
+                    "ADD_TO_WISHLIST",
+                    "INITIATED_CHECKOUT",
+                    "ADD_PAYMENT_INFO",
+                    "PURCHASE",
+                    "LEAD",
+                    "COMPLETE_REGISTRATION",
+                    "CONTENT_VIEW",
+                    "SEARCH",
+                    "OTHER"
+                  ],
+                  "type": "string",
+                  "description": "Custom event type for conversion tracking"
+                }
+              },
+              "description": "Object being promoted (page, app, pixel, product catalog, etc.)"
+            },
+            "optimization_goal": {
+              "enum": [
+                "NONE",
+                "APP_INSTALLS",
+                "AD_RECALL_LIFT",
+                "ENGAGED_USERS",
+                "EVENT_RESPONSES",
+                "IMPRESSIONS",
+                "LEAD_GENERATION",
+                "QUALITY_LEAD",
+                "LINK_CLICKS",
+                "OFFSITE_CONVERSIONS",
+                "PAGE_LIKES",
+                "POST_ENGAGEMENT",
+                "QUALITY_CALL",
+                "REACH",
+                "LANDING_PAGE_VIEWS",
+                "VISIT_INSTAGRAM_PROFILE",
+                "VALUE",
+                "THRUPLAY",
+                "CONVERSATIONS",
+                "MESSAGING_PURCHASE_CONVERSION"
+              ],
+              "type": "string",
+              "description": "What the ad set optimizes for (e.g., LINK_CLICKS, CONVERSIONS, REACH, APP_INSTALLS)"
+            }
+          }
+        },
+        "mapping": {
+          "body": {
+            "name": "{{ String(args.name) }}",
+            "status": "{{ String(args.status || 'PAUSED') }}",
+            "end_time": "{{ args.end_time ? String(args.end_time) : undefined }}",
+            "targeting": "{{ JSON.stringify(args.targeting) }}",
+            "bid_amount": "{{ args.bid_amount ? Number(args.bid_amount) : undefined }}",
+            "start_time": "{{ args.start_time ? String(args.start_time) : undefined }}",
+            "campaign_id": "{{ String(args.campaign_id) }}",
+            "bid_strategy": "{{ args.bid_strategy ? String(args.bid_strategy) : undefined }}",
+            "daily_budget": "{{ args.daily_budget ? Number(args.daily_budget) : undefined }}",
+            "billing_event": "{{ String(args.billing_event) }}",
+            "lifetime_budget": "{{ args.lifetime_budget ? Number(args.lifetime_budget) : undefined }}",
+            "promoted_object": "{{ args.promoted_object ? JSON.stringify(args.promoted_object) : undefined }}",
+            "optimization_goal": "{{ String(args.optimization_goal) }}"
+          },
+          "path": {
+            "ad_account_id": "{{ String(args.ad_account_id) }}"
+          }
+        },
+        "response": {
+          "select": "{{ body }}"
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "update-adset",
+        "description": "Updates an existing ad set's settings including name, status, budget, schedule, targeting, bidding, and optimization. Returns success status. Note: When updating budget to a lower value, new value must be at least 10% greater than amount already spent.",
+        "method": "POST",
+        "path": "/{adset_id}",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "adset_id"
+          ],
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "New name for the ad set"
+            },
+            "status": {
+              "enum": [
+                "ACTIVE",
+                "PAUSED",
+                "DELETED",
+                "ARCHIVED"
+              ],
+              "type": "string",
+              "description": "New status for the ad set"
+            },
+            "adset_id": {
+              "type": "string",
+              "description": "The ID of the ad set to update"
+            },
+            "end_time": {
+              "type": "string",
+              "format": "date-time",
+              "description": "New end time in ISO 8601 format or Unix timestamp"
+            },
+            "targeting": {
+              "type": "object",
+              "properties": {
+                "age_max": {
+                  "type": "integer",
+                  "maximum": 65,
+                  "minimum": 13
+                },
+                "age_min": {
+                  "type": "integer",
+                  "maximum": 65,
+                  "minimum": 13
+                },
+                "genders": {
+                  "type": "array",
+                  "items": {
+                    "enum": [
+                      1,
+                      2
+                    ],
+                    "type": "integer"
+                  }
+                },
+                "geo_locations": {
+                  "type": "object",
+                  "properties": {
+                    "cities": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "regions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    "countries": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              },
+              "description": "New targeting specification"
+            },
+            "bid_amount": {
+              "type": "integer",
+              "description": "New bid amount in smallest currency unit"
+            },
+            "start_time": {
+              "type": "string",
+              "format": "date-time",
+              "description": "New start time in ISO 8601 format or Unix timestamp"
+            },
+            "bid_strategy": {
+              "enum": [
+                "LOWEST_COST_WITHOUT_CAP",
+                "LOWEST_COST_WITH_BID_CAP",
+                "COST_CAP"
+              ],
+              "type": "string",
+              "description": "New bid strategy for the ad set"
+            },
+            "daily_budget": {
+              "type": "integer",
+              "minimum": 100,
+              "description": "New daily budget in smallest currency unit. Cannot be used with lifetime_budget."
+            },
+            "billing_event": {
+              "enum": [
+                "APP_INSTALLS",
+                "CLICKS",
+                "IMPRESSIONS",
+                "LINK_CLICKS",
+                "NONE",
+                "OFFER_CLAIMS",
+                "PAGE_LIKES",
+                "POST_ENGAGEMENT",
+                "THRUPLAY",
+                "PURCHASE",
+                "LISTING_INTERACTION"
+              ],
+              "type": "string",
+              "description": "New billing event"
+            },
+            "lifetime_budget": {
+              "type": "integer",
+              "minimum": 100,
+              "description": "New lifetime budget in smallest currency unit. Cannot be used with daily_budget."
+            },
+            "optimization_goal": {
+              "enum": [
+                "NONE",
+                "APP_INSTALLS",
+                "AD_RECALL_LIFT",
+                "ENGAGED_USERS",
+                "EVENT_RESPONSES",
+                "IMPRESSIONS",
+                "LEAD_GENERATION",
+                "QUALITY_LEAD",
+                "LINK_CLICKS",
+                "OFFSITE_CONVERSIONS",
+                "PAGE_LIKES",
+                "POST_ENGAGEMENT",
+                "QUALITY_CALL",
+                "REACH",
+                "LANDING_PAGE_VIEWS",
+                "VISIT_INSTAGRAM_PROFILE",
+                "VALUE",
+                "THRUPLAY",
+                "CONVERSATIONS"
+              ],
+              "type": "string",
+              "description": "New optimization goal"
+            }
+          }
+        },
+        "mapping": {
+          "body": {
+            "name": "{{ args.name ? String(args.name) : undefined }}",
+            "status": "{{ args.status ? String(args.status) : undefined }}",
+            "end_time": "{{ args.end_time ? String(args.end_time) : undefined }}",
+            "targeting": "{{ args.targeting ? JSON.stringify(args.targeting) : undefined }}",
+            "bid_amount": "{{ args.bid_amount ? Number(args.bid_amount) : undefined }}",
+            "start_time": "{{ args.start_time ? String(args.start_time) : undefined }}",
+            "bid_strategy": "{{ args.bid_strategy ? String(args.bid_strategy) : undefined }}",
+            "daily_budget": "{{ args.daily_budget ? Number(args.daily_budget) : undefined }}",
+            "billing_event": "{{ args.billing_event ? String(args.billing_event) : undefined }}",
+            "lifetime_budget": "{{ args.lifetime_budget ? Number(args.lifetime_budget) : undefined }}",
+            "optimization_goal": "{{ args.optimization_goal ? String(args.optimization_goal) : undefined }}"
+          },
+          "path": {
+            "adset_id": "{{ String(args.adset_id) }}"
+          }
+        },
+        "response": {
+          "select": "{{ body }}"
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "create-ad",
+        "description": "Creates a new ad within an ad set. The ad references a previously created ad creative. Returns the ad ID upon successful creation. Ad is created in PAUSED status by default for safety. You must provide the ad set ID and creative ID.",
+        "method": "POST",
+        "path": "/act_{ad_account_id}/ads",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "ad_account_id",
+            "name",
+            "adset_id",
+            "creative"
+          ],
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "Name for the ad"
+            },
+            "status": {
+              "enum": [
+                "ACTIVE",
+                "PAUSED"
+              ],
+              "type": "string",
+              "default": "PAUSED",
+              "description": "Initial status of the ad. Recommended to start with PAUSED."
+            },
+            "adset_id": {
+              "type": "string",
+              "description": "The ID of the ad set this ad belongs to"
+            },
+            "creative": {
+              "type": "object",
+              "required": [
+                "creative_id"
+              ],
+              "properties": {
+                "creative_id": {
+                  "type": "string",
+                  "description": "The ID of the ad creative to use"
+                }
+              },
+              "description": "Creative specification. Must include creative_id of a previously created ad creative."
+            },
+            "ad_account_id": {
+              "type": "string",
+              "description": "The ID of the ad account (without 'act_' prefix)"
+            },
+            "tracking_specs": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "fb_pixel": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "Pixel IDs for tracking"
+                  },
+                  "action.type": {
+                    "type": "string",
+                    "description": "Action type to track (e.g., 'offsite_conversion.fb_pixel_purchase')"
+                  }
+                }
+              },
+              "description": "Conversion tracking specifications for the ad"
+            }
+          }
+        },
+        "mapping": {
+          "body": {
+            "name": "{{ String(args.name) }}",
+            "status": "{{ String(args.status || 'PAUSED') }}",
+            "adset_id": "{{ String(args.adset_id) }}",
+            "creative": "{{ JSON.stringify(args.creative) }}",
+            "tracking_specs": "{{ args.tracking_specs ? JSON.stringify(args.tracking_specs) : undefined }}"
+          },
+          "path": {
+            "ad_account_id": "{{ String(args.ad_account_id) }}"
+          }
+        },
+        "response": {
+          "select": "{{ body }}"
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "update-ad",
+        "description": "Updates an existing ad's settings including name, status, creative, and tracking specifications. Returns success status. Note: Changing creative requires the ad to go through review again.",
+        "method": "POST",
+        "path": "/{ad_id}",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "ad_id"
+          ],
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "New name for the ad"
+            },
+            "ad_id": {
+              "type": "string",
+              "description": "The ID of the ad to update"
+            },
+            "status": {
+              "enum": [
+                "ACTIVE",
+                "PAUSED",
+                "DELETED",
+                "ARCHIVED"
+              ],
+              "type": "string",
+              "description": "New status for the ad"
+            },
+            "creative": {
+              "type": "object",
+              "properties": {
+                "creative_id": {
+                  "type": "string",
+                  "description": "New creative ID to use"
+                }
+              },
+              "description": "New creative specification. Provide creative_id to change the ad creative."
+            },
+            "tracking_specs": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "fb_pixel": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "Pixel IDs for tracking"
+                  },
+                  "action.type": {
+                    "type": "string",
+                    "description": "Action type to track"
+                  }
+                }
+              },
+              "description": "New conversion tracking specifications"
+            }
+          }
+        },
+        "mapping": {
+          "body": {
+            "name": "{{ args.name ? String(args.name) : undefined }}",
+            "status": "{{ args.status ? String(args.status) : undefined }}",
+            "creative": "{{ args.creative ? JSON.stringify(args.creative) : undefined }}",
+            "tracking_specs": "{{ args.tracking_specs ? JSON.stringify(args.tracking_specs) : undefined }}"
+          },
+          "path": {
+            "ad_id": "{{ String(args.ad_id) }}"
+          }
+        },
+        "response": {
+          "select": "{{ body }}"
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "get-current-user",
+        "description": "Retrieves information about the currently authenticated user. Returns user ID, name, and business_id if the user is a system user. This is typically the first call to make after authentication to discover the user's identity.",
+        "method": "GET",
+        "path": "/me",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "fields": {
+              "type": "string",
+              "default": "id,name",
+              "description": "Comma-separated list of fields to retrieve (e.g., 'id,name,email')"
+            }
+          }
+        },
+        "mapping": {
+          "query": {
+            "fields": "{{ String(args.fields || 'id,name') }}"
+          }
+        },
+        "response": {
+          "select": "{{ body }}"
+        },
+        "timeoutMs": 10000
+      },
+      {
+        "name": "list-my-businesses",
+        "description": "Retrieves a list of all Business Managers that the authenticated user can access. This endpoint does NOT require a business_id parameter - it auto-discovers all businesses the user has access to. Returns business details including ID, name, timezone, and primary page. Use this to let users select which business to work with.",
+        "method": "GET",
+        "path": "/me/businesses",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "fields": {
+              "type": "string",
+              "default": "id,name,timezone_id,primary_page,created_time",
+              "description": "Comma-separated list of fields to retrieve (e.g., 'id,name,timezone_id,primary_page,created_time,created_by,updated_time,updated_by')"
+            }
+          }
+        },
+        "mapping": {
+          "query": {
+            "fields": "{{ String(args.fields || 'id,name,timezone_id,primary_page,created_time') }}"
+          }
+        },
+        "response": {
+          "select": "{{ body }}"
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "list-my-ad-accounts",
+        "description": "Retrieves a list of all ad accounts that the authenticated user has been granted permissions to access, across ALL businesses. This endpoint does NOT require a business_id parameter - it auto-discovers all accessible ad accounts. Returns ad account details including ID, name, account status, currency, timezone, and the business_id each account belongs to. Use this to let users select which ad account to work with.",
+        "method": "GET",
+        "path": "/me/assigned_ad_accounts",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "fields": {
+              "type": "string",
+              "default": "id,name,account_status,currency,timezone_name,business_id",
+              "description": "Comma-separated list of fields to retrieve (e.g., 'id,name,account_status,currency,timezone_name,business_id,permitted_tasks,access_type')"
+            }
+          }
+        },
+        "mapping": {
+          "query": {
+            "fields": "{{ String(args.fields || 'id,name,account_status,currency,timezone_name,business_id') }}"
+          }
+        },
+        "response": {
+          "select": "{{ body }}"
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "list-user-ad-accounts",
+        "description": "Retrieves all ad accounts accessible to the authenticated OAuth user using the standard /me/adaccounts endpoint. This endpoint auto-discovers all ad accounts the user has access to without requiring a business_id parameter. Returns ad account details including ID, name, account status, currency, timezone, and associated business. This is the primary discovery endpoint for users to find their accessible ad accounts.",
+        "method": "GET",
+        "path": "/me/adaccounts",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "fields": {
+              "type": "string",
+              "default": "id,name,account_status,currency,timezone_name,business,owner,amount_spent,spend_cap",
+              "description": "Comma-separated list of fields to retrieve. Common fields: id, name, account_status, currency, timezone_name, business (returns business id and name), owner, amount_spent, spend_cap, created_time, funding_source_details. See Meta Marketing API Ad Account reference for full list."
+            }
+          }
+        },
+        "mapping": {
+          "query": {
+            "fields": "{{ String(args.fields || 'id,name,account_status,currency,timezone_name,business,owner,amount_spent,spend_cap') }}"
+          }
+        },
+        "response": {
+          "select": "{{ body }}"
+        },
+        "timeoutMs": 15000
+      }
+    ]
+  }
+}

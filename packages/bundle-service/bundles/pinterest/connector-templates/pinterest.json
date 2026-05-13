@@ -1,0 +1,619 @@
+{
+  "schemaVersion": "1",
+  "kind": "connector_template",
+  "exportedAt": "2026-05-13T06:46:43.660Z",
+  "metadata": {
+    "fromProvider": "pinterest",
+    "fromSlug": "pinterest",
+    "fromId": "q-9Yaj_cJPZiUZA-2HRyM"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "connectorTemplate": {
+      "id": "q-9Yaj_cJPZiUZA-2HRyM",
+      "slug": "pinterest",
+      "provider": "pinterest",
+      "name": "Pinterest",
+      "description": "Pinterest API connector for social media management. Create and publish pins, manage boards, track engagement metrics, a",
+      "isEnabled": true,
+      "version": "1.0.0",
+      "category": "social",
+      "baseUrl": "https://api.pinterest.com/v5",
+      "auth": {
+        "type": "oauth2",
+        "scopes": [
+          "boards:read",
+          "boards:write",
+          "pins:read",
+          "pins:write",
+          "user_accounts:read",
+          "boards:read_secret",
+          "pins:read_secret"
+        ],
+        "tokenUrl": "https://api.pinterest.com/v5/oauth/token",
+        "injection": {
+          "style": "header",
+          "headerName": "Authorization",
+          "tokenPrefix": "Bearer"
+        },
+        "clientIdRef": {
+          "key": "PINTEREST_CLIENT_ID",
+          "type": "platform_secret"
+        },
+        "tokenResponse": {
+          "expiresInField": "expires_in",
+          "tokenTypeField": "token_type",
+          "accessTokenField": "access_token",
+          "refreshTokenField": "refresh_token"
+        },
+        "accessTokenRef": {
+          "key": "PINTEREST_ACCESS_TOKEN",
+          "type": "connector_secret"
+        },
+        "scopeDelimiter": ",",
+        "clientSecretRef": {
+          "key": "PINTEREST_CLIENT_SECRET",
+          "type": "platform_secret"
+        },
+        "refreshTokenRef": {
+          "key": "PINTEREST_REFRESH_TOKEN",
+          "type": "connector_secret"
+        },
+        "authorizationUrl": "https://www.pinterest.com/oauth/"
+      },
+      "rateLimit": {
+        "tier": "standard",
+        "burstLimit": 100,
+        "requestsPerMinute": 6000
+      },
+      "metadataSchema": {
+        "type": "object",
+        "required": [],
+        "properties": {
+          "app_name": {
+            "type": "string",
+            "description": "Optional name for the Pinterest app being used (for tracking purposes)"
+          },
+          "environment": {
+            "enum": [
+              "production",
+              "development",
+              "testing"
+            ],
+            "type": "string",
+            "description": "Environment context for this connector instance"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "actions": [
+      {
+        "name": "create-pin",
+        "description": "Create a new Pin on Pinterest. Supports image and video pins with title, description, link, and board placement.",
+        "method": "POST",
+        "path": "/pins",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "boardId",
+            "mediaSource"
+          ],
+          "properties": {
+            "link": {
+              "type": "string",
+              "description": "URL the Pin will link to when clicked"
+            },
+            "title": {
+              "type": "string",
+              "description": "Pin title (max 100 characters)"
+            },
+            "altText": {
+              "type": "string",
+              "description": "Alt text for the Pin image for accessibility"
+            },
+            "boardId": {
+              "type": "string",
+              "description": "The ID of the board to save the Pin to"
+            },
+            "description": {
+              "type": "string",
+              "description": "Pin description (max 800 characters)"
+            },
+            "mediaSource": {
+              "type": "object",
+              "description": "Media source object with source_type (image_url, image_base64, video_id) and corresponding fields"
+            },
+            "boardSectionId": {
+              "type": "string",
+              "description": "Optional board section ID to save the Pin to a specific section"
+            }
+          },
+          "additionalProperties": false
+        },
+        "mapping": {
+          "body": {
+            "link": "{{ String(args.link) }}",
+            "title": "{{ String(args.title) }}",
+            "alt_text": "{{ String(args.altText) }}",
+            "board_id": "{{ String(args.boardId) }}",
+            "description": "{{ String(args.description) }}",
+            "media_source": "{{ args.mediaSource }}",
+            "board_section_id": "{{ String(args.boardSectionId) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "register-media-upload",
+        "description": "Register intent to upload media (image or video) to Pinterest. Returns media_id and upload_url for uploading content.",
+        "method": "POST",
+        "path": "/media",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "mediaType"
+          ],
+          "properties": {
+            "mediaType": {
+              "enum": [
+                "image",
+                "video"
+              ],
+              "type": "string",
+              "description": "Type of media to upload (image or video)"
+            }
+          },
+          "additionalProperties": false
+        },
+        "mapping": {
+          "body": {
+            "media_type": "{{ String(args.mediaType) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "delete-pin",
+        "description": "Delete a Pin by ID. The Pin must be owned by the authenticated user.",
+        "method": "DELETE",
+        "path": "/pins/{pin_id}",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "pinId"
+          ],
+          "properties": {
+            "pinId": {
+              "type": "string",
+              "description": "The unique ID of the Pin to delete"
+            }
+          },
+          "additionalProperties": false
+        },
+        "mapping": {
+          "path": {
+            "pin_id": "{{ String(args.pinId) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "get-pin",
+        "description": "Get details of a specific Pin by ID. Returns Pin metadata including title, description, media, and engagement metrics.",
+        "method": "GET",
+        "path": "/pins/{pin_id}",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "pinId"
+          ],
+          "properties": {
+            "pinId": {
+              "type": "string",
+              "description": "The unique ID of the Pin to retrieve"
+            }
+          },
+          "additionalProperties": false
+        },
+        "mapping": {
+          "path": {
+            "pin_id": "{{ String(args.pinId) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "update-pin",
+        "description": "Update a Pin's title, description, link, or board placement. The Pin must be owned by the authenticated user.",
+        "method": "PATCH",
+        "path": "/pins/{pin_id}",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "pinId"
+          ],
+          "properties": {
+            "link": {
+              "type": "string",
+              "description": "Updated link URL"
+            },
+            "pinId": {
+              "type": "string",
+              "description": "The unique ID of the Pin to update"
+            },
+            "title": {
+              "type": "string",
+              "description": "Updated Pin title"
+            },
+            "altText": {
+              "type": "string",
+              "description": "Updated alt text for accessibility"
+            },
+            "boardId": {
+              "type": "string",
+              "description": "Move Pin to a different board"
+            },
+            "description": {
+              "type": "string",
+              "description": "Updated Pin description"
+            },
+            "boardSectionId": {
+              "type": "string",
+              "description": "Move Pin to a different board section"
+            }
+          },
+          "additionalProperties": false
+        },
+        "mapping": {
+          "body": {
+            "link": "{{ String(args.link) }}",
+            "title": "{{ String(args.title) }}",
+            "alt_text": "{{ String(args.altText) }}",
+            "board_id": "{{ String(args.boardId) }}",
+            "description": "{{ String(args.description) }}",
+            "board_section_id": "{{ String(args.boardSectionId) }}"
+          },
+          "path": {
+            "pin_id": "{{ String(args.pinId) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "list-pins",
+        "description": "List Pins owned by the authenticated user. Supports pagination with bookmark parameter.",
+        "method": "GET",
+        "path": "/pins",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "bookmark": {
+              "type": "string",
+              "description": "Pagination cursor from previous response"
+            },
+            "pageSize": {
+              "type": "number",
+              "default": 25,
+              "description": "Number of Pins to return per page (max 250)"
+            }
+          },
+          "additionalProperties": false
+        },
+        "mapping": {
+          "query": {
+            "bookmark": "{{ String(args.bookmark) }}",
+            "page_size": "{{ String(args.pageSize || '25') }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "create-board",
+        "description": "Create a new board. Boards are collections where Pins are saved.",
+        "method": "POST",
+        "path": "/boards",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "name"
+          ],
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "Board name (max 100 characters)"
+            },
+            "privacy": {
+              "enum": [
+                "PUBLIC",
+                "PROTECTED",
+                "SECRET"
+              ],
+              "type": "string",
+              "default": "PUBLIC",
+              "description": "Board privacy level"
+            },
+            "description": {
+              "type": "string",
+              "description": "Board description (max 500 characters)"
+            }
+          },
+          "additionalProperties": false
+        },
+        "mapping": {
+          "body": {
+            "name": "{{ String(args.name) }}",
+            "privacy": "{{ String(args.privacy || 'PUBLIC') }}",
+            "description": "{{ String(args.description) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "list-boards",
+        "description": "List boards owned by the authenticated user. Supports pagination.",
+        "method": "GET",
+        "path": "/boards",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "bookmark": {
+              "type": "string",
+              "description": "Pagination cursor from previous response"
+            },
+            "pageSize": {
+              "type": "number",
+              "default": 25,
+              "description": "Number of boards to return per page (max 250)"
+            }
+          },
+          "additionalProperties": false
+        },
+        "mapping": {
+          "query": {
+            "bookmark": "{{ String(args.bookmark) }}",
+            "page_size": "{{ String(args.pageSize || '25') }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "get-board",
+        "description": "Get details of a specific board by ID. Returns board metadata and Pin count.",
+        "method": "GET",
+        "path": "/boards/{board_id}",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "boardId"
+          ],
+          "properties": {
+            "boardId": {
+              "type": "string",
+              "description": "The unique ID of the board to retrieve"
+            }
+          },
+          "additionalProperties": false
+        },
+        "mapping": {
+          "path": {
+            "board_id": "{{ String(args.boardId) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "get-user-account",
+        "description": "Get the authenticated user's account information including username, profile image, follower count, and account type.",
+        "method": "GET",
+        "path": "/user_account",
+        "parameters": {
+          "type": "object",
+          "properties": {},
+          "additionalProperties": false
+        },
+        "mapping": {},
+        "timeoutMs": 15000
+      },
+      {
+        "name": "list-board-pins",
+        "description": "List all Pins on a specific board. Supports pagination and filtering.",
+        "method": "GET",
+        "path": "/boards/{board_id}/pins",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "boardId"
+          ],
+          "properties": {
+            "boardId": {
+              "type": "string",
+              "description": "The unique ID of the board"
+            },
+            "bookmark": {
+              "type": "string",
+              "description": "Pagination cursor from previous response"
+            },
+            "pageSize": {
+              "type": "number",
+              "default": 25,
+              "description": "Number of Pins to return per page (max 250)"
+            }
+          },
+          "additionalProperties": false
+        },
+        "mapping": {
+          "path": {
+            "board_id": "{{ String(args.boardId) }}"
+          },
+          "query": {
+            "bookmark": "{{ String(args.bookmark) }}",
+            "page_size": "{{ String(args.pageSize || '25') }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "update-board",
+        "description": "Update a board's name, description, or privacy settings. The board must be owned by the authenticated user.",
+        "method": "PATCH",
+        "path": "/boards/{board_id}",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "boardId"
+          ],
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "Updated board name"
+            },
+            "boardId": {
+              "type": "string",
+              "description": "The unique ID of the board to update"
+            },
+            "privacy": {
+              "enum": [
+                "PUBLIC",
+                "PROTECTED",
+                "SECRET"
+              ],
+              "type": "string",
+              "description": "Updated privacy level"
+            },
+            "description": {
+              "type": "string",
+              "description": "Updated board description"
+            }
+          },
+          "additionalProperties": false
+        },
+        "mapping": {
+          "body": {
+            "name": "{{ String(args.name) }}",
+            "privacy": "{{ String(args.privacy) }}",
+            "description": "{{ String(args.description) }}"
+          },
+          "path": {
+            "board_id": "{{ String(args.boardId) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "delete-board",
+        "description": "Delete a board by ID. The board must be owned by the authenticated user and must be empty (no Pins).",
+        "method": "DELETE",
+        "path": "/boards/{board_id}",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "boardId"
+          ],
+          "properties": {
+            "boardId": {
+              "type": "string",
+              "description": "The unique ID of the board to delete"
+            }
+          },
+          "additionalProperties": false
+        },
+        "mapping": {
+          "path": {
+            "board_id": "{{ String(args.boardId) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "get-pin-analytics",
+        "description": "Get analytics metrics for a specific Pin including impressions, saves, clicks, and engagement data.",
+        "method": "GET",
+        "path": "/pins/{pin_id}/analytics",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "pinId",
+            "startDate",
+            "endDate"
+          ],
+          "properties": {
+            "pinId": {
+              "type": "string",
+              "description": "The unique ID of the Pin"
+            },
+            "endDate": {
+              "type": "string",
+              "description": "End date for analytics (YYYY-MM-DD format)"
+            },
+            "startDate": {
+              "type": "string",
+              "description": "Start date for analytics (YYYY-MM-DD format)"
+            },
+            "metricTypes": {
+              "type": "string",
+              "description": "Comma-separated list of metrics (IMPRESSION, SAVE, PIN_CLICK, OUTBOUND_CLICK, etc.)"
+            }
+          },
+          "additionalProperties": false
+        },
+        "mapping": {
+          "path": {
+            "pin_id": "{{ String(args.pinId) }}"
+          },
+          "query": {
+            "end_date": "{{ String(args.endDate) }}",
+            "start_date": "{{ String(args.startDate) }}",
+            "metric_types": "{{ String(args.metricTypes || 'IMPRESSION,SAVE,PIN_CLICK,OUTBOUND_CLICK') }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "get-user-account-analytics",
+        "description": "Get analytics metrics for the authenticated user's account including total impressions, engagements, and audience insights.",
+        "method": "GET",
+        "path": "/user_account/analytics",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "startDate",
+            "endDate"
+          ],
+          "properties": {
+            "endDate": {
+              "type": "string",
+              "description": "End date for analytics (YYYY-MM-DD format)"
+            },
+            "appTypes": {
+              "type": "string",
+              "default": "ALL",
+              "description": "Filter by app type (ALL, MOBILE, WEB, etc.)"
+            },
+            "startDate": {
+              "type": "string",
+              "description": "Start date for analytics (YYYY-MM-DD format)"
+            },
+            "metricTypes": {
+              "type": "string",
+              "description": "Comma-separated list of metrics to retrieve"
+            }
+          },
+          "additionalProperties": false
+        },
+        "mapping": {
+          "query": {
+            "end_date": "{{ String(args.endDate) }}",
+            "app_types": "{{ String(args.appTypes || 'ALL') }}",
+            "start_date": "{{ String(args.startDate) }}",
+            "metric_types": "{{ String(args.metricTypes || 'IMPRESSION,OUTBOUND_CLICK,PIN_CLICK,SAVE') }}"
+          }
+        },
+        "timeoutMs": 15000
+      }
+    ]
+  }
+}

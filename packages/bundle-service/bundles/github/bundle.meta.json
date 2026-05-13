@@ -1,0 +1,9 @@
+{
+  "name": "GitHub",
+  "description": "Connect a GitHub App installation to enable tools that read and write repositories, issues, and pull requests via the Gi",
+  "version": "1.0.0",
+  "tags": [
+    "connector"
+  ],
+  "kind": "connector"
+}

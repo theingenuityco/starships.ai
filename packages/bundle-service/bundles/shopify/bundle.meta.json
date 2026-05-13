@@ -1,0 +1,9 @@
+{
+  "name": "Shopify",
+  "description": "Connect a Shopify store to enable tools that manage products, orders, customers, and inventory via the Shopify Admin API",
+  "version": "1.0.0",
+  "tags": [
+    "connector"
+  ],
+  "kind": "connector"
+}

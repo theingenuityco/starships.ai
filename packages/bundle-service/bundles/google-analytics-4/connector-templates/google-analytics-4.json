@@ -1,0 +1,341 @@
+{
+  "schemaVersion": "1",
+  "kind": "connector_template",
+  "exportedAt": "2026-05-13T06:46:43.660Z",
+  "metadata": {
+    "fromProvider": "google-analytics-4",
+    "fromSlug": "google-analytics-4",
+    "fromId": "BTe8OmDE6EvThToZA5-Qn"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "connectorTemplate": {
+      "id": "BTe8OmDE6EvThToZA5-Qn",
+      "slug": "google-analytics-4",
+      "provider": "google-analytics-4",
+      "name": "Google Analytics 4",
+      "description": "Connect to Google Analytics 4 to retrieve analytics data, events, users, and generate custom reports. Requires OAuth2 au",
+      "isEnabled": true,
+      "version": "1.0.0",
+      "category": "analytics",
+      "baseUrl": "https://analyticsdata.googleapis.com",
+      "auth": {
+        "type": "oauth2",
+        "scopes": [
+          "https://www.googleapis.com/auth/analytics.readonly",
+          "https://www.googleapis.com/auth/analytics"
+        ],
+        "tokenUrl": "https://oauth2.googleapis.com/token",
+        "injection": {
+          "style": "header",
+          "headerName": "Authorization",
+          "tokenPrefix": "Bearer"
+        },
+        "clientIdRef": {
+          "key": "GA4_OAUTH_CLIENT_ID",
+          "type": "platform_secret"
+        },
+        "tokenResponse": {
+          "scopeField": "scope",
+          "expiresInField": "expires_in",
+          "tokenTypeField": "token_type",
+          "accessTokenField": "access_token",
+          "refreshTokenField": "refresh_token"
+        },
+        "accessTokenRef": {
+          "key": "GA4_ACCESS_TOKEN",
+          "type": "connector_secret"
+        },
+        "scopeDelimiter": " ",
+        "clientSecretRef": {
+          "key": "GA4_OAUTH_CLIENT_SECRET",
+          "type": "platform_secret"
+        },
+        "refreshTokenRef": {
+          "key": "GA4_REFRESH_TOKEN",
+          "type": "connector_secret"
+        },
+        "authorizationUrl": "https://accounts.google.com/o/oauth2/v2/auth",
+        "extraAuthorizeParams": {
+          "prompt": "consent",
+          "access_type": "offline"
+        }
+      },
+      "rateLimit": {
+        "burstLimit": 60,
+        "requestsPerMinute": 600
+      },
+      "metadataSchema": {
+        "type": "object",
+        "required": [],
+        "properties": {
+          "propertyId": {
+            "type": "string",
+            "description": "Default Google Analytics 4 property ID for this connector instance (format: properties/123456789)"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "actions": [
+      {
+        "name": "batch-run-reports",
+        "description": "Run multiple reports in a single request for efficient batch analytics queries",
+        "method": "POST",
+        "path": "/v1beta/properties/{propertyId}:batchRunReports",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "propertyId",
+            "requests"
+          ],
+          "properties": {
+            "requests": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "dateRanges",
+                  "metrics"
+                ],
+                "properties": {
+                  "metrics": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "name"
+                      ],
+                      "properties": {
+                        "name": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  },
+                  "dateRanges": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "startDate",
+                        "endDate"
+                      ],
+                      "properties": {
+                        "endDate": {
+                          "type": "string",
+                          "description": "End date in YYYY-MM-DD format"
+                        },
+                        "startDate": {
+                          "type": "string",
+                          "description": "Start date in YYYY-MM-DD format"
+                        }
+                      }
+                    }
+                  },
+                  "dimensions": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "description": "Array of report requests to execute in batch"
+            },
+            "propertyId": {
+              "type": "string",
+              "description": "Google Analytics 4 property ID (format: properties/123456789)"
+            }
+          }
+        },
+        "mapping": {
+          "body": {
+            "requests": "{{ args.requests }}"
+          },
+          "path": {
+            "propertyId": "{{ String(args.propertyId || metadata.propertyId) }}"
+          }
+        },
+        "response": {
+          "select": "{{ body }}"
+        },
+        "timeoutMs": 45000
+      },
+      {
+        "name": "get-metadata",
+        "description": "Retrieve metadata about available dimensions and metrics for the Google Analytics 4 property",
+        "method": "GET",
+        "path": "/v1beta/properties/{propertyId}/metadata",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "propertyId"
+          ],
+          "properties": {
+            "propertyId": {
+              "type": "string",
+              "description": "Google Analytics 4 property ID (format: properties/123456789)"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "propertyId": "{{ String(args.propertyId || metadata.propertyId) }}"
+          }
+        },
+        "response": {
+          "select": "{{ body }}"
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "run-report",
+        "description": "Run a custom report with dimensions, metrics, and date ranges from Google Analytics 4 data",
+        "method": "POST",
+        "path": "/v1beta/properties/{propertyId}:runReport",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "propertyId",
+            "dateRanges",
+            "metrics"
+          ],
+          "properties": {
+            "metrics": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "name"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "Metric name"
+                  }
+                }
+              },
+              "description": "Metrics to include (e.g., activeUsers, sessions, screenPageViews)"
+            },
+            "dateRanges": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "startDate",
+                  "endDate"
+                ],
+                "properties": {
+                  "endDate": {
+                    "type": "string",
+                    "description": "End date in YYYY-MM-DD format"
+                  },
+                  "startDate": {
+                    "type": "string",
+                    "description": "Start date in YYYY-MM-DD format"
+                  }
+                }
+              },
+              "description": "Date ranges for the report"
+            },
+            "dimensions": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "Dimension name"
+                  }
+                }
+              },
+              "description": "Optional dimensions to include (e.g., country, city, deviceCategory)"
+            },
+            "propertyId": {
+              "type": "string",
+              "description": "Google Analytics 4 property ID (format: properties/123456789)"
+            }
+          }
+        },
+        "mapping": {
+          "body": {
+            "metrics": "{{ args.metrics }}",
+            "dateRanges": "{{ args.dateRanges }}",
+            "dimensions": "{{ args.dimensions || [] }}"
+          },
+          "path": {
+            "propertyId": "{{ String(args.propertyId || metadata.propertyId) }}"
+          }
+        },
+        "response": {
+          "select": "{{ body }}"
+        },
+        "timeoutMs": 30000
+      },
+      {
+        "name": "check-compatibility",
+        "description": "Check if dimensions and metrics are compatible for use together in reports",
+        "method": "POST",
+        "path": "/v1beta/properties/{propertyId}:checkCompatibility",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "propertyId"
+          ],
+          "properties": {
+            "metrics": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  }
+                }
+              },
+              "description": "Metrics to check for compatibility"
+            },
+            "dimensions": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  }
+                }
+              },
+              "description": "Dimensions to check for compatibility"
+            },
+            "propertyId": {
+              "type": "string",
+              "description": "Google Analytics 4 property ID (format: properties/123456789)"
+            }
+          }
+        },
+        "mapping": {
+          "body": {
+            "metrics": "{{ args.metrics || [] }}",
+            "dimensions": "{{ args.dimensions || [] }}"
+          },
+          "path": {
+            "propertyId": "{{ String(args.propertyId || metadata.propertyId) }}"
+          }
+        },
+        "response": {
+          "select": "{{ body }}"
+        },
+        "timeoutMs": 15000
+      }
+    ]
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "name": "ActiveCampaign",
+  "description": "Marketing automation & CRM platform for contacts, campaigns, deals, and automations",
+  "version": "1.0.0",
+  "tags": [
+    "Marketing Automation"
+  ],
+  "kind": "connector"
+}

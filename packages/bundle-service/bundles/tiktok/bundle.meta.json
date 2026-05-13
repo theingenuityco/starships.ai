@@ -1,0 +1,9 @@
+{
+  "name": "TikTok",
+  "description": "TikTok API connector for social media management. Create and publish videos, manage user profiles, track engagement metr",
+  "version": "1.0.0",
+  "tags": [
+    "social"
+  ],
+  "kind": "connector"
+}

@@ -1,0 +1,262 @@
+{
+  "schemaVersion": "1",
+  "kind": "connector_template",
+  "exportedAt": "2026-05-13T06:46:43.660Z",
+  "metadata": {
+    "fromProvider": "activecampaign",
+    "fromSlug": "activecampaign",
+    "fromId": "JtKdtERLbP_Rz2PIUfOy-"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "connectorTemplate": {
+      "id": "JtKdtERLbP_Rz2PIUfOy-",
+      "slug": "activecampaign",
+      "provider": "activecampaign",
+      "name": "ActiveCampaign",
+      "description": "Marketing automation & CRM platform for contacts, campaigns, deals, and automations",
+      "isEnabled": true,
+      "version": "1.0.0",
+      "category": "Marketing Automation",
+      "baseUrl": "https://api.activecampaign.com/3",
+      "auth": {
+        "type": "api_key",
+        "apiKeyRef": {
+          "key": "ACTIVECAMPAIGN_API_KEY",
+          "type": "connector_secret"
+        },
+        "injection": {
+          "style": "header",
+          "headerName": "Authorization",
+          "tokenPrefix": "Bearer"
+        }
+      },
+      "rateLimit": {
+        "burstLimit": 10,
+        "requestsPerMinute": 600
+      }
+    },
+    "actions": [
+      {
+        "name": "create_contact",
+        "description": "Create a new contact",
+        "method": "POST",
+        "path": "/contacts",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "email"
+          ],
+          "properties": {
+            "email": {
+              "type": "string",
+              "description": "Contact email"
+            },
+            "phone": {
+              "type": "string",
+              "description": "Phone number"
+            },
+            "lastName": {
+              "type": "string",
+              "description": "Last name"
+            },
+            "firstName": {
+              "type": "string",
+              "description": "First name"
+            }
+          }
+        },
+        "mapping": {
+          "body": {
+            "contact": {
+              "email": "{{ String(args.email) }}",
+              "phone": "{{ String(args.phone || '') }}",
+              "lastName": "{{ String(args.lastName || '') }}",
+              "firstName": "{{ String(args.firstName || '') }}"
+            }
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "list_deals",
+        "description": "List all deals",
+        "method": "GET",
+        "path": "/deals",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "limit": {
+              "type": "number",
+              "description": "Number of deals to return"
+            },
+            "offset": {
+              "type": "number",
+              "description": "Offset for pagination"
+            }
+          }
+        },
+        "mapping": {
+          "query": {
+            "limit": "{{ String(args.limit || 20) }}",
+            "offset": "{{ String(args.offset || 0) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "get_automation",
+        "description": "Get automation details by ID",
+        "method": "GET",
+        "path": "/automations/{automation_id}",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "automation_id"
+          ],
+          "properties": {
+            "automation_id": {
+              "type": "string",
+              "description": "Automation ID"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "automation_id": "{{ String(args.automation_id) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "list_automations",
+        "description": "List all automations",
+        "method": "GET",
+        "path": "/automations",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "limit": {
+              "type": "number",
+              "description": "Number of automations to return"
+            },
+            "offset": {
+              "type": "number",
+              "description": "Offset for pagination"
+            }
+          }
+        },
+        "mapping": {
+          "query": {
+            "limit": "{{ String(args.limit || 20) }}",
+            "offset": "{{ String(args.offset || 0) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "get_campaign",
+        "description": "Get campaign details by ID",
+        "method": "GET",
+        "path": "/campaigns/{campaign_id}",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "campaign_id"
+          ],
+          "properties": {
+            "campaign_id": {
+              "type": "string",
+              "description": "Campaign ID"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "campaign_id": "{{ String(args.campaign_id) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "list_campaigns",
+        "description": "List all campaigns",
+        "method": "GET",
+        "path": "/campaigns",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "limit": {
+              "type": "number",
+              "description": "Number of campaigns to return"
+            },
+            "offset": {
+              "type": "number",
+              "description": "Offset for pagination"
+            }
+          }
+        },
+        "mapping": {
+          "query": {
+            "limit": "{{ String(args.limit || 20) }}",
+            "offset": "{{ String(args.offset || 0) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "get_contact",
+        "description": "Get contact details by ID",
+        "method": "GET",
+        "path": "/contacts/{contact_id}",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "contact_id"
+          ],
+          "properties": {
+            "contact_id": {
+              "type": "string",
+              "description": "Contact ID"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "contact_id": "{{ String(args.contact_id) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "list_contacts",
+        "description": "List all contacts",
+        "method": "GET",
+        "path": "/contacts",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "limit": {
+              "type": "number",
+              "description": "Number of contacts to return"
+            },
+            "offset": {
+              "type": "number",
+              "description": "Offset for pagination"
+            }
+          }
+        },
+        "mapping": {
+          "query": {
+            "limit": "{{ String(args.limit || 20) }}",
+            "offset": "{{ String(args.offset || 0) }}"
+          }
+        },
+        "timeoutMs": 15000
+      }
+    ]
+  }
+}

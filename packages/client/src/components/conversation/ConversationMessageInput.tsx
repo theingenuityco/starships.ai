@@ -1302,7 +1302,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
 
       const vw = typeof window !== 'undefined' ? window.innerWidth : 1024
       const vh = typeof window !== 'undefined' ? window.innerHeight : 768
-      const menuWidth = Math.min(420, vw - 40)
+      const menuWidth = Math.min(260, vw - 40)
       const maxH = 256
       const rect = anchorRect
       const top = rect
@@ -1321,7 +1321,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       return (
         <div
           style={style}
-          className="w-[min(420px,calc(100vw-40px))] max-h-64 overflow-auto rounded-lg border border-border/40 bg-popover/95 backdrop-blur-md shadow-frosted-lg p-1"
+          className="w-[min(260px,calc(100vw-40px))] max-h-64 overflow-auto rounded-lg border border-border/40 bg-popover/95 backdrop-blur-md shadow-frosted-lg p-1"
           role="listbox"
           aria-label="Mention suggestions"
         >
@@ -1339,8 +1339,15 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             const inRoom = (item as any)?.inRoom !== false
             return (
               <div key={key}>
-                {showInRoomHeader ? <div className="px-2 py-1 text-[11px] font-medium text-muted-foreground">In this room</div> : null}
-                {showNotInRoomHeader ? <div className="px-2 pt-2 pb-1 text-[11px] font-medium text-muted-foreground">Not in this room</div> : null}
+                {showInRoomHeader ? (
+                  <div className="px-2 pb-1 pt-0.5 text-xs font-medium text-muted-foreground/70 uppercase tracking-wide">In this room</div>
+                ) : null}
+                {showNotInRoomHeader ? (
+                  <div className="mx-1 my-1 h-px bg-border/40" role="separator" />
+                ) : null}
+                {showNotInRoomHeader ? (
+                  <div className="px-2 pb-1 pt-0.5 text-xs font-medium text-muted-foreground/70 uppercase tracking-wide">Not in this room</div>
+                ) : null}
                 <button
                   id={`mention-option-${key}`}
                   ref={idx === active ? activeItemRef : null}
@@ -1349,9 +1356,10 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                   role="option"
                   aria-selected={idx === active}
                   className={cn(
-                    // Match navbar item styling: muted by default, foreground on hover/active.
-                    'group relative rounded-lg flex items-center border w-full h-8 cursor-pointer text-sm px-2 gap-2 transition-colors focus-visible-ring',
-                    idx === active ? 'text-foreground bg-muted border-transparent' : 'text-muted-foreground border-transparent hover:text-foreground hover:bg-muted'
+                    'group relative rounded-lg flex items-center w-full cursor-pointer text-sm px-2 py-1.5 gap-2 text-left transition-colors select-none outline-none',
+                    idx === active
+                      ? 'text-foreground bg-muted/70 dark:bg-[#2C2C30]'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-muted/70 dark:hover:bg-[#2C2C30]'
                   )}
                   onMouseEnter={() => onHover(idx)}
                   onMouseDown={e => {
@@ -1360,8 +1368,8 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                     command(item)
                   }}
                 >
-                  <div className="relative">
-                    <Avatar className={cn('h-5 w-5 rounded-full ring-1 ring-border/40')}>
+                  <div className="relative shrink-0">
+                    <Avatar className="h-5 w-5 rounded-full ring-1 ring-border/40">
                       {kind === 'user' ? (
                         <>
                           {user?.avatar ? <AvatarImage src={user.avatar} alt={label || 'User'} referrerPolicy="no-referrer" className="object-cover rounded-full" /> : null}
@@ -1374,7 +1382,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                     <PresenceIndicator kind={kind === 'user' ? (online ? 'online' : 'offline') : 'online'} active={true} size="xs" />
                   </div>
                   <span className="min-w-0 truncate font-medium flex-1">{label}</span>
-                  {!inRoom ? <span className="ml-2 text-[11px] font-medium text-muted-foreground">Needs approval</span> : null}
+                  {!inRoom ? <span className="shrink-0 text-[11px] text-muted-foreground">Needs approval</span> : null}
                 </button>
               </div>
             )

@@ -1,0 +1,447 @@
+{
+  "schemaVersion": "1",
+  "kind": "connector_template",
+  "exportedAt": "2026-05-13T06:46:43.660Z",
+  "metadata": {
+    "fromProvider": "helpscout",
+    "fromSlug": "helpscout",
+    "fromId": "IMDgK3Pi8ujm86XQz9QO2"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "connectorTemplate": {
+      "id": "IMDgK3Pi8ujm86XQz9QO2",
+      "slug": "helpscout",
+      "provider": "helpscout",
+      "name": "Help Scout",
+      "description": "Help Scout is a customer service platform providing email-based help desk (Inbox), live chat and proactive messages (Bea",
+      "isEnabled": true,
+      "version": "1.0.0",
+      "category": "customer-support",
+      "baseUrl": "https://api.helpscout.net/v2",
+      "auth": {
+        "type": "oauth2",
+        "scopes": [
+          "owner",
+          "users:read",
+          "users:write",
+          "customers:read",
+          "customers:write",
+          "conversations:read",
+          "conversations:write",
+          "mailboxes:read"
+        ],
+        "tokenUrl": "https://api.helpscout.net/v2/oauth2/token",
+        "injection": {
+          "style": "header",
+          "headerName": "Authorization",
+          "tokenPrefix": "Bearer"
+        },
+        "clientIdRef": {
+          "key": "HELPSCOUT_OAUTH_CLIENT_ID",
+          "type": "platform_secret"
+        },
+        "tokenResponse": {
+          "scopeField": "scope",
+          "expiresInField": "expires_in",
+          "tokenTypeField": "token_type",
+          "accessTokenField": "access_token",
+          "refreshTokenField": "refresh_token"
+        },
+        "accessTokenRef": {
+          "key": "HELPSCOUT_ACCESS_TOKEN",
+          "type": "connector_secret"
+        },
+        "scopeDelimiter": " ",
+        "clientSecretRef": {
+          "key": "HELPSCOUT_OAUTH_CLIENT_SECRET",
+          "type": "platform_secret"
+        },
+        "refreshTokenRef": {
+          "key": "HELPSCOUT_REFRESH_TOKEN",
+          "type": "connector_secret"
+        },
+        "authorizationUrl": "https://secure.helpscout.net/authentication/authorizeClientApplication"
+      },
+      "rateLimit": {
+        "burstLimit": 20,
+        "requestsPerMinute": 200
+      },
+      "metadataSchema": {
+        "type": "object",
+        "required": [],
+        "properties": {
+          "mailbox_id": {
+            "type": "string",
+            "description": "Default mailbox ID for operations (optional)"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "actions": [
+      {
+        "name": "get_customer",
+        "description": "Get details for a specific customer",
+        "method": "GET",
+        "path": "/customers/{customerId}",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "customerId"
+          ],
+          "properties": {
+            "customerId": {
+              "type": "string",
+              "description": "The customer ID"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "customerId": "{{ String(args.customerId) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "create_conversation",
+        "description": "Create a new conversation",
+        "method": "POST",
+        "path": "/conversations",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "customerId",
+            "mailboxId",
+            "subject",
+            "text"
+          ],
+          "properties": {
+            "text": {
+              "type": "string",
+              "description": "Initial message text"
+            },
+            "status": {
+              "enum": [
+                "active",
+                "pending",
+                "closed"
+              ],
+              "type": "string",
+              "description": "Initial conversation status"
+            },
+            "subject": {
+              "type": "string",
+              "description": "Conversation subject"
+            },
+            "mailboxId": {
+              "type": "string",
+              "description": "The mailbox ID"
+            },
+            "customerId": {
+              "type": "string",
+              "description": "The customer ID"
+            }
+          }
+        },
+        "mapping": {
+          "body": {
+            "text": "{{ String(args.text) }}",
+            "status": "{{ String(args.status || 'active') }}",
+            "subject": "{{ String(args.subject) }}",
+            "mailboxId": "{{ String(args.mailboxId) }}",
+            "customerId": "{{ String(args.customerId) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "get_conversation",
+        "description": "Get details for a specific conversation",
+        "method": "GET",
+        "path": "/conversations/{conversationId}",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "conversationId"
+          ],
+          "properties": {
+            "conversationId": {
+              "type": "string",
+              "description": "The conversation ID"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "conversationId": "{{ String(args.conversationId) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "list_conversations",
+        "description": "List conversations in a mailbox with optional filtering",
+        "method": "GET",
+        "path": "/mailboxes/{mailboxId}/conversations",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "mailboxId"
+          ],
+          "properties": {
+            "tag": {
+              "type": "string",
+              "description": "Filter by tags (comma-separated)"
+            },
+            "page": {
+              "type": "integer",
+              "description": "Page number for pagination (default: 1)"
+            },
+            "status": {
+              "enum": [
+                "all",
+                "active",
+                "pending"
+              ],
+              "type": "string",
+              "description": "Filter by conversation status"
+            },
+            "mailboxId": {
+              "type": "string",
+              "description": "The mailbox ID"
+            },
+            "modifiedSince": {
+              "type": "string",
+              "description": "ISO 8601 datetime - return conversations modified since this date"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "mailboxId": "{{ String(args.mailboxId) }}"
+          },
+          "query": {
+            "tag": "{{ String(args.tag || '') }}",
+            "page": "{{ String(args.page || 1) }}",
+            "status": "{{ String(args.status || 'all') }}",
+            "modifiedSince": "{{ String(args.modifiedSince || '') }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "create_customer",
+        "description": "Create a new customer",
+        "method": "POST",
+        "path": "/customers",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "firstName",
+            "lastName",
+            "email"
+          ],
+          "properties": {
+            "email": {
+              "type": "string",
+              "description": "Customer email address"
+            },
+            "jobTitle": {
+              "type": "string",
+              "description": "Customer job title"
+            },
+            "lastName": {
+              "type": "string",
+              "description": "Customer last name"
+            },
+            "location": {
+              "type": "string",
+              "description": "Customer location"
+            },
+            "firstName": {
+              "type": "string",
+              "description": "Customer first name"
+            },
+            "organization": {
+              "type": "string",
+              "description": "Customer organization"
+            }
+          }
+        },
+        "mapping": {
+          "body": {
+            "email": "{{ String(args.email) }}",
+            "jobTitle": "{{ String(args.jobTitle || '') }}",
+            "lastName": "{{ String(args.lastName) }}",
+            "location": "{{ String(args.location || '') }}",
+            "firstName": "{{ String(args.firstName) }}",
+            "organization": "{{ String(args.organization || '') }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "add_reply",
+        "description": "Add a reply to an existing conversation",
+        "method": "POST",
+        "path": "/conversations/{conversationId}/threads",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "conversationId",
+            "text"
+          ],
+          "properties": {
+            "text": {
+              "type": "string",
+              "description": "Reply message text"
+            },
+            "status": {
+              "enum": [
+                "active",
+                "pending",
+                "closed"
+              ],
+              "type": "string",
+              "description": "Set conversation status after reply"
+            },
+            "conversationId": {
+              "type": "string",
+              "description": "The conversation ID"
+            }
+          }
+        },
+        "mapping": {
+          "body": {
+            "text": "{{ String(args.text) }}",
+            "status": "{{ String(args.status || '') }}"
+          },
+          "path": {
+            "conversationId": "{{ String(args.conversationId) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "list_customers",
+        "description": "List all customers in a mailbox with pagination support",
+        "method": "GET",
+        "path": "/mailboxes/{mailboxId}/customers",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "mailboxId"
+          ],
+          "properties": {
+            "page": {
+              "type": "integer",
+              "description": "Page number for pagination (default: 1)"
+            },
+            "status": {
+              "enum": [
+                "all",
+                "active",
+                "pending"
+              ],
+              "type": "string",
+              "description": "Filter by customer status"
+            },
+            "mailboxId": {
+              "type": "string",
+              "description": "The mailbox ID"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "mailboxId": "{{ String(args.mailboxId) }}"
+          },
+          "query": {
+            "page": "{{ String(args.page || 1) }}",
+            "status": "{{ String(args.status || 'all') }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "get_mailbox",
+        "description": "Get details for a specific mailbox",
+        "method": "GET",
+        "path": "/mailboxes/{mailboxId}",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "mailboxId"
+          ],
+          "properties": {
+            "mailboxId": {
+              "type": "string",
+              "description": "The mailbox ID"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "mailboxId": "{{ String(args.mailboxId) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "search_conversations",
+        "description": "Search conversations using Help Scout query syntax",
+        "method": "GET",
+        "path": "/search/conversations",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "query"
+          ],
+          "properties": {
+            "page": {
+              "type": "integer",
+              "description": "Page number for pagination (default: 1)"
+            },
+            "query": {
+              "type": "string",
+              "description": "Search query (Help Scout query syntax, e.g., 'status:active' or 'customerIds:123')"
+            }
+          }
+        },
+        "mapping": {
+          "query": {
+            "page": "{{ String(args.page || 1) }}",
+            "query": "{{ String(args.query) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "list_mailboxes",
+        "description": "List all mailboxes accessible to the authenticated user",
+        "method": "GET",
+        "path": "/mailboxes",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "page": {
+              "type": "integer",
+              "description": "Page number for pagination (default: 1)"
+            }
+          }
+        },
+        "mapping": {
+          "query": {
+            "page": "{{ String(args.page || 1) }}"
+          }
+        },
+        "timeoutMs": 15000
+      }
+    ]
+  }
+}

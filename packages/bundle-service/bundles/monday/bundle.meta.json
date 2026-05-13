@@ -1,0 +1,9 @@
+{
+  "name": "Monday.com",
+  "description": "Connect to Monday.com Work OS platform to manage boards, items, groups, and automate workflows. Supports OAuth2 authenti",
+  "version": "1.0.0",
+  "tags": [
+    "connector"
+  ],
+  "kind": "connector"
+}

@@ -1,0 +1,402 @@
+{
+  "schemaVersion": "1",
+  "kind": "connector_template",
+  "exportedAt": "2026-05-13T06:46:43.660Z",
+  "metadata": {
+    "fromProvider": "hubspot",
+    "fromSlug": "hubspot",
+    "fromId": "wXx9DbUbaZFfI1sUDE1a0"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "connectorTemplate": {
+      "id": "wXx9DbUbaZFfI1sUDE1a0",
+      "slug": "hubspot",
+      "provider": "hubspot",
+      "name": "HubSpot",
+      "description": "HubSpot CRM connector for managing contacts, companies, deals, and automating sales and marketing workflows",
+      "isEnabled": true,
+      "version": "1.0.0",
+      "category": "crm",
+      "baseUrl": "https://api.hubapi.com",
+      "auth": {
+        "type": "oauth2",
+        "scopes": [
+          "oauth",
+          "crm.objects.contacts.read",
+          "crm.objects.contacts.write",
+          "crm.objects.companies.read",
+          "crm.objects.companies.write",
+          "crm.objects.deals.read",
+          "crm.objects.deals.write"
+        ],
+        "tokenUrl": "https://api.hubapi.com/oauth/v1/access-token",
+        "injection": {
+          "style": "header",
+          "headerName": "Authorization",
+          "tokenPrefix": "Bearer"
+        },
+        "clientIdRef": {
+          "key": "HUBSPOT_OAUTH_CLIENT_ID",
+          "type": "platform_secret"
+        },
+        "tokenResponse": {
+          "expiresInField": "expires_in",
+          "accessTokenField": "access_token",
+          "refreshTokenField": "refresh_token"
+        },
+        "accessTokenRef": {
+          "key": "HUBSPOT_ACCESS_TOKEN",
+          "type": "connector_secret"
+        },
+        "scopeDelimiter": " ",
+        "clientSecretRef": {
+          "key": "HUBSPOT_OAUTH_CLIENT_SECRET",
+          "type": "platform_secret"
+        },
+        "refreshTokenRef": {
+          "key": "HUBSPOT_REFRESH_TOKEN",
+          "type": "connector_secret"
+        },
+        "authorizationUrl": "https://app.hubspot.com/oauth/authorize"
+      },
+      "rateLimit": {
+        "burstLimit": 20,
+        "requestsPerMinute": 600
+      },
+      "metadataSchema": {
+        "type": "object",
+        "required": [],
+        "properties": {
+          "portalId": {
+            "type": "string",
+            "description": "Optional HubSpot Portal ID for multi-account scenarios"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "actions": [
+      {
+        "name": "create-deal",
+        "description": "Create a new deal in HubSpot CRM",
+        "method": "POST",
+        "path": "/crm/v3/objects/deals",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "dealname",
+            "dealstage"
+          ],
+          "properties": {
+            "amount": {
+              "type": "number",
+              "description": "Deal amount in currency units"
+            },
+            "dealname": {
+              "type": "string",
+              "description": "Deal name"
+            },
+            "closedate": {
+              "type": "string",
+              "description": "Expected close date (ISO 8601 format)"
+            },
+            "dealstage": {
+              "type": "string",
+              "description": "Deal pipeline stage"
+            }
+          }
+        },
+        "mapping": {
+          "body": {
+            "properties": {
+              "amount": "{{ String(args.amount) }}",
+              "dealname": "{{ String(args.dealname) }}",
+              "closedate": "{{ String(args.closedate) }}",
+              "dealstage": "{{ String(args.dealstage) }}"
+            }
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "list-contacts",
+        "description": "List all contacts in HubSpot CRM",
+        "method": "GET",
+        "path": "/crm/v3/objects/contacts",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "after": {
+              "type": "string",
+              "description": "Pagination cursor for next page"
+            },
+            "limit": {
+              "type": "integer",
+              "default": 10,
+              "description": "Number of contacts to return (max 100)"
+            },
+            "archived": {
+              "type": "boolean",
+              "default": false,
+              "description": "Filter by archived status"
+            }
+          }
+        },
+        "mapping": {
+          "query": {
+            "after": "{{ args.after }}",
+            "limit": "{{ String(args.limit || 10) }}",
+            "archived": "{{ String(args.archived || false) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "create-contact",
+        "description": "Create a new contact in HubSpot CRM",
+        "method": "POST",
+        "path": "/crm/v3/objects/contacts",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "email"
+          ],
+          "properties": {
+            "email": {
+              "type": "string",
+              "description": "Contact email address"
+            },
+            "phone": {
+              "type": "string",
+              "description": "Contact phone number"
+            },
+            "company": {
+              "type": "string",
+              "description": "Contact company name"
+            },
+            "lastName": {
+              "type": "string",
+              "description": "Contact last name"
+            },
+            "firstName": {
+              "type": "string",
+              "description": "Contact first name"
+            }
+          }
+        },
+        "mapping": {
+          "body": {
+            "properties": {
+              "email": "{{ String(args.email) }}",
+              "phone": "{{ args.phone }}",
+              "company": "{{ args.company }}",
+              "lastname": "{{ args.lastName }}",
+              "firstname": "{{ args.firstName }}"
+            }
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "get-contact",
+        "description": "Get a specific contact by ID",
+        "method": "GET",
+        "path": "/crm/v3/objects/contacts/{contactId}",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "contactId"
+          ],
+          "properties": {
+            "contactId": {
+              "type": "string",
+              "description": "HubSpot contact ID"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "contactId": "{{ String(args.contactId) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "update-contact",
+        "description": "Update an existing contact",
+        "method": "PATCH",
+        "path": "/crm/v3/objects/contacts/{contactId}",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "contactId"
+          ],
+          "properties": {
+            "email": {
+              "type": "string",
+              "description": "Contact email address"
+            },
+            "phone": {
+              "type": "string",
+              "description": "Contact phone number"
+            },
+            "company": {
+              "type": "string",
+              "description": "Contact company name"
+            },
+            "lastName": {
+              "type": "string",
+              "description": "Contact last name"
+            },
+            "contactId": {
+              "type": "string",
+              "description": "HubSpot contact ID"
+            },
+            "firstName": {
+              "type": "string",
+              "description": "Contact first name"
+            }
+          }
+        },
+        "mapping": {
+          "body": {
+            "properties": {
+              "email": "{{ args.email }}",
+              "phone": "{{ args.phone }}",
+              "company": "{{ args.company }}",
+              "lastname": "{{ args.lastName }}",
+              "firstname": "{{ args.firstName }}"
+            }
+          },
+          "path": {
+            "contactId": "{{ String(args.contactId) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "list-companies",
+        "description": "List all companies in HubSpot CRM",
+        "method": "GET",
+        "path": "/crm/v3/objects/companies",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "after": {
+              "type": "string",
+              "description": "Pagination cursor for next page"
+            },
+            "limit": {
+              "type": "integer",
+              "default": 10,
+              "description": "Number of companies to return (max 100)"
+            }
+          }
+        },
+        "mapping": {
+          "query": {
+            "after": "{{ args.after }}",
+            "limit": "{{ String(args.limit || 10) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "create-company",
+        "description": "Create a new company in HubSpot CRM",
+        "method": "POST",
+        "path": "/crm/v3/objects/companies",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "name"
+          ],
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "Company name"
+            },
+            "phone": {
+              "type": "string",
+              "description": "Company phone number"
+            },
+            "domain": {
+              "type": "string",
+              "description": "Company website domain"
+            },
+            "industry": {
+              "type": "string",
+              "description": "Company industry"
+            }
+          }
+        },
+        "mapping": {
+          "body": {
+            "properties": {
+              "name": "{{ String(args.name) }}",
+              "phone": "{{ args.phone }}",
+              "domain": "{{ args.domain }}",
+              "industry": "{{ args.industry }}"
+            }
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "list-deals",
+        "description": "List all deals in HubSpot CRM",
+        "method": "GET",
+        "path": "/crm/v3/objects/deals",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "after": {
+              "type": "string",
+              "description": "Pagination cursor for next page"
+            },
+            "limit": {
+              "type": "integer",
+              "default": 10,
+              "description": "Number of deals to return (max 100)"
+            }
+          }
+        },
+        "mapping": {
+          "query": {
+            "after": "{{ args.after }}",
+            "limit": "{{ String(args.limit || 10) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "get-deal",
+        "description": "Get a specific deal by ID",
+        "method": "GET",
+        "path": "/crm/v3/objects/deals/{dealId}",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "dealId"
+          ],
+          "properties": {
+            "dealId": {
+              "type": "string",
+              "description": "HubSpot deal ID"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "dealId": "{{ String(args.dealId) }}"
+          }
+        },
+        "timeoutMs": 15000
+      }
+    ]
+  }
+}

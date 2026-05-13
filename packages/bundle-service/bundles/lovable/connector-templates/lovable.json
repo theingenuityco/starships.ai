@@ -1,0 +1,56 @@
+{
+  "schemaVersion": "1",
+  "kind": "connector_template",
+  "exportedAt": "2026-05-13T06:46:43.660Z",
+  "metadata": {
+    "fromProvider": "lovable",
+    "fromSlug": "lovable",
+    "fromId": "HWhO23s_UlcDJMqUdBKFD"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "connectorTemplate": {
+      "id": "HWhO23s_UlcDJMqUdBKFD",
+      "slug": "lovable",
+      "provider": "lovable",
+      "name": "Lovable",
+      "description": "Lovable is a full-stack AI development platform that enables teams to build, iterate on, and deploy production-grade web",
+      "isEnabled": true,
+      "version": "1.0.0",
+      "category": "development",
+      "baseUrl": "https://api.lovable.dev",
+      "auth": {
+        "type": "api_key",
+        "apiKeyRef": {
+          "key": "LOVABLE_API_KEY",
+          "type": "connector_secret"
+        },
+        "injection": {
+          "style": "header",
+          "headerName": "Authorization",
+          "tokenPrefix": "Bearer"
+        }
+      },
+      "rateLimit": {
+        "tier": "default",
+        "burstLimit": 20,
+        "requestsPerMinute": 120
+      },
+      "metadataSchema": {
+        "type": "object",
+        "required": [],
+        "properties": {
+          "workspaceName": {
+            "type": "string",
+            "description": "Optional: Name of your Lovable workspace for reference"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "actions": []
+  }
+}

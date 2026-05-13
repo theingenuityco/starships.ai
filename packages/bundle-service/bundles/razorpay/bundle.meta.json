@@ -1,0 +1,9 @@
+{
+  "name": "Razorpay",
+  "description": "Razorpay payment gateway connector for processing payments, managing invoices, customers, and settlements.",
+  "version": "1.0.0",
+  "tags": [
+    "connector"
+  ],
+  "kind": "connector"
+}

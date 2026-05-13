@@ -1,0 +1,115 @@
+{
+  "schemaVersion": "1",
+  "kind": "connector_template",
+  "exportedAt": "2026-05-13T06:46:43.660Z",
+  "metadata": {
+    "fromProvider": "klaviyo",
+    "fromSlug": "klaviyo",
+    "fromId": "RSx77wkQMB755W2VUWFC6"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "connectorTemplate": {
+      "id": "RSx77wkQMB755W2VUWFC6",
+      "slug": "klaviyo",
+      "provider": "klaviyo",
+      "name": "Klaviyo",
+      "description": "Customer data and marketing automation platform for personalized campaigns.",
+      "isEnabled": true,
+      "version": "1.0.0",
+      "category": "connector",
+      "baseUrl": "https://a.klaviyo.com/api",
+      "auth": {
+        "type": "api_key",
+        "apiKeyRef": {
+          "key": "KLAVIYO_API_KEY",
+          "type": "connector_secret"
+        },
+        "injection": {
+          "style": "header",
+          "headerName": "Authorization",
+          "tokenPrefix": "Bearer"
+        }
+      },
+      "rateLimit": {
+        "tier": "default",
+        "requestsPerMinute": 600
+      }
+    },
+    "actions": [
+      {
+        "name": "get_profile",
+        "description": "Get detailed information about a specific subscriber profile",
+        "method": "GET",
+        "path": "/api/profiles/{profile_id}",
+        "mapping": {
+          "path": {
+            "profile_id": "{{ String(args.profile_id) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "list_profiles",
+        "description": "List subscriber profiles with optional filtering and pagination",
+        "method": "GET",
+        "path": "/api/profiles",
+        "mapping": {
+          "query": {
+            "page[size]": "{{ String(args.page_size || 20) }}",
+            "page[cursor]": "{{ String(args.page_cursor || '') }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "get_list",
+        "description": "Get detailed information about a specific email list",
+        "method": "GET",
+        "path": "/v1/lists/{list_id}",
+        "mapping": {
+          "path": {
+            "list_id": "{{ String(args.list_id) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "list_lists",
+        "description": "List all email lists in the Klaviyo account",
+        "method": "GET",
+        "path": "/v1/lists",
+        "timeoutMs": 15000
+      },
+      {
+        "name": "list_flows",
+        "description": "List all automation flows in the account",
+        "method": "GET",
+        "path": "/v1/flows",
+        "timeoutMs": 15000
+      },
+      {
+        "name": "get_campaign",
+        "description": "Get detailed information about a specific campaign",
+        "method": "GET",
+        "path": "/v1/campaigns/{campaign_id}",
+        "mapping": {
+          "path": {
+            "campaign_id": "{{ String(args.campaign_id) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "list_campaigns",
+        "description": "List all email campaigns in the account",
+        "method": "GET",
+        "path": "/v1/campaigns",
+        "timeoutMs": 15000
+      }
+    ]
+  }
+}

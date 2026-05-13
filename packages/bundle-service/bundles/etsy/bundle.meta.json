@@ -1,0 +1,9 @@
+{
+  "name": "Etsy",
+  "description": "Etsy Open API v3 connector for managing shops, listings, orders, transactions, and reviews on the Etsy platform.",
+  "version": "1.0.0",
+  "tags": [
+    "e-commerce"
+  ],
+  "kind": "connector"
+}

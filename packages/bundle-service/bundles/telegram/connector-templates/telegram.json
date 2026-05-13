@@ -1,0 +1,349 @@
+{
+  "schemaVersion": "1",
+  "kind": "connector_template",
+  "exportedAt": "2026-05-13T06:46:43.660Z",
+  "metadata": {
+    "fromProvider": "telegram",
+    "fromSlug": "telegram",
+    "fromId": "0LHKoahCm5DjQiS1wWEBM"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "connectorTemplate": {
+      "id": "0LHKoahCm5DjQiS1wWEBM",
+      "slug": "telegram",
+      "provider": "telegram",
+      "name": "Telegram Bot",
+      "description": "Connect a Telegram Bot to send messages, photos, documents, and interact with Telegram chats. Get your bot token from @B",
+      "isEnabled": true,
+      "version": "1.0.0",
+      "category": "connector",
+      "baseUrl": "https://api.telegram.org",
+      "auth": {
+        "type": "api_key",
+        "apiKeyRef": {
+          "key": "TELEGRAM_BOT_TOKEN",
+          "type": "connector_secret"
+        },
+        "injection": {
+          "style": "header",
+          "headerName": "X-Telegram-Bot-Token",
+          "tokenPrefix": ""
+        }
+      },
+      "rateLimit": {
+        "burstLimit": 20,
+        "requestsPerSecond": 30
+      },
+      "metadataSchema": {
+        "type": "object",
+        "required": [
+          "botToken"
+        ],
+        "properties": {
+          "botName": {
+            "type": "string",
+            "title": "Bot Name",
+            "description": "Display name of your bot (optional, for your reference)"
+          },
+          "botToken": {
+            "type": "string",
+            "title": "Bot Token",
+            "description": "Your Telegram Bot Token from @BotFather (format: 123456789:ABCdefGHIjklMNOpqrsTUVwxyz). This will be used in API request paths."
+          },
+          "botUsername": {
+            "type": "string",
+            "title": "Bot Username",
+            "description": "Your bot's username (e.g., @MyAwesomeBot) - optional, for reference"
+          }
+        }
+      }
+    },
+    "actions": [
+      {
+        "name": "get-me",
+        "description": "Get basic information about the bot (username, name, can_join_groups, etc.)",
+        "method": "GET",
+        "path": "/bot{metadata.botToken}/getMe"
+      },
+      {
+        "name": "send-message",
+        "description": "Send a text message to a chat. chatId can be a user ID, group ID, or channel username (@channelname). parse_mode: Markdown, MarkdownV2, or HTML",
+        "method": "POST",
+        "path": "/bot{metadata.botToken}/sendMessage",
+        "mapping": {
+          "body": {
+            "text": "{args.text}",
+            "chat_id": "{args.chatId}",
+            "parse_mode": "{args.parseMode}",
+            "reply_to_message_id": "{args.replyToMessageId}",
+            "disable_notification": "{args.disableNotification}",
+            "disable_web_page_preview": "{args.disableWebPagePreview}"
+          }
+        }
+      },
+      {
+        "name": "send-photo",
+        "description": "Send a photo. photo can be a file_id (reuse existing), URL (public image), or file upload",
+        "method": "POST",
+        "path": "/bot{metadata.botToken}/sendPhoto",
+        "mapping": {
+          "body": {
+            "photo": "{args.photo}",
+            "caption": "{args.caption}",
+            "chat_id": "{args.chatId}",
+            "parse_mode": "{args.parseMode}",
+            "reply_to_message_id": "{args.replyToMessageId}",
+            "disable_notification": "{args.disableNotification}"
+          }
+        }
+      },
+      {
+        "name": "send-document",
+        "description": "Send a document (PDF, ZIP, DOC, etc.). document can be a file_id or URL",
+        "method": "POST",
+        "path": "/bot{metadata.botToken}/sendDocument",
+        "mapping": {
+          "body": {
+            "caption": "{args.caption}",
+            "chat_id": "{args.chatId}",
+            "document": "{args.document}",
+            "parse_mode": "{args.parseMode}",
+            "reply_to_message_id": "{args.replyToMessageId}",
+            "disable_notification": "{args.disableNotification}"
+          }
+        }
+      },
+      {
+        "name": "send-video",
+        "description": "Send a video file. Telegram clients support mp4 videos",
+        "method": "POST",
+        "path": "/bot{metadata.botToken}/sendVideo",
+        "mapping": {
+          "body": {
+            "video": "{args.video}",
+            "width": "{args.width}",
+            "height": "{args.height}",
+            "caption": "{args.caption}",
+            "chat_id": "{args.chatId}",
+            "duration": "{args.duration}",
+            "parse_mode": "{args.parseMode}",
+            "disable_notification": "{args.disableNotification}"
+          }
+        }
+      },
+      {
+        "name": "send-audio",
+        "description": "Send audio files (music). For voice messages use send-voice instead",
+        "method": "POST",
+        "path": "/bot{metadata.botToken}/sendAudio",
+        "mapping": {
+          "body": {
+            "audio": "{args.audio}",
+            "title": "{args.title}",
+            "caption": "{args.caption}",
+            "chat_id": "{args.chatId}",
+            "duration": "{args.duration}",
+            "performer": "{args.performer}",
+            "parse_mode": "{args.parseMode}",
+            "disable_notification": "{args.disableNotification}"
+          }
+        }
+      },
+      {
+        "name": "send-voice",
+        "description": "Send voice messages. Must be in OGG format with OPUS codec, max 1MB",
+        "method": "POST",
+        "path": "/bot{metadata.botToken}/sendVoice",
+        "mapping": {
+          "body": {
+            "voice": "{args.voice}",
+            "caption": "{args.caption}",
+            "chat_id": "{args.chatId}",
+            "duration": "{args.duration}",
+            "parse_mode": "{args.parseMode}",
+            "disable_notification": "{args.disableNotification}"
+          }
+        }
+      },
+      {
+        "name": "send-location",
+        "description": "Send a location point on the map. Use livePeriod (60-86400 seconds) for live locations",
+        "method": "POST",
+        "path": "/bot{metadata.botToken}/sendLocation",
+        "mapping": {
+          "body": {
+            "chat_id": "{args.chatId}",
+            "latitude": "{args.latitude}",
+            "longitude": "{args.longitude}",
+            "live_period": "{args.livePeriod}",
+            "horizontal_accuracy": "{args.horizontalAccuracy}",
+            "disable_notification": "{args.disableNotification}"
+          }
+        }
+      },
+      {
+        "name": "send-poll",
+        "description": "Send a native poll. options must be an array of 2-10 answer strings. type: quiz or regular",
+        "method": "POST",
+        "path": "/bot{metadata.botToken}/sendPoll",
+        "mapping": {
+          "body": {
+            "type": "{args.type}",
+            "chat_id": "{args.chatId}",
+            "options": "{args.options}",
+            "question": "{args.question}",
+            "is_anonymous": "{args.isAnonymous}",
+            "disable_notification": "{args.disableNotification}",
+            "allows_multiple_answers": "{args.allowsMultipleAnswers}"
+          }
+        }
+      },
+      {
+        "name": "send-sticker",
+        "description": "Send a sticker. sticker can be a file_id or URL to a .WEBP or .TGS file",
+        "method": "POST",
+        "path": "/bot{metadata.botToken}/sendSticker",
+        "mapping": {
+          "body": {
+            "chat_id": "{args.chatId}",
+            "sticker": "{args.sticker}",
+            "reply_to_message_id": "{args.replyToMessageId}",
+            "disable_notification": "{args.disableNotification}"
+          }
+        }
+      },
+      {
+        "name": "get-updates",
+        "description": "Get incoming updates (messages, callbacks, etc.). Use offset to acknowledge processed updates. Long polling supported with timeout",
+        "method": "GET",
+        "path": "/bot{metadata.botToken}/getUpdates",
+        "mapping": {
+          "query": {
+            "limit": "{args.limit}",
+            "offset": "{args.offset}",
+            "timeout": "{args.timeout}",
+            "allowed_updates": "{args.allowedUpdates}"
+          }
+        }
+      },
+      {
+        "name": "delete-message",
+        "description": "Delete a message. Only works for messages sent by the bot or in groups where bot is admin with delete permission",
+        "method": "POST",
+        "path": "/bot{metadata.botToken}/deleteMessage",
+        "mapping": {
+          "body": {
+            "chat_id": "{args.chatId}",
+            "message_id": "{args.messageId}"
+          }
+        }
+      },
+      {
+        "name": "edit-message-text",
+        "description": "Edit text of a message sent by the bot. Can edit messages up to 48 hours old",
+        "method": "POST",
+        "path": "/bot{metadata.botToken}/editMessageText",
+        "mapping": {
+          "body": {
+            "text": "{args.text}",
+            "chat_id": "{args.chatId}",
+            "message_id": "{args.messageId}",
+            "parse_mode": "{args.parseMode}",
+            "disable_web_page_preview": "{args.disableWebPagePreview}"
+          }
+        }
+      },
+      {
+        "name": "send-chat-action",
+        "description": "Send typing indicator or upload status. action values: typing, upload_photo, record_video, upload_video, record_voice, upload_voice, upload_document, find_location, record_video_note, upload_video_note",
+        "method": "POST",
+        "path": "/bot{metadata.botToken}/sendChatAction",
+        "mapping": {
+          "body": {
+            "action": "{args.action}",
+            "chat_id": "{args.chatId}"
+          }
+        }
+      },
+      {
+        "name": "get-chat",
+        "description": "Get up-to-date information about a chat (title, type, description, photo, permissions, etc.)",
+        "method": "GET",
+        "path": "/bot{metadata.botToken}/getChat",
+        "mapping": {
+          "query": {
+            "chat_id": "{args.chatId}"
+          }
+        }
+      },
+      {
+        "name": "get-chat-member",
+        "description": "Get information about a member of a chat (status: creator, administrator, member, restricted, left, kicked; plus permissions)",
+        "method": "GET",
+        "path": "/bot{metadata.botToken}/getChatMember",
+        "mapping": {
+          "query": {
+            "chat_id": "{args.chatId}",
+            "user_id": "{args.userId}"
+          }
+        }
+      },
+      {
+        "name": "get-chat-administrators",
+        "description": "Get a list of administrators in a chat (including their status and custom titles)",
+        "method": "GET",
+        "path": "/bot{metadata.botToken}/getChatAdministrators",
+        "mapping": {
+          "query": {
+            "chat_id": "{args.chatId}"
+          }
+        }
+      },
+      {
+        "name": "get-chat-member-count",
+        "description": "Get the number of members in a chat",
+        "method": "GET",
+        "path": "/bot{metadata.botToken}/getChatMemberCount",
+        "mapping": {
+          "query": {
+            "chat_id": "{args.chatId}"
+          }
+        }
+      },
+      {
+        "name": "forward-message",
+        "description": "Forward a message from one chat to another",
+        "method": "POST",
+        "path": "/bot{metadata.botToken}/forwardMessage",
+        "mapping": {
+          "body": {
+            "chat_id": "{args.chatId}",
+            "message_id": "{args.messageId}",
+            "from_chat_id": "{args.fromChatId}",
+            "disable_notification": "{args.disableNotification}"
+          }
+        }
+      },
+      {
+        "name": "copy-message",
+        "description": "Copy a message without forwarding (removes the 'forwarded from' header)",
+        "method": "POST",
+        "path": "/bot{metadata.botToken}/copyMessage",
+        "mapping": {
+          "body": {
+            "caption": "{args.caption}",
+            "chat_id": "{args.chatId}",
+            "message_id": "{args.messageId}",
+            "parse_mode": "{args.parseMode}",
+            "from_chat_id": "{args.fromChatId}",
+            "disable_notification": "{args.disableNotification}"
+          }
+        }
+      }
+    ]
+  }
+}

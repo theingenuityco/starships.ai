@@ -1,0 +1,429 @@
+{
+  "schemaVersion": "1",
+  "kind": "connector_template",
+  "exportedAt": "2026-05-13T06:46:43.660Z",
+  "metadata": {
+    "fromProvider": "basecamp",
+    "fromSlug": "basecamp",
+    "fromId": "b7O--yeEoicBHw47_Bsdj"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "connectorTemplate": {
+      "id": "b7O--yeEoicBHw47_Bsdj",
+      "slug": "basecamp",
+      "provider": "basecamp",
+      "name": "Basecamp 4",
+      "description": "Integrate with Basecamp 4 to manage projects, to-dos, messages, and comments. Requires OAuth2 authentication and an acco",
+      "isEnabled": true,
+      "version": "1.0.0",
+      "category": "connector",
+      "baseUrl": "https://3.basecampapi.com/{{ metadata.account_id }}",
+      "auth": {
+        "type": "oauth2",
+        "scopes": [
+          "read",
+          "write"
+        ],
+        "tokenUrl": "https://launchpad.37signals.com/authorization/token",
+        "injection": {
+          "style": "header",
+          "headerName": "Authorization",
+          "tokenPrefix": "Bearer"
+        },
+        "clientIdRef": {
+          "key": "BASECAMP_CLIENT_ID",
+          "type": "platform_secret"
+        },
+        "accessTokenRef": {
+          "key": "BASECAMP_ACCESS_TOKEN",
+          "type": "connector_secret"
+        },
+        "scopeDelimiter": " ",
+        "clientSecretRef": {
+          "key": "BASECAMP_CLIENT_SECRET",
+          "type": "platform_secret"
+        },
+        "refreshTokenRef": {
+          "key": "BASECAMP_REFRESH_TOKEN",
+          "type": "connector_secret"
+        },
+        "authorizationUrl": "https://launchpad.37signals.com/authorization/new"
+      },
+      "rateLimit": {
+        "burstLimit": 10,
+        "requestsPerMinute": 300
+      },
+      "metadataSchema": {
+        "type": "object",
+        "required": [
+          "account_id"
+        ],
+        "properties": {
+          "account_id": {
+            "type": "string",
+            "description": "Your Basecamp account ID (required for API calls)"
+          }
+        }
+      }
+    },
+    "actions": [
+      {
+        "name": "create_message",
+        "description": "Create a new message in a message board",
+        "method": "POST",
+        "path": "/buckets/{bucket_id}/message_boards/{message_board_id}/messages.json",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "bucket_id",
+            "message_board_id",
+            "subject",
+            "content"
+          ],
+          "properties": {
+            "status": {
+              "type": "string",
+              "default": "active",
+              "description": "Status of the message (e.g., 'active')"
+            },
+            "content": {
+              "type": "string",
+              "description": "The HTML content of the message"
+            },
+            "subject": {
+              "type": "string",
+              "description": "The subject/title of the message"
+            },
+            "bucket_id": {
+              "type": "string",
+              "description": "The ID of the project (bucket)"
+            },
+            "message_board_id": {
+              "type": "string",
+              "description": "The ID of the message board"
+            }
+          }
+        },
+        "mapping": {
+          "body": {
+            "status": "{{ String(args.status || 'active') }}",
+            "content": "{{ String(args.content) }}",
+            "subject": "{{ String(args.subject) }}"
+          },
+          "path": {
+            "bucket_id": "{{ String(args.bucket_id) }}",
+            "message_board_id": "{{ String(args.message_board_id) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "update_todo",
+        "description": "Update an existing to-do",
+        "method": "PUT",
+        "path": "/buckets/{bucket_id}/todos/{todo_id}.json",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "bucket_id",
+            "todo_id"
+          ],
+          "properties": {
+            "due_on": {
+              "type": "string",
+              "description": "Updated due date in YYYY-MM-DD format (optional)"
+            },
+            "content": {
+              "type": "string",
+              "description": "Updated content/title (optional)"
+            },
+            "todo_id": {
+              "type": "string",
+              "description": "The ID of the to-do"
+            },
+            "bucket_id": {
+              "type": "string",
+              "description": "The ID of the project (bucket)"
+            },
+            "completed": {
+              "type": "boolean",
+              "description": "Mark as completed or not (optional)"
+            }
+          }
+        },
+        "mapping": {
+          "body": {
+            "due_on": "{{ args.due_on || null }}",
+            "content": "{{ args.content || null }}",
+            "completed": "{{ args.completed !== undefined ? args.completed : null }}"
+          },
+          "path": {
+            "todo_id": "{{ String(args.todo_id) }}",
+            "bucket_id": "{{ String(args.bucket_id) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "get_project",
+        "description": "Get details for a specific project including its enabled tools",
+        "method": "GET",
+        "path": "/projects/{project_id}.json",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "project_id"
+          ],
+          "properties": {
+            "project_id": {
+              "type": "string",
+              "description": "The ID of the project"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "project_id": "{{ String(args.project_id) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "list_todolists",
+        "description": "List all to-do lists in a project",
+        "method": "GET",
+        "path": "/buckets/{bucket_id}/todolists.json",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "bucket_id"
+          ],
+          "properties": {
+            "bucket_id": {
+              "type": "string",
+              "description": "The ID of the project (bucket)"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "bucket_id": "{{ String(args.bucket_id) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "list_projects",
+        "description": "List all projects accessible to the authenticated user",
+        "method": "GET",
+        "path": "/projects.json",
+        "timeoutMs": 15000
+      },
+      {
+        "name": "create_comment",
+        "description": "Create a new comment on a recording",
+        "method": "POST",
+        "path": "/buckets/{bucket_id}/recordings/{recording_id}/comments.json",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "bucket_id",
+            "recording_id",
+            "content"
+          ],
+          "properties": {
+            "content": {
+              "type": "string",
+              "description": "The HTML content of the comment"
+            },
+            "bucket_id": {
+              "type": "string",
+              "description": "The ID of the project (bucket)"
+            },
+            "recording_id": {
+              "type": "string",
+              "description": "The ID of the recording (message, to-do, etc.)"
+            }
+          }
+        },
+        "mapping": {
+          "body": {
+            "content": "{{ String(args.content) }}"
+          },
+          "path": {
+            "bucket_id": "{{ String(args.bucket_id) }}",
+            "recording_id": "{{ String(args.recording_id) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "list_comments",
+        "description": "List all comments on a recording (message, to-do, etc.)",
+        "method": "GET",
+        "path": "/buckets/{bucket_id}/recordings/{recording_id}/comments.json",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "bucket_id",
+            "recording_id"
+          ],
+          "properties": {
+            "bucket_id": {
+              "type": "string",
+              "description": "The ID of the project (bucket)"
+            },
+            "recording_id": {
+              "type": "string",
+              "description": "The ID of the recording (message, to-do, etc.)"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "bucket_id": "{{ String(args.bucket_id) }}",
+            "recording_id": "{{ String(args.recording_id) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "list_messages",
+        "description": "List all messages in a message board",
+        "method": "GET",
+        "path": "/buckets/{bucket_id}/message_boards/{message_board_id}/messages.json",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "bucket_id",
+            "message_board_id"
+          ],
+          "properties": {
+            "bucket_id": {
+              "type": "string",
+              "description": "The ID of the project (bucket)"
+            },
+            "message_board_id": {
+              "type": "string",
+              "description": "The ID of the message board"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "bucket_id": "{{ String(args.bucket_id) }}",
+            "message_board_id": "{{ String(args.message_board_id) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "get_todolist",
+        "description": "Get details for a specific to-do list",
+        "method": "GET",
+        "path": "/buckets/{bucket_id}/todolists/{todolist_id}.json",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "bucket_id",
+            "todolist_id"
+          ],
+          "properties": {
+            "bucket_id": {
+              "type": "string",
+              "description": "The ID of the project (bucket)"
+            },
+            "todolist_id": {
+              "type": "string",
+              "description": "The ID of the to-do list"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "bucket_id": "{{ String(args.bucket_id) }}",
+            "todolist_id": "{{ String(args.todolist_id) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "list_todos",
+        "description": "List all to-dos in a to-do list",
+        "method": "GET",
+        "path": "/buckets/{bucket_id}/todolists/{todolist_id}/todos.json",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "bucket_id",
+            "todolist_id"
+          ],
+          "properties": {
+            "bucket_id": {
+              "type": "string",
+              "description": "The ID of the project (bucket)"
+            },
+            "todolist_id": {
+              "type": "string",
+              "description": "The ID of the to-do list"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "bucket_id": "{{ String(args.bucket_id) }}",
+            "todolist_id": "{{ String(args.todolist_id) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "create_todo",
+        "description": "Create a new to-do in a to-do list",
+        "method": "POST",
+        "path": "/buckets/{bucket_id}/todolists/{todolist_id}/todos.json",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "bucket_id",
+            "todolist_id",
+            "content"
+          ],
+          "properties": {
+            "due_on": {
+              "type": "string",
+              "description": "Due date in YYYY-MM-DD format (optional)"
+            },
+            "content": {
+              "type": "string",
+              "description": "The content/title of the to-do"
+            },
+            "bucket_id": {
+              "type": "string",
+              "description": "The ID of the project (bucket)"
+            },
+            "todolist_id": {
+              "type": "string",
+              "description": "The ID of the to-do list"
+            }
+          }
+        },
+        "mapping": {
+          "body": {
+            "due_on": "{{ args.due_on || null }}",
+            "content": "{{ String(args.content) }}"
+          },
+          "path": {
+            "bucket_id": "{{ String(args.bucket_id) }}",
+            "todolist_id": "{{ String(args.todolist_id) }}"
+          }
+        },
+        "timeoutMs": 15000
+      }
+    ]
+  }
+}

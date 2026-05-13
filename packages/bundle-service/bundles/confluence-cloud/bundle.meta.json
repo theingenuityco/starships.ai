@@ -1,0 +1,9 @@
+{
+  "name": "Confluence Cloud",
+  "description": "Confluence Cloud connector with essential operations",
+  "version": "1.0.0",
+  "tags": [
+    "documentation"
+  ],
+  "kind": "connector"
+}

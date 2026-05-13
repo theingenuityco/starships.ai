@@ -1,0 +1,9 @@
+{
+  "name": "Xero",
+  "description": "Cloud-based accounting software for managing invoices, contacts, accounts, and financial transactions",
+  "version": "1.0.0",
+  "tags": [
+    "connector"
+  ],
+  "kind": "connector"
+}

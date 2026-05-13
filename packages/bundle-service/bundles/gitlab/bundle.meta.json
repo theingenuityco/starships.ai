@@ -1,0 +1,9 @@
+{
+  "name": "GitLab",
+  "description": "GitLab DevOps platform for version control, CI/CD, project management, and deployment.",
+  "version": "1.0.0",
+  "tags": [
+    "version-control"
+  ],
+  "kind": "connector"
+}

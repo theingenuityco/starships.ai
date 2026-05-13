@@ -1,0 +1,410 @@
+{
+  "schemaVersion": "1",
+  "kind": "connector_template",
+  "exportedAt": "2026-05-13T06:46:43.660Z",
+  "metadata": {
+    "fromProvider": "twilio",
+    "fromSlug": "twilio",
+    "fromId": "0QqI1BKzzOKVRBYuHDTPi"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "connectorTemplate": {
+      "id": "0QqI1BKzzOKVRBYuHDTPi",
+      "slug": "twilio",
+      "provider": "twilio",
+      "name": "Twilio",
+      "description": "Twilio is a cloud communications platform providing APIs for SMS, voice calls, phone number management, and messaging se",
+      "isEnabled": true,
+      "version": "1.0.0",
+      "category": "connector",
+      "baseUrl": "https://api.twilio.com/2010-04-01",
+      "auth": {
+        "type": "basic",
+        "passwordRef": {
+          "key": "TWILIO_AUTH_TOKEN",
+          "type": "connector_secret"
+        },
+        "usernameRef": {
+          "key": "TWILIO_ACCOUNT_SID",
+          "type": "connector_secret"
+        }
+      },
+      "rateLimit": {
+        "burstLimit": 20,
+        "requestsPerMinute": 120
+      },
+      "metadataSchema": {
+        "type": "object",
+        "required": [],
+        "properties": {
+          "accountSid": {
+            "type": "string",
+            "description": "Your Twilio Account SID (optional if using path parameter)"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "actions": [
+      {
+        "name": "list-incoming-phone-numbers",
+        "description": "List all incoming phone numbers on your account",
+        "method": "GET",
+        "path": "/Accounts/{AccountSid}/IncomingPhoneNumbers.json",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "accountSid"
+          ],
+          "properties": {
+            "limit": {
+              "type": "integer",
+              "description": "Number of phone numbers to return (default: 50)"
+            },
+            "accountSid": {
+              "type": "string",
+              "description": "Your Twilio Account SID"
+            },
+            "phoneNumber": {
+              "type": "string",
+              "description": "Filter by specific phone number (E.164 format)"
+            },
+            "friendlyName": {
+              "type": "string",
+              "description": "Filter by friendly name"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "AccountSid": "{{ String(args.accountSid) }}"
+          },
+          "query": {
+            "Limit": "{{ String(args.limit || 50) }}",
+            "PhoneNumber": "{{ String(args.phoneNumber || '') }}",
+            "FriendlyName": "{{ String(args.friendlyName || '') }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "get-incoming-phone-number",
+        "description": "Retrieve details about an incoming phone number",
+        "method": "GET",
+        "path": "/Accounts/{AccountSid}/IncomingPhoneNumbers/{PhoneNumberSid}.json",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "accountSid",
+            "phoneNumberSid"
+          ],
+          "properties": {
+            "accountSid": {
+              "type": "string",
+              "description": "Your Twilio Account SID"
+            },
+            "phoneNumberSid": {
+              "type": "string",
+              "description": "The SID of the incoming phone number"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "AccountSid": "{{ String(args.accountSid) }}",
+            "PhoneNumberSid": "{{ String(args.phoneNumberSid) }}"
+          }
+        },
+        "timeoutMs": 10000
+      },
+      {
+        "name": "list-calls",
+        "description": "List calls from your account with optional filtering",
+        "method": "GET",
+        "path": "/Accounts/{AccountSid}/Calls.json",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "accountSid"
+          ],
+          "properties": {
+            "to": {
+              "type": "string",
+              "description": "Filter by called phone number"
+            },
+            "from": {
+              "type": "string",
+              "description": "Filter by calling phone number"
+            },
+            "limit": {
+              "type": "integer",
+              "description": "Number of calls to return (default: 50)"
+            },
+            "status": {
+              "type": "string",
+              "description": "Filter by call status (queued, ringing, in-progress, completed, failed, busy, no-answer)"
+            },
+            "accountSid": {
+              "type": "string",
+              "description": "Your Twilio Account SID"
+            },
+            "startTimeAfter": {
+              "type": "string",
+              "description": "Filter calls started after this date (ISO 8601)"
+            },
+            "startTimeBefore": {
+              "type": "string",
+              "description": "Filter calls started before this date (ISO 8601)"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "AccountSid": "{{ String(args.accountSid) }}"
+          },
+          "query": {
+            "To": "{{ String(args.to || '') }}",
+            "From": "{{ String(args.from || '') }}",
+            "Limit": "{{ String(args.limit || 50) }}",
+            "Status": "{{ String(args.status || '') }}",
+            "StartTimeAfter": "{{ String(args.startTimeAfter || '') }}",
+            "StartTimeBefore": "{{ String(args.startTimeBefore || '') }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "get-call",
+        "description": "Retrieve a specific call by SID",
+        "method": "GET",
+        "path": "/Accounts/{AccountSid}/Calls/{CallSid}.json",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "accountSid",
+            "callSid"
+          ],
+          "properties": {
+            "callSid": {
+              "type": "string",
+              "description": "The SID of the call to retrieve"
+            },
+            "accountSid": {
+              "type": "string",
+              "description": "Your Twilio Account SID"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "CallSid": "{{ String(args.callSid) }}",
+            "AccountSid": "{{ String(args.accountSid) }}"
+          }
+        },
+        "timeoutMs": 10000
+      },
+      {
+        "name": "list-messages",
+        "description": "List messages from your account with optional filtering",
+        "method": "GET",
+        "path": "/Accounts/{AccountSid}/Messages.json",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "accountSid"
+          ],
+          "properties": {
+            "to": {
+              "type": "string",
+              "description": "Filter by recipient phone number"
+            },
+            "from": {
+              "type": "string",
+              "description": "Filter by sender phone number"
+            },
+            "limit": {
+              "type": "integer",
+              "description": "Number of messages to return (default: 50)"
+            },
+            "accountSid": {
+              "type": "string",
+              "description": "Your Twilio Account SID"
+            },
+            "dateSentAfter": {
+              "type": "string",
+              "description": "Filter messages sent after this date (ISO 8601)"
+            },
+            "dateSentBefore": {
+              "type": "string",
+              "description": "Filter messages sent before this date (ISO 8601)"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "AccountSid": "{{ String(args.accountSid) }}"
+          },
+          "query": {
+            "To": "{{ String(args.to || '') }}",
+            "From": "{{ String(args.from || '') }}",
+            "Limit": "{{ String(args.limit || 50) }}",
+            "DateSentAfter": "{{ String(args.dateSentAfter || '') }}",
+            "DateSentBefore": "{{ String(args.dateSentBefore || '') }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "get-message",
+        "description": "Retrieve a specific message by SID",
+        "method": "GET",
+        "path": "/Accounts/{AccountSid}/Messages/{MessageSid}.json",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "accountSid",
+            "messageSid"
+          ],
+          "properties": {
+            "accountSid": {
+              "type": "string",
+              "description": "Your Twilio Account SID"
+            },
+            "messageSid": {
+              "type": "string",
+              "description": "The SID of the message to retrieve"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "AccountSid": "{{ String(args.accountSid) }}",
+            "MessageSid": "{{ String(args.messageSid) }}"
+          }
+        },
+        "timeoutMs": 10000
+      },
+      {
+        "name": "send-message",
+        "description": "Send an SMS or MMS message",
+        "method": "POST",
+        "path": "/Accounts/{AccountSid}/Messages.json",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "accountSid",
+            "from",
+            "to",
+            "body"
+          ],
+          "properties": {
+            "to": {
+              "type": "string",
+              "description": "The recipient phone number (E.164 format)"
+            },
+            "body": {
+              "type": "string",
+              "description": "The message body text"
+            },
+            "from": {
+              "type": "string",
+              "description": "The Twilio phone number to send from (E.164 format)"
+            },
+            "accountSid": {
+              "type": "string",
+              "description": "Your Twilio Account SID"
+            }
+          }
+        },
+        "mapping": {
+          "body": {
+            "To": "{{ String(args.to) }}",
+            "Body": "{{ String(args.body) }}",
+            "From": "{{ String(args.from) }}"
+          },
+          "path": {
+            "AccountSid": "{{ String(args.accountSid) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "make-call",
+        "description": "Make an outbound phone call",
+        "method": "POST",
+        "path": "/Accounts/{AccountSid}/Calls.json",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "accountSid",
+            "from",
+            "to",
+            "url"
+          ],
+          "properties": {
+            "to": {
+              "type": "string",
+              "description": "The phone number to call (E.164 format)"
+            },
+            "url": {
+              "type": "string",
+              "description": "URL containing TwiML instructions for the call"
+            },
+            "from": {
+              "type": "string",
+              "description": "The Twilio phone number to call from (E.164 format)"
+            },
+            "method": {
+              "type": "string",
+              "description": "HTTP method for fetching TwiML (GET or POST, default: POST)"
+            },
+            "accountSid": {
+              "type": "string",
+              "description": "Your Twilio Account SID"
+            }
+          }
+        },
+        "mapping": {
+          "body": {
+            "To": "{{ String(args.to) }}",
+            "Url": "{{ String(args.url) }}",
+            "From": "{{ String(args.from) }}",
+            "Method": "{{ String(args.method || 'POST') }}"
+          },
+          "path": {
+            "AccountSid": "{{ String(args.accountSid) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "get-account",
+        "description": "Retrieve account details and properties",
+        "method": "GET",
+        "path": "/Accounts/{AccountSid}.json",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "accountSid"
+          ],
+          "properties": {
+            "accountSid": {
+              "type": "string",
+              "description": "Your Twilio Account SID"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "AccountSid": "{{ String(args.accountSid) }}"
+          }
+        },
+        "timeoutMs": 10000
+      }
+    ]
+  }
+}

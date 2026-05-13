@@ -28,6 +28,7 @@ export interface BundleManifest {
     views?: BundleManifestEntity[];
     datasets?: BundleManifestEntity[];
     taskBoards?: BundleManifestEntity[];
+    connectorTemplates?: BundleManifestEntity[];
   };
 }
 

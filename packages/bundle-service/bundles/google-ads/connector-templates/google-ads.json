@@ -1,0 +1,290 @@
+{
+  "schemaVersion": "1",
+  "kind": "connector_template",
+  "exportedAt": "2026-05-13T06:46:43.660Z",
+  "metadata": {
+    "fromProvider": "google-ads",
+    "fromSlug": "google-ads",
+    "fromId": "99mKvBSOUO4whsbYqpmGU"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "connectorTemplate": {
+      "id": "99mKvBSOUO4whsbYqpmGU",
+      "slug": "google-ads",
+      "provider": "google-ads",
+      "name": "Google Ads",
+      "description": "Manage Google Ads campaigns, ad groups, keywords, and performance reporting via OAuth2.",
+      "isEnabled": true,
+      "version": "1.0.0",
+      "category": "connector",
+      "baseUrl": "https://googleads.googleapis.com/v17",
+      "auth": {
+        "type": "oauth2",
+        "scopes": [
+          "https://www.googleapis.com/auth/adwords"
+        ],
+        "tokenUrl": "https://oauth2.googleapis.com/token",
+        "injection": {
+          "style": "header",
+          "headerName": "Authorization",
+          "tokenPrefix": "Bearer"
+        },
+        "clientIdRef": {
+          "key": "GOOGLE_ADS_CLIENT_ID",
+          "type": "platform_secret"
+        },
+        "accessTokenRef": {
+          "key": "GOOGLE_ADS_ACCESS_TOKEN",
+          "type": "connector_secret"
+        },
+        "scopeDelimiter": " ",
+        "clientSecretRef": {
+          "key": "GOOGLE_ADS_CLIENT_SECRET",
+          "type": "platform_secret"
+        },
+        "refreshTokenRef": {
+          "key": "GOOGLE_ADS_REFRESH_TOKEN",
+          "type": "connector_secret"
+        },
+        "authorizationUrl": "https://accounts.google.com/o/oauth2/v2/auth"
+      },
+      "rateLimit": {
+        "burstLimit": 10,
+        "requestsPerMinute": 6
+      },
+      "metadataSchema": {
+        "type": "object",
+        "required": [],
+        "properties": {
+          "customer_id": {
+            "type": "string",
+            "description": "Google Ads customer ID (required for API calls)"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "actions": [
+      {
+        "name": "list_ads",
+        "description": "List all ads in an ad group",
+        "method": "POST",
+        "path": "/customers/{customer_id}/googleAds:searchStream",
+        "mapping": {
+          "body": {
+            "query": "SELECT ad_group_ad.ad.id, ad_group_ad.ad.type, ad_group_ad.status, ad_group_ad.ad.responsive_search_ad.headlines, ad_group_ad.ad.responsive_search_ad.descriptions FROM ad_group_ad WHERE ad_group.id = {{ String(args.ad_group_id) }} ORDER BY ad_group_ad.ad.id"
+          },
+          "path": {
+            "customer_id": "{{ String(metadata.customer_id) }}"
+          }
+        },
+        "response": {
+          "select": "{{ body.results }}"
+        },
+        "timeoutMs": 30000
+      },
+      {
+        "name": "get_keyword_stats",
+        "description": "Get performance stats for a specific keyword",
+        "method": "POST",
+        "path": "/customers/{customer_id}/googleAds:searchStream",
+        "mapping": {
+          "body": {
+            "query": "SELECT ad_group_criterion.keyword.text, ad_group_criterion.keyword.match_type, metrics.impressions, metrics.clicks, metrics.ctr, metrics.average_cpc, metrics.cost_micros FROM keyword_view WHERE ad_group_criterion.keyword.text = '{{ String(args.keyword_text) }}' AND segments.date DURING {{ String(args.date_range || 'LAST_30_DAYS') }}"
+          },
+          "path": {
+            "customer_id": "{{ String(metadata.customer_id) }}"
+          }
+        },
+        "response": {
+          "select": "{{ body.results }}"
+        },
+        "timeoutMs": 30000
+      },
+      {
+        "name": "list_campaigns",
+        "description": "List all campaigns for a customer",
+        "method": "POST",
+        "path": "/customers/{customer_id}/googleAds:searchStream",
+        "mapping": {
+          "body": {
+            "query": "SELECT campaign.id, campaign.name, campaign.status, campaign.advertising_channel_type FROM campaign ORDER BY campaign.id"
+          },
+          "path": {
+            "customer_id": "{{ String(metadata.customer_id) }}"
+          }
+        },
+        "response": {
+          "select": "{{ body.results }}"
+        },
+        "timeoutMs": 30000
+      },
+      {
+        "name": "get_campaign",
+        "description": "Get a specific campaign by ID",
+        "method": "POST",
+        "path": "/customers/{customer_id}/googleAds:searchStream",
+        "mapping": {
+          "body": {
+            "query": "SELECT campaign.id, campaign.name, campaign.status, campaign.budget_amount_micros, campaign.advertising_channel_type FROM campaign WHERE campaign.id = {{ String(args.campaign_id) }}"
+          },
+          "path": {
+            "customer_id": "{{ String(metadata.customer_id) }}"
+          }
+        },
+        "response": {
+          "select": "{{ body.results[0] }}"
+        },
+        "timeoutMs": 30000
+      },
+      {
+        "name": "list_ad_groups",
+        "description": "List all ad groups for a campaign",
+        "method": "POST",
+        "path": "/customers/{customer_id}/googleAds:searchStream",
+        "mapping": {
+          "body": {
+            "query": "SELECT ad_group.id, ad_group.name, ad_group.status, ad_group.cpc_bid_micros FROM ad_group WHERE campaign.id = {{ String(args.campaign_id) }} ORDER BY ad_group.id"
+          },
+          "path": {
+            "customer_id": "{{ String(metadata.customer_id) }}"
+          }
+        },
+        "response": {
+          "select": "{{ body.results }}"
+        },
+        "timeoutMs": 30000
+      },
+      {
+        "name": "get_ad_group",
+        "description": "Get a specific ad group by ID",
+        "method": "POST",
+        "path": "/customers/{customer_id}/googleAds:searchStream",
+        "mapping": {
+          "body": {
+            "query": "SELECT ad_group.id, ad_group.name, ad_group.status, ad_group.cpc_bid_micros, campaign.id FROM ad_group WHERE ad_group.id = {{ String(args.ad_group_id) }}"
+          },
+          "path": {
+            "customer_id": "{{ String(metadata.customer_id) }}"
+          }
+        },
+        "response": {
+          "select": "{{ body.results[0] }}"
+        },
+        "timeoutMs": 30000
+      },
+      {
+        "name": "list_keywords",
+        "description": "List all keywords for an ad group",
+        "method": "POST",
+        "path": "/customers/{customer_id}/googleAds:searchStream",
+        "mapping": {
+          "body": {
+            "query": "SELECT ad_group_criterion.keyword.text, ad_group_criterion.keyword.match_type, ad_group_criterion.status, ad_group_criterion.cpc_bid_micros FROM keyword_view WHERE ad_group.id = {{ String(args.ad_group_id) }} ORDER BY ad_group_criterion.keyword.text"
+          },
+          "path": {
+            "customer_id": "{{ String(metadata.customer_id) }}"
+          }
+        },
+        "response": {
+          "select": "{{ body.results }}"
+        },
+        "timeoutMs": 30000
+      },
+      {
+        "name": "get_performance_report",
+        "description": "Get campaign performance metrics for a date range",
+        "method": "POST",
+        "path": "/customers/{customer_id}/googleAds:searchStream",
+        "mapping": {
+          "body": {
+            "query": "SELECT campaign.id, campaign.name, segments.date, metrics.impressions, metrics.clicks, metrics.ctr, metrics.average_cpc, metrics.cost_micros FROM campaign WHERE campaign.id = {{ String(args.campaign_id) }} AND segments.date DURING {{ String(args.date_range || 'LAST_30_DAYS') }}"
+          },
+          "path": {
+            "customer_id": "{{ String(metadata.customer_id) }}"
+          }
+        },
+        "response": {
+          "select": "{{ body.results }}"
+        },
+        "timeoutMs": 30000
+      },
+      {
+        "name": "resume_campaign",
+        "description": "Resume a paused campaign",
+        "method": "POST",
+        "path": "/customers/{customer_id}/campaigns/{campaign_id}:mutate",
+        "mapping": {
+          "body": {
+            "campaign_operations": [
+              {
+                "update": {
+                  "status": "ENABLED",
+                  "resource_name": "customers/{{ String(metadata.customer_id) }}/campaigns/{{ String(args.campaign_id) }}"
+                },
+                "update_mask": "status"
+              }
+            ]
+          },
+          "path": {
+            "campaign_id": "{{ String(args.campaign_id) }}",
+            "customer_id": "{{ String(metadata.customer_id) }}"
+          }
+        },
+        "response": {
+          "select": "{{ body.results }}"
+        },
+        "timeoutMs": 30000
+      },
+      {
+        "name": "get_ad",
+        "description": "Get a specific ad by ID",
+        "method": "POST",
+        "path": "/customers/{customer_id}/googleAds:searchStream",
+        "mapping": {
+          "body": {
+            "query": "SELECT ad_group_ad.ad.id, ad_group_ad.ad.type, ad_group_ad.status, ad_group_ad.ad.responsive_search_ad.headlines, ad_group_ad.ad.responsive_search_ad.descriptions FROM ad_group_ad WHERE ad_group_ad.ad.id = {{ String(args.ad_id) }}"
+          },
+          "path": {
+            "customer_id": "{{ String(metadata.customer_id) }}"
+          }
+        },
+        "response": {
+          "select": "{{ body.results[0] }}"
+        },
+        "timeoutMs": 30000
+      },
+      {
+        "name": "pause_campaign",
+        "description": "Pause a campaign by updating its status",
+        "method": "POST",
+        "path": "/customers/{customer_id}/campaigns/{campaign_id}:mutate",
+        "mapping": {
+          "body": {
+            "campaign_operations": [
+              {
+                "update": {
+                  "status": "PAUSED",
+                  "resource_name": "customers/{{ String(metadata.customer_id) }}/campaigns/{{ String(args.campaign_id) }}"
+                },
+                "update_mask": "status"
+              }
+            ]
+          },
+          "path": {
+            "campaign_id": "{{ String(args.campaign_id) }}",
+            "customer_id": "{{ String(metadata.customer_id) }}"
+          }
+        },
+        "response": {
+          "select": "{{ body.results }}"
+        },
+        "timeoutMs": 30000
+      }
+    ]
+  }
+}

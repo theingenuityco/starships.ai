@@ -1,0 +1,9 @@
+{
+  "name": "Salesforce",
+  "description": "Salesforce CRM connector for managing leads, accounts, opportunities, contacts, and other business objects via the Sales",
+  "version": "1.0.0",
+  "tags": [
+    "crm"
+  ],
+  "kind": "connector"
+}

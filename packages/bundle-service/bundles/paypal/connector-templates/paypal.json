@@ -1,0 +1,420 @@
+{
+  "schemaVersion": "1",
+  "kind": "connector_template",
+  "exportedAt": "2026-05-13T06:46:43.660Z",
+  "metadata": {
+    "fromProvider": "paypal",
+    "fromSlug": "paypal",
+    "fromId": "5tHae3coQu24iw0XJc_bD"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "connectorTemplate": {
+      "id": "5tHae3coQu24iw0XJc_bD",
+      "slug": "paypal",
+      "provider": "paypal",
+      "name": "PayPal",
+      "description": "PayPal connector for managing orders, payments, authorizations, captures, and refunds. Supports OAuth2 authentication fo",
+      "isEnabled": true,
+      "version": "1.0.0",
+      "category": "connector",
+      "baseUrl": "https://api.paypal.com",
+      "auth": {
+        "type": "oauth2",
+        "scopes": [
+          "https://api.paypal.com/v1/payments/payment",
+          "https://api.paypal.com/v1/payments/payment/create",
+          "https://api.paypal.com/v1/payments/payment/execute"
+        ],
+        "tokenUrl": "https://api.paypal.com/v1/oauth2/token",
+        "injection": {
+          "style": "header",
+          "headerName": "Authorization",
+          "tokenPrefix": "Bearer"
+        },
+        "clientIdRef": {
+          "key": "PAYPAL_OAUTH_CLIENT_ID",
+          "type": "platform_secret"
+        },
+        "tokenResponse": {
+          "expiresInField": "expires_in",
+          "accessTokenField": "access_token",
+          "refreshTokenField": "refresh_token"
+        },
+        "accessTokenRef": {
+          "key": "PAYPAL_ACCESS_TOKEN",
+          "type": "connector_secret"
+        },
+        "scopeDelimiter": " ",
+        "clientSecretRef": {
+          "key": "PAYPAL_OAUTH_CLIENT_SECRET",
+          "type": "platform_secret"
+        },
+        "refreshTokenRef": {
+          "key": "PAYPAL_REFRESH_TOKEN",
+          "type": "connector_secret"
+        },
+        "authorizationUrl": "https://www.paypal.com/signin/authorize"
+      },
+      "rateLimit": {
+        "burstLimit": 20,
+        "requestsPerMinute": 100
+      },
+      "metadataSchema": {
+        "type": "object",
+        "required": [
+          "environment"
+        ],
+        "properties": {
+          "environment": {
+            "enum": [
+              "sandbox",
+              "production"
+            ],
+            "type": "string",
+            "description": "PayPal environment (sandbox for testing, production for live)"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "actions": [
+      {
+        "name": "get-order",
+        "description": "Retrieve details for an order by ID",
+        "method": "GET",
+        "path": "/v2/checkout/orders/{id}",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "orderId"
+          ],
+          "properties": {
+            "orderId": {
+              "type": "string",
+              "description": "The ID of the order to retrieve"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "id": "{{ String(args.orderId) }}"
+          }
+        },
+        "timeoutMs": 10000
+      },
+      {
+        "name": "get-refund",
+        "description": "Retrieve details for a refund by ID",
+        "method": "GET",
+        "path": "/v2/payments/refunds/{refundId}",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "refundId"
+          ],
+          "properties": {
+            "refundId": {
+              "type": "string",
+              "description": "The ID of the refund to retrieve"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "refundId": "{{ String(args.refundId) }}"
+          }
+        },
+        "timeoutMs": 10000
+      },
+      {
+        "name": "authorize-order",
+        "description": "Authorize payment for an order",
+        "method": "POST",
+        "path": "/v2/checkout/orders/{id}/authorize",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "orderId"
+          ],
+          "properties": {
+            "prefer": {
+              "enum": [
+                "return=minimal",
+                "return=representation"
+              ],
+              "type": "string",
+              "description": "Preferred response format"
+            },
+            "orderId": {
+              "type": "string",
+              "description": "The ID of the order to authorize"
+            },
+            "requestId": {
+              "type": "string",
+              "description": "Unique request ID for idempotency"
+            },
+            "paymentSource": {
+              "type": "object",
+              "description": "Payment source for authorization"
+            }
+          }
+        },
+        "mapping": {
+          "body": {
+            "payment_source": "{{ args.paymentSource }}"
+          },
+          "path": {
+            "id": "{{ String(args.orderId) }}"
+          },
+          "headers": {
+            "Prefer": "{{ String(args.prefer || 'return=minimal') }}",
+            "PayPal-Request-Id": "{{ String(args.requestId) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "refund-payment",
+        "description": "Refund a captured payment by ID",
+        "method": "POST",
+        "path": "/v2/payments/captures/{captureId}/refund",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "captureId"
+          ],
+          "properties": {
+            "amount": {
+              "type": "object",
+              "description": "Refund amount object with currency_code and value"
+            },
+            "captureId": {
+              "type": "string",
+              "description": "The ID of the captured payment to refund"
+            },
+            "invoiceId": {
+              "type": "string",
+              "description": "Optional invoice ID"
+            },
+            "requestId": {
+              "type": "string",
+              "description": "Unique request ID for idempotency"
+            },
+            "noteToPayee": {
+              "type": "string",
+              "description": "Note to include with the refund"
+            }
+          }
+        },
+        "mapping": {
+          "body": {
+            "amount": "{{ args.amount }}",
+            "invoice_id": "{{ String(args.invoiceId) }}",
+            "note_to_payer": "{{ String(args.noteToPayee) }}"
+          },
+          "path": {
+            "captureId": "{{ String(args.captureId) }}"
+          },
+          "headers": {
+            "PayPal-Request-Id": "{{ String(args.requestId) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "create-order",
+        "description": "Create a new order with payment source",
+        "method": "POST",
+        "path": "/v2/checkout/orders",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "purchaseUnits"
+          ],
+          "properties": {
+            "intent": {
+              "enum": [
+                "CAPTURE",
+                "AUTHORIZE"
+              ],
+              "type": "string",
+              "description": "Payment intent"
+            },
+            "requestId": {
+              "type": "string",
+              "description": "Unique request ID for idempotency"
+            },
+            "paymentSource": {
+              "type": "object",
+              "description": "Payment source object"
+            },
+            "purchaseUnits": {
+              "type": "array",
+              "description": "Array of purchase unit objects"
+            }
+          }
+        },
+        "mapping": {
+          "body": {
+            "intent": "{{ String(args.intent || 'CAPTURE') }}",
+            "payment_source": "{{ args.paymentSource }}",
+            "purchase_units": "{{ args.purchaseUnits }}"
+          },
+          "headers": {
+            "PayPal-Request-Id": "{{ String(args.requestId) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "confirm-order",
+        "description": "Confirm a payer's intent to pay for an order",
+        "method": "POST",
+        "path": "/v2/checkout/orders/{id}/confirm-payment-source",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "orderId"
+          ],
+          "properties": {
+            "orderId": {
+              "type": "string",
+              "description": "The ID of the order to confirm"
+            },
+            "requestId": {
+              "type": "string",
+              "description": "Unique request ID for idempotency"
+            },
+            "paymentSource": {
+              "type": "object",
+              "description": "Payment source confirmation details"
+            }
+          }
+        },
+        "mapping": {
+          "body": {
+            "payment_source": "{{ args.paymentSource }}"
+          },
+          "path": {
+            "id": "{{ String(args.orderId) }}"
+          },
+          "headers": {
+            "PayPal-Request-Id": "{{ String(args.requestId) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "capture-payment",
+        "description": "Capture an authorized payment by ID",
+        "method": "POST",
+        "path": "/v2/payments/authorizations/{authorizationId}/capture",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "authorizationId"
+          ],
+          "properties": {
+            "amount": {
+              "type": "object",
+              "description": "Amount object with currency_code and value"
+            },
+            "prefer": {
+              "enum": [
+                "return=minimal",
+                "return=representation"
+              ],
+              "type": "string",
+              "description": "Preferred response format"
+            },
+            "invoiceId": {
+              "type": "string",
+              "description": "Optional invoice ID"
+            },
+            "requestId": {
+              "type": "string",
+              "description": "Unique request ID for idempotency"
+            },
+            "authorizationId": {
+              "type": "string",
+              "description": "The ID of the authorized payment to capture"
+            }
+          }
+        },
+        "mapping": {
+          "body": {
+            "amount": "{{ args.amount }}",
+            "invoice_id": "{{ String(args.invoiceId) }}"
+          },
+          "path": {
+            "authorizationId": "{{ String(args.authorizationId) }}"
+          },
+          "headers": {
+            "Prefer": "{{ String(args.prefer || 'return=minimal') }}",
+            "PayPal-Request-Id": "{{ String(args.requestId) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "void-payment",
+        "description": "Void an authorized payment by ID",
+        "method": "POST",
+        "path": "/v2/payments/authorizations/{authorizationId}/void",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "authorizationId"
+          ],
+          "properties": {
+            "authAssertion": {
+              "type": "string",
+              "description": "Optional JWT assertion for merchant identification"
+            },
+            "authorizationId": {
+              "type": "string",
+              "description": "The ID of the authorized payment to void"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "authorizationId": "{{ String(args.authorizationId) }}"
+          },
+          "headers": {
+            "PayPal-Auth-Assertion": "{{ String(args.authAssertion) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "get-captured-payment",
+        "description": "Retrieve details for a captured payment by ID",
+        "method": "GET",
+        "path": "/v2/payments/captures/{captureId}",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "captureId"
+          ],
+          "properties": {
+            "captureId": {
+              "type": "string",
+              "description": "The ID of the captured payment to retrieve"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "captureId": "{{ String(args.captureId) }}"
+          }
+        },
+        "timeoutMs": 10000
+      }
+    ]
+  }
+}

@@ -1,0 +1,136 @@
+{
+  "schemaVersion": "1",
+  "kind": "connector_template",
+  "exportedAt": "2026-05-13T06:46:43.660Z",
+  "metadata": {
+    "fromProvider": "amazon-seller-central",
+    "fromSlug": "amazon-seller-central",
+    "fromId": "2og2LKWSh0EFqJQhbsCbB"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "connectorTemplate": {
+      "id": "2og2LKWSh0EFqJQhbsCbB",
+      "slug": "amazon-seller-central",
+      "provider": "amazon-seller-central",
+      "name": "Amazon Seller Central",
+      "description": "Amazon Selling Partner API for orders, inventory, products, and reports.",
+      "isEnabled": true,
+      "version": "1.0.0",
+      "category": "connector",
+      "baseUrl": "https://sellingpartnerapi-na.amazon.com",
+      "auth": {
+        "type": "api_key",
+        "apiKeyRef": {
+          "key": "AMAZON_ACCESS_TOKEN",
+          "type": "connector_secret"
+        },
+        "injection": {
+          "style": "header",
+          "headerName": "x-amz-access-token"
+        }
+      },
+      "rateLimit": {
+        "burstLimit": 10,
+        "requestsPerMinute": 120
+      },
+      "metadataSchema": {
+        "type": "object",
+        "required": [],
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    "actions": [
+      {
+        "name": "get_order",
+        "description": "Get detailed information for a specific order",
+        "method": "GET",
+        "path": "/orders/v0/orders/{order_id}",
+        "mapping": {
+          "path": {
+            "order_id": "{{ String(args.orderId) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "list_orders",
+        "description": "List seller orders with optional filters",
+        "method": "GET",
+        "path": "/orders/v0/orders",
+        "mapping": {
+          "query": {
+            "PageSize": "{{ String(args.pageSize || 10) }}",
+            "CreatedAfter": "{{ String(args.createdAfter || '') }}",
+            "CreatedBefore": "{{ String(args.createdBefore || '') }}",
+            "OrderStatuses": "{{ String(args.orderStatuses || 'Unshipped,PartiallyShipped') }}",
+            "MarketplaceIds": "{{ String(args.marketplaceIds || 'ATVPDKIKX0DER') }}",
+            "LastUpdatedAfter": "{{ String(args.lastUpdatedAfter || '') }}",
+            "LastUpdatedBefore": "{{ String(args.lastUpdatedBefore || '') }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "list_inventory",
+        "description": "List FBA inventory summary by SKU or ASIN",
+        "method": "GET",
+        "path": "/fba/inventory/v1/summary",
+        "mapping": {
+          "query": {
+            "details": "{{ String(args.details || 'true') }}",
+            "skuFilter": "{{ String(args.skuFilter || '') }}",
+            "startingToken": "{{ String(args.startingToken || '') }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "get_product",
+        "description": "Get product catalog details by ASIN",
+        "method": "GET",
+        "path": "/catalog/v0/items/{asin}",
+        "mapping": {
+          "path": {
+            "asin": "{{ String(args.asin) }}"
+          },
+          "query": {
+            "marketplaceIds": "{{ String(args.marketplaceIds || 'ATVPDKIKX0DER') }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "list_reports",
+        "description": "List seller reports with optional filtering",
+        "method": "GET",
+        "path": "/reports/2020-09-04/reports",
+        "mapping": {
+          "query": {
+            "pageSize": "{{ String(args.pageSize || 10) }}",
+            "reportTypes": "{{ String(args.reportTypes || '') }}",
+            "createdSince": "{{ String(args.createdSince || '') }}",
+            "processingStatuses": "{{ String(args.processingStatuses || '') }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "get_report",
+        "description": "Get details for a specific report by ID",
+        "method": "GET",
+        "path": "/reports/2020-09-04/reports/{report_id}",
+        "mapping": {
+          "path": {
+            "report_id": "{{ String(args.reportId) }}"
+          }
+        },
+        "timeoutMs": 15000
+      }
+    ]
+  }
+}

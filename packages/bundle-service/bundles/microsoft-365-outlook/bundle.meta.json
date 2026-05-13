@@ -1,0 +1,9 @@
+{
+  "name": "Microsoft 365 / Outlook",
+  "description": "Unified Microsoft 365 connector for email, calendar, contacts, tasks, files, and Teams",
+  "version": "1.0.0",
+  "tags": [
+    "enterprise-productivity"
+  ],
+  "kind": "connector"
+}

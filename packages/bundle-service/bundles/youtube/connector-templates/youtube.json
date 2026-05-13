@@ -1,0 +1,343 @@
+{
+  "schemaVersion": "1",
+  "kind": "connector_template",
+  "exportedAt": "2026-05-13T06:46:43.660Z",
+  "metadata": {
+    "fromProvider": "youtube",
+    "fromSlug": "youtube",
+    "fromId": "OjfYxTP9d6dJdHUT9HHO2"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "connectorTemplate": {
+      "id": "OjfYxTP9d6dJdHUT9HHO2",
+      "slug": "youtube",
+      "provider": "youtube",
+      "name": "YouTube",
+      "description": "YouTube Data API v3 connector for social media management. Upload and manage videos, interact with comments, track chann",
+      "isEnabled": true,
+      "version": "1.0.0",
+      "category": "social",
+      "baseUrl": "https://www.googleapis.com/youtube/v3",
+      "auth": {
+        "type": "oauth2",
+        "scopes": [
+          "https://www.googleapis.com/auth/youtube",
+          "https://www.googleapis.com/auth/youtube.upload",
+          "https://www.googleapis.com/auth/youtube.force-ssl"
+        ],
+        "tokenUrl": "https://oauth2.googleapis.com/token",
+        "injection": {
+          "style": "query",
+          "queryParamName": "access_token"
+        },
+        "clientIdRef": {
+          "key": "YOUTUBE_OAUTH_CLIENT_ID",
+          "type": "platform_secret"
+        },
+        "tokenResponse": {
+          "scopeField": "scope",
+          "expiresInField": "expires_in",
+          "tokenTypeField": "token_type",
+          "accessTokenField": "access_token",
+          "refreshTokenField": "refresh_token"
+        },
+        "accessTokenRef": {
+          "key": "YOUTUBE_ACCESS_TOKEN",
+          "type": "connector_secret"
+        },
+        "scopeDelimiter": " ",
+        "clientSecretRef": {
+          "key": "YOUTUBE_OAUTH_CLIENT_SECRET",
+          "type": "platform_secret"
+        },
+        "refreshTokenRef": {
+          "key": "YOUTUBE_REFRESH_TOKEN",
+          "type": "connector_secret"
+        },
+        "authorizationUrl": "https://accounts.google.com/o/oauth2/v2/auth",
+        "extraAuthorizeParams": {
+          "prompt": "consent",
+          "access_type": "offline"
+        }
+      },
+      "rateLimit": {
+        "burstLimit": 50,
+        "requestsPerMinute": 300
+      },
+      "metadataSchema": {
+        "type": "object",
+        "required": [],
+        "properties": {
+          "channel_id": {
+            "type": "string",
+            "description": "YouTube channel ID for this connector instance"
+          },
+          "environment": {
+            "enum": [
+              "production",
+              "development",
+              "testing"
+            ],
+            "type": "string",
+            "description": "Environment context for this connector instance"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "actions": [
+      {
+        "name": "upload-video",
+        "description": "Upload a video to YouTube. Requires video file and metadata (title, description, tags). Returns video ID and processing status.",
+        "method": "POST",
+        "path": "/videos",
+        "mapping": {
+          "body": {
+            "status": {
+              "privacyStatus": "{{ String(args.privacyStatus || 'private') }}",
+              "selfDeclaredMadeForKids": "{{ Boolean(args.madeForKids || false) }}"
+            },
+            "snippet": {
+              "tags": "{{ args.tags || [] }}",
+              "title": "{{ String(args.title) }}",
+              "categoryId": "{{ String(args.categoryId || '22') }}",
+              "description": "{{ String(args.description || '') }}"
+            }
+          },
+          "query": {
+            "part": "snippet,status"
+          }
+        },
+        "timeoutMs": 60000
+      },
+      {
+        "name": "update-video",
+        "description": "Update video metadata including title, description, tags, privacy status, and category.",
+        "method": "PUT",
+        "path": "/videos",
+        "mapping": {
+          "body": {
+            "id": "{{ String(args.videoId) }}",
+            "status": {
+              "privacyStatus": "{{ String(args.privacyStatus || 'private') }}"
+            },
+            "snippet": {
+              "tags": "{{ args.tags || [] }}",
+              "title": "{{ String(args.title) }}",
+              "categoryId": "{{ String(args.categoryId || '22') }}",
+              "description": "{{ String(args.description || '') }}"
+            }
+          },
+          "query": {
+            "part": "snippet,status"
+          }
+        },
+        "timeoutMs": 30000
+      },
+      {
+        "name": "delete-video",
+        "description": "Delete a video from YouTube. Requires video ID. Permanently removes the video from the channel.",
+        "method": "DELETE",
+        "path": "/videos",
+        "mapping": {
+          "query": {
+            "id": "{{ String(args.videoId) }}"
+          }
+        },
+        "timeoutMs": 30000
+      },
+      {
+        "name": "get-video",
+        "description": "Get detailed information about a specific video including snippet, statistics, content details, and status.",
+        "method": "GET",
+        "path": "/videos",
+        "mapping": {
+          "query": {
+            "id": "{{ String(args.videoId) }}",
+            "part": "{{ String(args.part || 'snippet,statistics,contentDetails,status') }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "list-videos",
+        "description": "List videos from a channel. Can filter by chart (mostPopular), myRating, or specific IDs.",
+        "method": "GET",
+        "path": "/videos",
+        "mapping": {
+          "query": {
+            "part": "{{ String(args.part || 'snippet,statistics') }}",
+            "chart": "{{ String(args.chart || '') }}",
+            "myRating": "{{ String(args.myRating || '') }}",
+            "maxResults": "{{ String(args.maxResults || '10') }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "list-playlists",
+        "description": "List playlists from a channel or get playlists owned by authenticated user.",
+        "method": "GET",
+        "path": "/playlists",
+        "mapping": {
+          "query": {
+            "mine": "{{ Boolean(args.mine || false) }}",
+            "part": "{{ String(args.part || 'snippet,contentDetails') }}",
+            "channelId": "{{ String(args.channelId || '') }}",
+            "maxResults": "{{ String(args.maxResults || '10') }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "list-comments",
+        "description": "List comments for a video or get comment threads. Returns top-level comments with optional replies.",
+        "method": "GET",
+        "path": "/commentThreads",
+        "mapping": {
+          "query": {
+            "part": "{{ String(args.part || 'snippet,replies') }}",
+            "order": "{{ String(args.order || 'relevance') }}",
+            "videoId": "{{ String(args.videoId) }}",
+            "maxResults": "{{ String(args.maxResults || '20') }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "reply-to-comment",
+        "description": "Reply to a comment on a video. Creates a new comment as a reply to an existing comment thread.",
+        "method": "POST",
+        "path": "/comments",
+        "mapping": {
+          "body": {
+            "snippet": {
+              "parentId": "{{ String(args.parentId) }}",
+              "textOriginal": "{{ String(args.text) }}"
+            }
+          },
+          "query": {
+            "part": "snippet"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "rate-video",
+        "description": "Like, dislike, or remove rating from a video. Rating options: like, dislike, none.",
+        "method": "POST",
+        "path": "/videos/rate",
+        "mapping": {
+          "query": {
+            "id": "{{ String(args.videoId) }}",
+            "rating": "{{ String(args.rating) }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "get-channel",
+        "description": "Get detailed information about a YouTube channel including branding, statistics, and content details.",
+        "method": "GET",
+        "path": "/channels",
+        "mapping": {
+          "query": {
+            "id": "{{ String(args.channelId || '') }}",
+            "mine": "{{ Boolean(args.mine || false) }}",
+            "part": "{{ String(args.part || 'snippet,statistics,contentDetails,brandingSettings') }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "list-subscriptions",
+        "description": "List channel subscriptions for the authenticated user or a specific channel.",
+        "method": "GET",
+        "path": "/subscriptions",
+        "mapping": {
+          "query": {
+            "mine": "{{ Boolean(args.mine || true) }}",
+            "part": "{{ String(args.part || 'snippet,contentDetails') }}",
+            "channelId": "{{ String(args.channelId || '') }}",
+            "maxResults": "{{ String(args.maxResults || '10') }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "subscribe-to-channel",
+        "description": "Subscribe to a YouTube channel. Creates a subscription for the authenticated user.",
+        "method": "POST",
+        "path": "/subscriptions",
+        "mapping": {
+          "body": {
+            "snippet": {
+              "resourceId": {
+                "kind": "youtube#channel",
+                "channelId": "{{ String(args.channelId) }}"
+              }
+            }
+          },
+          "query": {
+            "part": "snippet"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "search-videos",
+        "description": "Search for videos, channels, or playlists. Returns search results matching the query with optional filters.",
+        "method": "GET",
+        "path": "/search",
+        "mapping": {
+          "query": {
+            "q": "{{ String(args.query) }}",
+            "part": "{{ String(args.part || 'snippet') }}",
+            "type": "{{ String(args.type || 'video') }}",
+            "order": "{{ String(args.order || 'relevance') }}",
+            "channelId": "{{ String(args.channelId || '') }}",
+            "maxResults": "{{ String(args.maxResults || '10') }}"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "set-thumbnail",
+        "description": "Upload a custom thumbnail for a video. Requires video ID and thumbnail image file.",
+        "method": "POST",
+        "path": "/thumbnails/set",
+        "mapping": {
+          "query": {
+            "videoId": "{{ String(args.videoId) }}"
+          }
+        },
+        "timeoutMs": 30000
+      },
+      {
+        "name": "create-playlist",
+        "description": "Create a new playlist on the channel. Specify title, description, and privacy status.",
+        "method": "POST",
+        "path": "/playlists",
+        "mapping": {
+          "body": {
+            "status": {
+              "privacyStatus": "{{ String(args.privacyStatus || 'private') }}"
+            },
+            "snippet": {
+              "title": "{{ String(args.title) }}",
+              "description": "{{ String(args.description || '') }}"
+            }
+          },
+          "query": {
+            "part": "snippet,status"
+          }
+        },
+        "timeoutMs": 15000
+      }
+    ]
+  }
+}

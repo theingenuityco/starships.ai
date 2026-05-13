@@ -125,6 +125,12 @@ export interface ConnectorTemplateExportPayloadV1 {
    * NOTE: We intentionally do NOT export the legacy connector_templates.endpoints_json field.
    */
   actions?: ConnectorEndpointV2[];
+  /**
+   * Webhook/event ingestion config from connector_templates.webhooks_json.
+   * Stored alongside the connector template in bundle files so the server can
+   * route incoming webhook events without a DB read.
+   */
+  webhooks?: Record<string, unknown>;
 }
 
 export interface StarshipImportResponse {

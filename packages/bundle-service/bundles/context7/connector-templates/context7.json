@@ -1,0 +1,136 @@
+{
+  "schemaVersion": "1",
+  "kind": "connector_template",
+  "exportedAt": "2026-05-13T06:46:43.660Z",
+  "metadata": {
+    "fromProvider": "context7",
+    "fromSlug": "context7",
+    "fromId": "geIvz-j6u4UHNNJIQI3Sw"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "connectorTemplate": {
+      "id": "geIvz-j6u4UHNNJIQI3Sw",
+      "slug": "context7",
+      "provider": "context7",
+      "name": "Context7",
+      "description": "Context7 API for searching code libraries and fetching up-to-date documentation programmatically. Search libraries by na",
+      "isEnabled": true,
+      "version": "1.0.1",
+      "category": "connector",
+      "baseUrl": "https://context7.com/api/v2",
+      "auth": {
+        "type": "api_key",
+        "apiKeyRef": {
+          "key": "CONTEXT7_API_KEY",
+          "type": "connector_secret"
+        },
+        "injection": {
+          "style": "header",
+          "headerName": "Authorization",
+          "tokenPrefix": "Bearer"
+        }
+      },
+      "rateLimit": {
+        "burstLimit": 5,
+        "requestsPerSecond": 1
+      }
+    },
+    "actions": [
+      {
+        "name": "search-libraries",
+        "description": "Search for libraries by name and query. Returns library metadata including ID, description, versions, stars, and trust scores.",
+        "method": "GET",
+        "path": "/libs/search",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "query"
+          ],
+          "properties": {
+            "query": {
+              "type": "string",
+              "description": "Search query for finding libraries (e.g., 'http client', 'testing framework')"
+            },
+            "libraryName": {
+              "type": "string",
+              "description": "Optional specific library name to filter by"
+            }
+          }
+        },
+        "mapping": {
+          "query": {
+            "query": "{{ String(args.query) }}",
+            "libraryName": "{{ args.libraryName ? String(args.libraryName) : undefined }}"
+          }
+        }
+      },
+      {
+        "name": "get-documentation",
+        "description": "Get documentation for a specific library. Returns code snippets and info snippets ranked by relevance to your query. Use type=json for structured data or type=txt for plain text.",
+        "method": "GET",
+        "path": "/context",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "libraryId",
+            "query"
+          ],
+          "properties": {
+            "type": {
+              "enum": [
+                "json",
+                "txt"
+              ],
+              "type": "string",
+              "default": "json",
+              "description": "Response format - either 'json' for structured data or 'txt' for plain text"
+            },
+            "query": {
+              "type": "string",
+              "description": "Specific question or topic (e.g., 'how to make POST request', 'authentication')"
+            },
+            "libraryId": {
+              "type": "string",
+              "description": "Library identifier from search results"
+            }
+          }
+        },
+        "mapping": {
+          "query": {
+            "type": "{{ String(args.type || 'json') }}",
+            "query": "{{ String(args.query) }}",
+            "libraryId": "{{ String(args.libraryId) }}"
+          }
+        }
+      },
+      {
+        "name": "test-new-endpoint",
+        "description": "Test endpoint for validation",
+        "method": "POST",
+        "path": "/test",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "query"
+          ],
+          "properties": {
+            "query": {
+              "type": "string",
+              "description": "Test query parameter"
+            }
+          }
+        },
+        "mapping": {
+          "body": {
+            "query": "{{ String(args.query) }}"
+          }
+        },
+        "timeoutMs": 10000
+      }
+    ]
+  }
+}

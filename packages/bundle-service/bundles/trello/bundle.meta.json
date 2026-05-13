@@ -1,0 +1,9 @@
+{
+  "name": "Trello",
+  "description": "Trello project management connector for managing boards, lists, cards, and members via OAuth2 authentication.",
+  "version": "1.0.0",
+  "tags": [
+    "project-management"
+  ],
+  "kind": "connector"
+}

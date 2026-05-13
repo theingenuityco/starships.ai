@@ -1,0 +1,9 @@
+{
+  "name": "Notion",
+  "description": "Connect a Notion workspace to enable tools that create, read, and manage pages, databases, and content via the Notion AP",
+  "version": "1.0.0",
+  "tags": [
+    "connector"
+  ],
+  "kind": "connector"
+}

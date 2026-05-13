@@ -19,13 +19,15 @@ import { z } from 'zod';
 import { getEnvConfig } from '@starships/env';
 import { validateOAuthState } from '@/utils/jwt';
 import type { ConnectorProvider } from '@starships/protocol';
-import { ConnectorTemplateRepository } from '@starships/models';
 import { PlatformSecretService } from '@/services/PlatformSecretService';
+import { ConnectorTemplateRegistryClient } from '@/services/ConnectorTemplateRegistryClient';
 import { parseExternalLaunchConfigFromAuthJson, verifyExternalLaunchQuery } from '@/utils/external-launch';
 
 const env = getEnvConfig();
 
 const router: Router = Router();
+
+const connectorTemplateRegistry = new ConnectorTemplateRegistryClient();
 
 
 
@@ -154,8 +156,7 @@ async function connectorExternalEntryValidateHandler(req: Request, res: Response
 
     const { provider } = params;
 
-    const templateRepo = new ConnectorTemplateRepository();
-    const template = await templateRepo.findByProvider(provider as ConnectorProvider);
+    const template = await connectorTemplateRegistry.findByProvider(provider as ConnectorProvider);
     if (!template) {
       sendError(res, 'RESOURCE_NOT_FOUND', 'Connector template not found', 404, { provider });
       return;
@@ -498,8 +499,7 @@ async function connectorCallbackHandler(req: Request, res: Response): Promise<vo
     // Optional: verify provider-signed callback query when the connector template opts in.
     // This is used by providers like Shopify that sign callback params with an HMAC.
     try {
-      const templateRepo = new ConnectorTemplateRepository();
-      const template = await templateRepo.findByProvider(provider as ConnectorProvider);
+      const template = await connectorTemplateRegistry.findByProvider(provider as ConnectorProvider);
       const launchConfig = template ? parseExternalLaunchConfigFromAuthJson(template.authJson) : null;
 
       if (launchConfig) {

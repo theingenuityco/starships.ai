@@ -1,0 +1,9 @@
+{
+  "name": "Semrush",
+  "description": "SEO, PPC, and market intelligence data via Semrush API",
+  "version": "1.0.0",
+  "tags": [
+    "connector"
+  ],
+  "kind": "connector"
+}

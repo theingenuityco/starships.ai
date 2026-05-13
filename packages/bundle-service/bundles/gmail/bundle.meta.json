@@ -1,0 +1,9 @@
+{
+  "name": "Gmail",
+  "description": "Connect a Gmail account to send, read, and manage emails via the Gmail API.",
+  "version": "1.0.0",
+  "tags": [
+    "connector"
+  ],
+  "kind": "connector"
+}

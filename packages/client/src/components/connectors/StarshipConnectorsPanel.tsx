@@ -30,13 +30,6 @@ const CONNECTOR_CTA_BUTTON_CLASS =
   'h-9 px-3 font-medium transition-all duration-200 border border-transparent text-primary/80 hover:text-primary hover:border-primary/25 hover:bg-primary/10 hover:shadow-sm disabled:text-muted-foreground disabled:hover:text-muted-foreground disabled:hover:border-transparent disabled:hover:bg-transparent disabled:hover:shadow-none'
 const CONNECTOR_CTA_ICON_CLASS = 'mr-1 h-4 w-4 text-primary/80 group-disabled:text-muted-foreground'
 
-const INTERNAL_STARSHIPS_CONNECTOR_PROVIDER = 'starships'
-
-function excludeInternalStarshipsConnectorFromTotal(total: number | null): number | null {
-  if (typeof total !== 'number' || !Number.isFinite(total)) return null
-  // Catalog endpoint includes the built-in Starships connector; the UI hides it.
-  return Math.max(0, total - 1)
-}
 
 interface StarshipConnectorsPanelProps {
   starshipId: string
@@ -540,7 +533,7 @@ export function StarshipConnectorsPanel({
 
   // Catalog is driven by connector_templates (enabled only). UI adapts actions based on auth.type.
   const visibleCatalog = useMemo(() => {
-    const base = (catalogItems || []).filter(item => item.provider !== 'starships')
+    const base = (catalogItems || []).filter(item => item.provider !== 'system')
     if (Array.isArray(onlyProviders) && onlyProviders.length > 0) {
       const allow = new Set(onlyProviders.map(p => String(p)))
       return base.filter(item => allow.has(String(item.provider)))
@@ -639,7 +632,7 @@ export function StarshipConnectorsPanel({
   useEffect(() => {
     if (!onCatalogTotalChange) return
     const nextRaw = paginateCatalog ? pagedTotal : visibleCatalog.length
-    const next = paginateCatalog ? excludeInternalStarshipsConnectorFromTotal(nextRaw) : nextRaw
+    const next = nextRaw
     if (lastCatalogTotalRef.current === next) return
     lastCatalogTotalRef.current = next
     onCatalogTotalChange(next)

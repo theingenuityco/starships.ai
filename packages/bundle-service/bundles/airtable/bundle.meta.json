@@ -1,0 +1,9 @@
+{
+  "name": "Airtable",
+  "description": "Airtable connector for managing bases, tables, records, and fields. Integrate with Airtable's REST API to create, read, ",
+  "version": "1.0.0",
+  "tags": [
+    "connector"
+  ],
+  "kind": "connector"
+}

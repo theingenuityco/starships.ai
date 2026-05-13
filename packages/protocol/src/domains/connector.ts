@@ -294,6 +294,13 @@ export interface ConnectorAuthOAuth2V2 {
   accessTokenRef: SecretRef;
   refreshTokenRef?: SecretRef;
 
+  /**
+   * How to authenticate the token exchange request.
+   * - 'body' (default): client_id + client_secret in the POST form body
+   * - 'basic': HTTP Basic Auth header (required by Notion, some others)
+   */
+  tokenAuthStyle?: 'body' | 'basic';
+
   injection: {
     style: 'header' | 'query';
     headerName?: string; // default "Authorization"

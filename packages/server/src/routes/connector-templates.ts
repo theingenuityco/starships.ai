@@ -9,26 +9,21 @@ import type {
   AdminConnectorTemplateListResponse,
   AdminConnectorTemplateImportResponse,
   AdminConnectorTemplateResponse,
-  AdminConnectorTemplateDeleteResponse,
   AdminConnectorTemplateActionsListResponse,
   AdminConnectorTemplateActionResponse,
-  BulkReplaceConnectorTemplateActionsRequest,
   AuthUser,
   ConnectorAuthV2,
   ConnectorEndpointV2,
   ConnectorTemplateAdminModel,
   ConnectorTemplateModel,
   ConnectorTemplateRuntimeFieldsV2,
-  CreateConnectorTemplateRequest,
   ImportExportContainerV1,
   ConnectorTemplateExportPayloadV1,
-  UpdateConnectorTemplateRequest,
 } from '@starships/protocol';
 import {
   ConnectorTemplateActionRepository,
   ConnectorTemplateEntity,
   ConnectorTemplateRepository,
-  ConnectorRepository,
 } from '@starships/models';
 
 const router: Router = Router();
@@ -53,56 +48,6 @@ const TemplateTextSchema = z
   .refine((val) => !/<[^>]*>/.test(val), { message: 'HTML tags are not allowed' });
 
 const AuthTypeSchema = z.enum(['oauth2', 'api_key', 'basic', 'platform_jwt', 'none']);
-
-// Loose-but-validated: require `auth.type`, allow additional keys for forward-compat.
-const AuthObjectSchema = z.object({ type: AuthTypeSchema }).passthrough();
-
-const UpdateConnectorTemplateSchema = z
-  .object({
-    name: TemplateTextSchema.max(255).optional(),
-    description: TemplateTextSchema.max(120).optional(),
-    isEnabled: z.boolean().optional(),
-    version: z.string().trim().min(1).max(20).optional(),
-    demoVideoUrl: z.string().trim().max(2048).url().optional(),
-    category: z.string().trim().min(1).max(100).optional(),
-    baseUrl: z.string().trim().min(1).max(2048).optional(),
-    auth: AuthObjectSchema.optional(),
-    variables: z.array(z.record(z.string(), z.unknown())).optional(),
-    rateLimit: z.record(z.string(), z.unknown()).optional(),
-    metadataSchema: z.record(z.string(), z.unknown()).optional(),
-  })
-  .refine(
-    (body) =>
-      body.name !== undefined ||
-      body.description !== undefined ||
-      body.isEnabled !== undefined ||
-      body.version !== undefined ||
-      body.demoVideoUrl !== undefined ||
-      body.category !== undefined ||
-      body.baseUrl !== undefined ||
-      body.auth !== undefined ||
-      body.variables !== undefined ||
-      body.rateLimit !== undefined ||
-      body.metadataSchema !== undefined,
-    { message: 'At least one field must be provided' }
-  );
-
-const CreateConnectorTemplateSchema = z.object({
-  id: TemplateIdOrProviderSchema.optional(),
-  slug: z.string().trim().min(1).max(255).optional(),
-  provider: z.string().trim().min(1).max(255),
-  name: TemplateTextSchema.max(255),
-  description: TemplateTextSchema.max(120),
-  isEnabled: z.boolean().optional(),
-  version: z.string().trim().min(1).max(20).optional(),
-  category: z.string().trim().min(1).max(100).optional(),
-  demoVideoUrl: z.string().trim().max(2048).url().optional(),
-  baseUrl: z.string().trim().min(1).max(2048),
-  auth: AuthObjectSchema,
-  variables: z.array(z.record(z.string(), z.unknown())).optional(),
-  rateLimit: z.record(z.string(), z.unknown()).optional(),
-  metadataSchema: z.record(z.string(), z.unknown()).optional(),
-});
 
 function toTemplateSummary(entity: ConnectorTemplateEntity): ConnectorTemplateModel {
   return {
@@ -246,130 +191,10 @@ router.get('/admin/connector-templates/:id/export', async (req: Request, res: Re
 
 /**
  * POST /admin/connector-templates/import
- * Import (upsert) a connector template from an export container (instance admin only).
+ * Disabled: connector templates are now managed via bundle-service files.
  */
-router.post('/admin/connector-templates/import', async (req: Request, res: Response): Promise<void> => {
-  try {
-    const ContainerSchema = z.object({
-      schemaVersion: z.literal('1'),
-      kind: z.literal('connector_template'),
-      exportedAt: z.string().min(1),
-      metadata: z.record(z.string(), z.unknown()).optional(),
-      source: z
-        .object({
-          app: z.string().optional(),
-          version: z.string().optional(),
-        })
-        .optional(),
-      payload: z.object({
-        connectorTemplate: z.object({
-          id: z.string().trim().min(1).optional(),
-          slug: z.string().trim().min(1).optional(),
-          provider: z.string().trim().min(1),
-          name: z.string().trim().min(1),
-          description: z.string().trim().min(1).max(120),
-          isEnabled: z.boolean().optional(),
-          version: z.string().trim().min(1).optional(),
-          category: z.string().trim().min(1).optional(),
-          baseUrl: z.string().trim().min(1),
-          auth: AuthObjectSchema,
-          variables: z.array(z.record(z.string(), z.unknown())).nullable().optional(),
-          rateLimit: z.record(z.string(), z.unknown()).nullable().optional(),
-          metadataSchema: z.record(z.string(), z.unknown()).nullable().optional(),
-          demoVideoUrl: z.string().trim().max(2048).url().nullable().optional(),
-        }),
-        actions: z.array(z.record(z.string(), z.unknown())).optional(),
-      }),
-    });
-
-    const body = validateData(ContainerSchema, req.body, res, 'connector template import container');
-    if (!body) return;
-
-    const warnings: string[] = [];
-    // Zod schema intentionally validates a safe-but-loose JSON shape; cast through unknown to satisfy TS.
-    const ctRaw = body.payload.connectorTemplate as unknown as CreateConnectorTemplateRequest;
-    const rawActions = (body.payload as unknown as { actions?: unknown }).actions;
-    const ctRawNullable = ctRaw as unknown as {
-      variables?: unknown;
-      rateLimit?: unknown;
-      metadataSchema?: unknown;
-      demoVideoUrl?: unknown;
-    };
-    // Normalize nulls (common when JSONB columns are null) into undefined for optional fields.
-    const ct: CreateConnectorTemplateRequest = {
-      ...ctRaw,
-      variables: ctRawNullable.variables === null ? undefined : ctRaw.variables,
-      rateLimit: ctRawNullable.rateLimit === null ? undefined : ctRaw.rateLimit,
-      metadataSchema: ctRawNullable.metadataSchema === null ? undefined : ctRaw.metadataSchema,
-      demoVideoUrl: typeof ctRawNullable.demoVideoUrl === 'string' ? ctRawNullable.demoVideoUrl.trim() || undefined : undefined,
-    };
-
-    const repo = new ConnectorTemplateRepository();
-
-    // Prefer explicit id match, then provider match (provider is effectively unique at the template level).
-    const existing = (ct.id ? await repo.findById(ct.id) : null) ?? (await repo.findByProvider(ct.provider));
-
-    let saved: ConnectorTemplateEntity;
-    let created = false;
-
-    if (existing) {
-      if (ct.slug && ct.slug !== existing.slug) {
-        warnings.push(`Imported slug "${ct.slug}" ignored; existing slug is "${existing.slug}".`);
-      }
-      if (ct.id && ct.id !== existing.id) {
-        warnings.push(`Imported id "${ct.id}" ignored; updating existing template id "${existing.id}".`);
-      }
-
-      const updated =
-        (await repo.update(existing.id, {
-          name: ct.name,
-          description: ct.description,
-          // Persist a denormalized auth_type column for DB filtering/legacy reasons, derived from auth_json.type.
-          authType: ct.auth.type,
-          isEnabled: ct.isEnabled,
-          version: ct.version,
-          category: ct.category,
-          demoVideoUrl: ct.demoVideoUrl,
-          baseUrl: ct.baseUrl,
-          authJson: ct.auth as unknown as ConnectorAuthV2,
-          variablesJson: ct.variables as unknown as ConnectorTemplateRuntimeFieldsV2['variables'],
-          rateLimitJson: ct.rateLimit as unknown as ConnectorTemplateRuntimeFieldsV2['rateLimit'],
-          metadataSchemaJson: ct.metadataSchema as unknown as ConnectorTemplateRuntimeFieldsV2['metadataSchema'],
-        })) ?? undefined;
-
-      if (!updated) {
-        sendError(res, 'RESOURCE_NOT_FOUND', 'Connector template not found', 404, { id: existing.id });
-        return;
-      }
-      saved = updated;
-    } else {
-      created = true;
-      saved = await repo.create(ct);
-    }
-
-    // Optional: import action catalog (source of truth: connector_template_actions).
-    // We intentionally do NOT read/write the legacy connector_templates.endpoints_json field here.
-    if (rawActions !== undefined) {
-      if (!Array.isArray(rawActions)) {
-        throw new Error('payload.actions must be an array when provided');
-      }
-      const actionRepo = new ConnectorTemplateActionRepository();
-      await actionRepo.replaceAllActions({
-        templateId: saved.id,
-        actions: rawActions as unknown as ConnectorEndpointV2[],
-      });
-    }
-
-    const payload: AdminConnectorTemplateImportResponse = {
-      connector: toAdminModel(saved),
-      created,
-      warnings: warnings.length ? warnings : undefined,
-    };
-
-    sendSuccess(res, payload, created ? 201 : 200);
-  } catch (error) {
-    handleError(error, res, 'importing connector template');
-  }
+router.post('/admin/connector-templates/import', (_req: Request, res: Response): void => {
+  res.status(405).json({ error: 'Connector templates are now managed via bundle-service files. Use the migration script to import templates.' });
 });
 
 // GET /admin/connector-templates - List connector templates (summaries)
@@ -389,38 +214,9 @@ router.get('/admin/connector-templates', async (req: Request, res: Response): Pr
   }
 });
 
-// POST /admin/connector-templates - Create a connector template (admin only)
-router.post('/admin/connector-templates', async (req: Request, res: Response): Promise<void> => {
-  try {
-    const body = validateData(CreateConnectorTemplateSchema, req.body as CreateConnectorTemplateRequest, res, 'connector template create');
-    if (!body) return;
-
-    const repo = new ConnectorTemplateRepository();
-    const created = await repo.create({
-      id: body.id,
-      slug: body.slug,
-      provider: body.provider,
-      name: body.name,
-      description: body.description,
-      isEnabled: body.isEnabled,
-      version: body.version,
-      category: body.category,
-      demoVideoUrl: body.demoVideoUrl,
-      baseUrl: body.baseUrl,
-      auth: body.auth as unknown as ConnectorAuthV2,
-      variables: body.variables as unknown as ConnectorTemplateRuntimeFieldsV2['variables'],
-      rateLimit: body.rateLimit as unknown as ConnectorTemplateRuntimeFieldsV2['rateLimit'],
-      metadataSchema: body.metadataSchema as unknown as ConnectorTemplateRuntimeFieldsV2['metadataSchema'],
-    } satisfies CreateConnectorTemplateRequest);
-
-    const payload: AdminConnectorTemplateResponse = {
-      connector: toAdminModel(created),
-    };
-
-    sendSuccess(res, payload, 201);
-  } catch (error) {
-    handleError(error, res, 'creating connector template');
-  }
+// POST /admin/connector-templates - Disabled: templates are now managed via bundle-service files.
+router.post('/admin/connector-templates', (_req: Request, res: Response): void => {
+  res.status(405).json({ error: 'Connector templates are now managed via bundle-service files. Use the migration script to add or update templates.' });
 });
 
 // GET /admin/connector-templates/:id - Get a connector template (admin view)
@@ -445,51 +241,9 @@ router.get('/admin/connector-templates/:id', async (req: Request, res: Response)
   }
 });
 
-// PUT /admin/connector-templates/:id - Update a connector template (admin only)
-router.put('/admin/connector-templates/:id', async (req: Request, res: Response): Promise<void> => {
-  try {
-    const params = validateData(z.object({ id: TemplateIdOrProviderSchema }), req.params, res, 'connector template id');
-    if (!params) return;
-
-    const body = validateData(UpdateConnectorTemplateSchema, req.body as UpdateConnectorTemplateRequest, res, 'connector template update');
-    if (!body) return;
-
-    const repo = new ConnectorTemplateRepository();
-    const existing = (await repo.findById(params.id)) ?? (await repo.findByProvider(params.id));
-    if (!existing) {
-      sendError(res, 'RESOURCE_NOT_FOUND', 'Connector template not found', 404, { id: params.id });
-      return;
-    }
-
-    const updated = await repo.update(existing.id, {
-      name: body.name,
-      description: body.description,
-      // Persist a denormalized auth_type column for DB filtering/legacy reasons, derived from auth_json.type.
-      authType: body.auth ? body.auth.type : undefined,
-      isEnabled: body.isEnabled,
-      version: body.version,
-      category: body.category,
-      demoVideoUrl: body.demoVideoUrl,
-      baseUrl: body.baseUrl,
-      authJson: body.auth as unknown as ConnectorAuthV2,
-      variablesJson: body.variables as unknown as ConnectorTemplateRuntimeFieldsV2['variables'],
-      rateLimitJson: body.rateLimit as unknown as ConnectorTemplateRuntimeFieldsV2['rateLimit'],
-      metadataSchemaJson: body.metadataSchema as unknown as ConnectorTemplateRuntimeFieldsV2['metadataSchema'],
-    });
-
-    if (!updated) {
-      sendError(res, 'RESOURCE_NOT_FOUND', 'Connector template not found', 404, { id: params.id });
-      return;
-    }
-
-    const payload: AdminConnectorTemplateResponse = {
-      connector: toAdminModel(updated),
-    };
-
-    sendSuccess(res, payload);
-  } catch (error) {
-    handleError(error, res, 'updating connector template');
-  }
+// PUT /admin/connector-templates/:id - Disabled: templates are now managed via bundle-service files.
+router.put('/admin/connector-templates/:id', (_req: Request, res: Response): void => {
+  res.status(405).json({ error: 'Connector templates are now managed via bundle-service files. Use the migration script to add or update templates.' });
 });
 
 // ============================================================================
@@ -589,139 +343,24 @@ router.get('/admin/connector-templates/:id/actions/:actionName', async (req: Req
   }
 });
 
-const UpsertActionSchema = z
-  .object({
-    action: z.record(z.string(), z.unknown()),
-    ordinal: z.number().int().min(0).optional(),
-  })
-  .strict();
-
-// PUT /admin/connector-templates/:id/actions/:actionName - upsert one action
-router.put('/admin/connector-templates/:id/actions/:actionName', async (req: Request, res: Response): Promise<void> => {
-  try {
-    const params = validateData(
-      z.object({ id: TemplateIdOrProviderSchema, actionName: z.string().trim().min(1).max(255) }),
-      req.params,
-      res,
-      'connector template action params'
-    );
-    if (!params) return;
-
-    const body = validateData(UpsertActionSchema, req.body as unknown, res, 'upsert action body');
-    if (!body) return;
-
-    const template = await loadTemplateByIdOrProvider(params.id);
-    if (!template) {
-      sendError(res, 'RESOURCE_NOT_FOUND', 'Connector template not found', 404, { id: params.id });
-      return;
-    }
-
-    const action = body.action as unknown as ConnectorEndpointV2;
-    // Enforce name match for safety.
-    action.name = params.actionName;
-
-    const actionRepo = new ConnectorTemplateActionRepository();
-    await actionRepo.upsertAction({ templateId: template.id, action, ordinal: body.ordinal });
-
-    sendSuccess(res, { ok: true });
-  } catch (error) {
-    handleError(error, res, 'upserting connector template action');
-  }
+// PUT /admin/connector-templates/:id/actions/:actionName - Disabled
+router.put('/admin/connector-templates/:id/actions/:actionName', (_req: Request, res: Response): void => {
+  res.status(405).json({ error: 'Connector templates are now managed via bundle-service files. Use the migration script to update templates.' });
 });
 
-// DELETE /admin/connector-templates/:id/actions/:actionName
-router.delete('/admin/connector-templates/:id/actions/:actionName', async (req: Request, res: Response): Promise<void> => {
-  try {
-    const params = validateData(
-      z.object({ id: TemplateIdOrProviderSchema, actionName: z.string().trim().min(1).max(255) }),
-      req.params,
-      res,
-      'connector template action params'
-    );
-    if (!params) return;
-
-    const template = await loadTemplateByIdOrProvider(params.id);
-    if (!template) {
-      sendError(res, 'RESOURCE_NOT_FOUND', 'Connector template not found', 404, { id: params.id });
-      return;
-    }
-
-    const actionRepo = new ConnectorTemplateActionRepository();
-    const deleted = await actionRepo.deleteAction({ templateId: template.id, actionName: params.actionName });
-    if (!deleted) {
-      sendError(res, 'RESOURCE_NOT_FOUND', 'Connector template action not found', 404, { id: template.id, actionName: params.actionName });
-      return;
-    }
-
-    // NOTE: 204 is valid HTTP for DELETE, but our connector/workflow tooling expects a JSON ApiResponse payload.
-    // Returning a standard success payload avoids false-negative failures.
-    sendSuccess(res, { ok: true });
-  } catch (error) {
-    handleError(error, res, 'deleting connector template action');
-  }
+// DELETE /admin/connector-templates/:id/actions/:actionName - Disabled
+router.delete('/admin/connector-templates/:id/actions/:actionName', (_req: Request, res: Response): void => {
+  res.status(405).json({ error: 'Connector templates are now managed via bundle-service files. Use the migration script to update templates.' });
 });
 
-// PUT /admin/connector-templates/:id/actions - bulk replace
-router.put('/admin/connector-templates/:id/actions', async (req: Request, res: Response): Promise<void> => {
-  try {
-    const params = validateData(z.object({ id: TemplateIdOrProviderSchema }), req.params, res, 'connector template id');
-    if (!params) return;
-
-    const BodySchema = z.object({ actions: z.array(z.record(z.string(), z.unknown())) }).strict();
-    const body = validateData(
-      BodySchema,
-      req.body as unknown as BulkReplaceConnectorTemplateActionsRequest,
-      res,
-      'bulk replace actions body'
-    );
-    if (!body) return;
-
-    const template = await loadTemplateByIdOrProvider(params.id);
-    if (!template) {
-      sendError(res, 'RESOURCE_NOT_FOUND', 'Connector template not found', 404, { id: params.id });
-      return;
-    }
-
-    const actionRepo = new ConnectorTemplateActionRepository();
-    await actionRepo.replaceAllActions({ templateId: template.id, actions: body.actions as unknown as ConnectorEndpointV2[] });
-
-    sendSuccess(res, { ok: true });
-  } catch (error) {
-    handleError(error, res, 'bulk replacing connector template actions');
-  }
+// PUT /admin/connector-templates/:id/actions - Disabled (bulk replace)
+router.put('/admin/connector-templates/:id/actions', (_req: Request, res: Response): void => {
+  res.status(405).json({ error: 'Connector templates are now managed via bundle-service files. Use the migration script to update templates.' });
 });
 
-// DELETE /admin/connector-templates/:id - Delete a connector template (admin only)
-router.delete('/admin/connector-templates/:id', async (req: Request, res: Response): Promise<void> => {
-  try {
-    const params = validateData(z.object({ id: TemplateIdOrProviderSchema }), req.params, res, 'connector template id');
-    if (!params) return;
-
-    const repo = new ConnectorTemplateRepository();
-    const connectorRepo = new ConnectorRepository();
-    const existing = (await repo.findById(params.id)) ?? (await repo.findByProvider(params.id));
-    if (!existing) {
-      sendError(res, 'RESOURCE_NOT_FOUND', 'Connector template not found', 404, { id: params.id });
-      return;
-    }
-
-    const deletedConnectors = await connectorRepo.deleteByTemplateId(existing.id);
-
-    const deleted = await repo.delete(existing.id);
-    if (!deleted) {
-      sendError(res, 'RESOURCE_NOT_FOUND', 'Connector template not found', 404, { id: params.id });
-      return;
-    }
-
-    const payload: AdminConnectorTemplateDeleteResponse = {
-      message: 'Connector template deleted',
-      deletedConnectors: deletedConnectors || undefined,
-    };
-
-    sendSuccess(res, payload);
-  } catch (error) {
-    handleError(error, res, 'deleting connector template');
-  }
+// DELETE /admin/connector-templates/:id - Disabled
+router.delete('/admin/connector-templates/:id', (_req: Request, res: Response): void => {
+  res.status(405).json({ error: 'Connector templates are now managed via bundle-service files. Use the migration script to update templates.' });
 });
 
 export default router;

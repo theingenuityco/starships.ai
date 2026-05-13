@@ -1,0 +1,347 @@
+{
+  "schemaVersion": "1",
+  "kind": "connector_template",
+  "exportedAt": "2026-05-13T06:46:43.660Z",
+  "metadata": {
+    "fromProvider": "zendesk",
+    "fromSlug": "zendesk",
+    "fromId": "OLOUfchqpkaOjCgiJg7EY"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "connectorTemplate": {
+      "id": "OLOUfchqpkaOjCgiJg7EY",
+      "slug": "zendesk",
+      "provider": "zendesk",
+      "name": "Zendesk",
+      "description": "Zendesk customer service platform connector for managing tickets, conversations, users, and support operations with OAut",
+      "isEnabled": true,
+      "version": "1.0.0",
+      "category": "connector",
+      "baseUrl": "https://api.smooch.io/v2",
+      "auth": {
+        "type": "oauth2",
+        "scopes": [
+          "app"
+        ],
+        "tokenUrl": "https://api.smooch.io/oauth/token",
+        "injection": {
+          "style": "header",
+          "headerName": "Authorization",
+          "tokenPrefix": "Bearer"
+        },
+        "clientIdRef": {
+          "key": "ZENDESK_OAUTH_CLIENT_ID",
+          "type": "platform_secret"
+        },
+        "tokenResponse": {
+          "accessTokenField": "access_token",
+          "refreshTokenField": "refresh_token"
+        },
+        "accessTokenRef": {
+          "key": "ZENDESK_ACCESS_TOKEN",
+          "type": "connector_secret"
+        },
+        "scopeDelimiter": " ",
+        "clientSecretRef": {
+          "key": "ZENDESK_OAUTH_CLIENT_SECRET",
+          "type": "platform_secret"
+        },
+        "refreshTokenRef": {
+          "key": "ZENDESK_REFRESH_TOKEN",
+          "type": "connector_secret"
+        },
+        "authorizationUrl": "https://api.smooch.io/oauth/authorize"
+      },
+      "rateLimit": {
+        "burstLimit": 10,
+        "requestsPerMinute": 60
+      },
+      "metadataSchema": {
+        "type": "object",
+        "required": [
+          "appId"
+        ],
+        "properties": {
+          "appId": {
+            "type": "string",
+            "description": "The Zendesk app ID for API calls"
+          },
+          "subdomain": {
+            "type": "string",
+            "description": "Optional Zendesk subdomain for custom base URL"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "actions": [
+      {
+        "name": "create-user",
+        "description": "Create a new user in Zendesk",
+        "method": "POST",
+        "path": "/apps/{appId}/users",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "appId",
+            "externalId"
+          ],
+          "properties": {
+            "appId": {
+              "type": "string",
+              "description": "The app ID"
+            },
+            "email": {
+              "type": "string",
+              "description": "User's email address"
+            },
+            "locale": {
+              "type": "string",
+              "description": "User's locale (e.g., 'en-US')"
+            },
+            "surname": {
+              "type": "string",
+              "description": "User's surname"
+            },
+            "avatarUrl": {
+              "type": "string",
+              "description": "URL of the user's avatar"
+            },
+            "givenName": {
+              "type": "string",
+              "description": "User's given name"
+            },
+            "externalId": {
+              "type": "string",
+              "description": "A unique identifier for the user (max 1024 characters)"
+            }
+          }
+        },
+        "mapping": {
+          "body": {
+            "profile": {
+              "email": "{{ String(args.email) }}",
+              "locale": "{{ String(args.locale || 'en') }}",
+              "surname": "{{ String(args.surname) }}",
+              "avatarUrl": "{{ String(args.avatarUrl) }}",
+              "givenName": "{{ String(args.givenName) }}"
+            },
+            "externalId": "{{ String(args.externalId) }}"
+          },
+          "path": {
+            "appId": "{{ String(args.appId || metadata.appId) }}"
+          }
+        },
+        "response": {
+          "select": "{{ body.user }}"
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "delete-user",
+        "description": "Delete a user and their conversation history",
+        "method": "DELETE",
+        "path": "/apps/{appId}/users/{userIdOrExternalId}",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "appId",
+            "userIdOrExternalId"
+          ],
+          "properties": {
+            "appId": {
+              "type": "string",
+              "description": "The app ID"
+            },
+            "userIdOrExternalId": {
+              "type": "string",
+              "description": "The user's ID or external ID"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "appId": "{{ String(args.appId || metadata.appId) }}",
+            "userIdOrExternalId": "{{ String(args.userIdOrExternalId) }}"
+          }
+        },
+        "response": {
+          "select": "{{ body }}"
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "list-conversations",
+        "description": "List all conversations for a user with pagination support",
+        "method": "GET",
+        "path": "/apps/{appId}/conversations",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "appId"
+          ],
+          "properties": {
+            "appId": {
+              "type": "string",
+              "description": "The app ID"
+            },
+            "limit": {
+              "type": "integer",
+              "default": 25,
+              "description": "Maximum number of results to return"
+            },
+            "userId": {
+              "type": "string",
+              "description": "Filter conversations by user ID"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "appId": "{{ String(args.appId || metadata.appId) }}"
+          },
+          "query": {
+            "limit": "{{ String(args.limit || 25) }}",
+            "filter[userId]": "{{ String(args.userId) }}"
+          }
+        },
+        "response": {
+          "select": "{{ body.conversations }}"
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "update-user",
+        "description": "Update an existing user's information",
+        "method": "PATCH",
+        "path": "/apps/{appId}/users/{userIdOrExternalId}",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "appId",
+            "userIdOrExternalId"
+          ],
+          "properties": {
+            "appId": {
+              "type": "string",
+              "description": "The app ID"
+            },
+            "email": {
+              "type": "string",
+              "description": "User's email address"
+            },
+            "locale": {
+              "type": "string",
+              "description": "User's locale"
+            },
+            "surname": {
+              "type": "string",
+              "description": "User's surname"
+            },
+            "avatarUrl": {
+              "type": "string",
+              "description": "URL of the user's avatar"
+            },
+            "givenName": {
+              "type": "string",
+              "description": "User's given name"
+            },
+            "userIdOrExternalId": {
+              "type": "string",
+              "description": "The user's ID or external ID"
+            }
+          }
+        },
+        "mapping": {
+          "body": {
+            "profile": {
+              "email": "{{ String(args.email) }}",
+              "locale": "{{ String(args.locale) }}",
+              "surname": "{{ String(args.surname) }}",
+              "avatarUrl": "{{ String(args.avatarUrl) }}",
+              "givenName": "{{ String(args.givenName) }}"
+            }
+          },
+          "path": {
+            "appId": "{{ String(args.appId || metadata.appId) }}",
+            "userIdOrExternalId": "{{ String(args.userIdOrExternalId) }}"
+          }
+        },
+        "response": {
+          "select": "{{ body.user }}"
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "get-conversation",
+        "description": "Fetch a specific conversation by ID",
+        "method": "GET",
+        "path": "/apps/{appId}/conversations/{conversationId}",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "appId",
+            "conversationId"
+          ],
+          "properties": {
+            "appId": {
+              "type": "string",
+              "description": "The app ID"
+            },
+            "conversationId": {
+              "type": "string",
+              "description": "The conversation ID"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "appId": "{{ String(args.appId || metadata.appId) }}",
+            "conversationId": "{{ String(args.conversationId) }}"
+          }
+        },
+        "response": {
+          "select": "{{ body.conversation }}"
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "get-user",
+        "description": "Fetch a user by ID or external ID",
+        "method": "GET",
+        "path": "/apps/{appId}/users/{userIdOrExternalId}",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "appId",
+            "userIdOrExternalId"
+          ],
+          "properties": {
+            "appId": {
+              "type": "string",
+              "description": "The app ID"
+            },
+            "userIdOrExternalId": {
+              "type": "string",
+              "description": "The user's ID or external ID"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "appId": "{{ String(args.appId || metadata.appId) }}",
+            "userIdOrExternalId": "{{ String(args.userIdOrExternalId) }}"
+          }
+        },
+        "response": {
+          "select": "{{ body.user }}"
+        },
+        "timeoutMs": 15000
+      }
+    ]
+  }
+}

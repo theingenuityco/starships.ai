@@ -1,0 +1,9 @@
+{
+  "name": "Snowflake",
+  "description": "Cloud data warehouse platform for querying, managing, and analyzing data at scale.",
+  "version": "1.0.0",
+  "tags": [
+    "connector"
+  ],
+  "kind": "connector"
+}

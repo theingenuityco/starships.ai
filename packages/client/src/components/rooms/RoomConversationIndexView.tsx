@@ -255,6 +255,17 @@ export function RoomConversationIndexView(props: {
               variant="ghost"
               size="sm"
               className="h-8 w-8 px-0 text-muted-foreground hover:text-foreground"
+              aria-label="Participants"
+              title="Participants"
+              onClick={() => props.onOpenParticipantsPane?.()}
+            >
+              <Icon name="users" weight="bold" className="h-4 w-4" />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-8 w-8 px-0 text-muted-foreground hover:text-foreground"
               aria-label="History"
               title="History"
               onClick={() => props.onOpenHistoryPane?.()}

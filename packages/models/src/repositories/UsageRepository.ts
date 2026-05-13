@@ -445,22 +445,4 @@ export class UsageRepository extends BaseRepository {
     return row ? fromDatabase(UsageEntity, row) : null;
   }
 
-  /**
-   * Mark a usage row as billed, linking to the created ledger entry id (nullable).
-   * Executed within the caller's transaction.
-   */
-  async markBilledWithClient(client: PoolClient, usageId: string, ledgerId: string | null, billedAt: string): Promise<void> {
-    if (!usageId?.trim()) throw new Error('usageId is required');
-    const billedTs = billedAt || new Date().toISOString();
-
-    await client.query(
-      `
-      UPDATE usage
-      SET billed_at = $2,
-          billed_ledger_id = $3
-      WHERE id = $1
-      `,
-      [usageId, billedTs, ledgerId]
-    );
-  }
 }

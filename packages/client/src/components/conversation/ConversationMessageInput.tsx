@@ -18,7 +18,6 @@ import {
 } from '@/hooks/useConversations'
 import { useConversationStreamContext } from '@/hooks/ConversationStreamContext'
 import { useConversationContextUsage } from '@/hooks/useConversationContextUsage'
-import { useWallet } from '@/hooks/useWallet'
 import { useStarshipBySlug } from '@/hooks/useStarships'
 import { cn } from '@/lib/utils'
 import { formatAgentDisplayName } from '@/lib/agentDisplay'
@@ -39,7 +38,6 @@ import api, { agentAPI } from '@/lib/api'
 import AgentAvatar from '@/components/animated/AgentAvatar'
 // Tooltip no longer needed after removing tool builder button
 import { ExpandableMessageOverlay } from './ExpandableMessageOverlay'
-import Link from 'next/link'
 import { toast } from 'sonner'
 import { useStarshipAgents } from '@/hooks/useAgents'
 import { useStarshipMembersAndInvites, type StarshipMemberListItem } from '@/hooks/useStarshipMembers'
@@ -206,16 +204,6 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     const createConversation = useCreateConversation()
     const linkMessageToConversation = useLinkMessageToConversation()
     const { data: starshipForPerms } = useStarshipBySlug(starshipSlug || '', Boolean(starshipSlug))
-    const canManageBilling = Boolean(isInstanceAdmin || (userId && starshipForPerms?.ownerId === userId))
-    const { data: wallet, isLoading } = useWallet(starshipId, Boolean(starshipId && canManageBilling))
-    // Credits policy (server is authoritative; this is for UX only)
-    const CREDITS_PER_MESSAGE = 10
-    const LOW_WARNING_THRESHOLD = 50 // ~5 messages left
-    const balanceNum = Number(wallet?.balance ?? '0')
-
-    // Determine current ship slug for billing URL
-    const billingHref = `/ship/${starshipSlug}/settings/billing`
-
     // Load agents for @mention parsing
     const { data: starshipAgents = [] } = useStarshipAgents(starshipId, !!starshipId)
     const { data: membersData } = useStarshipMembersAndInvites(starshipId, Boolean(starshipId))
@@ -433,10 +421,6 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       const selectedId = String((selectedAgent as any)?.id || '').trim()
       return Boolean(selectedId)
     }, [conversationId, conversationAgents, draftHasAgentMention, isMentionOnlyThread, selectedAgent])
-
-    // Collaborators can't access billing endpoints; avoid blocking chat on wallet data they can't fetch.
-    const hasFunds = canManageBilling ? !requiresCreditsForDraft || balanceNum >= CREDITS_PER_MESSAGE : true
-    const showLowBalanceWarning = Boolean(canManageBilling && conversationId && !isLoading && hasFunds && requiresCreditsForDraft && balanceNum <= LOW_WARNING_THRESHOLD)
 
     // Reset pending state when conversation is created
     useEffect(() => {
@@ -1281,7 +1265,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     const hasSendableContent = hasActualContent || hasPendingAttachments
     // Preserve existing agent-target gating for text, but allow attachment-only sends without text.
     const meetsTargetGate = hasActualContent ? hasTargetAgent : hasPendingAttachments
-    const canSend = hasSendableContent && meetsTargetGate && !disabled && !sending && !isStreamingEffective && hasFunds
+    const canSend = hasSendableContent && meetsTargetGate && !disabled && !sending && !isStreamingEffective
 
     // Mobile UX: Discord-like "focus mode" (secondary actions fade back once typing/focused).
     const isMobileComposerEngaged = Boolean((isEditorFocused || hasActualContent) && !disabled && !isStreamingEffective)
@@ -2206,63 +2190,6 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
               />
             )
           })}
-
-        {/* Low credits warning banner */}
-        {showLowBalanceWarning && (
-          <div className="mb-4 p-3 rounded-lg bg-gradient-to-r from-yellow-50/80 to-orange-50/60 dark:from-yellow-950/20 dark:to-orange-950/10 border border-yellow-200/50 dark:border-yellow-800/30 backdrop-blur-sm shadow-sm">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-yellow-100 dark:bg-yellow-900/30 flex items-center justify-center flex-shrink-0">
-                <svg className="w-5 h-5 text-yellow-600 dark:text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-                </svg>
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-yellow-900 dark:text-yellow-100 mb-1">Low credits</p>
-                <p className="text-xs text-yellow-700 dark:text-yellow-300 leading-relaxed">
-                  You’re running low on credits. Each agent-triggering message costs {CREDITS_PER_MESSAGE} credits—add more to avoid interruptions.
-                </p>
-              </div>
-              <div className="flex-shrink-0">
-                <Link href={billingHref}>
-                  <Button variant="default" size="sm" className="border-0 shadow-md hover:shadow-lg transition-all duration-200 font-medium">
-                    Get credits
-                  </Button>
-                </Link>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Professional insufficient credits indicator */}
-        {canManageBilling && requiresCreditsForDraft && !hasFunds && !isLoading && conversationId && (
-          <div className="mb-4 p-3 rounded-lg bg-gradient-to-r from-red-50/80 to-orange-50/60 dark:from-red-950/20 dark:to-orange-950/10 border border-red-200/50 dark:border-red-800/30 backdrop-blur-sm shadow-sm">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center flex-shrink-0">
-                <svg className="w-5 h-5 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"
-                  />
-                </svg>
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-red-900 dark:text-red-100 mb-1">Insufficient credits</p>
-                <p className="text-xs text-red-700 dark:text-red-300 leading-relaxed">
-                  You need at least {CREDITS_PER_MESSAGE} credits to send an agent-triggering message. Please add credits to keep chatting.
-                </p>
-              </div>
-              <div className="flex-shrink-0">
-                <Link href={billingHref}>
-                  <Button variant="default" size="sm" className="bg-red-600 hover:bg-red-700 text-white border-0 shadow-md hover:shadow-lg transition-all duration-200 font-medium">
-                    Get credits
-                  </Button>
-                </Link>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* File Attachments Preview - Outside input container in minimal mode */}
         {minimal && pendingFiles.length > 0 && (

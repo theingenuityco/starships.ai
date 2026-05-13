@@ -1,12 +1,10 @@
 import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
-import type { NextFunction, Request, Response } from 'express';
+import type { Request, Response } from 'express';
 import { Router } from 'express';
 import { z } from 'zod';
 import { validateData } from '@/utils/validation';
 import { IdSchema, SlugSchema, noXSS, XSS_ERROR_MESSAGE } from '@/schemas/common';
 import { AgentRepository, ToolRepository } from '@starships/models';
-import { BalanceValidationService } from '@/services/BalanceValidationService';
-import { WalletService } from '@/services/WalletService';
 import { createPaginationMeta, handleError, sendError, sendSuccess } from '../utils/responseHelpers';
 import { verifyStarshipAccess, verifyResourceAccess } from '@/middleware/verify-starship-access';
 import { isInstanceAdmin } from '@/utils/auth-helpers';
@@ -15,7 +13,6 @@ import type {
   AuthUser,
   CreateToolRequest,
   UpdateToolRequest,
-  WalletModel,
 } from '@starships/protocol';
 
 const router: Router = Router();
@@ -87,49 +84,6 @@ const UpdateToolSchema = z.object({
   isEnabled: z.boolean().optional(),
   status: z.enum(['draft', 'active']).optional(),
 });
-
-type WalletRequest = Request & { wallet?: WalletModel };
-
-// Balance validation middleware for tool operations
-const validateToolBalance = async (req: WalletRequest, res: Response, next: NextFunction) => {
-  try {
-    const { starshipId } = req.params;
-
-    if (!starshipId) {
-      sendError(res, 'VALIDATION_ERROR', 'Starship ID is required', 400);
-      return;
-    }
-
-    const walletService = new WalletService();
-    const wallet = await walletService.getByStarshipId(starshipId);
-
-    if (!wallet) {
-      sendError(res, 'RESOURCE_NOT_FOUND', 'Wallet not found', 404, {
-        starshipId,
-      });
-      return;
-    }
-
-    // Validate balance using centralized service
-    const balanceValidation = BalanceValidationService.validateBalance({
-      id: wallet.id,
-      balance: wallet.balance,
-    });
-
-    if (!balanceValidation.isValid) {
-      const errorDetails = BalanceValidationService.getInsufficientBalanceError(wallet.balance);
-      sendError(res, 'INSUFFICIENT_FUNDS', errorDetails.message, 402, errorDetails.details);
-      return;
-    }
-
-    // Add wallet to request for use in route handlers
-    req.wallet = wallet;
-    next();
-  } catch (error) {
-    console.error('[TOOLS] Balance validation error:', error);
-    sendError(res, 'INTERNAL_SERVER_ERROR', 'Balance validation failed', 500);
-  }
-};
 
 // ============================================================================
 // TOOL INSTANCE ENDPOINTS
@@ -380,7 +334,7 @@ router.get('/starships/:starshipId/tools/:slug', jwtAuthMiddleware, async (req: 
 });
 
 // POST /starships/:starshipId/tools - Create tool instance for starship (OpenAPI pattern)
-router.post('/starships/:starshipId/tools', jwtAuthMiddleware, validateToolBalance, async (req: Request, res: Response): Promise<void> => {
+router.post('/starships/:starshipId/tools', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const paramValidation = validateData(z.object({ starshipId: IdSchema }), req.params, res, 'starship parameter');
     if (!paramValidation) return;

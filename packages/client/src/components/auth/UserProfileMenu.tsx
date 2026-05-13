@@ -53,13 +53,6 @@ export function UserProfileMenu({ expanded = false }: UserProfileMenuProps): Rea
 
   const isOwner = Boolean(isAuthenticated && user?.id && (starshipFromList?.ownerId ?? starshipBySlug?.ownerId) === user.id)
 
-  const canManageBilling = Boolean(isAuthenticated && user?.id && activeStarshipId && (user?.isInstanceAdmin === true || (starshipFromList?.ownerId ?? starshipBySlug?.ownerId) === user.id))
-
-  const handleBillingClick = useCallback(() => {
-    if (!activeStarshipSlug) return
-    router.push(`/ship/${activeStarshipSlug}/settings/billing`)
-  }, [router, activeStarshipSlug])
-
   const handleAccountClick = useCallback(() => {
     router.push('/account')
   }, [router])
@@ -139,14 +132,6 @@ export function UserProfileMenu({ expanded = false }: UserProfileMenuProps): Rea
               <Icon name="rocket" className={navMenuItemIconClassName} />
             </div>
             My Starship
-          </DropdownMenuItem>
-        ) : null}
-        {canManageBilling ? (
-          <DropdownMenuItem onClick={handleBillingClick} disabled={!activeStarshipSlug} className={navMenuItemClassName}>
-            <div className="flex-shrink-0" style={{ width: '1.25rem', height: '1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: 0, pointerEvents: 'none' }}>
-              <Icon name="credit-card" className={navMenuItemIconClassName} />
-            </div>
-            Billing
           </DropdownMenuItem>
         ) : null}
         <DropdownMenuSeparator />

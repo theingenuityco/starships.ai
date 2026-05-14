@@ -20,7 +20,7 @@
         "properties": {
           "path": {
             "type": "string",
-            "description": "Absolute or relative path to the file to write."
+            "description": "Path to the file to write, relative to the server's working directory. A leading `/` is treated as relative to the working directory root, not the OS root (e.g. `/output.txt` writes `{cwd}/output.txt`)."
           },
           "content": {
             "type": "string",

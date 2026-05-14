@@ -21,7 +21,9 @@ export class FileSystem extends BaseNode<FileSystemParams> {
 
   async execute(input?: ExecutionItem[]): Promise<ExecutionItem[]> {
     const params = this.getParams();
-    const absPath = resolve(params.path);
+    // Strip leading `/` so paths like "/README.md" resolve relative to cwd, not OS root
+    const normalizedPath = params.path.startsWith('/') ? params.path.slice(1) : params.path;
+    const absPath = resolve(normalizedPath);
     const pairedItem = input?.[0];
 
     try {

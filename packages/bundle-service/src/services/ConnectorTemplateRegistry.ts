@@ -40,10 +40,16 @@ export class ConnectorTemplateRegistry {
 
     const results: ConnectorTemplateContainer[] = [];
 
-    const entries = fs.readdirSync(this.bundlesDir, { withFileTypes: true }).filter((d) => d.isDirectory());
+    const bundleDirs: string[] = [];
+    for (const categoryEntry of fs.readdirSync(this.bundlesDir, { withFileTypes: true })) {
+      if (!categoryEntry.isDirectory()) continue;
+      const categoryDir = path.join(this.bundlesDir, categoryEntry.name);
+      for (const bundleEntry of fs.readdirSync(categoryDir, { withFileTypes: true })) {
+        if (bundleEntry.isDirectory()) bundleDirs.push(path.join(categoryDir, bundleEntry.name));
+      }
+    }
 
-    for (const entry of entries) {
-      const bundleDir = path.join(this.bundlesDir, entry.name);
+    for (const bundleDir of bundleDirs) {
       const manifestPath = path.join(bundleDir, 'manifest.json');
       if (!fs.existsSync(manifestPath)) continue;
 

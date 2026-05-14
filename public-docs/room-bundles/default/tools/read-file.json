@@ -1,0 +1,72 @@
+{
+  "schemaVersion": "1",
+  "kind": "tool",
+  "exportedAt": "2026-05-15T00:00:00.000Z",
+  "metadata": {
+    "fromSlug": "read-file",
+    "fromStarshipSlug": "starships-platform"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "tool": {
+      "name": "Read File",
+      "description": "Read the contents of a file on the server filesystem. Returns the file content as a string.",
+      "parameters": {
+        "type": "object",
+        "required": ["path"],
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Absolute or relative path to the file to read."
+          },
+          "encoding": {
+            "type": "string",
+            "enum": ["utf-8", "base64"],
+            "default": "utf-8",
+            "description": "Encoding to use when reading the file. Use 'base64' for binary files."
+          }
+        }
+      },
+      "blueprint": {
+        "nodes": [
+          {
+            "ref": "s",
+            "name": "Start",
+            "type": "start",
+            "parameters": {}
+          },
+          {
+            "ref": "read",
+            "name": "Read File",
+            "type": "file_system",
+            "parameters": {
+              "operation": "read",
+              "path": "{{ input.path }}",
+              "encoding": "{{ input.encoding }}"
+            }
+          },
+          {
+            "ref": "e",
+            "name": "End",
+            "type": "end",
+            "parameters": {
+              "output": "{{ lastOutputOf('read') }}"
+            }
+          }
+        ],
+        "edges": [
+          { "ref": "e1", "from": "s",    "to": "read" },
+          { "ref": "e2", "from": "read", "to": "e" }
+        ]
+      },
+      "transforms": null,
+      "mutations": null,
+      "condition": null,
+      "isEnabled": true,
+      "status": "active"
+    }
+  }
+}

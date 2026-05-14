@@ -393,6 +393,28 @@ export interface CodeParams extends BaseParams {
 }
 
 /**
+ * Terminal node parameters for executing shell commands
+ */
+export interface TerminalParams extends BaseParams {
+  command: string;
+  workingDirectory?: string;
+  timeout?: number; // Execution timeout in milliseconds (default: 30000)
+  env?: Record<string, string>; // Merged onto process.env
+}
+
+/**
+ * FileSystem node parameters for reading and writing files
+ */
+export type FileSystemOperation = 'read' | 'write' | 'append' | 'delete' | 'list' | 'exists';
+
+export interface FileSystemParams extends BaseParams {
+  operation: FileSystemOperation;
+  path: string;
+  content?: string; // Used for write/append
+  encoding?: 'utf-8' | 'base64'; // Default: utf-8
+}
+
+/**
  * UIAction node parameters for emitting UI actions (declarative UI hints).
  *
  * `action` and `payload` are template-resolved at runtime using Eval/Execution context.
@@ -435,7 +457,9 @@ export type NodeParameters =
   | ConditionalParams
   | TransformParams
   | MutateParams
-  | CodeParams;
+  | CodeParams
+  | TerminalParams
+  | FileSystemParams;
 
 /**
  * Reducer specification for Mutate node (pure-return only)

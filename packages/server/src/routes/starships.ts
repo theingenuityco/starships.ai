@@ -1123,6 +1123,30 @@ function resolvePublicDocsRoot(): string {
   return path.resolve(process.cwd(), 'public-docs');
 }
 
+function resolveBundlesRoot(): string {
+  const fromEnv = process.env.BUNDLES_DIR;
+  if (fromEnv && fs.existsSync(fromEnv) && fs.statSync(fromEnv).isDirectory()) {
+    return fromEnv;
+  }
+
+  const candidates = [
+    // When server is started from repo root
+    path.resolve(process.cwd(), 'packages', 'bundle-service', 'bundles'),
+    // When server cwd is packages/server
+    path.resolve(process.cwd(), '..', 'bundle-service', 'bundles'),
+    path.resolve(process.cwd(), '..', '..', 'packages', 'bundle-service', 'bundles'),
+  ];
+
+  for (const dir of candidates) {
+    if (fs.existsSync(dir) && fs.statSync(dir).isDirectory()) {
+      return dir;
+    }
+  }
+
+  // Fallback (will error later with clear message)
+  return path.resolve(process.cwd(), 'packages', 'bundle-service', 'bundles');
+}
+
 function getBundleEntry(reader: BundleReader, file: string): BundleEntry | null {
   return reader.getEntry(file);
 }
@@ -3053,10 +3077,10 @@ function mapSizeToEmployeeRange(size: string): string | null {
  */
 async function ensureDefaultBundleForStarship(opts: { starshipId: string; userId: string }): Promise<void> {
   const { starshipId, userId } = opts;
-  const docsRoot = resolvePublicDocsRoot();
-  const bundleDir = path.join(docsRoot, 'room-bundles', 'default');
+  const bundlesRoot = resolveBundlesRoot();
+  const bundleDir = path.join(bundlesRoot, 'tools', 'default');
   if (!fs.existsSync(bundleDir) || !fs.statSync(bundleDir).isDirectory()) {
-    console.error('[default-bundle] Bundle directory not found', { docsRoot, bundleDir });
+    console.error('[default-bundle] Bundle directory not found', { bundlesRoot, bundleDir });
     throw Object.assign(new Error('Default room bundle is not available on the server'), { code: 'BUNDLE_NOT_FOUND' });
   }
 
@@ -3164,18 +3188,18 @@ async function ensureLeadGenRoomInternal(opts: {
       reader = await RemoteBundleReader.create(bundleServiceUrl, 'lead-generation');
     } catch (err) {
       console.error('[leadgen] Failed to fetch bundle from bundle service, falling back to disk', { bundleServiceUrl, error: err instanceof Error ? err.message : String(err) });
-      const docsRoot = resolvePublicDocsRoot();
-      const bundleDir = path.join(docsRoot, 'room-bundles', 'lead-generation');
+      const bundlesRoot = resolveBundlesRoot();
+      const bundleDir = path.join(bundlesRoot, 'rooms', 'lead-generation');
       if (!fs.existsSync(bundleDir) || !fs.statSync(bundleDir).isDirectory()) {
         throw Object.assign(new Error('Lead generation room bundle is not available on the server'), { code: 'BUNDLE_NOT_FOUND' });
       }
       reader = new DirectoryBundleReader(bundleDir);
     }
   } else {
-    const docsRoot = resolvePublicDocsRoot();
-    const bundleDir = path.join(docsRoot, 'room-bundles', 'lead-generation');
+    const bundlesRoot = resolveBundlesRoot();
+    const bundleDir = path.join(bundlesRoot, 'rooms', 'lead-generation');
     if (!fs.existsSync(bundleDir) || !fs.statSync(bundleDir).isDirectory()) {
-      console.error('[leadgen] Bundle directory not found', { docsRoot, bundleDir });
+      console.error('[leadgen] Bundle directory not found', { bundlesRoot, bundleDir });
       throw Object.assign(new Error('Lead generation room bundle is not available on the server'), { code: 'BUNDLE_NOT_FOUND' });
     }
     reader = new DirectoryBundleReader(bundleDir);

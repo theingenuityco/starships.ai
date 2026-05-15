@@ -44,11 +44,17 @@ export class BundleRegistry {
   list(): BundleSummary[] {
     if (!fs.existsSync(this.bundlesDir)) return [];
 
-    return fs
-      .readdirSync(this.bundlesDir, { withFileTypes: true })
-      .filter((d) => d.isDirectory())
-      .map((d) => this.get(d.name))
-      .filter((b): b is BundleSummary => b !== null);
+    const results: BundleSummary[] = [];
+    for (const categoryEntry of fs.readdirSync(this.bundlesDir, { withFileTypes: true })) {
+      if (!categoryEntry.isDirectory()) continue;
+      const categoryDir = path.join(this.bundlesDir, categoryEntry.name);
+      for (const bundleEntry of fs.readdirSync(categoryDir, { withFileTypes: true })) {
+        if (!bundleEntry.isDirectory()) continue;
+        const summary = this.get(bundleEntry.name);
+        if (summary) results.push(summary);
+      }
+    }
+    return results;
   }
 
   get(id: string): BundleSummary | null {
@@ -106,9 +112,12 @@ export class BundleRegistry {
     // Prevent directory traversal via id
     if (id.includes('/') || id.includes('..') || id.startsWith('.')) return null;
 
-    const dir = path.join(this.bundlesDir, id);
-    if (!fs.existsSync(dir) || !fs.statSync(dir).isDirectory()) return null;
-
-    return dir;
+    if (!fs.existsSync(this.bundlesDir)) return null;
+    for (const categoryEntry of fs.readdirSync(this.bundlesDir, { withFileTypes: true })) {
+      if (!categoryEntry.isDirectory()) continue;
+      const candidate = path.join(this.bundlesDir, categoryEntry.name, id);
+      if (fs.existsSync(candidate) && fs.statSync(candidate).isDirectory()) return candidate;
+    }
+    return null;
   }
 }

@@ -24,6 +24,8 @@ export { Conditional } from './nodes/Conditional';
 export { Transform } from './nodes/Transform';
 export { Mutate } from './nodes/Mutate';
 export { Tool } from './nodes/Tool';
+export { Terminal } from './nodes/Terminal';
+export { FileSystem } from './nodes/FileSystem';
 
 // Node result types
 export type { ConditionalResult } from './nodes/Conditional';

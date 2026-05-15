@@ -1,0 +1,65 @@
+{
+  "schemaVersion": "1",
+  "kind": "tool",
+  "exportedAt": "2026-05-15T00:00:00.000Z",
+  "metadata": {
+    "fromSlug": "list-directory",
+    "fromStarshipSlug": "starships-platform"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "tool": {
+      "name": "List Directory",
+      "description": "List the contents of a directory on the server filesystem. Returns an array of entries with name, type (file or directory), and size.",
+      "parameters": {
+        "type": "object",
+        "required": ["path"],
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Path to the directory to list, relative to the server's working directory. A leading `/` is treated as relative to the working directory root, not the OS root (e.g. `/src` lists `{cwd}/src`)."
+          }
+        }
+      },
+      "blueprint": {
+        "nodes": [
+          {
+            "ref": "s",
+            "name": "Start",
+            "type": "start",
+            "parameters": {}
+          },
+          {
+            "ref": "list",
+            "name": "List Directory",
+            "type": "file_system",
+            "parameters": {
+              "operation": "list",
+              "path": "{{ input.path }}"
+            }
+          },
+          {
+            "ref": "e",
+            "name": "End",
+            "type": "end",
+            "parameters": {
+              "output": "{{ lastOutputOf('list') }}"
+            }
+          }
+        ],
+        "edges": [
+          { "ref": "e1", "from": "s",    "to": "list" },
+          { "ref": "e2", "from": "list", "to": "e" }
+        ]
+      },
+      "transforms": null,
+      "mutations": null,
+      "condition": null,
+      "isEnabled": true,
+      "status": "active"
+    }
+  }
+}

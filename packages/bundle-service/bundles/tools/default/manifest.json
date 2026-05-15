@@ -39,7 +39,11 @@
       { "kind": "tool", "fromSlug": "list-connector-templates", "file": "tools/list-connector-templates.json" },
       { "kind": "tool", "fromSlug": "search-connector-actions", "file": "tools/search-connector-actions.json" },
       { "kind": "tool", "fromSlug": "assign-agent-tool", "file": "tools/assign-agent-tool.json" },
-      { "kind": "tool", "fromSlug": "unassign-agent-tool", "file": "tools/unassign-agent-tool.json" }
+      { "kind": "tool", "fromSlug": "unassign-agent-tool", "file": "tools/unassign-agent-tool.json" },
+      { "kind": "tool", "fromSlug": "run-terminal-command", "file": "tools/run-terminal-command.json" },
+      { "kind": "tool", "fromSlug": "read-file", "file": "tools/read-file.json" },
+      { "kind": "tool", "fromSlug": "write-file", "file": "tools/write-file.json" },
+      { "kind": "tool", "fromSlug": "list-directory", "file": "tools/list-directory.json" }
     ]
   }
 }

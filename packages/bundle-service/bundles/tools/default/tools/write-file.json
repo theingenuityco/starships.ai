@@ -1,0 +1,77 @@
+{
+  "schemaVersion": "1",
+  "kind": "tool",
+  "exportedAt": "2026-05-15T00:00:00.000Z",
+  "metadata": {
+    "fromSlug": "write-file",
+    "fromStarshipSlug": "starships-platform"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "tool": {
+      "name": "Write File",
+      "description": "Write content to a file on the server filesystem. Creates the file if it does not exist; overwrites it if it does.",
+      "parameters": {
+        "type": "object",
+        "required": ["path", "content"],
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Path to the file to write, relative to the server's working directory. A leading `/` is treated as relative to the working directory root, not the OS root (e.g. `/output.txt` writes `{cwd}/output.txt`)."
+          },
+          "content": {
+            "type": "string",
+            "description": "Content to write to the file."
+          },
+          "encoding": {
+            "type": "string",
+            "enum": ["utf-8", "base64"],
+            "default": "utf-8",
+            "description": "Encoding of the content string. Use 'base64' to write binary files."
+          }
+        }
+      },
+      "blueprint": {
+        "nodes": [
+          {
+            "ref": "s",
+            "name": "Start",
+            "type": "start",
+            "parameters": {}
+          },
+          {
+            "ref": "write",
+            "name": "Write File",
+            "type": "file_system",
+            "parameters": {
+              "operation": "write",
+              "path": "{{ input.path }}",
+              "content": "{{ input.content }}",
+              "encoding": "{{ input.encoding }}"
+            }
+          },
+          {
+            "ref": "e",
+            "name": "End",
+            "type": "end",
+            "parameters": {
+              "output": "{{ lastOutputOf('write') }}"
+            }
+          }
+        ],
+        "edges": [
+          { "ref": "e1", "from": "s",     "to": "write" },
+          { "ref": "e2", "from": "write", "to": "e" }
+        ]
+      },
+      "transforms": null,
+      "mutations": null,
+      "condition": null,
+      "isEnabled": true,
+      "status": "active"
+    }
+  }
+}

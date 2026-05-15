@@ -1,0 +1,75 @@
+{
+  "schemaVersion": "1",
+  "kind": "tool",
+  "exportedAt": "2026-05-15T00:00:00.000Z",
+  "metadata": {
+    "fromSlug": "run-terminal-command",
+    "fromStarshipSlug": "starships-platform"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "tool": {
+      "name": "Run Terminal Command",
+      "description": "Execute a shell command on the server and return stdout, stderr, and the exit code. Non-zero exit codes are returned as data rather than errors so the agent can decide how to proceed.",
+      "parameters": {
+        "type": "object",
+        "required": ["command"],
+        "properties": {
+          "command": {
+            "type": "string",
+            "description": "The shell command to execute."
+          },
+          "workingDirectory": {
+            "type": "string",
+            "description": "Working directory to run the command in. Defaults to the process working directory."
+          },
+          "timeout": {
+            "type": "integer",
+            "default": 30000,
+            "description": "Execution timeout in milliseconds (minimum 1000). Defaults to 30000."
+          }
+        }
+      },
+      "blueprint": {
+        "nodes": [
+          {
+            "ref": "s",
+            "name": "Start",
+            "type": "start",
+            "parameters": {}
+          },
+          {
+            "ref": "run",
+            "name": "Run Command",
+            "type": "terminal",
+            "parameters": {
+              "command": "{{ input.command }}",
+              "workingDirectory": "{{ input.workingDirectory }}",
+              "timeout": "{{ input.timeout }}"
+            }
+          },
+          {
+            "ref": "e",
+            "name": "End",
+            "type": "end",
+            "parameters": {
+              "output": "{{ lastOutputOf('run') }}"
+            }
+          }
+        ],
+        "edges": [
+          { "ref": "e1", "from": "s",   "to": "run" },
+          { "ref": "e2", "from": "run", "to": "e" }
+        ]
+      },
+      "transforms": null,
+      "mutations": null,
+      "condition": null,
+      "isEnabled": true,
+      "status": "active"
+    }
+  }
+}

@@ -22,8 +22,13 @@ export class FileSystem extends BaseNode<FileSystemParams> {
   async execute(input?: ExecutionItem[]): Promise<ExecutionItem[]> {
     const params = this.getParams();
     // Strip leading `/` so paths like "/README.md" resolve relative to cwd, not OS root
+    // Strip leading `/` so paths like "/README.md" resolve relative to cwd, not OS root
     const normalizedPath = params.path.startsWith('/') ? params.path.slice(1) : params.path;
     const absPath = resolve(normalizedPath);
+    const cwd = process.cwd();
+    if (absPath !== cwd && !absPath.startsWith(cwd + require('path').sep)) {
+      throw new Error(`Path '${params.path}' escapes the workspace boundary`);
+    }
     const pairedItem = input?.[0];
 
     try {

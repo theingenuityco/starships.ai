@@ -1,8 +1,11 @@
+import { HeroBackground } from './HeroBackground';
+
 export function Hero() {
   return (
     <section className="relative overflow-hidden">
       <div className="absolute inset-0 bg-glow pointer-events-none" aria-hidden />
       <div className="absolute inset-0 bg-grid pointer-events-none" aria-hidden />
+      <HeroBackground className="absolute inset-0 pointer-events-none" />
 
       <div className="relative mx-auto max-w-5xl px-6 pt-44 pb-12 sm:pt-52 sm:pb-16">
         <h1 className="text-4xl sm:text-5xl md:text-6xl font-semibold tracking-tight leading-[1.05] max-w-3xl">

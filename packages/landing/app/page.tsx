@@ -1,20 +1,20 @@
-import { Audience } from '@/components/Audience';
-import { Capabilities } from '@/components/Capabilities';
+import { Concept } from '@/components/Concept';
+import { FinalCTA } from '@/components/FinalCTA';
 import { Footer } from '@/components/Footer';
 import { Hero } from '@/components/Hero';
-import { TrustBlock } from '@/components/TrustBlock';
-import { VisualStrip } from '@/components/VisualStrip';
-import { WhyExists } from '@/components/WhyExists';
+import { PainPoints } from '@/components/PainPoints';
+import { Product } from '@/components/Product';
+import { UseCases } from '@/components/UseCases';
 
 export default function HomePage() {
   return (
     <main>
       <Hero />
-      <VisualStrip />
-      <WhyExists />
-      <Capabilities />
-      <Audience />
-      <TrustBlock />
+      <PainPoints />
+      <Concept />
+      <UseCases />
+      <Product />
+      <FinalCTA />
       <Footer />
     </main>
   );

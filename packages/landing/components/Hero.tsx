@@ -1,37 +1,40 @@
 export function Hero() {
   return (
-    <section className="relative overflow-hidden border-b border-(--color-border)">
+    <section className="relative overflow-hidden">
       <div className="absolute inset-0 bg-glow pointer-events-none" aria-hidden />
       <div className="absolute inset-0 bg-grid pointer-events-none" aria-hidden />
 
-      <div className="relative mx-auto max-w-6xl px-6 pt-28 pb-20 sm:pt-32 sm:pb-24">
-        <div className="flex items-center gap-2 text-sm text-(--color-fg-muted) mb-8">
-          <span className="inline-block h-2 w-2 rounded-full bg-(--color-accent)" />
-          <span>Starships</span>
-        </div>
-
+      <div className="relative mx-auto max-w-5xl px-6 pt-44 pb-12 sm:pt-52 sm:pb-16">
         <h1 className="text-4xl sm:text-5xl md:text-6xl font-semibold tracking-tight leading-[1.05] max-w-3xl">
-          The agent platform you can actually ship on.
+          Starship. Your startup, on autopilot.
         </h1>
 
-        <p className="mt-6 text-lg sm:text-xl text-(--color-fg-muted) max-w-2xl leading-relaxed">
-          Multi-tenant, connector-rich, production-grade agent infrastructure — so you can stop building the boring parts and start shipping
-          real products.
-        </p>
+        <div className="mt-8 max-w-2xl">
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <span className="text-xl font-semibold tracking-tight">star&middot;ship</span>
+            <span className="font-serif italic text-(--color-fg-muted)">/ ˈstɑːr.ʃɪp /</span>
+            <span className="font-serif italic text-sm text-(--color-fg-muted)">noun</span>
+          </div>
+          <p className="mt-3 text-lg text-(--color-fg-muted) leading-relaxed">
+            A new generation of startup, built natively around autonomous AI agents.
+          </p>
+          <p className="mt-3 font-serif italic text-(--color-fg-subtle)">
+            &ldquo;The starship is to AI, what the startup was to the internet.&rdquo;
+          </p>
+        </div>
 
-        <div className="mt-10 flex flex-wrap items-center gap-3">
-          <a
-            href="/contact"
-            className="inline-flex items-center justify-center rounded-(--radius-button) bg-(--color-accent) px-5 py-3 text-sm font-medium text-white shadow-sm hover:bg-(--color-accent-strong) transition-colors"
-          >
-            Book a call →
-          </a>
-          <a
-            href="#what-it-does"
-            className="inline-flex items-center justify-center rounded-(--radius-button) border border-(--color-border-strong) px-5 py-3 text-sm font-medium text-(--color-fg) hover:bg-(--color-bg-soft) transition-colors"
-          >
-            See the engine
-          </a>
+        <div className="mt-16 sm:mt-20 relative aspect-video rounded-(--radius-card) border border-(--color-border) bg-(--color-bg-elev) overflow-hidden shadow-2xl shadow-black/40">
+          <video
+            className="absolute inset-0 h-full w-full object-cover"
+            src="/hero.mp4"
+            poster="/screenshots/01-room.svg"
+            autoPlay
+            muted
+            loop
+            playsInline
+            preload="metadata"
+            aria-label="Starships product walkthrough"
+          />
         </div>
       </div>
     </section>

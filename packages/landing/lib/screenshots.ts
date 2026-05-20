@@ -6,13 +6,6 @@
 
 export type Shot = { src: string; alt: string };
 
-export const heroStrip: Shot[] = [
-  { src: '/screenshots/01-room.svg', alt: 'Agent room with live conversation and tool calls' },
-  { src: '/screenshots/02-agent-builder.svg', alt: 'Agent builder — name, prompt, model, tools' },
-  { src: '/screenshots/03-connectors.svg', alt: 'Connectors page with multiple OAuth integrations' },
-  { src: '/screenshots/04-approval.svg', alt: 'Tool approval flow inline in a conversation' },
-];
-
 export const capabilityShots = {
   workspace: { src: '/screenshots/05-workspace.svg', alt: 'Multi-tenant workspace with rooms and named agents' },
   connectors: { src: '/screenshots/06-connectors-detail.svg', alt: 'Connector library with OAuth and API-key integrations' },

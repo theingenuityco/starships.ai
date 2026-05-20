@@ -1,31 +1,40 @@
 import type { Metadata } from 'next';
+import { Inter, Orbitron } from 'next/font/google';
+import { Nav } from '@/components/Nav';
 import './globals.css';
 
+const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
+const orbitron = Orbitron({ subsets: ['latin'], variable: '--font-orbitron', weight: ['400', '500', '700'] });
+
+const title = 'Starships — Your startup, on autopilot';
+const description =
+  'Starship (noun): a new generation of startup, built natively around autonomous AI agents.';
+
 export const metadata: Metadata = {
-  title: 'Starships — The agent platform you can actually ship on',
-  description:
-    'Multi-tenant, connector-rich, production-grade agent infrastructure. Stop building the boring parts and start shipping real products.',
+  title,
+  description,
   metadataBase: new URL('https://starships.ai'),
   openGraph: {
-    title: 'Starships — The agent platform you can actually ship on',
-    description:
-      'Multi-tenant, connector-rich, production-grade agent infrastructure. Stop building the boring parts and start shipping real products.',
+    title,
+    description,
     url: 'https://starships.ai',
     siteName: 'Starships',
     type: 'website',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Starships — The agent platform you can actually ship on',
-    description:
-      'Multi-tenant, connector-rich, production-grade agent infrastructure. Stop building the boring parts and start shipping real products.',
+    title,
+    description,
   },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <body>{children}</body>
+    <html lang="en" className={`${inter.variable} ${orbitron.variable}`}>
+      <body>
+        <Nav />
+        {children}
+      </body>
     </html>
   );
 }

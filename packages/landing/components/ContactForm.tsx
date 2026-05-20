@@ -50,19 +50,18 @@ export function ContactForm() {
 
   return (
     <section className="bg-(--color-bg)">
-      <div className="mx-auto max-w-6xl px-6 py-24">
+      <div className="mx-auto max-w-5xl px-6 py-24">
         <div className="max-w-2xl">
-          <p className="text-sm uppercase tracking-wider text-(--color-fg-subtle) mb-4">Let&rsquo;s talk</p>
+          <p className="text-sm uppercase tracking-wider text-(--color-fg-subtle) mb-4">Get in touch</p>
           <h2 className="text-3xl sm:text-4xl font-semibold tracking-tight">Tell us what you&rsquo;re building.</h2>
           <p className="mt-4 text-lg text-(--color-fg-muted) leading-relaxed">
-            Whether you&rsquo;re shipping a vertical AI product, a white-label deployment, or an internal agent workflow — drop your details
-            and we&rsquo;ll send a booking link to your inbox.
+            Leave your name and a line or two about what you&rsquo;re working on. We&rsquo;ll reply with a booking link.
           </p>
 
         {status === 'success' ? (
           <div className="mt-10 rounded-(--radius-card) border border-(--color-border) bg-(--color-bg-elev) p-8">
-            <p className="text-(--color-fg) text-lg">Thanks — we&rsquo;ll be in touch shortly.</p>
-            <p className="mt-2 text-(--color-fg-muted)">A confirmation with a booking link is on its way to your inbox.</p>
+            <p className="text-(--color-fg) text-lg">Got it. Thanks for reaching out.</p>
+            <p className="mt-2 text-(--color-fg-muted)">Check your inbox for the booking link.</p>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="mt-10 space-y-5">
@@ -117,9 +116,9 @@ export function ContactForm() {
             <button
               type="submit"
               disabled={status === 'submitting'}
-              className="inline-flex items-center justify-center rounded-(--radius-button) bg-(--color-accent) px-6 py-3 text-sm font-medium text-white hover:bg-(--color-accent-strong) transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+              className="inline-flex items-center justify-center rounded-(--radius-button) bg-(--color-accent) px-6 py-3 text-sm font-medium text-(--color-bg) hover:bg-(--color-accent-strong) transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              {status === 'submitting' ? 'Sending…' : 'Send and get a booking link →'}
+              {status === 'submitting' ? 'Sending…' : 'Send'}
             </button>
 
             <p className="text-xs text-(--color-fg-subtle)">

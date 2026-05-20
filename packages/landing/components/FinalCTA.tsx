@@ -1,6 +1,8 @@
+import { FadeIn } from './FadeIn';
+
 export function FinalCTA() {
   return (
-    <section className="border-b border-(--color-border) bg-(--color-bg-elev)">
+    <FadeIn as="section" className="border-b border-(--color-border) bg-(--color-bg-elev)">
       <div className="mx-auto max-w-5xl px-6 py-24">
         <div className="max-w-2xl">
           <p className="text-sm uppercase tracking-wider text-(--color-fg-subtle) mb-4">Get started</p>
@@ -28,6 +30,6 @@ export function FinalCTA() {
           </div>
         </div>
       </div>
-    </section>
+    </FadeIn>
   );
 }

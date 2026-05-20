@@ -1,6 +1,5 @@
 import { Audience } from '@/components/Audience';
 import { Capabilities } from '@/components/Capabilities';
-import { ContactForm } from '@/components/ContactForm';
 import { Footer } from '@/components/Footer';
 import { Hero } from '@/components/Hero';
 import { TrustBlock } from '@/components/TrustBlock';
@@ -16,7 +15,6 @@ export default function HomePage() {
       <Capabilities />
       <Audience />
       <TrustBlock />
-      <ContactForm />
       <Footer />
     </main>
   );

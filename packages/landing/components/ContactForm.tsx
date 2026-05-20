@@ -49,7 +49,7 @@ export function ContactForm() {
   }
 
   return (
-    <section id="contact" className="bg-(--color-bg)">
+    <section className="bg-(--color-bg)">
       <div className="mx-auto max-w-6xl px-6 py-24">
         <div className="max-w-2xl">
           <p className="text-sm uppercase tracking-wider text-(--color-fg-subtle) mb-4">Let&rsquo;s talk</p>

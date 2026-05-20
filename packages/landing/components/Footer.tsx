@@ -10,7 +10,7 @@ export function Footer() {
           <a href="mailto:hello@starships.ai" className="hover:text-(--color-fg) transition-colors">
             hello@starships.ai
           </a>
-          <a href="#contact" className="hover:text-(--color-fg) transition-colors">
+          <a href="/contact" className="hover:text-(--color-fg) transition-colors">
             Book a call
           </a>
         </div>

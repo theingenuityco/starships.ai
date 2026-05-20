@@ -21,7 +21,7 @@ export function Hero() {
 
         <div className="mt-10 flex flex-wrap items-center gap-3">
           <a
-            href="#contact"
+            href="/contact"
             className="inline-flex items-center justify-center rounded-(--radius-button) bg-(--color-accent) px-5 py-3 text-sm font-medium text-white shadow-sm hover:bg-(--color-accent-strong) transition-colors"
           >
             Book a call →

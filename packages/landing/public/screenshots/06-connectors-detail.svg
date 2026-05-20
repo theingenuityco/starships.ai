@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0d0f14"/>
+      <stop offset="100%" stop-color="#11141b"/>
+    </linearGradient>
+    <pattern id="grid" width="56" height="56" patternUnits="userSpaceOnUse">
+      <path d="M 56 0 L 0 0 0 56" fill="none" stroke="#1f242e" stroke-width="1"/>
+    </pattern>
+  </defs>
+  <rect width="1440" height="900" fill="url(#bg)"/>
+  <rect width="1440" height="900" fill="url(#grid)" opacity="0.4"/>
+  <g transform="translate(720,420)" text-anchor="middle" font-family="ui-sans-serif, system-ui, sans-serif">
+    <text fill="#6c7585" font-size="18" letter-spacing="3">SCREENSHOT PLACEHOLDER</text>
+    <text y="40" fill="#9aa3b2" font-size="32" font-weight="600">connectors detail</text>
+  </g>
+</svg>

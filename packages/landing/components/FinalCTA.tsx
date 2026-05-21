@@ -19,7 +19,7 @@ export function FinalCTA() {
               href="/contact"
               className="inline-flex items-center justify-center rounded-(--radius-button) bg-(--color-accent) px-5 py-3 text-sm font-medium text-(--color-bg) shadow-sm hover:bg-(--color-accent-strong) transition-colors"
             >
-              Book a call →
+              Request demo →
             </a>
             <a
               href="mailto:hello@starships.ai"

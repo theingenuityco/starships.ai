@@ -32,6 +32,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={`${inter.variable} ${orbitron.variable}`}>
       <body suppressHydrationWarning>
+        {/* Runs synchronously before browser scroll restoration fires — always start at top on reload */}
+        <script dangerouslySetInnerHTML={{ __html: "history.scrollRestoration='manual'" }} />
         <Nav />
         {children}
       </body>

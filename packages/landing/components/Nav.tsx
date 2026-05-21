@@ -4,7 +4,7 @@ import { Logo } from '@/components/Logo';
 export function Nav() {
   return (
     <header className="fixed top-8 left-0 right-0 z-50 px-4">
-      <nav className="mx-auto max-w-5xl flex items-center justify-between rounded-full bg-(--color-border)/55 backdrop-blur-xl pl-6 pr-4 py-3.5 sm:py-4">
+      <nav className="mx-auto max-w-5xl flex items-center justify-between rounded-full bg-black/30 backdrop-blur-xl pl-6 pr-4 py-3.5 sm:py-4">
         <div className="flex items-center gap-9">
           <Link href="/" className="flex items-center gap-3 text-(--color-fg) hover:opacity-80 transition-opacity">
             <Logo size={32} />
@@ -31,9 +31,9 @@ export function Nav() {
 
         <Link
           href="/contact"
-          className="rounded-full border border-(--color-border) bg-(--color-bg) px-5 py-2.5 text-[15px] font-medium text-(--color-fg) hover:bg-(--color-bg-elev) hover:border-(--color-border-strong) transition-colors"
+          className="rounded-full border border-(--color-border) bg-white/10 px-5 py-2.5 text-[15px] font-medium text-(--color-fg) hover:bg-white/15 hover:border-(--color-border-strong) transition-colors"
         >
-          Book a call
+          Request demo
         </Link>
       </nav>
     </header>

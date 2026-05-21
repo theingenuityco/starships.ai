@@ -16,7 +16,7 @@ export function Footer() {
             hello@starships.ai
           </a>
           <a href="/contact" className="hover:text-(--color-fg) transition-colors">
-            Book a call
+            Request demo
           </a>
         </div>
       </div>

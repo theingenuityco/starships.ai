@@ -47,17 +47,40 @@ body {
   font-family: var(--font-serif);
 }
 
-/* Subtle grid backdrop used in hero */
-.bg-grid {
-  background-image:
-    linear-gradient(to right, rgba(255, 255, 255, 0.04) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
-  background-size: 56px 56px;
-  background-position: -1px -1px;
-  mask-image: radial-gradient(ellipse at 50% 30%, black 25%, transparent 75%);
-}
-
 /* Soft radial glow for hero */
 .bg-glow {
   background: radial-gradient(80% 50% at 50% 0%, rgba(231, 236, 243, 0.06), transparent 70%);
+}
+
+/* Staggered entry animations — elements start hidden, animate in when observed */
+.fade-will-animate {
+  opacity: 0;
+  transform: translateY(20px);
+}
+
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-up {
+  opacity: 0;
+  animation: fade-up 0.9s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation-delay: var(--delay, 0ms);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fade-will-animate,
+  .animate-fade-up {
+    opacity: 1;
+    transform: none;
+    animation: none;
+  }
 }

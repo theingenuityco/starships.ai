@@ -77,7 +77,7 @@ export function Hero() {
             <video
               ref={videoRef}
               className="absolute inset-0 h-full w-full object-cover"
-              src="/hero.mp4"
+              src="https://cdn.monaco.com/landing/public/pages/home/hero-video.webm"
               loop
               playsInline
               preload="auto"

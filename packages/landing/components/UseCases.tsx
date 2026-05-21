@@ -1,3 +1,5 @@
+import { FadeIn } from './FadeIn';
+
 type Room = {
   name: string;
   tagline: string;
@@ -30,7 +32,7 @@ const rooms: Room[] = [
 
 export function UseCases() {
   return (
-    <section id="use-cases" className="border-b border-(--color-border)">
+    <FadeIn as="section" id="use-cases" className="border-b border-(--color-border)">
       <div className="mx-auto max-w-5xl px-6 py-24">
         <p className="text-sm uppercase tracking-wider text-(--color-fg-subtle) mb-4">What your virtual org looks like</p>
         <h2 className="text-3xl sm:text-4xl font-semibold tracking-tight max-w-3xl">
@@ -61,6 +63,6 @@ export function UseCases() {
           ))}
         </div>
       </div>
-    </section>
+    </FadeIn>
   );
 }

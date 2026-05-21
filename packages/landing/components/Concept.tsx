@@ -1,3 +1,5 @@
+import { FadeIn } from './FadeIn';
+
 const departments = [
   {
     name: 'Engineering',
@@ -15,7 +17,7 @@ const departments = [
 
 export function Concept() {
   return (
-    <section id="how-it-works" className="border-b border-(--color-border) bg-(--color-bg-elev)">
+    <FadeIn as="section" id="how-it-works" className="border-b border-(--color-border) bg-(--color-bg-elev)">
       <div className="mx-auto max-w-5xl px-6 py-24">
         <div className="max-w-3xl">
           <p className="text-sm uppercase tracking-wider text-(--color-fg-subtle) mb-4">The idea</p>
@@ -40,6 +42,6 @@ export function Concept() {
           ))}
         </div>
       </div>
-    </section>
+    </FadeIn>
   );
 }

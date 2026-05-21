@@ -1,6 +1,8 @@
+import { FadeIn } from './FadeIn';
+
 export function FinalCTA() {
   return (
-    <section className="border-b border-(--color-border) bg-(--color-bg-elev)">
+    <FadeIn as="section" className="border-b border-(--color-border) bg-(--color-bg-elev)">
       <div className="mx-auto max-w-5xl px-6 py-24">
         <div className="max-w-2xl">
           <p className="text-sm uppercase tracking-wider text-(--color-fg-subtle) mb-4">Get started</p>
@@ -17,7 +19,7 @@ export function FinalCTA() {
               href="/contact"
               className="inline-flex items-center justify-center rounded-(--radius-button) bg-(--color-accent) px-5 py-3 text-sm font-medium text-(--color-bg) shadow-sm hover:bg-(--color-accent-strong) transition-colors"
             >
-              Book a call →
+              Request demo →
             </a>
             <a
               href="mailto:hello@starships.ai"
@@ -28,6 +30,6 @@ export function FinalCTA() {
           </div>
         </div>
       </div>
-    </section>
+    </FadeIn>
   );
 }

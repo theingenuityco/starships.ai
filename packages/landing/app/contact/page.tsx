@@ -3,7 +3,7 @@ import { ContactForm } from '@/components/ContactForm';
 import { Footer } from '@/components/Footer';
 
 export const metadata: Metadata = {
-  title: 'Book a call — Starships',
+  title: 'Request demo — Starships',
   description: "Tell us what you're building. We'll reply with a booking link.",
 };
 

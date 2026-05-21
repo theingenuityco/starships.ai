@@ -1,19 +1,19 @@
-import { Concept } from '@/components/Concept';
 import { FinalCTA } from '@/components/FinalCTA';
 import { Footer } from '@/components/Footer';
 import { Hero } from '@/components/Hero';
 import { PainPoints } from '@/components/PainPoints';
-import { Product } from '@/components/Product';
-import { UseCases } from '@/components/UseCases';
+import { Primitives } from '@/components/Primitives';
+import { TrustControl } from '@/components/TrustControl';
+import { VirtualOrg } from '@/components/VirtualOrg';
 
 export default function HomePage() {
   return (
     <main>
       <Hero />
       <PainPoints />
-      <Concept />
-      <UseCases />
-      <Product />
+      <VirtualOrg />
+      <Primitives />
+      <TrustControl />
       <FinalCTA />
       <Footer />
     </main>

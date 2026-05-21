@@ -170,7 +170,7 @@ export function PainPoints() {
   }, []);
 
   return (
-    <FadeIn as="section" className="border-b border-(--color-border)">
+    <FadeIn as="section">
       <div className="mx-auto max-w-5xl px-6 py-32 sm:py-40">
         <h2 className="text-4xl font-semibold leading-[1.05] tracking-tight sm:text-5xl md:text-6xl">
           You are the bottleneck.
@@ -180,7 +180,7 @@ export function PainPoints() {
           <span className="text-(--color-fg-muted)">But you&rsquo;re still copy-pasting.</span>
         </h2>
 
-        <p className="mt-16 text-xl font-semibold tracking-tight text-(--color-fg) sm:text-2xl">
+        <p className="mt-28 text-xl font-semibold tracking-tight text-(--color-fg) sm:mt-32 sm:text-2xl">
           Let AI handle your TODOs instead
         </p>
 

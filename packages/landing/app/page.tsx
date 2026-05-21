@@ -1,3 +1,4 @@
+import { FeedDashboard } from '@/components/FeedDashboard';
 import { FinalCTA } from '@/components/FinalCTA';
 import { Footer } from '@/components/Footer';
 import { Hero } from '@/components/Hero';
@@ -12,6 +13,7 @@ export default function HomePage() {
       <Hero />
       <PainPoints />
       <VirtualOrg />
+      <FeedDashboard />
       <Primitives />
       <TrustControl />
       <FinalCTA />

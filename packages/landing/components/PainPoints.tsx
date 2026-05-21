@@ -1,37 +1,201 @@
+'use client';
+
+import { useEffect, useRef, useState } from 'react';
 import { FadeIn } from './FadeIn';
 
-const pains = [
-  {
-    title: 'Every decision goes through you.',
-    body: 'Product, sales, ops, support — context-switching kills your week. You finish the day having moved everything an inch.',
-  },
-  {
-    title: "AI tools chat. They don’t do.",
-    body: "A good answer doesn’t ship the feature, send the email, or update the CRM. Suggestions aren’t leverage.",
-  },
-  {
-    title: 'A real team is months and millions away.',
-    body: "You’d hire if you could afford to, or if you knew the role was right. You need leverage now, not a recruiter.",
-  },
+type Item = { text: string; comment: string };
+
+const items: Item[] = [
+  { text: 'annoying auth bug in prod - FIX ASAP', comment: 'Reproduced the bug, opened PR #432. Awaiting your review.' },
+  { text: 'followup with Broke Inc for payments', comment: 'Sent polite escalation, scheduled follow-up for Thursday.' },
+  { text: 'IMP! reply to the investor before Friday', comment: 'Drafted response with updated metrics. Awaiting your sign-off.' },
+  { text: 'figure out a pricing model, finish the pricing page', comment: 'Ran 3 pricing scenarios, drafted page copy. Awaiting your review.' },
+  { text: 'reply to 47 support tickets. NOW!', comment: 'Triaged all 47. 39 auto-resolved, 8 flagged for you.' },
+  { text: 'lunch???', comment: 'Ordered from Sweetgreen. Arriving at 12:45.' },
+  { text: 'fix staging (again!!!)', comment: 'Restarted services, redeployed. Green for 14 minutes.' },
+  { text: 'interview with potential eng candidate', comment: 'Sent prep notes and rubric. Calendar block confirmed for 3pm.' },
+  { text: 'draft proposal for ABC Enterprise', comment: 'Pulled their RFP, drafted proposal v1. Awaiting your review.' },
+  { text: 'update the CRM lol', comment: 'Logged 12 interactions in HubSpot. All caught up.' },
+  { text: 'send out those marketing mails by EOD today', comment: 'Personalized 4 segments, scheduled send for 5pm.' },
 ];
 
+type ItemState = 'idle' | 'working' | 'done';
+
+function StatusBadge({ state }: { state: ItemState }) {
+  if (state === 'idle') return null;
+  const isWorking = state === 'working';
+  const wrapperClass = isWorking
+    ? 'border-(--color-warn)/40 bg-(--color-warn)/10 text-(--color-warn)'
+    : 'border-(--color-success)/40 bg-(--color-success)/10 text-(--color-success)';
+  const dotClass = isWorking ? 'animate-pulse bg-(--color-warn)' : 'bg-(--color-success)';
+  return (
+    <span
+      className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-medium transition-colors duration-500 ${wrapperClass}`}
+    >
+      <span className={`inline-block h-1.5 w-1.5 rounded-full transition-colors duration-500 ${dotClass}`} />
+      {isWorking ? 'working' : 'done'}
+    </span>
+  );
+}
+
+function ItemRow({
+  item,
+  state,
+  setRef,
+}: {
+  item: Item;
+  state: ItemState;
+  setRef: (el: HTMLLIElement | null) => void;
+}) {
+  const isWorking = state === 'working';
+  const isDone = state === 'done';
+
+  return (
+    <li
+      ref={setRef}
+      className={`rounded-(--radius-card) border bg-(--color-bg-elev) px-5 py-4 transition-colors duration-500 ${
+        isDone
+          ? 'border-(--color-success)/30'
+          : isWorking
+            ? 'border-(--color-warn)/40'
+            : 'border-(--color-border)'
+      }`}
+    >
+      <div className="flex items-center gap-4">
+        <span
+          className={`inline-flex h-5 w-5 shrink-0 items-center justify-center rounded border transition-all duration-300 ${
+            isDone
+              ? 'border-(--color-success) bg-(--color-success)'
+              : isWorking
+                ? 'border-(--color-warn)'
+                : 'border-(--color-border)'
+          }`}
+        >
+          {isDone ? (
+            <svg viewBox="0 0 16 16" fill="none" className="h-3 w-3 text-(--color-bg)" aria-hidden>
+              <path
+                d="M3 8.5l3 3 7-7"
+                stroke="currentColor"
+                strokeWidth="2.2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          ) : isWorking ? (
+            <span className="h-2 w-2 animate-pulse rounded-full bg-(--color-warn)" />
+          ) : null}
+        </span>
+        <span
+          className={`flex-1 leading-relaxed transition-all duration-300 ${
+            isDone ? 'text-(--color-fg-subtle) line-through' : 'text-(--color-fg-muted)'
+          }`}
+        >
+          {item.text}
+        </span>
+        <StatusBadge state={state} />
+      </div>
+      <div
+        className={`grid transition-all duration-500 ease-out ${
+          isDone ? 'mt-4 grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
+        }`}
+      >
+        <div className="overflow-hidden">
+          <div className="ml-9 flex items-start gap-3">
+            <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-(--color-success)/15 ring-1 ring-(--color-success)/30">
+              <svg viewBox="0 0 16 16" fill="currentColor" className="h-3.5 w-3.5 text-(--color-success)" aria-hidden>
+                <path d="M8 0.5 L9.4 6.6 L15.5 8 L9.4 9.4 L8 15.5 L6.6 9.4 L0.5 8 L6.6 6.6 Z" />
+              </svg>
+            </div>
+            <div className="flex-1">
+              <div className="flex items-baseline gap-2">
+                <span className="text-sm font-semibold text-(--color-fg)">Agent</span>
+                <span className="text-xs text-(--color-fg-subtle)">just now</span>
+              </div>
+              <p className="mt-1 text-sm leading-relaxed text-(--color-fg-muted)">{item.comment}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </li>
+  );
+}
+
 export function PainPoints() {
+  const [states, setStates] = useState<ItemState[]>(() => items.map(() => 'idle'));
+  const refs = useRef<(HTMLLIElement | null)[]>([]);
+
+  useEffect(() => {
+    let rafId: number | null = null;
+
+    function update() {
+      const vh = window.innerHeight;
+      const lineWorking = vh * (2 / 3); // y-coordinate of the 2/3-from-top line
+      const lineDone = vh * (1 / 3); // y-coordinate of the 1/3-from-top line
+
+      setStates((prev) => {
+        const next = prev.slice();
+        let changed = false;
+        refs.current.forEach((el, i) => {
+          if (!el) return;
+          const top = el.getBoundingClientRect().top;
+          let newState: ItemState = 'idle';
+          if (top < lineDone) newState = 'done';
+          else if (top < lineWorking) newState = 'working';
+          if (next[i] !== newState) {
+            next[i] = newState;
+            changed = true;
+          }
+        });
+        return changed ? next : prev;
+      });
+    }
+
+    function onScroll() {
+      if (rafId !== null) return;
+      rafId = requestAnimationFrame(() => {
+        rafId = null;
+        update();
+      });
+    }
+
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll);
+    update();
+
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', onScroll);
+      if (rafId !== null) cancelAnimationFrame(rafId);
+    };
+  }, []);
+
   return (
     <FadeIn as="section" className="border-b border-(--color-border)">
-      <div className="mx-auto max-w-5xl px-6 py-24">
-        <p className="text-sm uppercase tracking-wider text-(--color-fg-subtle) mb-4">Where founders get stuck</p>
-        <h2 className="text-3xl sm:text-4xl font-semibold tracking-tight max-w-3xl leading-tight">
-          You&rsquo;re the bottleneck. You know it. You can&rsquo;t hire your way out yet.
+      <div className="mx-auto max-w-5xl px-6 py-32 sm:py-40">
+        <h2 className="text-4xl font-semibold leading-[1.05] tracking-tight sm:text-5xl md:text-6xl">
+          You are the bottleneck.
+          <br />
+          AI is the leverage.
+          <br />
+          <span className="text-(--color-fg-muted)">But you&rsquo;re still copy-pasting.</span>
         </h2>
 
-        <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-4">
-          {pains.map((p) => (
-            <div key={p.title} className="rounded-(--radius-card) border border-(--color-border) bg-(--color-bg-elev) p-6">
-              <h3 className="text-lg font-semibold tracking-tight">{p.title}</h3>
-              <p className="mt-2 text-(--color-fg-muted) leading-relaxed">{p.body}</p>
-            </div>
+        <p className="mt-16 text-xl font-semibold tracking-tight text-(--color-fg) sm:text-2xl">
+          Let AI handle your TODOs instead
+        </p>
+
+        <ul className="mt-6 max-w-2xl space-y-2">
+          {items.map((item, i) => (
+            <ItemRow
+              key={item.text}
+              item={item}
+              state={states[i]}
+              setRef={(el) => {
+                refs.current[i] = el;
+              }}
+            />
           ))}
-        </div>
+        </ul>
       </div>
     </FadeIn>
   );

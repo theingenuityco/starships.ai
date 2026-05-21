@@ -73,7 +73,7 @@ export function Hero() {
 
       <div className="relative mx-auto max-w-7xl px-6 pb-16 sm:pb-24">
         <FadeIn delay={260}>
-          <div className="relative aspect-video rounded-(--radius-card) overflow-hidden shadow-2xl shadow-black/40">
+          <div className="relative aspect-video rounded-(--radius-card) overflow-hidden shadow-2xl shadow-black/40 bg-black/30">
             <video
               ref={videoRef}
               className="absolute inset-0 h-full w-full object-cover"
@@ -85,7 +85,7 @@ export function Hero() {
               onEnded={() => setPlaying(false)}
             />
 
-            {/* Blurry placeholder — fades out once the video frame is ready */}
+            {/* Blurry placeholder, fades out once the video frame is ready */}
             <div
               className={`absolute inset-0 backdrop-blur-2xl transition-opacity duration-700 pointer-events-none ${videoReady ? 'opacity-0' : 'opacity-100'}`}
             />

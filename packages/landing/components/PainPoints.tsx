@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { FadeIn } from './FadeIn';
 
 type Item = { text: string; comment: string };
@@ -95,6 +95,7 @@ function ItemRow({
         <StatusBadge state={state} />
       </div>
       <div
+        data-expand
         className={`grid transition-all duration-500 ease-out ${
           isDone ? 'mt-4 grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
         }`}
@@ -123,6 +124,35 @@ function ItemRow({
 export function PainPoints() {
   const [states, setStates] = useState<ItemState[]>(() => items.map(() => 'idle'));
   const refs = useRef<(HTMLLIElement | null)[]>([]);
+  const ulRef = useRef<HTMLUListElement>(null);
+  const [ulMinHeight, setUlMinHeight] = useState<number | undefined>(undefined);
+  const measured = useRef(false);
+
+  // Measure the fully-expanded height before first paint so the container never
+  // grows during scroll, keeping page height stable throughout the animation.
+  useLayoutEffect(() => {
+    if (measured.current || !ulRef.current) return;
+    measured.current = true;
+
+    const ul = ulRef.current;
+
+    // Force all expandable grid divs to their open state inline so we can measure
+    // without triggering a React re-render or a CSS transition.
+    const grids = ul.querySelectorAll<HTMLElement>('[data-expand]');
+    grids.forEach((el) => {
+      el.style.gridTemplateRows = '1fr';
+      el.style.marginTop = '1rem';
+      el.style.opacity = '1';
+    });
+
+    setUlMinHeight(ul.scrollHeight);
+
+    grids.forEach((el) => {
+      el.style.gridTemplateRows = '';
+      el.style.marginTop = '';
+      el.style.opacity = '';
+    });
+  }, []);
 
   useEffect(() => {
     let rafId: number | null = null;
@@ -192,7 +222,7 @@ export function PainPoints() {
           <div className="px-5 pt-4 pb-3">
             <span className="text-xs font-medium uppercase tracking-wider text-(--color-fg-subtle)">Your to-do list</span>
           </div>
-          <ul className="space-y-2 px-3 pb-3 pt-0 sm:px-4 sm:pb-4">
+          <ul ref={ulRef} className="space-y-2 px-3 pb-3 pt-0 sm:px-4 sm:pb-4" style={ulMinHeight ? { minHeight: ulMinHeight } : undefined}>
             {items.map((item, i) => (
               <ItemRow
                 key={item.text}

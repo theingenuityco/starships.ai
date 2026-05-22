@@ -2,19 +2,21 @@ import { FadeIn } from './FadeIn';
 
 export function FinalCTA() {
   return (
-    <FadeIn as="section" className="border-b border-(--color-border) bg-(--color-bg-elev)">
+    <section className="border-b border-(--color-border) bg-(--color-bg-elev)">
       <div className="mx-auto max-w-5xl px-6 py-24">
         <div className="max-w-2xl">
-          <p className="text-sm uppercase tracking-wider text-(--color-fg-subtle) mb-4">Get started</p>
-          <h2 className="text-3xl sm:text-4xl font-semibold tracking-tight leading-tight">
+          <FadeIn as="p" delay={0} className="text-sm uppercase tracking-wider text-(--color-fg-subtle) mb-4">
+            Get started
+          </FadeIn>
+          <FadeIn as="h2" delay={90} className="text-3xl sm:text-4xl font-semibold tracking-tight leading-tight">
             Tell us what you&rsquo;d want your virtual org to do.
-          </h2>
-          <p className="mt-6 text-lg text-(--color-fg-muted) leading-relaxed">
+          </FadeIn>
+          <FadeIn as="p" delay={180} className="mt-6 text-lg text-(--color-fg-muted) leading-relaxed">
             Drop your name and a line about your business. On the call, we&rsquo;ll sketch what a Starships virtual org would look like for
             you — which rooms, which agents, connected to what.
-          </p>
+          </FadeIn>
 
-          <div className="mt-10 flex flex-wrap items-center gap-3">
+          <FadeIn delay={270} className="mt-10 flex flex-wrap items-center gap-3">
             <a
               href="/contact"
               className="inline-flex items-center justify-center rounded-(--radius-button) bg-(--color-accent) px-5 py-3 text-sm font-medium text-(--color-bg) shadow-sm hover:bg-(--color-accent-strong) transition-colors"
@@ -27,9 +29,9 @@ export function FinalCTA() {
             >
               hello@starships.ai
             </a>
-          </div>
+          </FadeIn>
         </div>
       </div>
-    </FadeIn>
+    </section>
   );
 }

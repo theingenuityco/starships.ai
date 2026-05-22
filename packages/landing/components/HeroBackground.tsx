@@ -222,7 +222,9 @@ void main() {
   vec3 starsBg   = starsLayer(p * 38.0 + vec2(0.0, scrollY * 8.0),  uTime, 0.80);
   vec3 starsFg   = starsLayer(p * 11.0 + mouseOffset * 10.0 + vec2(0.0, scrollY * 4.0), uTime, 0.93);
 
-  vec3 bg       = vec3(0.020, 0.024, 0.034);
+  // Matched to CSS --color-bg (#07080b) *after* the tonemap below, so the nebula's
+  // dark void is the exact same color as the page and the sections blend seamlessly.
+  vec3 bg       = vec3(0.0275, 0.0314, 0.0431);
   vec3 cMagenta = vec3(0.95, 0.28, 0.70);
   vec3 cTeal    = vec3(0.22, 0.78, 0.88);
   vec3 cAmber   = vec3(1.00, 0.60, 0.30);
@@ -341,7 +343,11 @@ export function HeroBackground({ className }: Props) {
     let visible = true;
     let firstFrameDrawn = false;
     let raf = 0;
+    let lastDraw = -Infinity;
     const startTime = performance.now();
+    // Ambient nebula animates slowly; 30fps is plenty and halves GPU load so it
+    // doesn't starve scroll compositing.
+    const frameInterval = 1000 / 30;
 
     const resize = () => {
       if (!gl) return;
@@ -375,20 +381,22 @@ export function HeroBackground({ className }: Props) {
     );
     observer.observe(canvas);
 
-    const tick = () => {
+    const tick = (now: number) => {
       raf = requestAnimationFrame(tick);
       if (!gl) return;
       if (!visible && firstFrameDrawn) return;
-
-      resize();
+      // Throttle to ~30fps once we're past the first paint.
+      if (firstFrameDrawn && now - lastDraw < frameInterval) return;
+      lastDraw = now;
 
       if (!reduced) {
-        mouseX += (targetMouseX - mouseX) * 0.04;
-        mouseY += (targetMouseY - mouseY) * 0.04;
-        scroll += (targetScroll - scroll) * 0.08;
+        // Damping doubled vs. the old 60fps loop to keep the same settling feel.
+        mouseX += (targetMouseX - mouseX) * 0.08;
+        mouseY += (targetMouseY - mouseY) * 0.08;
+        scroll += (targetScroll - scroll) * 0.15;
       }
 
-      const t = reduced ? 1.5 : (performance.now() - startTime) / 1000;
+      const t = reduced ? 1.5 : (now - startTime) / 1000;
       gl.uniform1f(uTime, t);
       gl.uniform2f(uResolution, canvas.width, canvas.height);
       gl.uniform2f(uMouse, mouseX, mouseY);
@@ -405,17 +413,21 @@ export function HeroBackground({ className }: Props) {
       }
     };
 
-    window.addEventListener('resize', resize);
+    // Size the drawing buffer only when the canvas box actually changes, instead
+    // of reading layout (clientWidth/Height) on every animation frame.
+    const resizeObserver = new ResizeObserver(() => resize());
+    resizeObserver.observe(canvas);
+
     if (!reduced) {
       window.addEventListener('mousemove', onMouseMove, { passive: true });
       window.addEventListener('scroll', onScroll, { passive: true });
     }
     resize();
-    tick();
+    raf = requestAnimationFrame(tick);
 
     return () => {
       if (raf) cancelAnimationFrame(raf);
-      window.removeEventListener('resize', resize);
+      resizeObserver.disconnect();
       window.removeEventListener('mousemove', onMouseMove);
       window.removeEventListener('scroll', onScroll);
       observer.disconnect();

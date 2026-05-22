@@ -11,29 +11,34 @@ export function FinalCTA() {
           </FadeIn>
           <FadeIn as="span" delay={90} className="block text-6xl sm:text-7xl md:text-8xl">
             Start running a
-            <br />
+          </FadeIn>
+          <FadeIn as="span" delay={180} className="block text-6xl sm:text-7xl md:text-8xl">
             Starship.
           </FadeIn>
         </h2>
-        <FadeIn as="p" delay={180} className="mt-8 max-w-2xl text-lg text-(--color-fg-muted) leading-relaxed">
+        <FadeIn as="p" delay={270} className="mt-8 max-w-2xl text-lg text-(--color-fg-muted) leading-relaxed">
           Tell us what you do. We&rsquo;ll build the org, wire it up, and hand you the keys.
         </FadeIn>
 
-        <FadeIn delay={270} className="mt-10 flex flex-wrap items-center gap-3">
-          <a
-            href="/contact"
-            className="inline-flex items-center justify-center gap-2 rounded-(--radius-button) bg-(--color-accent) px-5 py-3 text-sm font-medium text-(--color-bg) shadow-sm hover:bg-(--color-accent-strong) transition-colors"
-          >
-            Launch your Starship
-            <Icon name="arrow-right" className="h-4 w-4" />
-          </a>
-          <a
-            href="mailto:hello@starships.ai"
-            className="inline-flex items-center justify-center rounded-(--radius-button) border border-(--color-border-strong) px-5 py-3 text-sm font-medium text-(--color-fg) hover:bg-(--color-bg) transition-colors"
-          >
-            hello@starships.ai
-          </a>
-        </FadeIn>
+        <div className="mt-10 flex flex-wrap items-center gap-3">
+          <FadeIn delay={360}>
+            <a
+              href="/contact"
+              className="inline-flex items-center justify-center gap-2 rounded-(--radius-button) bg-(--color-accent) px-5 py-3 text-sm font-medium text-(--color-bg) shadow-sm hover:bg-(--color-accent-strong) transition-colors"
+            >
+              Launch your Starship
+              <Icon name="arrow-right" className="h-4 w-4" />
+            </a>
+          </FadeIn>
+          <FadeIn delay={440}>
+            <a
+              href="mailto:hello@starships.ai"
+              className="inline-flex items-center justify-center rounded-(--radius-button) border border-(--color-border-strong) px-5 py-3 text-sm font-medium text-(--color-fg) hover:bg-(--color-bg) transition-colors"
+            >
+              hello@starships.ai
+            </a>
+          </FadeIn>
+        </div>
       </div>
     </section>
   );

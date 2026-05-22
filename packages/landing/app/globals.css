@@ -76,11 +76,196 @@ body {
   animation-delay: var(--delay, 0ms);
 }
 
+/* Card motif animations — each tells a small, specific story */
+
+/* Approvals: three pending actions wave, then converge and blend into one approval check */
+@keyframes dot-wave {
+  0%,
+  100% {
+    opacity: 0.4;
+    transform: scale(0.8);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.25);
+  }
+}
+
+@keyframes approve-dot-l {
+  0% {
+    transform: translateX(7px);
+    opacity: 0;
+  }
+  8%,
+  62% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  72%,
+  100% {
+    transform: translateX(7px);
+    opacity: 0;
+  }
+}
+
+@keyframes approve-dot-r {
+  0% {
+    transform: translateX(-7px);
+    opacity: 0;
+  }
+  8%,
+  62% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  72%,
+  100% {
+    transform: translateX(-7px);
+    opacity: 0;
+  }
+}
+
+@keyframes approve-dot-m {
+  0% {
+    opacity: 0;
+  }
+  8%,
+  62% {
+    opacity: 1;
+  }
+  72%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes approve-reveal {
+  0%,
+  64% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  78% {
+    transform: scale(1.15);
+    opacity: 1;
+  }
+  84%,
+  92% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(0.5);
+    opacity: 0;
+  }
+}
+
+.dot-wave {
+  transform-origin: center;
+  animation: dot-wave 1.4s ease-in-out infinite;
+}
+
+.approve-dot-l {
+  animation: approve-dot-l 3.6s ease-in-out infinite;
+}
+
+.approve-dot-m {
+  animation: approve-dot-m 3.6s ease-in-out infinite;
+}
+
+.approve-dot-r {
+  animation: approve-dot-r 3.6s ease-in-out infinite;
+}
+
+.approve-reveal {
+  transform-origin: center;
+  animation: approve-reveal 3.6s ease-in-out infinite;
+}
+
+/* Burn: streaming histogram — each new bar grows in once, the arrow flips with the trend */
+@keyframes burn-grow {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+
+@keyframes burn-arrow {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.burn-grow {
+  transform-origin: bottom;
+  animation: burn-grow 0.6s ease-out;
+}
+
+.burn-arrow {
+  transform-origin: center;
+  animation: burn-arrow 0.3s ease-out;
+}
+
+/* Transparency: feed lines populate in sequence while the eye blinks */
+@keyframes feed-line {
+  0%,
+  100% {
+    transform: scaleX(0.15);
+    opacity: 0.2;
+  }
+  25%,
+  70% {
+    transform: scaleX(1);
+    opacity: 1;
+  }
+}
+
+@keyframes eye-blink {
+  0%,
+  90%,
+  100% {
+    transform: scaleY(1);
+  }
+  95% {
+    transform: scaleY(0.1);
+  }
+}
+
+.feed-line {
+  transform-origin: left center;
+  animation: feed-line 2.6s ease-in-out infinite;
+}
+
+.eye-blink {
+  transform-origin: center;
+  animation: eye-blink 4.5s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .fade-will-animate,
-  .animate-fade-up {
+  .animate-fade-up,
+  .dot-wave,
+  .approve-reveal,
+  .burn-grow,
+  .burn-arrow,
+  .feed-line,
+  .eye-blink {
     opacity: 1;
     transform: none;
+    animation: none;
+  }
+
+  .approve-dot-l,
+  .approve-dot-m,
+  .approve-dot-r {
+    opacity: 0;
     animation: none;
   }
 }

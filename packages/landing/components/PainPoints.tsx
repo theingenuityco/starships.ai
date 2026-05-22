@@ -185,20 +185,25 @@ export function PainPoints() {
         </h2>
 
         <FadeIn as="p" className="mt-28 text-xl font-semibold tracking-tight text-(--color-fg) sm:mt-32 sm:text-2xl">
-          Let AI handle your TODOs instead
+          Put AI to work instead
         </FadeIn>
 
-        <FadeIn as="ul" className="mt-6 max-w-2xl space-y-2">
-          {items.map((item, i) => (
-            <ItemRow
-              key={item.text}
-              item={item}
-              state={states[i]}
-              setRef={(el) => {
-                refs.current[i] = el;
-              }}
-            />
-          ))}
+        <FadeIn className="mt-6 max-w-2xl rounded-(--radius-card) border border-(--color-border) bg-(--color-bg)">
+          <div className="px-5 pt-4 pb-3">
+            <span className="text-xs font-medium uppercase tracking-wider text-(--color-fg-subtle)">Your to-do list</span>
+          </div>
+          <ul className="space-y-2 px-3 pb-3 pt-0 sm:px-4 sm:pb-4">
+            {items.map((item, i) => (
+              <ItemRow
+                key={item.text}
+                item={item}
+                state={states[i]}
+                setRef={(el) => {
+                  refs.current[i] = el;
+                }}
+              />
+            ))}
+          </ul>
         </FadeIn>
       </div>
     </section>

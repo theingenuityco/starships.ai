@@ -1,3 +1,6 @@
+'use client';
+
+import { useEffect, useRef } from 'react';
 import { FadeIn } from './FadeIn';
 import { Icon } from './Icon';
 
@@ -208,6 +211,63 @@ const visuals: Record<Primitive['visual'], React.ReactNode> = {
   data: <DataVisual />,
 };
 
+function PrimitiveRow({ p, i }: { p: Primitive; i: number }) {
+  const titleRef = useRef<HTMLHeadingElement>(null);
+  const descRef = useRef<HTMLParagraphElement>(null);
+  const compRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const trigger = titleRef.current;
+    if (!trigger) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          for (const el of [titleRef.current, descRef.current, compRef.current]) {
+            if (el) {
+              el.classList.remove('fade-will-animate');
+              el.classList.add('animate-fade-up');
+            }
+          }
+          observer.disconnect();
+        }
+      },
+      { threshold: 0, rootMargin: '0px 0px -120px 0px' }
+    );
+
+    observer.observe(trigger);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <div className="grid grid-cols-1 items-center gap-10 lg:grid-cols-2 lg:gap-16">
+      <div className={i % 2 === 1 ? 'lg:order-2' : ''}>
+        <h3
+          ref={titleRef}
+          className="fade-will-animate text-3xl font-semibold tracking-tight leading-[1.05] sm:text-4xl"
+          style={{ '--delay': '0ms' } as React.CSSProperties}
+        >
+          {p.name}.
+        </h3>
+        <p
+          ref={descRef}
+          className="fade-will-animate mt-6 max-w-md text-lg text-(--color-fg-muted) leading-relaxed"
+          style={{ '--delay': '90ms' } as React.CSSProperties}
+        >
+          {p.body}
+        </p>
+      </div>
+      <div
+        ref={compRef}
+        className={`fade-will-animate ${i % 2 === 1 ? 'lg:order-1' : ''}`}
+        style={{ '--delay': '180ms' } as React.CSSProperties}
+      >
+        {visuals[p.visual]}
+      </div>
+    </div>
+  );
+}
+
 export function Primitives() {
   return (
     <section className="bg-(--color-bg)">
@@ -223,13 +283,7 @@ export function Primitives() {
 
         <div className="mt-24 sm:mt-32 space-y-24 sm:space-y-32">
           {primitives.map((p, i) => (
-            <FadeIn key={p.name} className="grid grid-cols-1 items-center gap-10 lg:grid-cols-2 lg:gap-16">
-              <div className={i % 2 === 1 ? 'lg:order-2' : ''}>
-                <h3 className="text-3xl font-semibold tracking-tight leading-[1.05] sm:text-4xl">{p.name}.</h3>
-                <p className="mt-6 max-w-md text-lg text-(--color-fg-muted) leading-relaxed">{p.body}</p>
-              </div>
-              <div className={i % 2 === 1 ? 'lg:order-1' : ''}>{visuals[p.visual]}</div>
-            </FadeIn>
+            <PrimitiveRow key={p.name} p={p} i={i} />
           ))}
         </div>
       </div>

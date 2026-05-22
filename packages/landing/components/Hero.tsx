@@ -8,6 +8,7 @@ export function Hero() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [playing, setPlaying] = useState(false);
   const [videoReady, setVideoReady] = useState(false);
+  const [placeholderGone, setPlaceholderGone] = useState(false);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -49,6 +50,13 @@ export function Hero() {
       <div className="absolute inset-0 bg-glow pointer-events-none" aria-hidden />
       <HeroBackground className="absolute inset-0 pointer-events-none" />
 
+      {/* Bottom fade — dissolves the nebula into the page background so the hero
+          blends seamlessly into the next section instead of cutting off hard */}
+      <div
+        className="pointer-events-none absolute inset-x-0 bottom-0 h-64 bg-gradient-to-b from-transparent to-(--color-bg)"
+        aria-hidden
+      />
+
       <div className="relative mx-auto max-w-5xl px-6 pt-44 pb-12 sm:pt-52 sm:pb-16">
         <FadeIn delay={0}>
           <h1 className="text-4xl sm:text-5xl md:text-6xl font-semibold tracking-tight leading-[1.05] max-w-3xl">
@@ -85,10 +93,14 @@ export function Hero() {
               onEnded={() => setPlaying(false)}
             />
 
-            {/* Blurry placeholder, fades out once the video frame is ready */}
-            <div
-              className={`absolute inset-0 backdrop-blur-2xl transition-opacity duration-700 pointer-events-none ${videoReady ? 'opacity-0' : 'opacity-100'}`}
-            />
+            {/* Blurry placeholder, fades out once the video frame is ready, then
+                unmounts so its backdrop-filter layer stops being snapshotted on scroll */}
+            {!placeholderGone && (
+              <div
+                onTransitionEnd={() => videoReady && setPlaceholderGone(true)}
+                className={`absolute inset-0 backdrop-blur-2xl transition-opacity duration-700 pointer-events-none ${videoReady ? 'opacity-0' : 'opacity-100'}`}
+              />
+            )}
 
             {/* Play / pause overlay */}
             <button

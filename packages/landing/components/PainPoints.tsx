@@ -170,21 +170,25 @@ export function PainPoints() {
   }, []);
 
   return (
-    <FadeIn as="section">
+    <section>
       <div className="mx-auto max-w-5xl px-6 py-32 sm:py-40">
         <h2 className="text-4xl font-semibold leading-[1.05] tracking-tight sm:text-5xl md:text-6xl">
-          You are the bottleneck.
-          <br />
-          AI is the leverage.
-          <br />
-          <span className="text-(--color-fg-muted)">But you&rsquo;re still copy-pasting.</span>
+          <FadeIn as="span" className="block" delay={0}>
+            You are the bottleneck.
+          </FadeIn>
+          <FadeIn as="span" className="block" delay={90}>
+            AI is the leverage.
+          </FadeIn>
+          <FadeIn as="span" className="block text-(--color-fg-muted)" delay={180}>
+            But you&rsquo;re still copy-pasting.
+          </FadeIn>
         </h2>
 
-        <p className="mt-28 text-xl font-semibold tracking-tight text-(--color-fg) sm:mt-32 sm:text-2xl">
+        <FadeIn as="p" className="mt-28 text-xl font-semibold tracking-tight text-(--color-fg) sm:mt-32 sm:text-2xl">
           Let AI handle your TODOs instead
-        </p>
+        </FadeIn>
 
-        <ul className="mt-6 max-w-2xl space-y-2">
+        <FadeIn as="ul" className="mt-6 max-w-2xl space-y-2">
           {items.map((item, i) => (
             <ItemRow
               key={item.text}
@@ -195,8 +199,8 @@ export function PainPoints() {
               }}
             />
           ))}
-        </ul>
+        </FadeIn>
       </div>
-    </FadeIn>
+    </section>
   );
 }

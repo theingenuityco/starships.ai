@@ -12,9 +12,9 @@ export function Footer() {
                 Starships<span className="text-(--color-fg-subtle)">.ai</span>
               </span>
             </div>
-            <p className="text-sm text-(--color-fg-subtle) leading-relaxed max-w-xs">Your startup, on autopilot.</p>
+            <p className="text-(--color-fg-subtle) leading-relaxed max-w-xs">Your startup, on autopilot.</p>
             <p className="text-xs text-(--color-fg-subtle)">
-              &copy; {new Date().getFullYear()} Starships.ai &mdash; Manifested by{' '}
+              &copy; {new Date().getFullYear()} Starships.ai | Manifested by{' '}
               <a href="https://theingenuity.co" target="_blank" rel="noopener noreferrer" className="hover:text-(--color-fg-muted) transition-colors">
                 The Ingenuity Co
               </a>

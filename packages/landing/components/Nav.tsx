@@ -31,7 +31,7 @@ export function Nav() {
 
         <Link
           href="/contact"
-          className="rounded-full border border-(--color-border) bg-white/10 px-5 py-2.5 text-[15px] font-medium text-(--color-fg) hover:bg-white/15 hover:border-(--color-border-strong) transition-colors"
+          className="rounded-full bg-(--color-accent) px-5 py-2.5 text-[15px] font-medium text-(--color-bg) shadow-sm hover:bg-(--color-accent-strong) transition-colors"
         >
           Request demo
         </Link>

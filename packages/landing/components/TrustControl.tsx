@@ -1,162 +1,104 @@
-'use client';
-
-import { useEffect, useState } from 'react';
+import { BurnMotif } from './BurnMotif';
 import { FadeIn } from './FadeIn';
+import { Icon } from './Icon';
 
-type QueueItem = {
-  kind: string;
+type Facet = {
+  key: 'approvals' | 'burn' | 'transparency';
   title: string;
-  preview: string;
-  meta: string;
+  body: string;
 };
 
-const items: QueueItem[] = [
+const facets: Facet[] = [
   {
-    kind: 'PR merge',
-    title: 'fix: refresh stale session from cookie',
-    preview: '+12 −4 · src/auth/session.ts · 1 test added',
-    meta: 'Engineering room · 11:42 AM',
+    key: 'approvals',
+    title: 'Approvals',
+    body: 'You sign off before anything irreversible. Allow, ask, or deny, action by action.',
   },
   {
-    kind: 'Email send',
-    title: 'Follow-up to Broke Inc on payments',
-    preview: 'Hi Sam — circling back on the contract. We can…',
-    meta: 'Sales room · 11:38 AM',
+    key: 'burn',
+    title: 'Burn visibility',
+    body: "See your starship's total burn, live. Track spend by room and agent, to the dollar.",
   },
   {
-    kind: 'Invoice retry',
-    title: 'Charge $4,200 · INV-1240 · Stripe',
-    preview: 'Card declined 2× · customer notified Tuesday',
-    meta: 'Ops room · 11:35 AM',
+    key: 'transparency',
+    title: 'Full transparency',
+    body: "Open any conversation and follow an agent's reasoning. Halt one agent, a room, or everything.",
   },
 ];
 
-const pillars = [
-  {
-    icon: '🔒',
-    title: 'Nothing irreversible without you.',
-    body: 'Sends, merges, payments, deploys — every real-world action lands in your queue first.',
-  },
-  {
-    icon: '📜',
-    title: 'Every action audit-logged.',
-    body: 'Who proposed it, what changed, when you approved it, and the full chain of reasoning behind it.',
-  },
-  {
-    icon: '⏸',
-    title: 'Halt anything, instantly.',
-    body: 'Per-agent, per-room, or org-wide kill switch. Pause an agent without losing its in-flight work.',
-  },
-];
+// Each motif animates a small, specific story for its card.
+function Motif({ kind }: { kind: Facet['key'] }) {
+  if (kind === 'approvals') {
+    // Three pending actions wave, then converge and blend into a single approval check.
+    return (
+      <div className="flex h-10 items-center text-(--color-fg-muted)">
+        <div className="relative h-6 w-6">
+          <span className="approve-dot-l absolute left-[4px] top-[9px]">
+            <span className="dot-wave block h-1.5 w-1.5 rounded-full bg-current" />
+          </span>
+          <span className="approve-dot-m absolute left-[11px] top-[9px]">
+            <span className="dot-wave block h-1.5 w-1.5 rounded-full bg-current" style={{ animationDelay: '0.2s' }} />
+          </span>
+          <span className="approve-dot-r absolute left-[18px] top-[9px]">
+            <span className="dot-wave block h-1.5 w-1.5 rounded-full bg-current" style={{ animationDelay: '0.4s' }} />
+          </span>
+          <span className="approve-reveal absolute inset-0 flex items-center justify-center rounded-full bg-(--color-success)/15">
+            <Icon name="check" className="h-3.5 w-3.5 text-(--color-success)" />
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  if (kind === 'burn') {
+    // Streaming spend histogram: new bars grow in, old ones drop off, arrow flips with the trend.
+    return <BurnMotif />;
+  }
+
+  // The live feed populates line by line while the eye blinks.
+  return (
+    <div className="flex h-10 items-center gap-2.5 text-(--color-fg-muted)">
+      <Icon name="eye" className="eye-blink h-5 w-5" />
+      <span className="flex flex-col gap-1.5">
+        <span className="feed-line h-0.5 w-10 rounded-full bg-current" />
+        <span className="feed-line h-0.5 w-7 rounded-full bg-current" style={{ animationDelay: '0.3s' }} />
+        <span className="feed-line h-0.5 w-8 rounded-full bg-current" style={{ animationDelay: '0.6s' }} />
+      </span>
+    </div>
+  );
+}
 
 export function TrustControl() {
-  const [approvedIndex, setApprovedIndex] = useState<number | null>(null);
-
-  useEffect(() => {
-    const loop = setInterval(() => {
-      setApprovedIndex(0);
-      setTimeout(() => setApprovedIndex(null), 1800);
-    }, 5200);
-    return () => clearInterval(loop);
-  }, []);
-
   return (
-    <section className="border-b border-(--color-border) bg-(--color-bg-soft)">
-      <div className="mx-auto max-w-6xl px-6 py-24">
-        <div>
-          <FadeIn as="p" className="text-sm uppercase tracking-wider text-(--color-fg-subtle) mb-4" delay={0}>
-            Always your call
+    <section className="bg-(--color-bg)">
+      <div className="mx-auto max-w-5xl px-6 py-32 sm:py-40">
+        <h2 className="text-4xl font-semibold leading-[1.05] tracking-tight sm:text-5xl md:text-6xl">
+          <FadeIn as="span" className="block" delay={0}>
+            You are in full control.
           </FadeIn>
-          <h2 className="text-3xl sm:text-4xl md:text-5xl font-semibold tracking-tight leading-[1.05] max-w-3xl">
-            <FadeIn as="span" className="block" delay={90}>
-              You are in full control.
-            </FadeIn>
-            <FadeIn as="span" className="block text-(--color-fg-muted)" delay={180}>
-              Every action, your sign-off.
-            </FadeIn>
-          </h2>
-        </div>
-
-        <div className="mt-16 grid grid-cols-1 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] gap-12 lg:gap-16 items-start">
-          <div className="space-y-6">
-            {pillars.map((p, i) => (
-              <FadeIn
-                key={p.title}
-                delay={i * 90}
-                className="rounded-(--radius-card) border border-(--color-border) bg-(--color-bg-elev) p-6"
-              >
-                <div className="flex items-baseline gap-3">
-                  <span className="text-xl leading-none">{p.icon}</span>
-                  <h3 className="text-lg font-semibold tracking-tight">{p.title}</h3>
-                </div>
-                <p className="mt-3 text-(--color-fg-muted) leading-relaxed">{p.body}</p>
-              </FadeIn>
-            ))}
-          </div>
-
-          <FadeIn delay={140}>
-            <div className="rounded-(--radius-card) border border-(--color-border) bg-(--color-bg) overflow-hidden shadow-2xl shadow-black/40">
-              <div className="flex items-center justify-between border-b border-(--color-border) px-5 py-3">
-                <div className="flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full bg-(--color-accent)" />
-                  <span className="text-sm font-semibold">Approval queue</span>
-                </div>
-                <span className="text-xs text-(--color-fg-subtle)">{items.length} awaiting sign-off</span>
-              </div>
-
-              <ul>
-                {items.map((it, i) => {
-                  const isApproved = approvedIndex === i;
-                  return (
-                    <li
-                      key={it.title}
-                      className={`border-b border-(--color-border) last:border-b-0 px-5 py-4 transition-colors duration-500 ${
-                        isApproved ? 'bg-(--color-success)/10' : ''
-                      }`}
-                    >
-                      <div className="flex items-center justify-between gap-3">
-                        <span className="inline-flex items-center gap-2 text-xs uppercase tracking-wider text-(--color-fg-subtle)">
-                          <span className="font-mono">{it.kind}</span>
-                        </span>
-                        <span
-                          className={`text-xs transition-colors duration-500 ${
-                            isApproved ? 'text-(--color-success)' : 'text-(--color-fg-subtle)'
-                          }`}
-                        >
-                          {isApproved ? '✓ approved' : it.meta}
-                        </span>
-                      </div>
-                      <p className="mt-1.5 text-sm font-semibold text-(--color-fg)">{it.title}</p>
-                      <p className="mt-1 line-clamp-1 text-sm text-(--color-fg-muted)">{it.preview}</p>
-
-                      <div className="mt-3 flex gap-2">
-                        <button
-                          className={`rounded-(--radius-button) px-3 py-1.5 text-xs font-medium transition-all duration-300 ${
-                            isApproved
-                              ? 'bg-(--color-success) text-(--color-bg)'
-                              : 'bg-(--color-accent) text-(--color-bg) hover:bg-(--color-accent-strong)'
-                          }`}
-                        >
-                          {isApproved ? 'Approved' : 'Approve'}
-                        </button>
-                        <button className="rounded-(--radius-button) border border-(--color-border-strong) px-3 py-1.5 text-xs text-(--color-fg)">
-                          Request changes
-                        </button>
-                        <button className="rounded-(--radius-button) border border-(--color-border) px-3 py-1.5 text-xs text-(--color-fg-muted)">
-                          Reject
-                        </button>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-
-              <div className="border-t border-(--color-border) px-5 py-3 flex items-center justify-between text-xs text-(--color-fg-subtle)">
-                <span className="font-mono">audit log · 1,284 entries this week</span>
-                <a href="#" className="text-(--color-fg-muted) hover:text-(--color-fg)">View all →</a>
-              </div>
-            </div>
+          <FadeIn as="span" className="block text-(--color-fg-muted)" delay={90}>
+            Every action.
           </FadeIn>
+          <FadeIn as="span" className="block text-(--color-fg-muted)" delay={180}>
+            Every dollar.
+          </FadeIn>
+          <FadeIn as="span" className="block text-(--color-fg-muted)" delay={270}>
+            Every step.
+          </FadeIn>
+        </h2>
+
+        <div className="mt-24 grid grid-cols-1 gap-5 sm:mt-32 sm:grid-cols-3">
+          {facets.map((f, i) => (
+            <FadeIn
+              key={f.key}
+              delay={140 + i * 90}
+              className="rounded-(--radius-card) border border-(--color-border) bg-(--color-bg-elev) p-6"
+            >
+              <Motif kind={f.key} />
+              <h3 className="mt-5 text-xl font-semibold tracking-tight">{f.title}</h3>
+              <p className="mt-3 leading-relaxed text-(--color-fg-muted)">{f.body}</p>
+            </FadeIn>
+          ))}
         </div>
       </div>
     </section>

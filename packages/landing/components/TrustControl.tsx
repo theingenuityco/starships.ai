@@ -63,27 +63,36 @@ export function TrustControl() {
   return (
     <section className="border-b border-(--color-border) bg-(--color-bg-soft)">
       <div className="mx-auto max-w-6xl px-6 py-24">
-        <FadeIn>
-          <p className="text-sm uppercase tracking-wider text-(--color-fg-subtle) mb-4">Always your call</p>
+        <div>
+          <FadeIn as="p" className="text-sm uppercase tracking-wider text-(--color-fg-subtle) mb-4" delay={0}>
+            Always your call
+          </FadeIn>
           <h2 className="text-3xl sm:text-4xl md:text-5xl font-semibold tracking-tight leading-[1.05] max-w-3xl">
-            You are in full control.
-            <br />
-            <span className="text-(--color-fg-muted)">Every action, your sign-off.</span>
+            <FadeIn as="span" className="block" delay={90}>
+              You are in full control.
+            </FadeIn>
+            <FadeIn as="span" className="block text-(--color-fg-muted)" delay={180}>
+              Every action, your sign-off.
+            </FadeIn>
           </h2>
-        </FadeIn>
+        </div>
 
         <div className="mt-16 grid grid-cols-1 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] gap-12 lg:gap-16 items-start">
-          <FadeIn className="space-y-6">
-            {pillars.map((p) => (
-              <div key={p.title} className="rounded-(--radius-card) border border-(--color-border) bg-(--color-bg-elev) p-6">
+          <div className="space-y-6">
+            {pillars.map((p, i) => (
+              <FadeIn
+                key={p.title}
+                delay={i * 90}
+                className="rounded-(--radius-card) border border-(--color-border) bg-(--color-bg-elev) p-6"
+              >
                 <div className="flex items-baseline gap-3">
                   <span className="text-xl leading-none">{p.icon}</span>
                   <h3 className="text-lg font-semibold tracking-tight">{p.title}</h3>
                 </div>
                 <p className="mt-3 text-(--color-fg-muted) leading-relaxed">{p.body}</p>
-              </div>
+              </FadeIn>
             ))}
-          </FadeIn>
+          </div>
 
           <FadeIn delay={140}>
             <div className="rounded-(--radius-card) border border-(--color-border) bg-(--color-bg) overflow-hidden shadow-2xl shadow-black/40">

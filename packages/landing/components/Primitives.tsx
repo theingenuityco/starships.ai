@@ -43,7 +43,7 @@ function GoalsVisual() {
   return (
     <div className="w-full space-y-3">
       {goals.map((g) => (
-        <div key={g.room} className="rounded-md border border-(--color-border) bg-(--color-bg) p-4">
+        <div key={g.room} className="rounded-md border border-(--color-border) bg-(--color-bg-elev) p-4">
           <div className="flex items-baseline justify-between">
             <p className="text-[10px] uppercase tracking-wider text-(--color-fg-subtle)">{g.room} room</p>
             <p className="font-mono text-xs text-(--color-success)">{g.progress}%</p>
@@ -69,7 +69,7 @@ function HeartbeatsVisual() {
   return (
     <div className="w-full space-y-2.5">
       {beats.map((b) => (
-        <div key={b.who} className="rounded-md border border-(--color-border) bg-(--color-bg) p-3 font-mono text-xs">
+        <div key={b.who} className="rounded-md border border-(--color-border) bg-(--color-bg-elev) p-3 font-mono text-xs">
           <p className="text-(--color-fg-subtle)">{b.when}</p>
           <p className="mt-1 text-(--color-fg)">
             → <span className="text-(--color-accent)">{b.who}</span>: {b.what}
@@ -89,7 +89,7 @@ function DocsVisual() {
     { name: 'Customer tone of voice', updated: '2 months ago' },
   ];
   return (
-    <div className="w-full rounded-md border border-(--color-border) bg-(--color-bg) p-4">
+    <div className="w-full rounded-md border border-(--color-border) bg-(--color-bg-elev) p-5">
       <div className="flex items-center justify-between">
         <p className="text-[10px] uppercase tracking-wider text-(--color-fg-subtle)">Read by every agent</p>
         <p className="font-mono text-[10px] text-(--color-fg-subtle)">24 docs · synced</p>
@@ -112,7 +112,7 @@ function DocsVisual() {
 function DataVisual() {
   return (
     <div className="w-full space-y-3">
-      <div className="rounded-md border border-(--color-border) bg-(--color-bg) p-4 font-mono text-xs">
+      <div className="rounded-md border border-(--color-border) bg-(--color-bg-elev) p-4 font-mono text-xs">
         <p className="text-(--color-fg-subtle)">SELECT sum(mrr) FROM stripe.subscriptions</p>
         <p className="text-(--color-fg-subtle)">WHERE status = &lsquo;active&rsquo;</p>
         <p className="mt-4 text-3xl font-semibold text-(--color-success)">$248,140</p>
@@ -122,7 +122,7 @@ function DataVisual() {
         {['postgres', 'stripe', 'datadog'].map((s) => (
           <div
             key={s}
-            className="rounded border border-(--color-border) bg-(--color-bg) px-2 py-2 text-center font-mono text-[10px] uppercase tracking-wider text-(--color-fg-subtle)"
+            className="rounded border border-(--color-border) bg-(--color-bg-elev) px-2 py-2 text-center font-mono text-[10px] uppercase tracking-wider text-(--color-fg-subtle)"
           >
             {s}
           </div>
@@ -141,33 +141,29 @@ const visuals: Record<Primitive['visual'], React.ReactNode> = {
 
 export function Primitives() {
   return (
-    <section className="border-b border-(--color-border) bg-(--color-bg)">
-      <div className="mx-auto max-w-5xl px-6 py-24">
-        <FadeIn>
-          <p className="text-sm uppercase tracking-wider text-(--color-fg-subtle) mb-4">How it actually works</p>
-          <h2 className="text-3xl sm:text-4xl md:text-5xl font-semibold tracking-tight leading-[1.05] max-w-3xl">
-            Built from primitives, not prompts.
-          </h2>
-          <p className="mt-6 max-w-2xl text-lg text-(--color-fg-muted) leading-relaxed">
-            A virtual org is more than chat. It runs on the same primitives your real org does, only made first-class for agents.
-          </p>
-        </FadeIn>
+    <section className="bg-(--color-bg)">
+      <div className="mx-auto max-w-5xl px-6 py-32 sm:py-40">
+        <h2 className="text-4xl sm:text-5xl md:text-6xl font-semibold tracking-tight leading-[1.05]">
+          <FadeIn as="span" className="block" delay={0}>
+            Built from primitives,
+          </FadeIn>
+          <FadeIn as="span" className="block text-(--color-fg-muted)" delay={90}>
+            not prompts.
+          </FadeIn>
+        </h2>
 
-        <div className="mt-20 space-y-24">
+        <div className="mt-24 sm:mt-32 space-y-24 sm:space-y-32">
           {primitives.map((p, i) => (
-            <FadeIn key={p.name} className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-16 items-center">
+            <FadeIn key={p.name} className="grid grid-cols-1 items-center gap-10 lg:grid-cols-2 lg:gap-16">
               <div className={i % 2 === 1 ? 'lg:order-2' : ''}>
-                <h3 className="text-2xl font-semibold tracking-tight">{p.name}</h3>
-                <p className="mt-2 text-lg text-(--color-fg-muted)">{p.oneliner}</p>
-                <p className="mt-4 text-(--color-fg-muted) leading-relaxed">{p.body}</p>
+                <h3 className="text-3xl font-semibold tracking-tight leading-[1.05] sm:text-4xl">
+                  {p.name}.
+                  <br />
+                  <span className="text-(--color-fg-muted)">{p.oneliner}</span>
+                </h3>
+                <p className="mt-6 max-w-md text-lg text-(--color-fg-muted) leading-relaxed">{p.body}</p>
               </div>
-              <div
-                className={`rounded-(--radius-card) border border-(--color-border) bg-(--color-bg-elev) p-6 lg:p-8 ${
-                  i % 2 === 1 ? 'lg:order-1' : ''
-                }`}
-              >
-                {visuals[p.visual]}
-              </div>
+              <div className={i % 2 === 1 ? 'lg:order-1' : ''}>{visuals[p.visual]}</div>
             </FadeIn>
           ))}
         </div>

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { FadeIn } from './FadeIn';
 
 type State = 'working' | 'done' | 'needs-you';
 type Item = { id: number; time: Date; agent: string; action: string; state: State };
@@ -75,7 +76,7 @@ export function FeedDashboard() {
           }}
         >
             {/* The Mac window, centered on the wallpaper, extending below */}
-            <div className="absolute inset-x-8 top-8 sm:inset-x-16 sm:top-12">
+            <FadeIn className="absolute inset-x-8 top-8 sm:inset-x-16 sm:top-12">
               <div className="rounded-(--radius-card) border border-(--color-border) bg-(--color-bg-elev) shadow-2xl shadow-black/70">
                 {/* Window chrome */}
                 <div className="flex items-center gap-2 border-b border-(--color-border) px-4 py-3">
@@ -171,7 +172,7 @@ export function FeedDashboard() {
                   </div>
                 </div>
               </div>
-            </div>
+            </FadeIn>
 
           {/* Bottom fade inside the wallpaper — softens the window's cut edge and blends into the page */}
           <div className="pointer-events-none absolute inset-x-0 bottom-0 h-56 bg-gradient-to-b from-transparent to-(--color-bg)" />

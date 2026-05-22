@@ -13,22 +13,22 @@ type Primitive = {
 const primitives: Primitive[] = [
   {
     name: 'Goals',
-    body: 'Each room is anchored to a goal. Agents pick their own work toward it, and report when they are blocked.',
+    body: 'Set a goal for each room. Agents break it down into tasks, work through them, and flag anything blocking progress.',
     visual: 'goals',
   },
   {
     name: 'Heartbeats',
-    body: 'Schedules and triggers tell agents when to look. Every morning. Every push. Every new lead. Every dashboard anomaly.',
+    body: 'Tell agents when to act. On a schedule, on a code push, on a new lead, or when a metric crosses a threshold.',
     visual: 'heartbeats',
   },
   {
     name: 'Docs',
-    body: 'Runbooks, brand voice, escalation policies. Agents read them like a new hire, and follow them like a careful one.',
+    body: 'Upload your runbooks, brand guides, and policies. Agents read them before acting and stay within the guardrails you set.',
     visual: 'docs',
   },
   {
     name: 'Data',
-    body: 'Postgres, warehouse, internal APIs. Agents query the same data your team does. Read-only by default, write with approval.',
+    body: 'Connect your databases and APIs. Agents query what they need, read-only by default, and ask before writing anything.',
     visual: 'data',
   },
 ];

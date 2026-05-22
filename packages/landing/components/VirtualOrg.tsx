@@ -20,11 +20,14 @@ export function VirtualOrg() {
           <FadeIn as="h2" className="text-4xl sm:text-5xl md:text-6xl font-semibold tracking-tight leading-[1.05]">
             A virtual org that runs 24x7.
           </FadeIn>
-          <FadeIn as="p" delay={120} className="mt-8 max-w-2xl text-xl text-(--color-fg) leading-relaxed">
-            Open your laptop in the morning.
-            <br />
-            The work that needed doing is already half done.
-          </FadeIn>
+          <p className="mt-8 max-w-2xl text-xl text-(--color-fg) leading-relaxed">
+            <FadeIn as="span" className="block" delay={120}>
+              Open your laptop in the morning.
+            </FadeIn>
+            <FadeIn as="span" className="block" delay={210}>
+              The work that needed doing is already done.
+            </FadeIn>
+          </p>
         </div>
       </div>
     </section>

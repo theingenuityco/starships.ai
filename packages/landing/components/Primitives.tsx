@@ -2,7 +2,6 @@ import { FadeIn } from './FadeIn';
 
 type Primitive = {
   name: string;
-  oneliner: string;
   body: string;
   visual: 'goals' | 'heartbeats' | 'docs' | 'data';
 };
@@ -10,25 +9,21 @@ type Primitive = {
 const primitives: Primitive[] = [
   {
     name: 'Goals',
-    oneliner: 'Outcomes, not tickets.',
     body: 'Each room is anchored to a goal. Agents pick their own work toward it, and report when they are blocked.',
     visual: 'goals',
   },
   {
     name: 'Heartbeats',
-    oneliner: 'Pulses that wake agents up.',
     body: 'Schedules and triggers tell agents when to look. Every morning. Every push. Every new lead. Every dashboard anomaly.',
     visual: 'heartbeats',
   },
   {
     name: 'Docs',
-    oneliner: 'Your handbook, read by every agent.',
     body: 'Runbooks, brand voice, escalation policies. Agents read them like a new hire, and follow them like a careful one.',
     visual: 'docs',
   },
   {
     name: 'Data',
-    oneliner: 'Live access to your real systems.',
     body: 'Postgres, warehouse, internal APIs. Agents query the same data your team does. Read-only by default, write with approval.',
     visual: 'data',
   },
@@ -156,11 +151,7 @@ export function Primitives() {
           {primitives.map((p, i) => (
             <FadeIn key={p.name} className="grid grid-cols-1 items-center gap-10 lg:grid-cols-2 lg:gap-16">
               <div className={i % 2 === 1 ? 'lg:order-2' : ''}>
-                <h3 className="text-3xl font-semibold tracking-tight leading-[1.05] sm:text-4xl">
-                  {p.name}.
-                  <br />
-                  <span className="text-(--color-fg-muted)">{p.oneliner}</span>
-                </h3>
+                <h3 className="text-3xl font-semibold tracking-tight leading-[1.05] sm:text-4xl">{p.name}.</h3>
                 <p className="mt-6 max-w-md text-lg text-(--color-fg-muted) leading-relaxed">{p.body}</p>
               </div>
               <div className={i % 2 === 1 ? 'lg:order-1' : ''}>{visuals[p.visual]}</div>

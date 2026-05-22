@@ -8,7 +8,7 @@ interface FadeInProps extends React.HTMLAttributes<HTMLElement> {
   as?: React.ElementType;
 }
 
-export function FadeIn({ children, delay = 0, className = '', as: Tag = 'div', ...rest }: FadeInProps) {
+export function FadeIn({ children, delay = 0, className = '', as: Tag = 'div', style, ...rest }: FadeInProps) {
   const ref = useRef<HTMLElement>(null);
 
   useEffect(() => {
@@ -35,7 +35,7 @@ export function FadeIn({ children, delay = 0, className = '', as: Tag = 'div', .
       ref={ref}
       {...rest}
       className={`fade-will-animate ${className}`}
-      style={{ '--delay': `${delay}ms` } as React.CSSProperties}
+      style={{ '--delay': `${delay}ms`, ...style } as React.CSSProperties}
     >
       {children}
     </Tag>

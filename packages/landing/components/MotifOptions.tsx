@@ -68,10 +68,19 @@ function BroadcastCanvas() {
     if (!ctx) return;
     const CX = 100, CY = 100;
     const MAX_R = 95;
-    const SPEED = 0.5; // px per frame
+    const SPEED = 0.3; // px per frame
     type Ring = { r: number };
     // Pre-seed rings at evenly spaced radii so it looks alive immediately
     const rings: Ring[] = [0, 0.25, 0.5, 0.75].map(t => ({ r: t * MAX_R }));
+    // Radar blips — fixed targets within range that echo when a pulse sweeps
+    // past them. One is a "converted" target (green); the rest ping blue-gray.
+    type Blip = { dist: number; angle: number; green: boolean; lit: number; echo: number };
+    const blips: Blip[] = [
+      { dist: 44, angle: -1.0, green: true, lit: 0, echo: -1 },
+      { dist: 70, angle: 2.4, green: false, lit: 0, echo: -1 },
+      { dist: 56, angle: 1.15, green: false, lit: 0, echo: -1 },
+    ];
+    const MAX_ECHO = 16;
     let tick = 0, raf: number;
     const SPAWN_INTERVAL = Math.round(MAX_R / SPEED / rings.length); // keeps spacing even
     const draw = () => {
@@ -89,6 +98,38 @@ function BroadcastCanvas() {
         ctx.strokeStyle = `rgba(170,175,210,${opacity.toFixed(3)})`;
         ctx.lineWidth = 1.2;
         ctx.stroke();
+      }
+      // Blips — a pulse crossing a blip's radius triggers a fresh echo
+      for (const b of blips) {
+        for (const ring of rings) {
+          if (ring.r >= b.dist && ring.r - SPEED < b.dist) {
+            b.lit = 1;
+            b.echo = 0;
+          }
+        }
+        const bx = CX + Math.cos(b.angle) * b.dist;
+        const by = CY + Math.sin(b.angle) * b.dist;
+        const rgb = b.green ? '100,220,160' : '170,175,210';
+        // Echo ring radiating out from the blip itself
+        if (b.echo >= 0) {
+          b.echo += 0.5;
+          const eo = (1 - b.echo / MAX_ECHO) * 0.5;
+          if (eo > 0) {
+            ctx.beginPath();
+            ctx.arc(bx, by, b.echo, 0, Math.PI * 2);
+            ctx.strokeStyle = `rgba(${rgb},${eo.toFixed(3)})`;
+            ctx.lineWidth = 1;
+            ctx.stroke();
+          }
+          if (b.echo > MAX_ECHO) b.echo = -1;
+        }
+        // Blip dot — flares when freshly pinged, then settles back
+        b.lit = Math.max(0, b.lit - 0.012);
+        const alpha = (b.green ? 0.4 : 0.32) + b.lit * 0.55;
+        ctx.beginPath();
+        ctx.arc(bx, by, 3, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(${rgb},${alpha.toFixed(3)})`;
+        ctx.fill();
       }
       // Center dot — solid anchor point
       ctx.beginPath();

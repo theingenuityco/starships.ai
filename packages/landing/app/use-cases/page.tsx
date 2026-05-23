@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { FadeIn } from '@/components/FadeIn';
 import { Footer } from '@/components/Footer';
 import { MarketingMotif, EngineeringMotif, SalesMotif } from '@/components/MotifOptions';
+import { SectionReveal, ChainItem } from '@/components/SectionReveal';
 
 export const metadata: Metadata = {
   title: 'Use Cases — Starships',
@@ -14,7 +15,8 @@ export const dynamic = 'force-static';
 const sections = [
   {
     heading: 'For sales.',
-    body: "The Sales room keeps your pipeline moving even when you're heads-down closing. New leads researched before your first call. CRM updated after every interaction. Follow-ups drafted and queued before anything goes cold. Your reps spend time on conversations, not admin.",
+    body: ['Leads researched before your first call.', 'CRM updated after every interaction.', 'Follow-ups queued before anything goes cold.'],
+    integrations: ['HubSpot', 'Salesforce', 'Gmail', 'Gong', 'Slack'],
     agents: ['Account Researcher', 'CRM Updater', 'Follow-up Coordinator', 'Ticket Triager'],
     href: '/for-sales',
     cta: 'See the Sales room',
@@ -22,7 +24,8 @@ const sections = [
   },
   {
     heading: 'For developers.',
-    body: 'The Engineering room handles the maintenance layer your team never has time for. Every pull request reviewed before a human opens it. Tests written alongside new features. Security scans on every push. Dependencies upgraded weekly with a clean PR. Your engineers stay focused on the product.',
+    body: ['Every PR reviewed before a human opens it.', 'Tests written alongside new features.', 'Dependencies upgraded on a clean weekly PR.'],
+    integrations: ['GitHub', 'GitLab', 'Linear', 'Jira', 'Slack'],
     agents: ['PR Reviewer', 'Test Author', 'Security Scanner', 'Dependency Upgrader'],
     href: '/for-developers',
     cta: 'See the Engineering room',
@@ -30,7 +33,8 @@ const sections = [
   },
   {
     heading: 'For marketers.',
-    body: 'Starships gives marketing teams a set of autonomous agents that research, write, and send — without waiting for someone to kick things off. Outreach sequences drafted the moment a lead enters your CRM. KB articles published the moment a ticket resolves. Status updates posted every morning, without you writing a word.',
+    body: ['Outreach drafted the moment a lead enters your CRM.', 'KB articles published when a ticket resolves.', 'Morning updates sent without a single keystroke.'],
+    integrations: ['HubSpot', 'Mailchimp', 'Notion', 'Intercom', 'Slack'],
     agents: ['Outreach Drafter', 'Campaign Planner', 'KB Writer', 'Status Reporter'],
     href: '/for-marketers',
     cta: 'See the Marketing room',
@@ -45,13 +49,13 @@ export default function UseCasesPage() {
         <FadeIn>
           <p className="text-xs font-brand tracking-widest text-(--color-fg-subtle) uppercase mb-4">Use Cases</p>
         </FadeIn>
-        <h1 className="text-4xl sm:text-5xl font-semibold tracking-tight leading-[1.05]">
+        <h1 className="text-4xl sm:text-5xl md:text-6xl font-semibold tracking-tight leading-[1.05]">
           <FadeIn as="span" delay={60} className="block">One platform.</FadeIn>
           <FadeIn as="span" delay={120} className="block text-(--color-fg-muted)">Every team.</FadeIn>
         </h1>
         <FadeIn delay={200}>
           <p className="mt-6 max-w-xl text-lg text-(--color-fg-muted) leading-relaxed">
-            Starships runs across your whole org. Each team gets their own room, their own agents, and their own goals — all working while you sleep.
+            Starships runs across your whole org. Each team gets their own room, their own agents, and their own goals, all working while you sleep.
           </p>
         </FadeIn>
       </div>
@@ -59,45 +63,77 @@ export default function UseCasesPage() {
       {sections.map((s) => (
         <section key={s.heading} className="bg-(--color-bg)">
           <div className="mx-auto max-w-5xl px-6 py-16 sm:py-20">
-            <h2 className="text-4xl font-semibold leading-[1.05] tracking-tight sm:text-5xl md:text-6xl mb-16 sm:mb-20">
-              <FadeIn as="span" delay={0} className="block">{s.heading}</FadeIn>
-            </h2>
+            <SectionReveal>
+              <ChainItem
+                as="h2"
+                delay={0}
+                className="text-3xl font-semibold leading-[1.05] tracking-tight sm:text-4xl mb-16 sm:mb-20"
+              >
+                {s.heading}
+              </ChainItem>
 
-            <div className="grid grid-cols-1 items-center gap-12 lg:grid-cols-2 lg:gap-20">
+              <div className="grid grid-cols-1 items-center gap-12 lg:grid-cols-2 lg:gap-20">
 
-              {/* Motif on the left */}
-              <FadeIn delay={80} className="w-full max-w-sm mx-auto lg:mx-0">
-                {s.motif}
-              </FadeIn>
+                <ChainItem delay={80} className="w-full max-w-sm mx-auto lg:mx-0">
+                  {s.motif}
+                </ChainItem>
 
-              {/* Content on the right */}
-              <div>
-                <FadeIn delay={120}>
-                  <p className="text-lg text-(--color-fg-muted) leading-relaxed">{s.body}</p>
-                </FadeIn>
-                <FadeIn delay={190}>
-                  <div className="mt-8 flex flex-wrap gap-2">
-                    {s.agents.map((a) => (
-                      <span
-                        key={a}
-                        className="inline-flex items-center rounded-full border border-(--color-border) px-3 py-1 text-sm text-(--color-fg-subtle)"
-                      >
-                        {a}
-                      </span>
-                    ))}
-                  </div>
-                </FadeIn>
-                <FadeIn delay={260}>
-                  <Link
-                    href={s.href}
-                    className="mt-10 inline-flex items-center gap-2 rounded-(--radius-button) border border-(--color-border-strong) px-5 py-3 text-sm font-medium text-(--color-fg) hover:bg-(--color-bg-elev) transition-colors"
-                  >
-                    {s.cta} →
-                  </Link>
-                </FadeIn>
+                <div>
+                  <ChainItem delay={160}>
+                    <ul className="space-y-2">
+                      {s.body.map((line) => (
+                        <li key={line} className="flex items-start gap-2.5 text-lg text-(--color-fg-muted) leading-relaxed">
+                          <span className="mt-2.5 h-1 w-1 shrink-0 rounded-full bg-(--color-fg-subtle)" />
+                          {line}
+                        </li>
+                      ))}
+                    </ul>
+                  </ChainItem>
+
+                  <ChainItem delay={240}>
+                    <div className="mt-6">
+                      <p className="text-xs font-brand tracking-widest text-(--color-fg-subtle) uppercase mb-3">Works with</p>
+                      <div className="flex flex-wrap gap-2">
+                        {s.integrations.map((name) => (
+                          <span
+                            key={name}
+                            className="inline-flex items-center gap-1.5 rounded-md border border-(--color-border) bg-(--color-bg-soft) px-2.5 py-1 text-xs font-medium text-(--color-fg-muted)"
+                          >
+                            <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded bg-(--color-bg-elev) text-[9px] font-bold text-(--color-fg-subtle) ring-1 ring-(--color-border)">
+                              {name.slice(0, 2)}
+                            </span>
+                            {name}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </ChainItem>
+
+                  <ChainItem delay={320}>
+                    <div className="mt-5 flex flex-wrap gap-2">
+                      {s.agents.map((a) => (
+                        <span
+                          key={a}
+                          className="inline-flex items-center rounded-full border border-(--color-border) px-3 py-1 text-sm text-(--color-fg-subtle)"
+                        >
+                          {a}
+                        </span>
+                      ))}
+                    </div>
+                  </ChainItem>
+
+                  <ChainItem delay={400}>
+                    <Link
+                      href={s.href}
+                      className="mt-8 inline-flex items-center gap-2 rounded-(--radius-button) border border-(--color-border-strong) px-5 py-3 text-sm font-medium text-(--color-fg) hover:bg-(--color-bg-elev) transition-colors"
+                    >
+                      {s.cta} →
+                    </Link>
+                  </ChainItem>
+                </div>
+
               </div>
-
-            </div>
+            </SectionReveal>
           </div>
         </section>
       ))}

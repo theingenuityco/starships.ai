@@ -6,63 +6,64 @@ import { Icon } from '@/components/Icon';
 import { TrustControl } from '@/components/TrustControl';
 
 export const metadata: Metadata = {
-  title: 'Engineering — Starships',
-  description: 'Autonomous agents for code review, test authoring, security scanning, and dependency management.',
+  title: 'Sales — Starships',
+  description: 'Autonomous agents for account research, CRM hygiene, follow-up coordination, and ticket triage.',
 };
 
 export const dynamic = 'force-static';
 
 const agents = [
   {
-    name: 'PR Reviewer',
-    trigger: 'On every pull request',
+    name: 'Account Researcher',
+    trigger: 'On every new lead',
     description:
-      'Reads the diff, understands context from the codebase docs, leaves structured review comments, and flags anything that looks wrong — before a human even opens it.',
+      'The moment a new contact hits your CRM, it researches the company — funding stage, headcount, recent news, tech stack, decision-maker org. Enriches the record and routes it to the right rep before they even pick up the phone.',
   },
   {
-    name: 'Test Author',
-    trigger: 'On every new feature commit',
+    name: 'CRM Updater',
+    trigger: 'After every logged interaction',
     description:
-      'Reads the changed files, generates test cases covering the happy path and the edge cases, and opens a PR with the new test file. Your coverage goes up without anyone writing boilerplate.',
+      'Reads email threads, call transcripts, and meeting notes. Updates contact records, deal stages, and activity logs automatically. Your CRM stays clean without anyone spending Friday afternoon on data entry.',
   },
   {
-    name: 'Security Scanner',
-    trigger: 'On every push to main',
+    name: 'Follow-up Coordinator',
+    trigger: 'On every deal stage change',
     description:
-      'Scans the diff for known vulnerability patterns, CVEs in dependencies, and common security anti-patterns. Posts a summary to the Engineering room and escalates anything critical immediately.',
+      'Tracks where every deal is and what the agreed next step was. When a follow-up is due, drafts the email, queues it for your approval, and logs the touchpoint after send. Nothing slips through the cracks.',
   },
   {
-    name: 'Dependency Upgrader',
-    trigger: 'Weekly, every Monday',
+    name: 'Ticket Triager',
+    trigger: 'On every new inbound request',
     description:
-      'Checks for outdated packages, reads the changelogs, groups safe patch and minor upgrades into a single PR, and flags major-version bumps that need your attention.',
+      'Reads incoming messages across email, Slack, and your support inbox. Routes them to the right person, auto-responds to common questions, and escalates anything that needs a human immediately.',
   },
 ];
 
 const primitives = [
   {
     name: 'Goals.',
-    body: 'Set a goal for the Engineering room — "keep main green, ship weekly." Agents break it into tasks: review #432, patch lodash, write the billing tests. You see the board. They do the work.',
+    body: 'Set a goal for the Sales room — "close $200k ARR this quarter." Agents break it into tasks: research the 12 accounts in the pipeline, follow up with Broke Inc, update the 5 stale records. You see what\'s moving. They do the work.',
     visual: (
       <div className="w-full overflow-hidden rounded-lg border border-(--color-border) bg-(--color-bg-elev)">
         <div className="border-b border-(--color-border) bg-(--color-bg-soft) px-3.5 pt-3 pb-3">
           <div className="flex items-center gap-2">
             <Icon name="layout" className="h-3 w-3 shrink-0 text-(--color-fg-subtle)" />
-            <span className="flex-1 truncate text-xs font-semibold text-(--color-fg)">Engineering room</span>
-            <span className="shrink-0 font-mono text-[10px] tabular-nums text-(--color-fg-subtle)">2/5</span>
+            <span className="flex-1 truncate text-xs font-semibold text-(--color-fg)">Sales room</span>
+            <span className="shrink-0 font-mono text-[10px] tabular-nums text-(--color-fg-subtle)">3/6</span>
           </div>
-          <p className="mt-2 text-[13px] leading-snug text-(--color-fg-muted)">Keep main green. Ship weekly.</p>
+          <p className="mt-2 text-[13px] leading-snug text-(--color-fg-muted)">Close $200k ARR this quarter.</p>
           <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-(--color-border)">
-            <div className="h-full rounded-full bg-(--color-success)" style={{ width: '40%' }} />
+            <div className="h-full rounded-full bg-(--color-success)" style={{ width: '50%' }} />
           </div>
         </div>
         <div className="space-y-px p-2">
           {[
-            { title: 'Merge auth refactor PR #432', done: false, col: 'In review' },
-            { title: 'Fix flaky billing test', done: true },
-            { title: 'Upgrade Next.js to 16', done: false, col: 'In progress' },
-            { title: 'Patch CVE in lodash dep', done: true },
-            { title: 'Cut the weekly release', done: false, col: 'Todo' },
+            { title: 'Research 12 pipeline accounts', done: true },
+            { title: 'Follow up with Broke Inc', done: false, col: 'In progress' },
+            { title: 'Update 5 stale CRM records', done: true },
+            { title: 'Draft proposal for ABC Enterprise', done: false, col: 'In review' },
+            { title: 'Send intro to new inbound lead', done: true },
+            { title: 'Schedule Q3 pipeline review', done: false, col: 'Todo' },
           ].map((t) => (
             <div key={t.title} className="flex items-center gap-2.5 rounded-md px-2 py-1.5">
               <span
@@ -79,7 +80,7 @@ const primitives = [
               >
                 {t.title}
               </span>
-              {!t.done && t.col ? (
+              {'col' in t && !t.done ? (
                 <span className="shrink-0 rounded-full border border-(--color-border) px-1.5 py-px text-[10px] text-(--color-fg-subtle)">
                   {t.col}
                 </span>
@@ -92,14 +93,14 @@ const primitives = [
   },
   {
     name: 'Heartbeats.',
-    body: 'Tell each agent when to act. PR Reviewer fires on every pull request. Security Scanner fires on every push. Dependency Upgrader fires every Monday at 9am. No polling, no cron scripts, no if-this-then-that.',
+    body: 'Account Researcher fires on every new CRM lead. CRM Updater fires after every logged interaction. Follow-up Coordinator fires when a follow-up is overdue. Real-time, event-driven — not a batch job you run on Fridays.',
     visual: (
       <div className="w-full space-y-2">
         {[
-          { who: 'PR Reviewer', when: 'on every pull request', next: 'on PR', sub: 'live' },
-          { who: 'Security Scanner', when: 'on every push to main', next: 'on push', sub: 'live' },
-          { who: 'Anomaly Watcher', when: 'when p95 latency > 500ms', next: 'on alert', sub: 'armed' },
-          { who: 'Dependency Upgrader', when: 'every Monday at 9:00am', next: '9:00 AM', sub: 'Monday' },
+          { who: 'Account Researcher', when: 'on every new CRM lead', next: 'on event', sub: 'live' },
+          { who: 'CRM Updater', when: 'after every logged interaction', next: 'on event', sub: 'live' },
+          { who: 'Follow-up Coordinator', when: 'when follow-up is overdue', next: 'on alert', sub: 'armed' },
+          { who: 'Ticket Triager', when: 'on every new inbound request', next: 'on event', sub: 'live' },
         ].map((b) => (
           <div key={b.who} className="rounded-lg border border-(--color-border) bg-(--color-bg-elev) px-2.5 py-2">
             <div className="flex items-center justify-between gap-2">
@@ -124,14 +125,14 @@ const primitives = [
   },
   {
     name: 'Docs.',
-    body: 'Upload your coding standards, your PR template, your architecture decision records. Every agent reads them before acting. The PR Reviewer respects your conventions without you having to brief it.',
+    body: 'Upload your sales playbook, your ICP definition, your qualification framework, your objection handling guide. Account Researcher reads the ICP before deciding who to prioritise. Follow-up Coordinator reads the playbook before drafting the email.',
     visual: (
       <div className="w-full space-y-2">
         <div className="mb-2.5 flex items-center justify-between px-1">
           <p className="text-[10px] uppercase tracking-wider text-(--color-fg-subtle)">Read by every agent</p>
           <p className="font-mono text-[10px] text-(--color-fg-subtle)">4 docs · synced</p>
         </div>
-        {['Coding standards', 'PR review template', 'Architecture decisions', 'Security checklist'].map((d) => (
+        {['Sales playbook', 'ICP definition', 'Qualification framework', 'Objection handling guide'].map((d) => (
           <div key={d} className="flex items-center gap-3 rounded-lg border border-(--color-border) bg-(--color-bg-elev) px-4 py-3">
             <Icon name="file-text" className="h-4 w-4 shrink-0 text-(--color-fg-subtle)" />
             <span className="text-sm font-medium text-(--color-fg)">{d}</span>
@@ -142,13 +143,13 @@ const primitives = [
   },
   {
     name: 'Data.',
-    body: 'Connect your GitHub, error tracker, and metrics stack. Agents query what they need. The Security Scanner reads the CVE feed. The Anomaly Watcher reads your p95 latency. Read-only by default — they ask before writing anything.',
+    body: 'Connect your CRM, email provider, and call recording tool. CRM Updater reads your deal data. Account Researcher queries the contact record before enriching. All reads — agents ask before writing anything to your live database.',
     visual: (
       <div className="w-full space-y-2">
         {[
-          { name: 'GitHub', desc: 'Pull requests, commits, diffs', slug: 'github' },
-          { name: 'Sentry', desc: 'Errors and stack traces', slug: 'sentry' },
-          { name: 'Datadog', desc: 'Metrics and latency', slug: 'datadog' },
+          { name: 'HubSpot', desc: 'Contacts, deals, pipeline stages', slug: 'hubspot' },
+          { name: 'Gmail', desc: 'Email threads and interactions', slug: 'gmail' },
+          { name: 'Stripe', desc: 'Revenue, deals, payment history', slug: 'stripe' },
         ].map((d) => (
           <div
             key={d.slug}
@@ -169,35 +170,36 @@ const primitives = [
   },
 ];
 
-export default function ForDevelopersPage() {
+export default function ForSalesPage() {
   return (
-    <main className="pt-24">
+    <main>
       {/* Hero */}
       <section className="bg-(--color-bg)">
-        <div className="mx-auto max-w-5xl px-6 pt-20 pb-24 sm:pt-28 sm:pb-32">
-          <FadeIn delay={0}>
-            <Link href="/use-cases" className="text-xs text-(--color-fg-subtle) hover:text-(--color-fg) transition-colors">
-              ← All use cases
-            </Link>
-          </FadeIn>
+        <div className="mx-auto max-w-5xl px-6 pt-44 pb-24 sm:pt-52 sm:pb-32">
           <FadeIn delay={40}>
-            <p className="mt-6 text-xs font-brand tracking-widest text-(--color-fg-subtle) uppercase">Engineering room</p>
+            <p className="flex items-center gap-1.5 text-xs font-brand tracking-widest text-(--color-fg-subtle) uppercase">
+              <Link href="/use-cases" className="inline-flex items-center gap-1 hover:text-(--color-fg) transition-colors">
+                <Icon name="arrow-left" className="h-3 w-3" />Use Cases
+              </Link>
+              <span>/</span>
+              <span>Sales Room</span>
+            </p>
           </FadeIn>
           <h1 className="mt-4 text-4xl font-semibold leading-[1.05] tracking-tight sm:text-5xl md:text-6xl">
             <FadeIn as="span" delay={80} className="block">
-              Your codebase has a
+              No lead goes cold.
             </FadeIn>
             <FadeIn as="span" delay={160} className="block">
-              maintenance problem.
+              No CRM goes stale.
             </FadeIn>
             <FadeIn as="span" delay={240} className="block text-(--color-fg-muted)">
-              Starships fixes it.
+              No follow-up gets forgotten.
             </FadeIn>
           </h1>
           <FadeIn delay={320}>
             <p className="mt-8 max-w-2xl text-lg text-(--color-fg-muted) leading-relaxed">
-              PR reviews that never block. Tests written before you ask. Dependencies upgraded before they become a problem.
-              Security scans on every push. The Engineering room runs 24 hours a day so your engineers can focus on the product.
+              Account research done before your first call. CRM updated after every interaction. Follow-ups queued and ready.
+              The Sales room keeps your pipeline moving — even when you&rsquo;re heads-down closing.
             </p>
           </FadeIn>
           <div className="mt-10 flex flex-wrap items-center gap-3">
@@ -226,11 +228,11 @@ export default function ForDevelopersPage() {
       <section className="bg-(--color-bg)">
         <div className="mx-auto max-w-5xl px-6 py-24 sm:py-32">
           <FadeIn>
-            <p className="text-xs font-brand tracking-widest text-(--color-fg-subtle) uppercase mb-4">Your engineering crew</p>
+            <p className="text-xs font-brand tracking-widest text-(--color-fg-subtle) uppercase mb-4">Your sales crew</p>
           </FadeIn>
           <FadeIn delay={60}>
             <h2 className="text-3xl font-semibold tracking-tight leading-[1.05] sm:text-4xl">
-              Four agents. One room. Infinite leverage.
+              Always working the pipeline.
             </h2>
           </FadeIn>
           <div className="mt-12 grid grid-cols-1 gap-5 sm:grid-cols-2">
@@ -254,7 +256,7 @@ export default function ForDevelopersPage() {
             <h2 className="text-3xl font-semibold tracking-tight leading-[1.05] sm:text-4xl">The primitives behind it.</h2>
           </FadeIn>
           <FadeIn delay={60}>
-            <p className="mt-4 text-lg text-(--color-fg-muted)">Every agent in the Engineering room is built on four primitives you control.</p>
+            <p className="mt-4 text-lg text-(--color-fg-muted)">Every agent in the Sales room is built on four primitives you control.</p>
           </FadeIn>
           <div className="mt-20 space-y-24">
             {primitives.map((p, i) => (
@@ -283,17 +285,17 @@ export default function ForDevelopersPage() {
         <div className="mx-auto max-w-5xl px-6 py-32 sm:py-40">
           <h2 className="text-4xl font-semibold leading-[1.05] tracking-tight sm:text-5xl md:text-6xl">
             <FadeIn as="span" delay={0} className="block text-(--color-fg-muted)">
-              Your engineers should be
+              Your pipeline deserves
             </FadeIn>
             <FadeIn as="span" delay={90} className="block text-6xl sm:text-7xl md:text-8xl">
-              building,
+              a team that
             </FadeIn>
             <FadeIn as="span" delay={180} className="block text-6xl sm:text-7xl md:text-8xl">
-              not babysitting.
+              never sleeps.
             </FadeIn>
           </h2>
           <FadeIn as="p" delay={270} className="mt-8 max-w-2xl text-lg text-(--color-fg-muted) leading-relaxed">
-            Tell us how your team works. We&rsquo;ll configure the Engineering room and hand you the keys.
+            Tell us about your sales motion. We&rsquo;ll configure the Sales room and get agents working on your pipeline this week.
           </FadeIn>
           <div className="mt-10 flex flex-wrap items-center gap-3">
             <FadeIn delay={360}>

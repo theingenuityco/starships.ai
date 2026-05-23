@@ -6,64 +6,63 @@ import { Icon } from '@/components/Icon';
 import { TrustControl } from '@/components/TrustControl';
 
 export const metadata: Metadata = {
-  title: 'Sales — Starships',
-  description: 'Autonomous agents for account research, CRM hygiene, follow-up coordination, and ticket triage.',
+  title: 'Marketing — Starships',
+  description: 'Autonomous agents for outreach, content, campaign planning, and customer knowledge.',
 };
 
 export const dynamic = 'force-static';
 
 const agents = [
   {
-    name: 'Account Researcher',
-    trigger: 'On every new lead',
+    name: 'Outreach Drafter',
+    trigger: 'On every new qualified lead',
     description:
-      'The moment a new contact hits your CRM, it researches the company — funding stage, headcount, recent news, tech stack, decision-maker org. Enriches the record and routes it to the right rep before they even pick up the phone.',
+      'Reads the lead\'s company, role, and recent signals. Drafts a personalised first-touch email that matches your brand voice guide. Queues it for your approval before anything goes out.',
   },
   {
-    name: 'CRM Updater',
-    trigger: 'After every logged interaction',
+    name: 'Campaign Planner',
+    trigger: 'At the start of each quarter',
     description:
-      'Reads email threads, call transcripts, and meeting notes. Updates contact records, deal stages, and activity logs automatically. Your CRM stays clean without anyone spending Friday afternoon on data entry.',
+      'Reviews your previous campaign data, reads your brand positioning docs, and drafts a full campaign calendar — themes, channel breakdown, send schedule. You review and approve the plan, then it executes.',
   },
   {
-    name: 'Follow-up Coordinator',
-    trigger: 'On every deal stage change',
+    name: 'KB Writer',
+    trigger: 'On every resolved support ticket',
     description:
-      'Tracks where every deal is and what the agreed next step was. When a follow-up is due, drafts the email, queues it for your approval, and logs the touchpoint after send. Nothing slips through the cracks.',
+      'Reads the ticket thread, identifies whether the resolution is worth documenting, and drafts a knowledge base article in your tone of voice. Publishes when you approve.',
   },
   {
-    name: 'Ticket Triager',
-    trigger: 'On every new inbound request',
+    name: 'Status Reporter',
+    trigger: 'Every morning at 8am',
     description:
-      'Reads incoming messages across email, Slack, and your support inbox. Routes them to the right person, auto-responds to common questions, and escalates anything that needs a human immediately.',
+      'Pulls metrics from your connected data sources, summarises what moved and what didn\'t, and posts the daily brief to your team. Everyone starts the day informed, without you writing a word.',
   },
 ];
 
 const primitives = [
   {
     name: 'Goals.',
-    body: 'Set a goal for the Sales room — "close $200k ARR this quarter." Agents break it into tasks: research the 12 accounts in the pipeline, follow up with Broke Inc, update the 5 stale records. You see what\'s moving. They do the work.',
+    body: 'Set a goal for the Marketing room — "grow inbound 20% this quarter." Agents break it into tasks: plan the Q2 content calendar, draft the nurture sequence, publish 4 articles by Friday. You see the board. They execute.',
     visual: (
       <div className="w-full overflow-hidden rounded-lg border border-(--color-border) bg-(--color-bg-elev)">
         <div className="border-b border-(--color-border) bg-(--color-bg-soft) px-3.5 pt-3 pb-3">
           <div className="flex items-center gap-2">
             <Icon name="layout" className="h-3 w-3 shrink-0 text-(--color-fg-subtle)" />
-            <span className="flex-1 truncate text-xs font-semibold text-(--color-fg)">Sales room</span>
-            <span className="shrink-0 font-mono text-[10px] tabular-nums text-(--color-fg-subtle)">3/6</span>
+            <span className="flex-1 truncate text-xs font-semibold text-(--color-fg)">Marketing room</span>
+            <span className="shrink-0 font-mono text-[10px] tabular-nums text-(--color-fg-subtle)">2/5</span>
           </div>
-          <p className="mt-2 text-[13px] leading-snug text-(--color-fg-muted)">Close $200k ARR this quarter.</p>
+          <p className="mt-2 text-[13px] leading-snug text-(--color-fg-muted)">Grow inbound 20% this quarter.</p>
           <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-(--color-border)">
-            <div className="h-full rounded-full bg-(--color-success)" style={{ width: '50%' }} />
+            <div className="h-full rounded-full bg-(--color-success)" style={{ width: '40%' }} />
           </div>
         </div>
         <div className="space-y-px p-2">
           {[
-            { title: 'Research 12 pipeline accounts', done: true },
-            { title: 'Follow up with Broke Inc', done: false, col: 'In progress' },
-            { title: 'Update 5 stale CRM records', done: true },
-            { title: 'Draft proposal for ABC Enterprise', done: false, col: 'In review' },
-            { title: 'Send intro to new inbound lead', done: true },
-            { title: 'Schedule Q3 pipeline review', done: false, col: 'Todo' },
+            { title: 'Plan Q2 content calendar', done: true },
+            { title: 'Draft nurture sequence (5 emails)', done: false, col: 'In progress' },
+            { title: 'Publish 4 blog articles by Friday', done: false, col: 'In progress' },
+            { title: 'Update homepage messaging', done: true },
+            { title: 'Schedule social for launch week', done: false, col: 'Todo' },
           ].map((t) => (
             <div key={t.title} className="flex items-center gap-2.5 rounded-md px-2 py-1.5">
               <span
@@ -93,14 +92,14 @@ const primitives = [
   },
   {
     name: 'Heartbeats.',
-    body: 'Account Researcher fires on every new CRM lead. CRM Updater fires after every logged interaction. Follow-up Coordinator fires when a follow-up is overdue. Real-time, event-driven — not a batch job you run on Fridays.',
+    body: 'Outreach Drafter fires when a new lead enters your CRM. Status Reporter fires every morning at 8am. Campaign Planner fires on the first Monday of each quarter. Not when you remember to ask — on schedule, automatically.',
     visual: (
       <div className="w-full space-y-2">
         {[
-          { who: 'Account Researcher', when: 'on every new CRM lead', next: 'on event', sub: 'live' },
-          { who: 'CRM Updater', when: 'after every logged interaction', next: 'on event', sub: 'live' },
-          { who: 'Follow-up Coordinator', when: 'when follow-up is overdue', next: 'on alert', sub: 'armed' },
-          { who: 'Ticket Triager', when: 'on every new inbound request', next: 'on event', sub: 'live' },
+          { who: 'Outreach Drafter', when: 'on every new CRM lead', next: 'on event', sub: 'live' },
+          { who: 'Status Reporter', when: 'every morning at 8:00am', next: '8:00 AM', sub: 'tomorrow' },
+          { who: 'Campaign Planner', when: 'first Monday of each quarter', next: 'Jul 7', sub: 'scheduled' },
+          { who: 'KB Writer', when: 'on every resolved ticket', next: 'on event', sub: 'live' },
         ].map((b) => (
           <div key={b.who} className="rounded-lg border border-(--color-border) bg-(--color-bg-elev) px-2.5 py-2">
             <div className="flex items-center justify-between gap-2">
@@ -125,14 +124,14 @@ const primitives = [
   },
   {
     name: 'Docs.',
-    body: 'Upload your sales playbook, your ICP definition, your qualification framework, your objection handling guide. Account Researcher reads the ICP before deciding who to prioritise. Follow-up Coordinator reads the playbook before drafting the email.',
+    body: 'Upload your brand voice guide, your persona descriptions, your messaging hierarchy. Every agent reads them before writing a single word. Your outreach sounds like you wrote it — because the agent knew what you sound like.',
     visual: (
       <div className="w-full space-y-2">
         <div className="mb-2.5 flex items-center justify-between px-1">
           <p className="text-[10px] uppercase tracking-wider text-(--color-fg-subtle)">Read by every agent</p>
-          <p className="font-mono text-[10px] text-(--color-fg-subtle)">4 docs · synced</p>
+          <p className="font-mono text-[10px] text-(--color-fg-subtle)">5 docs · synced</p>
         </div>
-        {['Sales playbook', 'ICP definition', 'Qualification framework', 'Objection handling guide'].map((d) => (
+        {['Brand voice guide', 'Persona library', 'Messaging framework', 'Tone of voice', 'Competitor positioning'].map((d) => (
           <div key={d} className="flex items-center gap-3 rounded-lg border border-(--color-border) bg-(--color-bg-elev) px-4 py-3">
             <Icon name="file-text" className="h-4 w-4 shrink-0 text-(--color-fg-subtle)" />
             <span className="text-sm font-medium text-(--color-fg)">{d}</span>
@@ -143,13 +142,13 @@ const primitives = [
   },
   {
     name: 'Data.',
-    body: 'Connect your CRM, email provider, and call recording tool. CRM Updater reads your deal data. Account Researcher queries the contact record before enriching. All reads — agents ask before writing anything to your live database.',
+    body: 'Connect your CRM, email platform, and product analytics. Campaign Planner reads what campaigns actually converted. Status Reporter reads your current MRR and active users. Real data, in every brief.',
     visual: (
       <div className="w-full space-y-2">
         {[
-          { name: 'HubSpot', desc: 'Contacts, deals, pipeline stages', slug: 'hubspot' },
-          { name: 'Gmail', desc: 'Email threads and interactions', slug: 'gmail' },
-          { name: 'Stripe', desc: 'Revenue, deals, payment history', slug: 'stripe' },
+          { name: 'HubSpot', desc: 'Leads, contacts, deal stages', slug: 'hubspot' },
+          { name: 'Mailchimp', desc: 'Campaigns and open rates', slug: 'mailchimp' },
+          { name: 'Mixpanel', desc: 'MRR, active users, funnel', slug: 'mixpanel' },
         ].map((d) => (
           <div
             key={d.slug}
@@ -170,35 +169,36 @@ const primitives = [
   },
 ];
 
-export default function ForSalesPage() {
+export default function ForMarketersPage() {
   return (
-    <main className="pt-24">
+    <main>
       {/* Hero */}
       <section className="bg-(--color-bg)">
-        <div className="mx-auto max-w-5xl px-6 pt-20 pb-24 sm:pt-28 sm:pb-32">
-          <FadeIn delay={0}>
-            <Link href="/use-cases" className="text-xs text-(--color-fg-subtle) hover:text-(--color-fg) transition-colors">
-              ← All use cases
-            </Link>
-          </FadeIn>
+        <div className="mx-auto max-w-5xl px-6 pt-44 pb-24 sm:pt-52 sm:pb-32">
           <FadeIn delay={40}>
-            <p className="mt-6 text-xs font-brand tracking-widest text-(--color-fg-subtle) uppercase">Sales room</p>
+            <p className="flex items-center gap-1.5 text-xs font-brand tracking-widest text-(--color-fg-subtle) uppercase">
+              <Link href="/use-cases" className="inline-flex items-center gap-1 hover:text-(--color-fg) transition-colors">
+                <Icon name="arrow-left" className="h-3 w-3" />Use Cases
+              </Link>
+              <span>/</span>
+              <span>Marketing Room</span>
+            </p>
           </FadeIn>
           <h1 className="mt-4 text-4xl font-semibold leading-[1.05] tracking-tight sm:text-5xl md:text-6xl">
             <FadeIn as="span" delay={80} className="block">
-              No lead goes cold.
+              Marketing that runs
             </FadeIn>
             <FadeIn as="span" delay={160} className="block">
-              No CRM goes stale.
+              while you sleep.
             </FadeIn>
             <FadeIn as="span" delay={240} className="block text-(--color-fg-muted)">
-              No follow-up gets forgotten.
+              Not just AI-assisted.
             </FadeIn>
           </h1>
           <FadeIn delay={320}>
             <p className="mt-8 max-w-2xl text-lg text-(--color-fg-muted) leading-relaxed">
-              Account research done before your first call. CRM updated after every interaction. Follow-ups queued and ready.
-              The Sales room keeps your pipeline moving — even when you&rsquo;re heads-down closing.
+              Outreach sequences written and queued. KB articles published. Campaign cadences planned. Status updates posted.
+              The Marketing room never misses a beat — because it doesn&rsquo;t need to be asked.
             </p>
           </FadeIn>
           <div className="mt-10 flex flex-wrap items-center gap-3">
@@ -227,12 +227,10 @@ export default function ForSalesPage() {
       <section className="bg-(--color-bg)">
         <div className="mx-auto max-w-5xl px-6 py-24 sm:py-32">
           <FadeIn>
-            <p className="text-xs font-brand tracking-widest text-(--color-fg-subtle) uppercase mb-4">Your sales crew</p>
+            <p className="text-xs font-brand tracking-widest text-(--color-fg-subtle) uppercase mb-4">Your marketing crew</p>
           </FadeIn>
           <FadeIn delay={60}>
-            <h2 className="text-3xl font-semibold tracking-tight leading-[1.05] sm:text-4xl">
-              Always working the pipeline.
-            </h2>
+            <h2 className="text-3xl font-semibold tracking-tight leading-[1.05] sm:text-4xl">Always on. Always writing.</h2>
           </FadeIn>
           <div className="mt-12 grid grid-cols-1 gap-5 sm:grid-cols-2">
             {agents.map((a, i) => (
@@ -255,7 +253,7 @@ export default function ForSalesPage() {
             <h2 className="text-3xl font-semibold tracking-tight leading-[1.05] sm:text-4xl">The primitives behind it.</h2>
           </FadeIn>
           <FadeIn delay={60}>
-            <p className="mt-4 text-lg text-(--color-fg-muted)">Every agent in the Sales room is built on four primitives you control.</p>
+            <p className="mt-4 text-lg text-(--color-fg-muted)">Every agent in the Marketing room is built on four primitives you control.</p>
           </FadeIn>
           <div className="mt-20 space-y-24">
             {primitives.map((p, i) => (
@@ -284,17 +282,17 @@ export default function ForSalesPage() {
         <div className="mx-auto max-w-5xl px-6 py-32 sm:py-40">
           <h2 className="text-4xl font-semibold leading-[1.05] tracking-tight sm:text-5xl md:text-6xl">
             <FadeIn as="span" delay={0} className="block text-(--color-fg-muted)">
-              Your pipeline deserves
+              Marketing that scales
             </FadeIn>
             <FadeIn as="span" delay={90} className="block text-6xl sm:text-7xl md:text-8xl">
-              a team that
+              without a
             </FadeIn>
             <FadeIn as="span" delay={180} className="block text-6xl sm:text-7xl md:text-8xl">
-              never sleeps.
+              bigger team.
             </FadeIn>
           </h2>
           <FadeIn as="p" delay={270} className="mt-8 max-w-2xl text-lg text-(--color-fg-muted) leading-relaxed">
-            Tell us about your sales motion. We&rsquo;ll configure the Sales room and get agents working on your pipeline this week.
+            Tell us about your brand. We&rsquo;ll configure the Marketing room and have agents working by your next planning cycle.
           </FadeIn>
           <div className="mt-10 flex flex-wrap items-center gap-3">
             <FadeIn delay={360}>

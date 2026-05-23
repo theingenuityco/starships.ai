@@ -24,13 +24,13 @@ export function Footer() {
           <div className="flex gap-16">
             <div className="flex flex-col gap-4">
               <span className="text-xs font-medium uppercase tracking-widest text-(--color-fg-subtle)">Use cases</span>
-              <a href="/for-marketers" className="text-sm text-(--color-fg-muted) hover:text-(--color-fg) transition-colors">
+              <a href="/use-cases/for-marketers" className="text-sm text-(--color-fg-muted) hover:text-(--color-fg) transition-colors">
                 Marketers
               </a>
-              <a href="/for-developers" className="text-sm text-(--color-fg-muted) hover:text-(--color-fg) transition-colors">
+              <a href="/use-cases/for-developers" className="text-sm text-(--color-fg-muted) hover:text-(--color-fg) transition-colors">
                 Developers
               </a>
-              <a href="/for-sales" className="text-sm text-(--color-fg-muted) hover:text-(--color-fg) transition-colors">
+              <a href="/use-cases/for-sales" className="text-sm text-(--color-fg-muted) hover:text-(--color-fg) transition-colors">
                 Sales
               </a>
             </div>

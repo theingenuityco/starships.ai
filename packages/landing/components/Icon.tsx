@@ -83,6 +83,12 @@ export const iconPaths: Record<string, ReactNode> = {
       <path d="m12 5 7 7-7 7" />
     </>
   ),
+  'arrow-left': (
+    <>
+      <path d="M19 12H5" />
+      <path d="m12 19-7-7 7-7" />
+    </>
+  ),
   bell: (
     <>
       <path d="M10.268 21a2 2 0 0 0 3.464 0" />

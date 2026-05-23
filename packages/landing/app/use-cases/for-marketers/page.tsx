@@ -12,6 +12,27 @@ export const metadata: Metadata = {
 
 export const dynamic = 'force-static';
 
+const useCases = [
+  {
+    situation: 'A new lead enters your CRM',
+    headline: 'First touch drafted and queued.',
+    description:
+      'Outreach Drafter researches the company, reads your brand voice guide, and drafts a personalized first-touch email. It waits in the queue until you approve it. Nothing goes out without your sign-off.',
+  },
+  {
+    situation: 'The quarter starts',
+    headline: 'Campaign calendar ready by Monday.',
+    description:
+      'Campaign Planner reviews what worked last quarter, reads your positioning docs, and delivers a full calendar with themes, channels, and send schedule. You review and approve the plan.',
+  },
+  {
+    situation: 'A support ticket gets resolved',
+    headline: 'KB article published before the next one.',
+    description:
+      'KB Writer reads the ticket thread, decides if the resolution is worth documenting, and drafts an article in your tone of voice. Published when you approve it.',
+  },
+];
+
 const agents = [
   {
     name: 'Outreach Drafter',
@@ -39,135 +60,107 @@ const agents = [
   },
 ];
 
-const primitives = [
-  {
-    name: 'Goals.',
-    body: 'Set a goal for the Marketing room — "grow inbound 20% this quarter." Agents break it into tasks: plan the Q2 content calendar, draft the nurture sequence, publish 4 articles by Friday. You see the board. They execute.',
-    visual: (
-      <div className="w-full overflow-hidden rounded-lg border border-(--color-border) bg-(--color-bg-elev)">
-        <div className="border-b border-(--color-border) bg-(--color-bg-soft) px-3.5 pt-3 pb-3">
+function StatusBadge({ label, tone = 'success' }: { label: string; tone?: 'success' | 'warn' }) {
+  const isWarn = tone === 'warn';
+  return (
+    <span
+      className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-medium ${
+        isWarn
+          ? 'border-(--color-warn)/40 bg-(--color-warn)/10 text-(--color-warn)'
+          : 'border-(--color-success)/40 bg-(--color-success)/10 text-(--color-success)'
+      }`}
+    >
+      <span className={`h-1.5 w-1.5 rounded-full ${isWarn ? 'animate-pulse bg-(--color-warn)' : 'bg-(--color-success)'}`} />
+      {label}
+    </span>
+  );
+}
+
+// Mock artifact each agent produces — shows the output, not just describes it.
+function MockVisual({ index }: { index: number }) {
+  if (index === 0) {
+    return (
+      <div className="w-full overflow-hidden rounded-(--radius-card) border border-(--color-border) bg-(--color-bg-elev)">
+        <div className="flex items-center justify-between border-b border-(--color-border) bg-(--color-bg-soft) px-4 py-3">
           <div className="flex items-center gap-2">
-            <Icon name="layout" className="h-3 w-3 shrink-0 text-(--color-fg-subtle)" />
-            <span className="flex-1 truncate text-xs font-semibold text-(--color-fg)">Marketing room</span>
-            <span className="shrink-0 font-mono text-[10px] tabular-nums text-(--color-fg-subtle)">2/5</span>
+            <Icon name="mail" className="h-3.5 w-3.5 text-(--color-fg-subtle)" />
+            <span className="text-sm font-semibold text-(--color-fg)">Draft</span>
           </div>
-          <p className="mt-2 text-[13px] leading-snug text-(--color-fg-muted)">Grow inbound 20% this quarter.</p>
-          <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-(--color-border)">
-            <div className="h-full rounded-full bg-(--color-success)" style={{ width: '40%' }} />
-          </div>
+          <StatusBadge label="queued" tone="warn" />
         </div>
-        <div className="space-y-px p-2">
+        <div className="space-y-2 p-4 text-sm">
+          <div className="flex gap-3">
+            <span className="w-8 shrink-0 text-(--color-fg-subtle)">To</span>
+            <span className="text-(--color-fg)">jordan@acme.com</span>
+          </div>
+          <div className="flex gap-3">
+            <span className="w-8 shrink-0 text-(--color-fg-subtle)">Re</span>
+            <span className="text-(--color-fg)">Saw the Series B — congrats</span>
+          </div>
+          <p className="border-t border-(--color-border) pt-3 leading-relaxed text-(--color-fg-muted)">
+            Hi Jordan, congrats on the raise. Teams scaling as fast as Acme usually hit a wall on&hellip;
+          </p>
+        </div>
+        <div className="flex gap-2 border-t border-(--color-border) px-4 py-3">
+          <span className="rounded-(--radius-button) bg-(--color-accent) px-3 py-1.5 text-xs font-medium text-(--color-bg)">Approve &amp; send</span>
+          <span className="rounded-(--radius-button) border border-(--color-border-strong) px-3 py-1.5 text-xs font-medium text-(--color-fg)">Edit</span>
+        </div>
+      </div>
+    );
+  }
+  if (index === 1) {
+    return (
+      <div className="w-full overflow-hidden rounded-(--radius-card) border border-(--color-border) bg-(--color-bg-elev)">
+        <div className="flex items-center justify-between border-b border-(--color-border) bg-(--color-bg-soft) px-4 py-3">
+          <div className="flex items-center gap-2">
+            <Icon name="calendar" className="h-3.5 w-3.5 text-(--color-fg-subtle)" />
+            <span className="text-sm font-semibold text-(--color-fg)">Q2 campaign calendar</span>
+          </div>
+          <StatusBadge label="ready" />
+        </div>
+        <div className="divide-y divide-(--color-border)">
           {[
-            { title: 'Plan Q2 content calendar', done: true },
-            { title: 'Draft nurture sequence (5 emails)', done: false, col: 'In progress' },
-            { title: 'Publish 4 blog articles by Friday', done: false, col: 'In progress' },
-            { title: 'Update homepage messaging', done: true },
-            { title: 'Schedule social for launch week', done: false, col: 'Todo' },
-          ].map((t) => (
-            <div key={t.title} className="flex items-center gap-2.5 rounded-md px-2 py-1.5">
-              <span
-                className={`flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full border ${
-                  t.done ? 'border-(--color-success) bg-(--color-success)' : 'border-(--color-border)'
-                }`}
-              >
-                {t.done ? <Icon name="check" className="h-2 w-2 text-(--color-bg)" /> : null}
-              </span>
-              <span
-                className={`flex-1 truncate text-xs leading-snug ${
-                  t.done ? 'text-(--color-fg-subtle) line-through' : 'text-(--color-fg)'
-                }`}
-              >
-                {t.title}
-              </span>
-              {'col' in t && !t.done ? (
-                <span className="shrink-0 rounded-full border border-(--color-border) px-1.5 py-px text-[10px] text-(--color-fg-subtle)">
-                  {t.col}
-                </span>
-              ) : null}
+            ['Apr', 'Spring product launch push'],
+            ['May', 'Webinar series + nurture'],
+            ['Jun', 'Customer stories campaign'],
+          ].map(([m, plan]) => (
+            <div key={m} className="flex items-baseline gap-3 px-4 py-2.5 text-sm">
+              <span className="w-8 shrink-0 font-mono text-xs text-(--color-fg-subtle)">{m}</span>
+              <span className="text-(--color-fg)">{plan}</span>
             </div>
           ))}
         </div>
-      </div>
-    ),
-  },
-  {
-    name: 'Heartbeats.',
-    body: 'Outreach Drafter fires when a new lead enters your CRM. Status Reporter fires every morning at 8am. Campaign Planner fires on the first Monday of each quarter. Not when you remember to ask — on schedule, automatically.',
-    visual: (
-      <div className="w-full space-y-2">
-        {[
-          { who: 'Outreach Drafter', when: 'on every new CRM lead', next: 'on event', sub: 'live' },
-          { who: 'Status Reporter', when: 'every morning at 8:00am', next: '8:00 AM', sub: 'tomorrow' },
-          { who: 'Campaign Planner', when: 'first Monday of each quarter', next: 'Jul 7', sub: 'scheduled' },
-          { who: 'KB Writer', when: 'on every resolved ticket', next: 'on event', sub: 'live' },
-        ].map((b) => (
-          <div key={b.who} className="rounded-lg border border-(--color-border) bg-(--color-bg-elev) px-2.5 py-2">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex min-w-0 items-center gap-2">
-                <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-(--color-accent-soft) text-[11px] font-medium text-(--color-fg)">
-                  {b.who.charAt(0)}
-                </span>
-                <div className="min-w-0">
-                  <div className="truncate text-[11px] font-semibold text-(--color-fg)">{b.who}</div>
-                  <div className="truncate text-[10px] text-(--color-fg-subtle)">{b.when}</div>
-                </div>
-              </div>
-              <div className="shrink-0 text-right">
-                <div className="text-[11px] font-medium text-(--color-fg)">{b.next}</div>
-                <div className="text-[10px] text-(--color-fg-subtle)">{b.sub}</div>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-    ),
-  },
-  {
-    name: 'Docs.',
-    body: 'Upload your brand voice guide, your persona descriptions, your messaging hierarchy. Every agent reads them before writing a single word. Your outreach sounds like you wrote it — because the agent knew what you sound like.',
-    visual: (
-      <div className="w-full space-y-2">
-        <div className="mb-2.5 flex items-center justify-between px-1">
-          <p className="text-[10px] uppercase tracking-wider text-(--color-fg-subtle)">Read by every agent</p>
-          <p className="font-mono text-[10px] text-(--color-fg-subtle)">5 docs · synced</p>
+        <div className="border-t border-(--color-border) px-4 py-3 text-xs text-(--color-fg-subtle)">
+          3 channels · 12 sends planned
         </div>
-        {['Brand voice guide', 'Persona library', 'Messaging framework', 'Tone of voice', 'Competitor positioning'].map((d) => (
-          <div key={d} className="flex items-center gap-3 rounded-lg border border-(--color-border) bg-(--color-bg-elev) px-4 py-3">
-            <Icon name="file-text" className="h-4 w-4 shrink-0 text-(--color-fg-subtle)" />
-            <span className="text-sm font-medium text-(--color-fg)">{d}</span>
-          </div>
-        ))}
       </div>
-    ),
-  },
-  {
-    name: 'Data.',
-    body: 'Connect your CRM, email platform, and product analytics. Campaign Planner reads what campaigns actually converted. Status Reporter reads your current MRR and active users. Real data, in every brief.',
-    visual: (
-      <div className="w-full space-y-2">
-        {[
-          { name: 'HubSpot', desc: 'Leads, contacts, deal stages', slug: 'hubspot' },
-          { name: 'Mailchimp', desc: 'Campaigns and open rates', slug: 'mailchimp' },
-          { name: 'Mixpanel', desc: 'MRR, active users, funnel', slug: 'mixpanel' },
-        ].map((d) => (
-          <div
-            key={d.slug}
-            className="flex items-center gap-3 rounded-lg border border-(--color-border) bg-(--color-bg-elev) px-4 py-3"
-          >
-            <img src={`/integrations/${d.slug}.svg`} alt={d.name} className="h-5 w-5 shrink-0" />
-            <div className="min-w-0">
-              <p className="text-sm font-medium text-(--color-fg)">{d.name}</p>
-              <p className="text-xs text-(--color-fg-subtle)">{d.desc}</p>
-            </div>
-            <span className="ml-auto shrink-0 rounded-full bg-(--color-success)/10 px-2 py-0.5 text-[10px] font-medium text-(--color-success)">
-              read-only
-            </span>
-          </div>
-        ))}
+    );
+  }
+  return (
+    <div className="w-full overflow-hidden rounded-(--radius-card) border border-(--color-border) bg-(--color-bg-elev)">
+      <div className="flex items-center justify-between border-b border-(--color-border) bg-(--color-bg-soft) px-4 py-3">
+        <div className="flex items-center gap-2">
+          <Icon name="file-text" className="h-3.5 w-3.5 text-(--color-fg-subtle)" />
+          <span className="text-sm font-semibold text-(--color-fg)">KB article</span>
+        </div>
+        <StatusBadge label="published" />
       </div>
-    ),
-  },
-];
+      <div className="p-4">
+        <p className="text-base font-semibold text-(--color-fg)">How to reset your API key</p>
+        <p className="mt-2 leading-relaxed text-(--color-fg-muted) text-sm">
+          If your key is compromised or rotated on a schedule, you can generate a new one from Settings&hellip;
+        </p>
+      </div>
+      <div className="flex items-center gap-3 border-t border-(--color-border) px-4 py-3 text-xs text-(--color-fg-subtle)">
+        <span>From ticket #2841</span>
+        <span>·</span>
+        <span>tone matched</span>
+        <span>·</span>
+        <span>4 min read</span>
+      </div>
+    </div>
+  );
+}
 
 export default function ForMarketersPage() {
   return (
@@ -223,6 +216,38 @@ export default function ForMarketersPage() {
         </div>
       </section>
 
+      {/* Use Cases */}
+      <section className="bg-(--color-bg)">
+        <div className="mx-auto max-w-5xl px-6 py-24 sm:py-32">
+          <h2 className="text-4xl font-semibold leading-[1.05] tracking-tight sm:text-5xl md:text-6xl">
+            <FadeIn as="span" className="block" delay={0}>
+              What the room
+            </FadeIn>
+            <FadeIn as="span" className="block text-(--color-fg-muted)" delay={90}>
+              handles for you.
+            </FadeIn>
+          </h2>
+          <div className="mt-20 space-y-20 sm:space-y-24">
+            {useCases.map((uc, i) => (
+              <div key={uc.situation} className="grid grid-cols-1 items-center gap-10 lg:grid-cols-2 lg:gap-16">
+                <div className={i % 2 === 1 ? 'lg:order-2' : ''}>
+                  <FadeIn>
+                    <p className="text-3xl font-semibold tracking-tight leading-[1.05] text-(--color-fg-muted) sm:text-4xl">{uc.situation}.</p>
+                  </FadeIn>
+                  <FadeIn delay={90}>
+                    <p className="mt-6 text-xl font-semibold tracking-tight">{uc.headline}</p>
+                    <p className="mt-3 max-w-md text-(--color-fg-muted) leading-relaxed">{uc.description}</p>
+                  </FadeIn>
+                </div>
+                <FadeIn delay={180} className={i % 2 === 1 ? 'lg:order-1' : ''}>
+                  <MockVisual index={i} />
+                </FadeIn>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* Agents */}
       <section className="bg-(--color-bg)">
         <div className="mx-auto max-w-5xl px-6 py-24 sm:py-32">
@@ -241,35 +266,6 @@ export default function ForMarketersPage() {
                   <p className="mt-3 text-(--color-fg-muted) leading-relaxed text-[15px]">{a.description}</p>
                 </div>
               </FadeIn>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Primitives */}
-      <section className="bg-(--color-bg)">
-        <div className="mx-auto max-w-5xl px-6 py-24 sm:py-32">
-          <FadeIn>
-            <h2 className="text-3xl font-semibold tracking-tight leading-[1.05] sm:text-4xl">The primitives behind it.</h2>
-          </FadeIn>
-          <FadeIn delay={60}>
-            <p className="mt-4 text-lg text-(--color-fg-muted)">Every agent in the Marketing room is built on four primitives you control.</p>
-          </FadeIn>
-          <div className="mt-20 space-y-24">
-            {primitives.map((p, i) => (
-              <div key={p.name} className="grid grid-cols-1 items-center gap-10 lg:grid-cols-2 lg:gap-16">
-                <div className={i % 2 === 1 ? 'lg:order-2' : ''}>
-                  <FadeIn>
-                    <h3 className="text-3xl font-semibold tracking-tight leading-[1.05] sm:text-4xl">{p.name}</h3>
-                  </FadeIn>
-                  <FadeIn delay={90}>
-                    <p className="mt-6 max-w-md text-lg text-(--color-fg-muted) leading-relaxed">{p.body}</p>
-                  </FadeIn>
-                </div>
-                <FadeIn delay={180} className={i % 2 === 1 ? 'lg:order-1' : ''}>
-                  {p.visual}
-                </FadeIn>
-              </div>
             ))}
           </div>
         </div>

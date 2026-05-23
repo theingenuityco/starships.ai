@@ -118,18 +118,18 @@ export default function UseCasesPage() {
           <section key={s.heading} className="bg-(--color-bg)">
             <div className="mx-auto max-w-5xl px-6 py-5 sm:py-6">
               <SectionReveal>
-                <div className="rounded-(--radius-card) border border-(--color-border) bg-(--color-bg) p-8 sm:p-12">
-                  <ChainItem as="h2" delay={0} className="text-3xl font-semibold leading-[1.05] tracking-tight sm:text-4xl mb-10 sm:mb-12">
+                <ChainItem delay={0} className="rounded-(--radius-card) border border-(--color-border) bg-(--color-bg) p-8 sm:p-12">
+                  <ChainItem as="h2" delay={80} className="text-3xl font-semibold leading-[1.05] tracking-tight sm:text-4xl mb-10 sm:mb-12">
                     {s.heading}
                   </ChainItem>
 
                   <div className="grid grid-cols-1 items-center gap-12 lg:grid-cols-[280px_1fr] lg:gap-16">
-                    <ChainItem delay={80} className="w-full max-w-[280px] mx-auto lg:mx-0">
+                    <ChainItem delay={160} className="w-full max-w-[280px] mx-auto lg:mx-0">
                       {s.motif}
                     </ChainItem>
 
                     <div>
-                      <ChainItem delay={160}>
+                      <ChainItem delay={240}>
                         <ul className="space-y-3">
                           {s.body.map((line) => (
                             <li key={line} className="flex items-start gap-3 text-lg text-(--color-fg-muted) leading-relaxed">
@@ -140,7 +140,17 @@ export default function UseCasesPage() {
                         </ul>
                       </ChainItem>
 
-                      <ChainItem delay={240}>
+                      <ChainItem delay={320} className="mt-6 flex justify-start">
+                        <Link
+                          href={s.href}
+                          className="inline-flex items-center gap-1.5 text-sm font-medium text-(--color-fg-muted) hover:text-(--color-fg) transition-colors underline underline-offset-4"
+                        >
+                          {s.cta}
+                          <Icon name="arrow-right" className="h-4 w-4" />
+                        </Link>
+                      </ChainItem>
+
+                      <ChainItem delay={400}>
                         <div className="mt-10 grid grid-cols-1 gap-x-6 gap-y-8 border-t border-(--color-border) pt-8 sm:grid-cols-[auto_1fr] sm:gap-x-10">
                           <p className="text-xs font-brand tracking-widest text-(--color-fg-subtle) uppercase sm:pt-2">The crew</p>
                           <div className="flex flex-wrap gap-2">
@@ -169,19 +179,9 @@ export default function UseCasesPage() {
                           </div>
                         </div>
                       </ChainItem>
-
-                      <ChainItem delay={320} className="flex justify-end">
-                        <Link
-                          href={s.href}
-                          className="mt-10 inline-flex items-center gap-1.5 text-sm font-medium text-(--color-fg-muted) hover:text-(--color-fg) transition-colors underline underline-offset-4"
-                        >
-                          {s.cta}
-                          <Icon name="arrow-right" className="h-4 w-4" />
-                        </Link>
-                      </ChainItem>
                     </div>
                   </div>
-                </div>
+                </ChainItem>
               </SectionReveal>
             </div>
           </section>

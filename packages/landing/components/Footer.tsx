@@ -23,6 +23,18 @@ export function Footer() {
 
           <div className="flex gap-16">
             <div className="flex flex-col gap-4">
+              <span className="text-xs font-medium uppercase tracking-widest text-(--color-fg-subtle)">Use cases</span>
+              <a href="/for-marketers" className="text-sm text-(--color-fg-muted) hover:text-(--color-fg) transition-colors">
+                Marketers
+              </a>
+              <a href="/for-developers" className="text-sm text-(--color-fg-muted) hover:text-(--color-fg) transition-colors">
+                Developers
+              </a>
+              <a href="/for-sales" className="text-sm text-(--color-fg-muted) hover:text-(--color-fg) transition-colors">
+                Sales
+              </a>
+            </div>
+            <div className="flex flex-col gap-4">
               <span className="text-xs font-medium uppercase tracking-widest text-(--color-fg-subtle)">Contact</span>
               <a href="mailto:hello@starships.ai" className="text-sm text-(--color-fg-muted) hover:text-(--color-fg) transition-colors">
                 hello@starships.ai

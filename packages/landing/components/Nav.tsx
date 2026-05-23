@@ -21,7 +21,7 @@ export function Nav() {
               How it works
             </Link>
             <Link
-              href="/#use-cases"
+              href="/use-cases"
               className="text-[15px] text-(--color-fg-muted) hover:text-(--color-fg) transition-colors"
             >
               Use cases

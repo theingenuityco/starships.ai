@@ -12,11 +12,29 @@ export const metadata: Metadata = {
 
 export const dynamic = 'force-static';
 
+// Maps display name → /integrations/{slug}.svg
+const integrationSlug: Record<string, string> = {
+  HubSpot: 'hubspot',
+  Gmail: 'gmail',
+  Stripe: 'stripe',
+  Notion: 'notion',
+  Zoho: 'zoho',
+  GitHub: 'github',
+  GitLab: 'gitlab',
+  Linear: 'linear',
+  Jira: 'jira',
+  Sentry: 'sentry',
+  Mailchimp: 'mailchimp',
+  Mixpanel: 'mixpanel',
+  Intercom: 'intercom',
+  Datadog: 'datadog',
+};
+
 const sections = [
   {
     heading: 'For sales.',
     body: ['Leads researched before your first call.', 'CRM updated after every interaction.', 'Follow-ups queued before anything goes cold.'],
-    integrations: ['HubSpot', 'Salesforce', 'Gmail', 'Gong', 'Slack'],
+    integrations: ['HubSpot', 'Gmail', 'Stripe', 'Notion', 'Zoho'],
     agents: ['Account Researcher', 'CRM Updater', 'Follow-up Coordinator', 'Ticket Triager'],
     href: '/for-sales',
     cta: 'See the Sales room',
@@ -25,7 +43,7 @@ const sections = [
   {
     heading: 'For developers.',
     body: ['Every PR reviewed before a human opens it.', 'Tests written alongside new features.', 'Dependencies upgraded on a clean weekly PR.'],
-    integrations: ['GitHub', 'GitLab', 'Linear', 'Jira', 'Slack'],
+    integrations: ['GitHub', 'GitLab', 'Linear', 'Jira', 'Sentry'],
     agents: ['PR Reviewer', 'Test Author', 'Security Scanner', 'Dependency Upgrader'],
     href: '/for-developers',
     cta: 'See the Engineering room',
@@ -34,7 +52,7 @@ const sections = [
   {
     heading: 'For marketers.',
     body: ['Outreach drafted the moment a lead enters your CRM.', 'KB articles published when a ticket resolves.', 'Morning updates sent without a single keystroke.'],
-    integrations: ['HubSpot', 'Mailchimp', 'Notion', 'Intercom', 'Slack'],
+    integrations: ['HubSpot', 'Mailchimp', 'Mixpanel', 'Intercom', 'Notion'],
     agents: ['Outreach Drafter', 'Campaign Planner', 'KB Writer', 'Status Reporter'],
     href: '/for-marketers',
     cta: 'See the Marketing room',
@@ -99,8 +117,12 @@ export default function UseCasesPage() {
                             key={name}
                             className="inline-flex items-center gap-1.5 rounded-md border border-(--color-border) bg-(--color-bg-soft) px-2.5 py-1 text-xs font-medium text-(--color-fg-muted)"
                           >
-                            <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded bg-(--color-bg-elev) text-[9px] font-bold text-(--color-fg-subtle) ring-1 ring-(--color-border)">
-                              {name.slice(0, 2)}
+                            <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center">
+                              <img
+                                src={`/integrations/${integrationSlug[name]}.svg`}
+                                alt={name}
+                                className="h-3.5 w-3.5 opacity-60"
+                              />
                             </span>
                             {name}
                           </span>

@@ -4,6 +4,7 @@ import { FadeIn } from '@/components/FadeIn';
 import { Footer } from '@/components/Footer';
 import { Icon } from '@/components/Icon';
 import { TrustControl } from '@/components/TrustControl';
+import { UseCasesScroller } from '@/components/UseCasesScroller';
 
 export const metadata: Metadata = {
   title: 'Marketing — Starships',
@@ -217,36 +218,7 @@ export default function ForMarketersPage() {
       </section>
 
       {/* Use Cases */}
-      <section className="bg-(--color-bg)">
-        <div className="mx-auto max-w-5xl px-6 py-24 sm:py-32">
-          <h2 className="text-4xl font-semibold leading-[1.05] tracking-tight sm:text-5xl md:text-6xl">
-            <FadeIn as="span" className="block" delay={0}>
-              What the room
-            </FadeIn>
-            <FadeIn as="span" className="block text-(--color-fg-muted)" delay={90}>
-              handles for you.
-            </FadeIn>
-          </h2>
-          <div className="mt-20 space-y-20 sm:space-y-24">
-            {useCases.map((uc, i) => (
-              <div key={uc.situation} className="grid grid-cols-1 items-center gap-10 lg:grid-cols-2 lg:gap-16">
-                <div className={i % 2 === 1 ? 'lg:order-2' : ''}>
-                  <FadeIn>
-                    <p className="text-3xl font-semibold tracking-tight leading-[1.05] text-(--color-fg-muted) sm:text-4xl">{uc.situation}.</p>
-                  </FadeIn>
-                  <FadeIn delay={90}>
-                    <p className="mt-6 text-xl font-semibold tracking-tight">{uc.headline}</p>
-                    <p className="mt-3 max-w-md text-(--color-fg-muted) leading-relaxed">{uc.description}</p>
-                  </FadeIn>
-                </div>
-                <FadeIn delay={180} className={i % 2 === 1 ? 'lg:order-1' : ''}>
-                  <MockVisual index={i} />
-                </FadeIn>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
+      <UseCasesScroller items={useCases} visuals={useCases.map((_, i) => <MockVisual key={i} index={i} />)} />
 
       {/* Agents */}
       <section className="bg-(--color-bg)">

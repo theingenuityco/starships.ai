@@ -154,9 +154,7 @@ const primitives = [
             key={d.slug}
             className="flex items-center gap-3 rounded-lg border border-(--color-border) bg-(--color-bg-elev) px-4 py-3"
           >
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-(--color-bg-soft) ring-1 ring-(--color-border)">
-              <img src={`/integrations/${d.slug}.svg`} alt={d.name} className="h-4 w-4 opacity-60" />
-            </span>
+            <img src={`/integrations/${d.slug}.svg`} alt={d.name} className="h-5 w-5 shrink-0" />
             <div className="min-w-0">
               <p className="text-sm font-medium text-(--color-fg)">{d.name}</p>
               <p className="text-xs text-(--color-fg-subtle)">{d.desc}</p>

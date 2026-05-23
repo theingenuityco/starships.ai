@@ -111,19 +111,17 @@ export default function UseCasesPage() {
                   <ChainItem delay={240}>
                     <div className="mt-6">
                       <p className="text-xs font-brand tracking-widest text-(--color-fg-subtle) uppercase mb-3">Works with</p>
-                      <div className="flex flex-wrap gap-2">
+                      <div className="flex flex-wrap gap-3">
                         {s.integrations.map((name) => (
                           <span
                             key={name}
-                            className="inline-flex items-center gap-1.5 rounded-md border border-(--color-border) bg-(--color-bg-soft) px-2.5 py-1 text-xs font-medium text-(--color-fg-muted)"
+                            className="inline-flex items-center gap-2 rounded-md border border-(--color-border) bg-(--color-bg-soft) px-3 py-1.5 text-xs font-medium text-(--color-fg-muted)"
                           >
-                            <span className="inline-flex h-4 w-4 shrink-0 items-center justify-center">
-                              <img
-                                src={`/integrations/${integrationSlug[name]}.svg`}
-                                alt={name}
-                                className="h-3.5 w-3.5 opacity-60"
-                              />
-                            </span>
+                            <img
+                              src={`/integrations/${integrationSlug[name]}.svg`}
+                              alt={name}
+                              className="h-4 w-4 shrink-0"
+                            />
                             {name}
                           </span>
                         ))}

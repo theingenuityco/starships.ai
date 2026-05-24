@@ -76,6 +76,17 @@ body {
   animation-delay: var(--delay, 0ms);
 }
 
+/* Dashboard window chains off the desktop's reveal instead of its own scroll
+   trigger: the desktop fades up on scroll, then the window follows as a sequel. */
+.dashboard-desktop > .dashboard-window {
+  opacity: 0;
+  transform: translateY(20px);
+}
+.dashboard-desktop.animate-fade-up > .dashboard-window {
+  animation: fade-up 0.9s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation-delay: var(--delay, 0ms);
+}
+
 /* Pause motif animations while the parent card is still hidden, so they start
    from 0% when the card fades in rather than at a random phase in the cycle. */
 .fade-will-animate .dot-wave,
@@ -267,6 +278,7 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .fade-will-animate,
   .animate-fade-up,
+  .dashboard-window,
   .dot-wave,
   .approve-reveal,
   .burn-grow,

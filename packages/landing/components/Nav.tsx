@@ -70,6 +70,12 @@ export function Nav() {
           </Link>
 
           <div className="hidden sm:flex items-center gap-7">
+            <Link
+              href="/how-it-works"
+              className="text-[15px] text-(--color-fg-muted) hover:text-(--color-fg) transition-colors"
+            >
+              How it works
+            </Link>
             <UseCasesDropdown />
           </div>
         </div>

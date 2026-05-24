@@ -21,7 +21,13 @@ export function Footer() {
             </p>
           </div>
 
-          <div className="flex gap-16">
+          <div className="flex flex-wrap gap-12 sm:gap-16">
+            <div className="flex flex-col gap-4">
+              <span className="text-xs font-medium uppercase tracking-widest text-(--color-fg-subtle)">Product</span>
+              <a href="/how-it-works" className="text-sm text-(--color-fg-muted) hover:text-(--color-fg) transition-colors">
+                How it works
+              </a>
+            </div>
             <div className="flex flex-col gap-4">
               <span className="text-xs font-medium uppercase tracking-widest text-(--color-fg-subtle)">Use cases</span>
               <a href="/use-cases/for-marketers" className="text-sm text-(--color-fg-muted) hover:text-(--color-fg) transition-colors">

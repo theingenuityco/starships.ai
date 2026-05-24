@@ -1,13 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { Turnstile, type TurnstileInstance } from '@marsidev/react-turnstile';
 import { Icon } from './Icon';
 
 type Status = 'idle' | 'submitting' | 'success' | 'error';
 
 const ROOMS = ['Engineering', 'Sales', 'Marketing', 'Operations', 'Something else'] as const;
 
-// Map the ?room= query param (set by use-case page CTAs) onto a chip label.
 const ROOM_PARAM: Record<string, (typeof ROOMS)[number]> = {
   engineering: 'Engineering',
   developers: 'Engineering',
@@ -15,6 +15,16 @@ const ROOM_PARAM: Record<string, (typeof ROOMS)[number]> = {
   marketing: 'Marketing',
   operations: 'Operations',
   ops: 'Operations',
+};
+
+type Payload = {
+  name: string;
+  email: string;
+  website: string;
+  companyUrl: string;
+  useCase: string;
+  message: string;
+  source: string;
 };
 
 const fieldClass =
@@ -28,8 +38,9 @@ export function ContactForm() {
   const [room, setRoom] = useState<string>('');
   const [source, setSource] = useState<string>('');
 
-  // Prefill the room from the referring use-case page, and capture attribution
-  // silently so we never have to ask "how did you hear about us".
+  const turnstileRef = useRef<TurnstileInstance>(null);
+  const pendingPayload = useRef<Payload | null>(null);
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
 
@@ -48,35 +59,15 @@ export function ContactForm() {
     setSource(parts.join(' · '));
   }, []);
 
-  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    setStatus('submitting');
-    setErrorMessage('');
-
-    const form = e.currentTarget;
-    const formData = new FormData(form);
-    const payload = {
-      name: String(formData.get('name') || '').trim(),
-      email: String(formData.get('email') || '').trim(),
-      website: String(formData.get('website') || '').trim(),
-      useCase: room,
-      message: String(formData.get('message') || '').trim(),
-      source,
-      // Honeypot — bots fill this; humans never see it.
-      company_url: String(formData.get('company_url') || '').trim(),
-    };
-
-    if (!payload.name || !payload.email) {
-      setStatus('error');
-      setErrorMessage('Please fill in your name and email.');
-      return;
-    }
+  async function submitWithToken(turnstileToken: string) {
+    const payload = pendingPayload.current;
+    if (!payload) return;
 
     try {
       const res = await fetch('/api/contact', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ ...payload, turnstileToken }),
       });
 
       if (!res.ok) {
@@ -85,13 +76,45 @@ export function ContactForm() {
       }
 
       setStatus('success');
-      form.reset();
-      setRoom('');
+      pendingPayload.current = null;
     } catch (err) {
       setStatus('error');
       setErrorMessage(err instanceof Error ? err.message : 'Something went wrong.');
+      turnstileRef.current?.reset();
     }
   }
+
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+
+    const form = e.currentTarget;
+    const formData = new FormData(form);
+
+    const name = String(formData.get('name') || '').trim();
+    const email = String(formData.get('email') || '').trim();
+
+    if (!name || !email) {
+      setStatus('error');
+      setErrorMessage('Please fill in your name and email.');
+      return;
+    }
+
+    pendingPayload.current = {
+      name,
+      email,
+      website: String(formData.get('website') || '').trim(),
+      companyUrl: String(formData.get('companyUrl') || '').trim(),
+      useCase: room,
+      message: String(formData.get('message') || '').trim(),
+      source,
+    };
+
+    setStatus('submitting');
+    setErrorMessage('');
+    turnstileRef.current?.execute();
+  }
+
+  const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? '';
 
   return (
     <div className="overflow-hidden rounded-(--radius-card) border border-(--color-border) bg-(--color-bg)">
@@ -111,12 +134,6 @@ export function ContactForm() {
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-5">
-            {/* Honeypot. Bots fill this; humans never see it. */}
-            <div aria-hidden="true" className="absolute left-[-9999px] top-auto h-0 w-0 overflow-hidden">
-              <label htmlFor="company_url">Company URL</label>
-              <input id="company_url" name="company_url" type="text" tabIndex={-1} autoComplete="off" />
-            </div>
-
             <div>
               <label htmlFor="name" className={labelClass}>
                 Name
@@ -143,6 +160,20 @@ export function ContactForm() {
                 autoComplete="url"
                 className={fieldClass}
                 placeholder="https://acme.co"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="companyUrl" className={labelClass}>
+                Company URL <span className="text-(--color-fg-subtle) normal-case">(optional)</span>
+              </label>
+              <input
+                id="companyUrl"
+                name="companyUrl"
+                type="url"
+                inputMode="url"
+                className={fieldClass}
+                placeholder="https://linkedin.com/company/acme"
               />
             </div>
 
@@ -203,6 +234,24 @@ export function ContactForm() {
                 hello@starships.ai
               </a>
             </p>
+
+            {siteKey && (
+              <Turnstile
+                ref={turnstileRef}
+                siteKey={siteKey}
+                options={{ size: 'invisible', execution: 'execute' }}
+                onSuccess={submitWithToken}
+                onError={() => {
+                  setStatus('error');
+                  setErrorMessage('CAPTCHA verification failed. Please try again.');
+                }}
+                onExpire={() => {
+                  setStatus('error');
+                  setErrorMessage('CAPTCHA expired. Please try again.');
+                  turnstileRef.current?.reset();
+                }}
+              />
+            )}
           </form>
         )}
       </div>

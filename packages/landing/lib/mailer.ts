@@ -1,40 +1,31 @@
-import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
+import { Resend } from 'resend';
 
-type SesEnv = {
-  region: string;
+type MailerEnv = {
+  apiKey: string;
   fromAddress: string;
   fromName: string;
   notificationTo: string;
   bookingUrl: string;
-  accessKeyId?: string;
-  secretAccessKey?: string;
   enabled: boolean;
 };
 
-function readEnv(): SesEnv {
+function readEnv(): MailerEnv {
   const enabledRaw = process.env.LANDING_ENABLE_EMAILS;
   const enabled = enabledRaw === undefined ? true : enabledRaw.toLowerCase() === 'true';
   return {
-    region: process.env.LANDING_AWS_SES_REGION || 'ap-south-1',
+    apiKey: process.env.LANDING_RESEND_API_KEY || '',
     fromAddress: process.env.LANDING_EMAIL_FROM_ADDRESS || 'hello@starships.ai',
     fromName: process.env.LANDING_EMAIL_FROM_NAME || 'Starships',
     notificationTo: process.env.LANDING_NOTIFICATION_TO || 'hello@starships.ai',
     bookingUrl: process.env.LANDING_BOOKING_URL || 'https://cal.com',
-    accessKeyId: process.env.LANDING_AWS_ACCESS_KEY_ID || undefined,
-    secretAccessKey: process.env.LANDING_AWS_SECRET_ACCESS_KEY || undefined,
     enabled,
   };
 }
 
-let cachedClient: SESClient | null = null;
-function getClient(env: SesEnv): SESClient {
+let cachedClient: Resend | null = null;
+function getClient(apiKey: string): Resend {
   if (cachedClient) return cachedClient;
-  cachedClient = new SESClient({
-    region: env.region,
-    ...(env.accessKeyId && env.secretAccessKey
-      ? { credentials: { accessKeyId: env.accessKeyId, secretAccessKey: env.secretAccessKey } }
-      : {}),
-  });
+  cachedClient = new Resend(apiKey);
   return cachedClient;
 }
 
@@ -46,27 +37,11 @@ export type Lead = {
   name: string;
   email: string;
   website: string;
+  companyUrl?: string;
   useCase: string;
   message: string;
   source: string;
 };
-
-async function sendOne(env: SesEnv, to: string, subject: string, html: string, text: string, replyTo?: string) {
-  const client = getClient(env);
-  const command = new SendEmailCommand({
-    Source: `${env.fromName} <${env.fromAddress}>`,
-    Destination: { ToAddresses: [to] },
-    Message: {
-      Subject: { Data: subject, Charset: 'UTF-8' },
-      Body: {
-        Html: { Data: html, Charset: 'UTF-8' },
-        Text: { Data: text, Charset: 'UTF-8' },
-      },
-    },
-    ...(replyTo ? { ReplyToAddresses: [replyTo] } : {}),
-  });
-  await client.send(command);
-}
 
 function notificationHtml(lead: Lead): string {
   const name = escapeHtml(lead.name);
@@ -75,6 +50,8 @@ function notificationHtml(lead: Lead): string {
   const message = escapeHtml(lead.message || '(not provided)').replace(/\n/g, '<br>');
   const websiteHref = lead.website ? (/^https?:\/\//i.test(lead.website) ? lead.website : `https://${lead.website}`) : '';
   const website = lead.website ? escapeHtml(lead.website) : '';
+  const companyUrlHref = lead.companyUrl ? (/^https?:\/\//i.test(lead.companyUrl) ? lead.companyUrl : `https://${lead.companyUrl}`) : '';
+  const companyUrl = lead.companyUrl ? escapeHtml(lead.companyUrl) : '';
   const source = lead.source ? escapeHtml(lead.source) : '';
 
   const row = (label: string, value: string, top = false) =>
@@ -87,6 +64,7 @@ function notificationHtml(lead: Lead): string {
         ${row('Name', name)}
         ${row('Email', `<a href="mailto:${email}">${email}</a>`)}
         ${website ? row('Website', `<a href="${escapeHtml(websiteHref)}">${website}</a>`) : ''}
+        ${companyUrl ? row('Company URL', `<a href="${escapeHtml(companyUrlHref)}">${companyUrl}</a>`) : ''}
         ${row('Room', useCase)}
         ${row('Context', message, true)}
         ${source ? row('Source', source, true) : ''}
@@ -102,6 +80,7 @@ function notificationText(lead: Lead): string {
     `Name: ${lead.name}`,
     `Email: ${lead.email}`,
     `Website: ${lead.website || '(not provided)'}`,
+    `Company URL: ${lead.companyUrl || '(not provided)'}`,
     `Room: ${lead.useCase || '(not specified)'}`,
     `Context: ${lead.message || '(not provided)'}`,
     `Source: ${lead.source || '(none)'}`,
@@ -148,22 +127,29 @@ export async function sendLeadEmails(lead: Lead): Promise<void> {
     return;
   }
 
-  // Notification to internal inbox — keep visitor email as reply-to so you can reply directly.
-  await sendOne(
-    env,
-    env.notificationTo,
-    `New Starships lead: ${lead.name}${lead.useCase ? ` (${lead.useCase})` : ''}`,
-    notificationHtml(lead),
-    notificationText(lead),
-    lead.email
-  );
+  if (!env.apiKey) {
+    console.warn('[landing/mailer] RESEND_API_KEY not set — skipping send');
+    return;
+  }
 
-  // Auto-reply with booking link.
-  await sendOne(
-    env,
-    lead.email,
-    'Thanks for reaching out — book a call with Starships',
-    autoReplyHtml(lead, env.bookingUrl),
-    autoReplyText(lead, env.bookingUrl)
-  );
+  const resend = getClient(env.apiKey);
+  const from = `${env.fromName} <${env.fromAddress}>`;
+
+  await Promise.all([
+    resend.emails.send({
+      from,
+      to: [env.notificationTo],
+      replyTo: lead.email,
+      subject: `New Starships lead: ${lead.name}${lead.useCase ? ` (${lead.useCase})` : ''}`,
+      html: notificationHtml(lead),
+      text: notificationText(lead),
+    }),
+    resend.emails.send({
+      from,
+      to: [lead.email],
+      subject: 'Thanks for reaching out — book a call with Starships',
+      html: autoReplyHtml(lead, env.bookingUrl),
+      text: autoReplyText(lead, env.bookingUrl),
+    }),
+  ]);
 }

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { sendLeadEmails, type Lead } from '@/lib/mailer';
-import { appendLeadToSheet } from '@/lib/sheets';
+import { appendLeadToNotion } from '@/lib/notion';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -56,8 +56,7 @@ export async function POST(req: Request) {
     name: clean(payload.name),
     email: clean(payload.email),
     website: clean(payload.website),
-    companyUrl: clean(payload.companyUrl) || undefined,
-    useCase: clean(payload.useCase),
+    room: clean(payload.room),
     message: clean(payload.message),
     source: clean(payload.source),
   };
@@ -73,7 +72,7 @@ export async function POST(req: Request) {
   try {
     await Promise.all([
       sendLeadEmails(lead),
-      appendLeadToSheet(lead).catch((err) => console.error('[api/contact] Sheet append failed', err)),
+      appendLeadToNotion(lead).catch((err) => console.error('[api/contact] Notion append failed', err)),
     ]);
     return NextResponse.json({ ok: true });
   } catch (err) {

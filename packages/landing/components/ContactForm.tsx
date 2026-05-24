@@ -21,8 +21,7 @@ type Payload = {
   name: string;
   email: string;
   website: string;
-  companyUrl: string;
-  useCase: string;
+  room: string;
   message: string;
   source: string;
 };
@@ -103,8 +102,7 @@ export function ContactForm() {
       name,
       email,
       website: String(formData.get('website') || '').trim(),
-      companyUrl: String(formData.get('companyUrl') || '').trim(),
-      useCase: room,
+      room,
       message: String(formData.get('message') || '').trim(),
       source,
     };
@@ -160,20 +158,6 @@ export function ContactForm() {
                 autoComplete="url"
                 className={fieldClass}
                 placeholder="https://acme.co"
-              />
-            </div>
-
-            <div>
-              <label htmlFor="companyUrl" className={labelClass}>
-                Company URL <span className="text-(--color-fg-subtle) normal-case">(optional)</span>
-              </label>
-              <input
-                id="companyUrl"
-                name="companyUrl"
-                type="url"
-                inputMode="url"
-                className={fieldClass}
-                placeholder="https://linkedin.com/company/acme"
               />
             </div>
 

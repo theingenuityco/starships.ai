@@ -14,8 +14,8 @@ function readEnv(): MailerEnv {
   const enabled = enabledRaw === undefined ? true : enabledRaw.toLowerCase() === 'true';
   return {
     apiKey: process.env.LANDING_RESEND_API_KEY || '',
-    fromAddress: process.env.LANDING_EMAIL_FROM_ADDRESS || 'hello@starships.ai',
-    fromName: process.env.LANDING_EMAIL_FROM_NAME || 'Starships',
+    fromAddress: process.env.LANDING_EMAIL_FROM_ADDRESS || 'stella@mail.starships.ai',
+    fromName: process.env.LANDING_EMAIL_FROM_NAME || 'Stella from Starships',
     notificationTo: process.env.LANDING_NOTIFICATION_TO || 'hello@starships.ai',
     bookingUrl: process.env.LANDING_BOOKING_URL || 'https://cal.com',
     enabled,
@@ -37,8 +37,7 @@ export type Lead = {
   name: string;
   email: string;
   website: string;
-  companyUrl?: string;
-  useCase: string;
+  room: string;
   message: string;
   source: string;
 };
@@ -46,12 +45,10 @@ export type Lead = {
 function notificationHtml(lead: Lead): string {
   const name = escapeHtml(lead.name);
   const email = escapeHtml(lead.email);
-  const useCase = escapeHtml(lead.useCase || '(not specified)');
+  const room = escapeHtml(lead.room || '(not specified)');
   const message = escapeHtml(lead.message || '(not provided)').replace(/\n/g, '<br>');
   const websiteHref = lead.website ? (/^https?:\/\//i.test(lead.website) ? lead.website : `https://${lead.website}`) : '';
   const website = lead.website ? escapeHtml(lead.website) : '';
-  const companyUrlHref = lead.companyUrl ? (/^https?:\/\//i.test(lead.companyUrl) ? lead.companyUrl : `https://${lead.companyUrl}`) : '';
-  const companyUrl = lead.companyUrl ? escapeHtml(lead.companyUrl) : '';
   const source = lead.source ? escapeHtml(lead.source) : '';
 
   const row = (label: string, value: string, top = false) =>
@@ -64,9 +61,8 @@ function notificationHtml(lead: Lead): string {
         ${row('Name', name)}
         ${row('Email', `<a href="mailto:${email}">${email}</a>`)}
         ${website ? row('Website', `<a href="${escapeHtml(websiteHref)}">${website}</a>`) : ''}
-        ${companyUrl ? row('Company URL', `<a href="${escapeHtml(companyUrlHref)}">${companyUrl}</a>`) : ''}
-        ${row('Room', useCase)}
-        ${row('Context', message, true)}
+        ${row('Room', room)}
+        ${row('Message', message, true)}
         ${source ? row('Source', source, true) : ''}
       </table>
     </div>
@@ -80,9 +76,8 @@ function notificationText(lead: Lead): string {
     `Name: ${lead.name}`,
     `Email: ${lead.email}`,
     `Website: ${lead.website || '(not provided)'}`,
-    `Company URL: ${lead.companyUrl || '(not provided)'}`,
-    `Room: ${lead.useCase || '(not specified)'}`,
-    `Context: ${lead.message || '(not provided)'}`,
+    `Room: ${lead.room || '(not specified)'}`,
+    `Message: ${lead.message || '(not provided)'}`,
     `Source: ${lead.source || '(none)'}`,
   ].join('\n');
 }
@@ -98,7 +93,7 @@ function autoReplyHtml(lead: Lead, bookingUrl: string): string {
         <a href="${url}" style="display: inline-block; background: #5a63ff; color: white; text-decoration: none; padding: 12px 20px; border-radius: 10px; font-weight: 500;">Book a 20-min call →</a>
       </p>
       <p>If that link doesn't work for you, just reply to this email and we'll find a time.</p>
-      <p style="margin-top: 32px;">— Rudra<br><span style="color: #6c7585;">Starships</span></p>
+      <p style="margin-top: 32px;">— Stella<br><span style="color: #6c7585;">Starships</span></p>
     </div>
   `.trim();
 }
@@ -114,7 +109,7 @@ function autoReplyText(lead: Lead, bookingUrl: string): string {
     ``,
     `If that link doesn't work for you, just reply to this email and we'll find a time.`,
     ``,
-    `— Rudra`,
+    `— Stella`,
     `Starships`,
   ].join('\n');
 }
@@ -135,12 +130,12 @@ export async function sendLeadEmails(lead: Lead): Promise<void> {
   const resend = getClient(env.apiKey);
   const from = `${env.fromName} <${env.fromAddress}>`;
 
-  await Promise.all([
+  const results = await Promise.all([
     resend.emails.send({
       from,
       to: [env.notificationTo],
       replyTo: lead.email,
-      subject: `New Starships lead: ${lead.name}${lead.useCase ? ` (${lead.useCase})` : ''}`,
+      subject: `New Starships lead: ${lead.name}${lead.room ? ` (${lead.room})` : ''}`,
       html: notificationHtml(lead),
       text: notificationText(lead),
     }),
@@ -152,4 +147,8 @@ export async function sendLeadEmails(lead: Lead): Promise<void> {
       text: autoReplyText(lead, env.bookingUrl),
     }),
   ]);
+
+  for (const { error } of results) {
+    if (error) throw new Error(`Resend error: ${error.message}`);
+  }
 }

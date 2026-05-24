@@ -34,30 +34,40 @@ const useCases = [
   },
 ];
 
-const agents = [
+type Agent = {
+  name: string;
+  trigger: string;
+  icon: string;
+  responsibilities: string[];
+};
+
+const agents: Agent[] = [
   {
     name: 'PR Reviewer',
-    trigger: 'On every pull request',
-    description:
-      'Reads the diff, understands context from the codebase docs, leaves structured review comments, and flags anything that looks wrong — before a human even opens it.',
+    trigger: 'On every pull request',    icon: 'git-branch',
+    responsibilities: [
+      'Reads the diff against your coding standards',
+      'Leaves structured review comments',
+      'Flags anything that looks wrong',
+    ],
   },
   {
     name: 'Test Author',
-    trigger: 'On every new feature commit',
-    description:
-      'Reads the changed files, generates test cases covering the happy path and the edge cases, and opens a PR with the new test file. Your coverage goes up without anyone writing boilerplate.',
-  },
-  {
-    name: 'Security Scanner',
-    trigger: 'On every push to main',
-    description:
-      'Scans the diff for known vulnerability patterns, CVEs in dependencies, and common security anti-patterns. Posts a summary to the Engineering room and escalates anything critical immediately.',
+    trigger: 'On every new feature commit',    icon: 'file-text',
+    responsibilities: [
+      'Reads the changed files',
+      'Generates happy-path and edge-case tests',
+      'Opens a PR with the new test file',
+    ],
   },
   {
     name: 'Dependency Upgrader',
-    trigger: 'Weekly, every Monday',
-    description:
-      'Checks for outdated packages, reads the changelogs, groups safe patch and minor upgrades into a single PR, and flags major-version bumps that need your attention.',
+    trigger: 'Weekly, every Monday',    icon: 'package',
+    responsibilities: [
+      'Reads changelogs for outdated packages',
+      'Groups safe patch + minor bumps into one PR',
+      'Flags major-version changes for you',
+    ],
   },
 ];
 
@@ -179,6 +189,75 @@ function MockVisual({ index }: { index: number }) {
   );
 }
 
+function AgentsHeading() {
+  return (
+    <h2 className="text-4xl sm:text-5xl md:text-6xl font-semibold tracking-tight leading-[1.05]">
+      <FadeIn as="span" className="block" delay={0}>
+        Meet your engineering crew.
+      </FadeIn>
+      <FadeIn as="span" className="block text-(--color-fg-muted)" delay={90}>
+        Each agent owns a beat.
+      </FadeIn>
+    </h2>
+  );
+}
+
+// Indexed editorial cards: big ordinal numeral + agent icon, then a special
+// "create your own agent" card in the final slot.
+function AgentsCards() {
+  return (
+    <div className="mt-16 sm:mt-20 grid grid-cols-1 gap-5 sm:grid-cols-2">
+      {agents.map((a, i) => (
+        <FadeIn key={a.name} delay={i * 80}>
+          <div className="relative h-full overflow-hidden rounded-(--radius-card) border border-(--color-border) bg-(--color-bg-elev) p-6">
+            <Icon
+              name={a.icon}
+              className="pointer-events-none absolute -right-16 -top-16 z-0 h-72 w-72 text-(--color-border)"
+            />
+            <div className="relative z-10">
+              <span className="font-mono text-3xl font-semibold tabular-nums text-(--color-border-strong)">
+                {String(i + 1).padStart(2, '0')}
+              </span>
+              <h3 className="mt-5 text-lg font-semibold text-(--color-fg)">{a.name}</h3>
+              <p className="mt-1.5 font-brand text-xs uppercase tracking-widest text-(--color-fg-subtle)">{a.trigger}</p>
+              <ul className="mt-4 space-y-2 border-t border-(--color-border) pt-4 text-sm text-(--color-fg-muted)">
+                {a.responsibilities.map((r) => (
+                  <li key={r} className="flex items-start gap-2">
+                    <Icon name="check" className="mt-0.5 h-3.5 w-3.5 shrink-0 text-(--color-success)" />
+                    {r}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </FadeIn>
+      ))}
+
+      {/* Special slot — invite the user to commission a new agent. */}
+      <FadeIn delay={agents.length * 80}>
+        <Link
+          href="/contact"
+          className="group flex h-full flex-col items-center justify-center rounded-(--radius-card) border border-dashed border-(--color-border-strong) bg-(--color-bg) p-6 text-center transition-colors hover:border-(--color-accent) hover:bg-(--color-bg-elev)"
+        >
+          <span className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-(--color-accent-soft) text-(--color-fg) transition-colors group-hover:bg-(--color-accent) group-hover:text-(--color-bg)">
+            <Icon name="plus" className="h-5 w-5" />
+          </span>
+          <h3 className="mt-4 text-lg font-semibold text-(--color-fg)">Create your own agent</h3>
+          <p className="mt-2 max-w-xs text-[15px] text-(--color-fg-muted)">
+            Build your own for the workflows
+            <br />
+            unique to your team.
+          </p>
+          <span className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-(--color-accent)">
+            Get started
+            <Icon name="arrow-right" className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+          </span>
+        </Link>
+      </FadeIn>
+    </div>
+  );
+}
+
 export default function ForDevelopersPage() {
   return (
     <main>
@@ -238,26 +317,9 @@ export default function ForDevelopersPage() {
 
       {/* Agents */}
       <section className="bg-(--color-bg)">
-        <div className="mx-auto max-w-5xl px-6 py-24 sm:py-32">
-          <FadeIn>
-            <p className="text-xs font-brand tracking-widest text-(--color-fg-subtle) uppercase mb-4">Your engineering crew</p>
-          </FadeIn>
-          <FadeIn delay={60}>
-            <h2 className="text-3xl font-semibold tracking-tight leading-[1.05] sm:text-4xl">
-              Four agents. One room. Infinite leverage.
-            </h2>
-          </FadeIn>
-          <div className="mt-12 grid grid-cols-1 gap-5 sm:grid-cols-2">
-            {agents.map((a, i) => (
-              <FadeIn key={a.name} delay={80 + i * 80}>
-                <div className="rounded-(--radius-card) border border-(--color-border) bg-(--color-bg-elev) p-6 h-full">
-                  <p className="text-xs font-brand tracking-widest text-(--color-fg-subtle) uppercase mb-3">{a.trigger}</p>
-                  <h3 className="text-lg font-semibold">{a.name}</h3>
-                  <p className="mt-3 text-(--color-fg-muted) leading-relaxed text-[15px]">{a.description}</p>
-                </div>
-              </FadeIn>
-            ))}
-          </div>
+        <div className="mx-auto max-w-5xl px-6 py-32 sm:py-40">
+          <AgentsHeading />
+          <AgentsCards />
         </div>
       </section>
 

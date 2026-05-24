@@ -34,30 +34,40 @@ const useCases = [
   },
 ];
 
-const agents = [
+type Agent = {
+  name: string;
+  trigger: string;
+  icon: string;
+  responsibilities: string[];
+};
+
+const agents: Agent[] = [
   {
     name: 'Account Researcher',
-    trigger: 'On every new lead',
-    description:
-      'The moment a new contact hits your CRM, it researches the company — funding stage, headcount, recent news, tech stack, decision-maker org. Enriches the record and routes it to the right rep before they even pick up the phone.',
+    trigger: 'On every new lead',    icon: 'search',
+    responsibilities: [
+      'Looks up funding, headcount, news, tech stack',
+      'Enriches the CRM record',
+      'Routes the lead to the right rep',
+    ],
   },
   {
     name: 'CRM Updater',
-    trigger: 'After every logged interaction',
-    description:
-      'Reads email threads, call transcripts, and meeting notes. Updates contact records, deal stages, and activity logs automatically. Your CRM stays clean without anyone spending Friday afternoon on data entry.',
+    trigger: 'After every logged interaction',    icon: 'database',
+    responsibilities: [
+      'Reads threads, call transcripts, meeting notes',
+      'Updates contacts, deal stages, activity logs',
+      'No more Friday-afternoon data entry',
+    ],
   },
   {
     name: 'Follow-up Coordinator',
-    trigger: 'On every deal stage change',
-    description:
-      'Tracks where every deal is and what the agreed next step was. When a follow-up is due, drafts the email, queues it for your approval, and logs the touchpoint after send. Nothing slips through the cracks.',
-  },
-  {
-    name: 'Ticket Triager',
-    trigger: 'On every new inbound request',
-    description:
-      'Reads incoming messages across email, Slack, and your support inbox. Routes them to the right person, auto-responds to common questions, and escalates anything that needs a human immediately.',
+    trigger: 'On every deal stage change',    icon: 'mail',
+    responsibilities: [
+      'Tracks the agreed next step on every deal',
+      'Drafts the follow-up in your voice',
+      'Queues for approval, logs after send',
+    ],
   },
 ];
 
@@ -77,7 +87,7 @@ function StatusBadge({ label, tone = 'success' }: { label: string; tone?: 'succe
   );
 }
 
-// Mock artifact each agent produces — used by Composition 3 to show the output, not just describe it.
+// Mock artifact each agent produces — shows the output, not just describes it.
 function MockVisual({ index }: { index: number }) {
   if (index === 0) {
     return (
@@ -164,6 +174,75 @@ function MockVisual({ index }: { index: number }) {
   );
 }
 
+function AgentsHeading() {
+  return (
+    <h2 className="text-4xl sm:text-5xl md:text-6xl font-semibold tracking-tight leading-[1.05]">
+      <FadeIn as="span" className="block" delay={0}>
+        Meet your sales crew.
+      </FadeIn>
+      <FadeIn as="span" className="block text-(--color-fg-muted)" delay={90}>
+        Each agent owns a beat.
+      </FadeIn>
+    </h2>
+  );
+}
+
+// Indexed editorial cards: big ordinal numeral + agent icon, then a special
+// "create your own agent" card in the final slot.
+function AgentsCards() {
+  return (
+    <div className="mt-16 sm:mt-20 grid grid-cols-1 gap-5 sm:grid-cols-2">
+      {agents.map((a, i) => (
+        <FadeIn key={a.name} delay={i * 80}>
+          <div className="relative h-full overflow-hidden rounded-(--radius-card) border border-(--color-border) bg-(--color-bg-elev) p-6">
+            <Icon
+              name={a.icon}
+              className="pointer-events-none absolute -right-16 -top-16 z-0 h-72 w-72 text-(--color-border)"
+            />
+            <div className="relative z-10">
+              <span className="font-mono text-3xl font-semibold tabular-nums text-(--color-border-strong)">
+                {String(i + 1).padStart(2, '0')}
+              </span>
+              <h3 className="mt-5 text-lg font-semibold text-(--color-fg)">{a.name}</h3>
+              <p className="mt-1.5 font-brand text-xs uppercase tracking-widest text-(--color-fg-subtle)">{a.trigger}</p>
+              <ul className="mt-4 space-y-2 border-t border-(--color-border) pt-4 text-sm text-(--color-fg-muted)">
+                {a.responsibilities.map((r) => (
+                  <li key={r} className="flex items-start gap-2">
+                    <Icon name="check" className="mt-0.5 h-3.5 w-3.5 shrink-0 text-(--color-success)" />
+                    {r}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </FadeIn>
+      ))}
+
+      {/* Special slot — invite the user to commission a new agent. */}
+      <FadeIn delay={agents.length * 80}>
+        <Link
+          href="/contact"
+          className="group flex h-full flex-col items-center justify-center rounded-(--radius-card) border border-dashed border-(--color-border-strong) bg-(--color-bg) p-6 text-center transition-colors hover:border-(--color-accent) hover:bg-(--color-bg-elev)"
+        >
+          <span className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-(--color-accent-soft) text-(--color-fg) transition-colors group-hover:bg-(--color-accent) group-hover:text-(--color-bg)">
+            <Icon name="plus" className="h-5 w-5" />
+          </span>
+          <h3 className="mt-4 text-lg font-semibold text-(--color-fg)">Create your own agent</h3>
+          <p className="mt-2 max-w-xs text-[15px] text-(--color-fg-muted)">
+            Build your own for the workflows
+            <br />
+            unique to your team.
+          </p>
+          <span className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-(--color-accent)">
+            Get started
+            <Icon name="arrow-right" className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+          </span>
+        </Link>
+      </FadeIn>
+    </div>
+  );
+}
+
 export default function ForSalesPage() {
   return (
     <main>
@@ -222,27 +301,10 @@ export default function ForSalesPage() {
       <UseCasesScroller items={useCases} visuals={useCases.map((_, i) => <MockVisual key={i} index={i} />)} />
 
       {/* Agents */}
-      <section className="bg-(--color-bg) border-t border-(--color-border)">
-        <div className="mx-auto max-w-5xl px-6 py-24 sm:py-32">
-          <FadeIn>
-            <p className="text-xs font-brand tracking-widest text-(--color-fg-subtle) uppercase mb-4">Your sales crew</p>
-          </FadeIn>
-          <FadeIn delay={60}>
-            <h2 className="text-3xl font-semibold tracking-tight leading-[1.05] sm:text-4xl">
-              Always working the pipeline.
-            </h2>
-          </FadeIn>
-          <div className="mt-12 grid grid-cols-1 gap-5 sm:grid-cols-2">
-            {agents.map((a, i) => (
-              <FadeIn key={a.name} delay={80 + i * 80}>
-                <div className="rounded-(--radius-card) border border-(--color-border) bg-(--color-bg-elev) p-6 h-full">
-                  <p className="text-xs font-brand tracking-widest text-(--color-fg-subtle) uppercase mb-3">{a.trigger}</p>
-                  <h3 className="text-lg font-semibold">{a.name}</h3>
-                  <p className="mt-3 text-(--color-fg-muted) leading-relaxed text-[15px]">{a.description}</p>
-                </div>
-              </FadeIn>
-            ))}
-          </div>
+      <section className="bg-(--color-bg)">
+        <div className="mx-auto max-w-5xl px-6 py-32 sm:py-40">
+          <AgentsHeading />
+          <AgentsCards />
         </div>
       </section>
 

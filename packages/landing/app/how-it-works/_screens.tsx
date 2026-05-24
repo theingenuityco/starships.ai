@@ -381,15 +381,16 @@ export function Hero() {
         </FadeIn>
         <h1 className="text-4xl font-semibold leading-[1.05] tracking-tight sm:text-5xl md:text-6xl">
           <FadeIn as="span" delay={80} className="block">
-            From a sentence about your company
+            Describe it. Connect it. Direct it.
           </FadeIn>
           <FadeIn as="span" delay={160} className="block text-(--color-fg-muted)">
-            to a company that runs itself.
+            It does the rest.
           </FadeIn>
         </h1>
         <FadeIn delay={240}>
           <p className="mt-8 max-w-2xl text-lg leading-relaxed text-(--color-fg-muted)">
-            A Starship is a virtual org you set up in an afternoon. Here is how it goes from empty to running, step by step.
+            <span className="block">Tell your Starship what you do.</span>
+            <span className="block">It builds the rooms, staffs the agents, and gets to work.</span>
           </p>
         </FadeIn>
         <div className="mt-10 flex flex-wrap items-center gap-3">
@@ -401,14 +402,6 @@ export function Hero() {
               Request demo
               <Icon name="arrow-right" className="h-4 w-4" />
             </Link>
-          </FadeIn>
-          <FadeIn delay={380}>
-            <a
-              href="mailto:hello@starships.ai"
-              className="inline-flex items-center justify-center rounded-(--radius-button) border border-(--color-border-strong) px-5 py-3 text-sm font-medium text-(--color-fg) transition-colors hover:bg-(--color-bg-elev)"
-            >
-              hello@starships.ai
-            </a>
           </FadeIn>
         </div>
       </div>

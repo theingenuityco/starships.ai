@@ -220,10 +220,10 @@ function AgentsCards() {
               </span>
               <h3 className="mt-5 text-lg font-semibold text-(--color-fg)">{a.name}</h3>
               <p className="mt-1.5 font-brand text-xs uppercase tracking-widest text-(--color-fg-subtle)">{a.trigger}</p>
-              <ul className="mt-4 space-y-2 border-t border-(--color-border) pt-4 text-sm text-(--color-fg-muted)">
+              <ul className="mt-4 space-y-2 border-t border-(--color-border) pt-4 text-[15px] leading-relaxed text-(--color-fg-muted)">
                 {a.responsibilities.map((r) => (
                   <li key={r} className="flex items-start gap-2">
-                    <Icon name="check" className="mt-0.5 h-3.5 w-3.5 shrink-0 text-(--color-success)" />
+                    <Icon name="check" className="mt-1 h-3.5 w-3.5 shrink-0 text-(--color-success)" />
                     {r}
                   </li>
                 ))}

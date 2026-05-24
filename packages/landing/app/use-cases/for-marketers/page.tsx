@@ -4,6 +4,7 @@ import { FadeIn } from '@/components/FadeIn';
 import { Footer } from '@/components/Footer';
 import { Icon } from '@/components/Icon';
 import { TrustControl } from '@/components/TrustControl';
+import { RoomDashboard } from '@/components/RoomDashboard';
 import { UseCasesScroller } from '@/components/UseCasesScroller';
 
 export const metadata: Metadata = {
@@ -12,6 +13,25 @@ export const metadata: Metadata = {
 };
 
 export const dynamic = 'force-static';
+
+const marketingFeed = [
+  { agent: 'Outreach Drafter', action: 'queued email to Jordan @ Acme', state: 'needs-you' as const },
+  { agent: 'Outreach Drafter', action: 'researching Blake @ Notion', state: 'working' as const },
+  { agent: 'Outreach Drafter', action: 'email to Sam @ Figma approved and sent', state: 'done' as const },
+  { agent: 'Campaign Planner', action: 'drafted Q3 campaign calendar', state: 'done' as const },
+  { agent: 'Campaign Planner', action: 'reading last quarter performance metrics', state: 'working' as const },
+  { agent: 'Campaign Planner', action: 'Q4 webinar plan ready for review', state: 'needs-you' as const },
+  { agent: 'KB Writer', action: 'published "How to reset your API key"', state: 'done' as const },
+  { agent: 'KB Writer', action: 'drafting article from ticket #3014', state: 'working' as const },
+  { agent: 'KB Writer', action: 'article #15 ready for approval', state: 'needs-you' as const },
+];
+
+const marketingRooms = [
+  { name: 'Lobby' },
+  { name: 'Marketing', unread: 2 },
+  { name: 'Sales' },
+  { name: 'Engineering' },
+];
 
 const useCases = [
   {
@@ -295,6 +315,15 @@ export default function ForMarketersPage() {
           </div>
         </div>
       </section>
+
+      {/* Room dashboard mockup */}
+      <RoomDashboard
+        title="starships · marketing"
+        activeRoom="Marketing"
+        rooms={marketingRooms}
+        feedPool={marketingFeed}
+        wallpaper="linear-gradient(180deg, rgba(7,8,11,0.45) 0%, rgba(7,8,11,0.75) 100%), url(/wallpaper-marketing.jpg)"
+      />
 
       {/* Use Cases */}
       <UseCasesScroller items={useCases} visuals={useCases.map((_, i) => <MockVisual key={i} index={i} />)} />

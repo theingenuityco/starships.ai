@@ -4,6 +4,7 @@ import { FadeIn } from '@/components/FadeIn';
 import { Footer } from '@/components/Footer';
 import { Icon } from '@/components/Icon';
 import { TrustControl } from '@/components/TrustControl';
+import { RoomDashboard } from '@/components/RoomDashboard';
 import { UseCasesScroller } from '@/components/UseCasesScroller';
 
 export const metadata: Metadata = {
@@ -12,6 +13,25 @@ export const metadata: Metadata = {
 };
 
 export const dynamic = 'force-static';
+
+const salesFeed = [
+  { agent: 'Account Researcher', action: 'enriched Acme Corp record', state: 'done' as const },
+  { agent: 'Account Researcher', action: 'researching Globex Corp', state: 'working' as const },
+  { agent: 'Account Researcher', action: 'routed Initech to Marcus (AE)', state: 'done' as const },
+  { agent: 'CRM Updater', action: 'synced call notes for Beta Inc', state: 'done' as const },
+  { agent: 'CRM Updater', action: 'updating deal stage for Initech', state: 'working' as const },
+  { agent: 'CRM Updater', action: 'activity log updated for 4 contacts', state: 'done' as const },
+  { agent: 'Follow-up Coordinator', action: 'queued follow-up for Priya @ Beta', state: 'needs-you' as const },
+  { agent: 'Follow-up Coordinator', action: 'draft approved, sent to Acme', state: 'done' as const },
+  { agent: 'Follow-up Coordinator', action: 'drafting check-in for Globex deal', state: 'working' as const },
+];
+
+const salesRooms = [
+  { name: 'Lobby' },
+  { name: 'Sales', unread: 1 },
+  { name: 'Marketing' },
+  { name: 'Engineering' },
+];
 
 const useCases = [
   {
@@ -296,6 +316,15 @@ export default function ForSalesPage() {
           </div>
         </div>
       </section>
+
+      {/* Room dashboard mockup */}
+      <RoomDashboard
+        title="starships · sales"
+        activeRoom="Sales"
+        rooms={salesRooms}
+        feedPool={salesFeed}
+        wallpaper="linear-gradient(180deg, rgba(7,8,11,0.45) 0%, rgba(7,8,11,0.75) 100%), url(/wallpaper-sales.jpg)"
+      />
 
       {/* Use Cases */}
       <UseCasesScroller items={useCases} visuals={useCases.map((_, i) => <MockVisual key={i} index={i} />)} />

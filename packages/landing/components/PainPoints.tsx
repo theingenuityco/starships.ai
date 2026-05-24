@@ -125,13 +125,15 @@ export function PainPoints() {
   const [states, setStates] = useState<ItemState[]>(() => items.map(() => 'idle'));
   const refs = useRef<(HTMLLIElement | null)[]>([]);
   const ulRef = useRef<HTMLUListElement>(null);
-  const [ulMinHeight, setUlMinHeight] = useState<number | undefined>(undefined);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const [wrapperMinHeight, setWrapperMinHeight] = useState<number | undefined>(undefined);
   const measured = useRef(false);
 
-  // Measure the fully-expanded height before first paint so the container never
-  // grows during scroll, keeping page height stable throughout the animation.
+  // Measure the fully-expanded height of the wrapper before first paint so the
+  // outer container never grows during scroll (keeping page height stable), while
+  // the bordered card itself can grow naturally as items expand.
   useLayoutEffect(() => {
-    if (measured.current || !ulRef.current) return;
+    if (measured.current || !ulRef.current || !wrapperRef.current) return;
     measured.current = true;
 
     const ul = ulRef.current;
@@ -145,7 +147,7 @@ export function PainPoints() {
       el.style.opacity = '1';
     });
 
-    setUlMinHeight(ul.scrollHeight);
+    setWrapperMinHeight(wrapperRef.current.scrollHeight);
 
     grids.forEach((el) => {
       el.style.gridTemplateRows = '';
@@ -218,23 +220,25 @@ export function PainPoints() {
           Put AI to work instead
         </FadeIn>
 
-        <FadeIn className="mt-6 max-w-2xl rounded-(--radius-card) border border-(--color-border) bg-(--color-bg)">
-          <div className="px-5 pt-4 pb-3">
-            <span className="text-xs font-medium uppercase tracking-wider text-(--color-fg-subtle)">Your to-do list</span>
-          </div>
-          <ul ref={ulRef} className="space-y-2 px-3 pb-3 pt-0 sm:px-4 sm:pb-4" style={ulMinHeight ? { minHeight: ulMinHeight } : undefined}>
-            {items.map((item, i) => (
-              <ItemRow
-                key={item.text}
-                item={item}
-                state={states[i]}
-                setRef={(el) => {
-                  refs.current[i] = el;
-                }}
-              />
-            ))}
-          </ul>
-        </FadeIn>
+        <div ref={wrapperRef} className="mt-6" style={wrapperMinHeight ? { minHeight: wrapperMinHeight } : undefined}>
+          <FadeIn className="max-w-2xl rounded-(--radius-card) border border-(--color-border) bg-(--color-bg)">
+            <div className="px-5 pt-4 pb-3">
+              <span className="text-xs font-medium uppercase tracking-wider text-(--color-fg-subtle)">Your to-do list</span>
+            </div>
+            <ul ref={ulRef} className="space-y-2 px-3 pb-3 pt-0 sm:px-4 sm:pb-4">
+              {items.map((item, i) => (
+                <ItemRow
+                  key={item.text}
+                  item={item}
+                  state={states[i]}
+                  setRef={(el) => {
+                    refs.current[i] = el;
+                  }}
+                />
+              ))}
+            </ul>
+          </FadeIn>
+        </div>
       </div>
     </section>
   );

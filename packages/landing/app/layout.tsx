@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Inter, Orbitron } from 'next/font/google';
 import Script from 'next/script';
+import { Analytics } from '@vercel/analytics/next';
 import { Nav } from '@/components/Nav';
 import './globals.css';
 
@@ -37,6 +38,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <Script id="scroll-restoration" strategy="beforeInteractive">{`history.scrollRestoration='manual'`}</Script>
         <Nav />
         {children}
+        <Analytics />
       </body>
     </html>
   );

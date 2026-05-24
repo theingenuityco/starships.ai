@@ -45,7 +45,10 @@ function escapeHtml(unsafe: string): string {
 export type Lead = {
   name: string;
   email: string;
-  company: string;
+  website: string;
+  useCase: string;
+  message: string;
+  source: string;
 };
 
 async function sendOne(env: SesEnv, to: string, subject: string, html: string, text: string, replyTo?: string) {
@@ -68,23 +71,41 @@ async function sendOne(env: SesEnv, to: string, subject: string, html: string, t
 function notificationHtml(lead: Lead): string {
   const name = escapeHtml(lead.name);
   const email = escapeHtml(lead.email);
-  const company = escapeHtml(lead.company || '(not provided)').replace(/\n/g, '<br>');
+  const useCase = escapeHtml(lead.useCase || '(not specified)');
+  const message = escapeHtml(lead.message || '(not provided)').replace(/\n/g, '<br>');
+  const websiteHref = lead.website ? (/^https?:\/\//i.test(lead.website) ? lead.website : `https://${lead.website}`) : '';
+  const website = lead.website ? escapeHtml(lead.website) : '';
+  const source = lead.source ? escapeHtml(lead.source) : '';
+
+  const row = (label: string, value: string, top = false) =>
+    `<tr><td style="padding: 8px 0; color: #6c7585; width: 120px;${top ? ' vertical-align: top;' : ''}">${label}</td><td style="padding: 8px 0;">${value}</td></tr>`;
+
   return `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 560px; margin: 0 auto; padding: 24px;">
       <h2 style="margin: 0 0 16px; font-size: 18px;">New landing lead</h2>
       <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
-        <tr><td style="padding: 8px 0; color: #6c7585; width: 120px;">Name</td><td style="padding: 8px 0;">${name}</td></tr>
-        <tr><td style="padding: 8px 0; color: #6c7585;">Email</td><td style="padding: 8px 0;"><a href="mailto:${email}">${email}</a></td></tr>
-        <tr><td style="padding: 8px 0; color: #6c7585; vertical-align: top;">Company / building</td><td style="padding: 8px 0;">${company}</td></tr>
+        ${row('Name', name)}
+        ${row('Email', `<a href="mailto:${email}">${email}</a>`)}
+        ${website ? row('Website', `<a href="${escapeHtml(websiteHref)}">${website}</a>`) : ''}
+        ${row('Room', useCase)}
+        ${row('Context', message, true)}
+        ${source ? row('Source', source, true) : ''}
       </table>
     </div>
   `.trim();
 }
 
 function notificationText(lead: Lead): string {
-  return [`New landing lead`, ``, `Name: ${lead.name}`, `Email: ${lead.email}`, `Company / building: ${lead.company || '(not provided)'}`].join(
-    '\n'
-  );
+  return [
+    `New landing lead`,
+    ``,
+    `Name: ${lead.name}`,
+    `Email: ${lead.email}`,
+    `Website: ${lead.website || '(not provided)'}`,
+    `Room: ${lead.useCase || '(not specified)'}`,
+    `Context: ${lead.message || '(not provided)'}`,
+    `Source: ${lead.source || '(none)'}`,
+  ].join('\n');
 }
 
 function autoReplyHtml(lead: Lead, bookingUrl: string): string {
@@ -131,7 +152,7 @@ export async function sendLeadEmails(lead: Lead): Promise<void> {
   await sendOne(
     env,
     env.notificationTo,
-    `New Starships lead: ${lead.name}${lead.company ? ` (${lead.company.slice(0, 40)}${lead.company.length > 40 ? '…' : ''})` : ''}`,
+    `New Starships lead: ${lead.name}${lead.useCase ? ` (${lead.useCase})` : ''}`,
     notificationHtml(lead),
     notificationText(lead),
     lead.email

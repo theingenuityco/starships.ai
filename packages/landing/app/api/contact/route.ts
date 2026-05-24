@@ -22,15 +22,18 @@ export async function POST(req: Request) {
 
   const payload = (body ?? {}) as Record<string, unknown>;
 
-  // Honeypot — if a hidden "website" field is filled, drop silently.
-  if (clean(payload.website)) {
+  // Honeypot. If the hidden "company_url" field is filled, drop silently.
+  if (clean(payload.company_url)) {
     return NextResponse.json({ ok: true });
   }
 
   const lead: Lead = {
     name: clean(payload.name),
     email: clean(payload.email),
-    company: clean(payload.company),
+    website: clean(payload.website),
+    useCase: clean(payload.useCase),
+    message: clean(payload.message),
+    source: clean(payload.source),
   };
 
   if (!lead.name || !lead.email) {

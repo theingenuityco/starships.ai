@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { Inter, Orbitron } from 'next/font/google';
+import Script from 'next/script';
 import { Nav } from '@/components/Nav';
 import './globals.css';
 
@@ -33,7 +34,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className={`${inter.variable} ${orbitron.variable}`}>
       <body suppressHydrationWarning>
         {/* Runs synchronously before browser scroll restoration fires — always start at top on reload */}
-        <script dangerouslySetInnerHTML={{ __html: "history.scrollRestoration='manual'" }} />
+        <Script id="scroll-restoration" strategy="beforeInteractive">{`history.scrollRestoration='manual'`}</Script>
         <Nav />
         {children}
       </body>

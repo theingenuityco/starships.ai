@@ -76,6 +76,20 @@ body {
   animation-delay: var(--delay, 0ms);
 }
 
+/* Pause motif animations while the parent card is still hidden, so they start
+   from 0% when the card fades in rather than at a random phase in the cycle. */
+.fade-will-animate .dot-wave,
+.fade-will-animate .approve-dot-l,
+.fade-will-animate .approve-dot-m,
+.fade-will-animate .approve-dot-r,
+.fade-will-animate .approve-reveal,
+.fade-will-animate .burn-grow,
+.fade-will-animate .burn-arrow,
+.fade-will-animate .feed-line,
+.fade-will-animate .eye-blink {
+  animation-play-state: paused;
+}
+
 /* Card motif animations — each tells a small, specific story */
 
 /* Approvals: three pending actions wave, then converge and blend into one approval check */
@@ -210,6 +224,7 @@ body {
 
 .burn-arrow {
   transform-origin: center;
+  transform-box: fill-box;
   animation: burn-arrow 0.3s ease-out;
 }
 
@@ -245,6 +260,7 @@ body {
 
 .eye-blink {
   transform-origin: center;
+  transform-box: fill-box;
   animation: eye-blink 4.5s ease-in-out infinite;
 }
 

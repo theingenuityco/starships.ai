@@ -13,10 +13,15 @@ function clean(value: unknown): string {
   return value.trim().slice(0, MAX_FIELD);
 }
 
+// Server-side misconfiguration codes — these indicate a bad secret key in the env, not a
+// suspicious user token. Blocking users when the server is misconfigured is wrong, so we
+// degrade gracefully (allow through) and scream loudly in logs instead.
+const SERVER_MISCONFIG_CODES = new Set(['invalid-input-secret', 'missing-input-secret']);
+
 async function verifyTurnstile(token: string): Promise<boolean> {
   const secret = process.env.LANDING_TURNSTILE_SECRET_KEY;
   if (!secret) {
-    console.warn('[api/contact] TURNSTILE_SECRET_KEY not set — skipping CAPTCHA verification');
+    console.warn('[api/contact] LANDING_TURNSTILE_SECRET_KEY not set — skipping CAPTCHA verification');
     return true;
   }
   try {
@@ -27,7 +32,17 @@ async function verifyTurnstile(token: string): Promise<boolean> {
     });
     const data = (await res.json()) as { success: boolean; 'error-codes'?: string[] };
     if (!data.success) {
-      console.error('[api/contact] Turnstile verification failed', data['error-codes']);
+      const codes = data['error-codes'] ?? [];
+      const isMisconfig = codes.some((c) => SERVER_MISCONFIG_CODES.has(c));
+      if (isMisconfig) {
+        console.error(
+          '[api/contact] LANDING_TURNSTILE_SECRET_KEY is invalid — fix this in Vercel env vars. ' +
+            'See https://dash.cloudflare.com -> Turnstile -> your widget -> Secret Key. Skipping CAPTCHA for now.',
+          codes,
+        );
+        return true;
+      }
+      console.error('[api/contact] Turnstile verification failed', codes);
     }
     return data.success === true;
   } catch {

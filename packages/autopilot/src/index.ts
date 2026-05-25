@@ -49,6 +49,17 @@ export { LocalRunner } from './runner/LocalRunner';
 export { ChildProcessRunner } from './runner/ChildProcessRunner';
 export { RunnerFactory } from './runner/RunnerFactory';
 
+// Workspace (native code execution)
+export type { WorkspaceSpec, ProvisionedWorkspace, GitCredentials, WorkspaceProvider } from './workspace/Workspace';
+
+// Execution providers (where a job runs: inline / container / user-machine / CI)
+export type {
+  ExecutionProvider,
+  ExecutionProviderKind,
+  ExecutionJob,
+  ExecutionResult,
+} from './runner/ExecutionProvider';
+
 // Autopilot configuration manager
 export { autopilot, AutopilotManager } from './Autopilot';
 export type { AutopilotConfig } from './Autopilot';

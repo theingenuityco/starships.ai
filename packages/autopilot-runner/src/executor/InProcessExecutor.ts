@@ -1,5 +1,5 @@
 import { Executor, ExecuteInput } from './Executor';
-import { CancelledError, Engine, type Execution } from '@starships/autopilot';
+import { CancelledError, Engine, type Execution, type WorkspaceSpec, type GitCredentials, type ProvisionedWorkspace } from '@starships/autopilot';
 import {
   createRunnerHostRuntime,
   type AwsRuntimeConfig,
@@ -10,6 +10,7 @@ import {
 } from '../hostRuntime/RunnerHostRuntime';
 import type { ConnectorTemplateRuntimeFieldsV2 } from '@starships/protocol/src/domains/connector';
 import { executionRegistry } from '@/execution/ExecutionRegistry';
+import { LocalWorkspaceProvider } from '@/workspace/LocalWorkspaceProvider';
 
 export class InProcessExecutor implements Executor {
   private static isExecutionResults(value: unknown): value is Execution['results'] {
@@ -68,6 +69,12 @@ export class InProcessExecutor implements Executor {
        * Model routing table.
        */
       modelRoutes?: Record<string, ProviderRoute[] | undefined>;
+      /**
+       * When present, provision a per-task workspace (clone the repo) and run the
+       * blueprint with FileSystem/Terminal nodes confined to it. Runner-only;
+       * git.token is a secret that MUST NOT be placed in runtimeEnv or the blueprint.
+       */
+      workspace?: { spec: WorkspaceSpec; git?: GitCredentials };
       [key: string]: unknown;
     };
 
@@ -83,8 +90,16 @@ export class InProcessExecutor implements Executor {
       azureAiFoundry,
       modelRoutes,
       runtimeEnv,
+      workspace,
       ...engineConfig
     } = rawConfig;
+
+    // Provision a per-task workspace (clone) when requested, before execution.
+    let provisioned: ProvisionedWorkspace | undefined;
+    if (workspace?.spec) {
+      const provider = new LocalWorkspaceProvider();
+      provisioned = await provider.provision(workspace.spec, workspace.git ?? { token: '' });
+    }
 
     const controller = new AbortController();
 
@@ -105,6 +120,7 @@ export class InProcessExecutor implements Executor {
       // Ensure env("...") templates resolve inside the Engine (Eval uses Engine.runtimeEnv).
       runtimeEnv: runtimeEnv ?? {},
       hostRuntime,
+      workspaceRoot: provisioned?.root,
       eventCallback: input.onEvent
         ? async (event: unknown) => {
             try {
@@ -131,6 +147,13 @@ export class InProcessExecutor implements Executor {
       throw err;
     } finally {
       executionRegistry.unregister(requestId);
+      if (provisioned) {
+        await provisioned.cleanup().catch((err) => {
+          console.error('[InProcessExecutor] Failed to clean up workspace', {
+            error: err instanceof Error ? err.message : String(err),
+          });
+        });
+      }
     }
   }
 }

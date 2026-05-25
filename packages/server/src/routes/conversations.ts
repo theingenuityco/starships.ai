@@ -25,8 +25,9 @@ import {
   ToolRepository,
   TurnRepository,
 } from '@starships/models';
-import { ExecutionItemUtils, RunnerFactory } from '@starships/autopilot';
+import { ExecutionItemUtils } from '@starships/autopilot';
 import type { Blueprint, EngineConfig } from '@starships/autopilot';
+import { executionProviderRouter } from '@/execution/ExecutionProviderRouter';
 import { AppError } from '@starships/errors';
 import { StarshipService } from '@/services/StarshipService';
 import { UserService } from '@/services/UserService';
@@ -253,15 +254,24 @@ async function executeToolBlueprint(args: {
   toolArgs: Record<string, unknown>;
   runnerConfig: Record<string, unknown>;
   eventCallback?: EngineConfig['eventCallback'];
+  starshipId?: string;
+  requiresWorkspace?: boolean;
 }): Promise<unknown> {
   const execution = ExecutionItemUtils.createExecution();
   const initial = ExecutionItemUtils.wrapSingle({ ...args.toolArgs, config: args.toolConfig });
   execution.results.push({ nodeRef: '__initial__', items: initial });
-  const runner = RunnerFactory.getTopLevelRunner(execution.depth ?? 0);
-  const items = await runner.run(args.blueprint, execution, {
-    failOnNodeError: true,
-    eventCallback: args.eventCallback,
-    ...(args.runnerConfig as unknown as EngineConfig),
+  const provider = await executionProviderRouter.getProvider({
+    starshipId: args.starshipId ?? '',
+    requiresWorkspace: args.requiresWorkspace ?? false,
+  });
+  const { items } = await provider.runJob({
+    blueprint: args.blueprint,
+    execution,
+    config: {
+      failOnNodeError: true,
+      eventCallback: args.eventCallback,
+      ...(args.runnerConfig as unknown as EngineConfig),
+    },
   });
   return ExecutionItemUtils.unwrapSingle(items);
 }

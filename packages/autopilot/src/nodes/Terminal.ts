@@ -9,6 +9,7 @@
 
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { resolve, sep } from 'path';
 import { BaseNode } from './BaseNode';
 import { ValidationResult, ValidationError, ExecutionItem } from '@/types';
 import type { TerminalParams } from '@/types/node-parameters';
@@ -19,6 +20,11 @@ const execAsync = promisify(exec);
 
 const DEFAULT_TIMEOUT_MS = 30_000;
 
+// When running inside a per-task workspace, the command env is rebuilt from this
+// allowlist instead of inheriting the full process env, so agent-authored
+// commands cannot read host secrets (GitHub tokens, JWT/encryption keys, etc.).
+const WORKSPACE_ENV_ALLOWLIST = ['PATH', 'HOME', 'LANG', 'LC_ALL', 'TERM', 'TMPDIR', 'SHELL'];
+
 export class Terminal extends BaseNode<TerminalParams> {
   constructor(params: TerminalParams, options?: NodeHandlerOptions) {
     super(params, options);
@@ -27,12 +33,15 @@ export class Terminal extends BaseNode<TerminalParams> {
   async execute(input?: ExecutionItem[]): Promise<ExecutionItem[]> {
     const params = this.getParams();
     const timeoutMs = params.timeout ?? DEFAULT_TIMEOUT_MS;
+    const workspaceRoot = this.options?.workspaceRoot ? resolve(this.options.workspaceRoot) : undefined;
+    const cwd = this.resolveCwd(workspaceRoot, params.workingDirectory);
+    const env = this.buildEnv(workspaceRoot, params.env);
 
     try {
       const { stdout, stderr } = await execAsync(params.command, {
-        cwd: params.workingDirectory,
+        cwd,
         timeout: timeoutMs,
-        env: params.env ? { ...process.env, ...params.env } : process.env,
+        env,
       });
 
       return ExecutionItemUtils.wrapSingle(
@@ -54,6 +63,41 @@ export class Terminal extends BaseNode<TerminalParams> {
       }
       throw this.handleExecutionError(error, 'Terminal execution failed');
     }
+  }
+
+  /**
+   * Resolve the command cwd, confining it to the workspace root when one is set.
+   * Without a workspace, preserves legacy behavior (params.workingDirectory or process cwd).
+   */
+  private resolveCwd(workspaceRoot: string | undefined, workingDirectory?: string): string | undefined {
+    if (!workspaceRoot) {
+      return workingDirectory;
+    }
+    if (!workingDirectory) {
+      return workspaceRoot;
+    }
+    const candidate = resolve(workspaceRoot, workingDirectory.replace(/^\/+/, ''));
+    if (candidate !== workspaceRoot && !candidate.startsWith(workspaceRoot + sep)) {
+      throw new Error(`workingDirectory '${workingDirectory}' escapes the workspace boundary`);
+    }
+    return candidate;
+  }
+
+  /**
+   * Build the child env. Inside a workspace, rebuild from an allowlist so host
+   * secrets are never exposed to agent-authored commands. Otherwise, legacy behavior.
+   */
+  private buildEnv(workspaceRoot: string | undefined, extra?: Record<string, string>): NodeJS.ProcessEnv {
+    if (!workspaceRoot) {
+      return extra ? { ...process.env, ...extra } : process.env;
+    }
+    const scrubbed: NodeJS.ProcessEnv = {};
+    for (const key of WORKSPACE_ENV_ALLOWLIST) {
+      if (process.env[key] !== undefined) {
+        scrubbed[key] = process.env[key];
+      }
+    }
+    return extra ? { ...scrubbed, ...extra } : scrubbed;
   }
 
   validate(): ValidationResult {

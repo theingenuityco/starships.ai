@@ -634,6 +634,9 @@ importers:
       next:
         specifier: 16.2.6
         version: 16.2.6(@babel/core@7.28.5)(@opentelemetry/api@1.9.0)(@playwright/test@1.53.2)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+      posthog-js:
+        specifier: ^1.318.1
+        version: 1.318.1
       react:
         specifier: 19.2.4
         version: 19.2.4

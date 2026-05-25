@@ -9,21 +9,22 @@ import { UseCasesScroller } from '@/components/UseCasesScroller';
 
 export const metadata: Metadata = {
   title: 'Engineering — Starships',
-  description: 'Autonomous agents for code review, test authoring, security scanning, and dependency management.',
+  description:
+    'An autonomous engineering room that turns your backlog into reviewed pull requests, with every change tested against a real checkout before you ever look.',
 };
 
 export const dynamic = 'force-static';
 
 const engineeringFeed = [
-  { agent: 'PR Reviewer', action: 'left 3 comments on #432 auth refactor', state: 'done' as const },
-  { agent: 'PR Reviewer', action: 'reviewing #441 payments cleanup', state: 'working' as const },
-  { agent: 'PR Reviewer', action: 'flagged unsafe null check on #438', state: 'needs-you' as const },
-  { agent: 'Test Author', action: 'committed billing.test.ts', state: 'done' as const },
-  { agent: 'Test Author', action: 'generating edge cases for payments module', state: 'working' as const },
-  { agent: 'Test Author', action: 'opened PR #444 with auth tests', state: 'done' as const },
-  { agent: 'Dependency Upgrader', action: 'bumped 3 packages safely', state: 'done' as const },
-  { agent: 'Dependency Upgrader', action: 'flagged react 19 major upgrade', state: 'needs-you' as const },
-  { agent: 'Security Scanner', action: 'scan complete, no issues found', state: 'done' as const },
+  { agent: 'Triage', action: 'pulled 4 new issues, queued 2 as small and testable', state: 'done' as const },
+  { agent: 'Triage', action: 'deduped #318 against #290', state: 'done' as const },
+  { agent: 'Scoper', action: 'wrote a spec for "fix null deref in billing"', state: 'done' as const },
+  { agent: 'Scoper', action: 'reading the payments module for edge cases', state: 'working' as const },
+  { agent: 'Builder', action: 'cloned the repo on branch fix/billing-null', state: 'working' as const },
+  { agent: 'Builder', action: 'ran your test suite: 142 passing', state: 'done' as const },
+  { agent: 'Builder', action: 'opened PR #441, checks green', state: 'done' as const },
+  { agent: 'Reviewer', action: 'reviewed #441 against your conventions', state: 'done' as const },
+  { agent: 'Reviewer', action: 'flagged a missing test on #438', state: 'needs-you' as const },
 ];
 
 const engineeringRooms = [
@@ -35,22 +36,22 @@ const engineeringRooms = [
 
 const useCases = [
   {
-    situation: 'A PR opens after hours',
-    headline: 'Reviewed before anyone wakes up.',
+    situation: 'A bug sits in the backlog',
+    headline: 'Triaged and scoped overnight.',
     description:
-      'PR Reviewer reads the diff, checks it against your coding standards, leaves structured comments, and flags anything suspicious. Your engineers open to a pre-reviewed PR.',
+      'Triage pulls new issues, dedupes them, and picks the ones small and testable enough to act on. Scoper reads the relevant code and writes a clear spec. You wake up to a groomed backlog, not a pile.',
   },
   {
-    situation: 'A new feature lands',
-    headline: 'Tests written. Coverage up.',
+    situation: 'A fix needs writing',
+    headline: 'Written, then run against your tests.',
     description:
-      'Test Author reads the changed files, generates test cases for the happy path and the edge cases, and opens a PR with the test file. No boilerplate, no reminders needed.',
+      'Builder clones the repo into an isolated workspace, makes the change, and runs your real test suite on a real checkout. Nothing moves forward until the suite is green.',
   },
   {
-    situation: 'A dependency is out of date',
-    headline: 'Upgraded before it becomes a problem.',
+    situation: 'A pull request is ready',
+    headline: 'Green before you open it.',
     description:
-      'Dependency Upgrader reads the changelogs, groups safe patch and minor bumps into a single PR, and flags major-version changes that need your attention. Every Monday.',
+      'Builder opens the PR with the change and passing checks. Reviewer reads the diff against your own conventions and leaves comments. You review work that already builds and passes, then merge.',
   },
 ];
 
@@ -63,30 +64,43 @@ type Agent = {
 
 const agents: Agent[] = [
   {
-    name: 'PR Reviewer',
-    trigger: 'On every pull request',    icon: 'git-branch',
+    name: 'Triage',
+    trigger: 'Runs on a schedule',
+    icon: 'list',
     responsibilities: [
-      'Reads the diff against your coding standards',
-      'Leaves structured review comments',
-      'Flags anything that looks wrong',
+      'Pulls and dedupes incoming issues',
+      'Decides what is small and test-verifiable',
+      'Places work on the pipeline board',
     ],
   },
   {
-    name: 'Test Author',
-    trigger: 'On every new feature commit',    icon: 'file-text',
+    name: 'Scoper',
+    trigger: 'When triage queues a ticket',
+    icon: 'file-text',
     responsibilities: [
-      'Reads the changed files',
-      'Generates happy-path and edge-case tests',
-      'Opens a PR with the new test file',
+      'Reads the relevant code',
+      'Writes a spec with acceptance criteria',
+      'Saves it as a doc on the ticket',
     ],
   },
   {
-    name: 'Dependency Upgrader',
-    trigger: 'Weekly, every Monday',    icon: 'package',
+    name: 'Builder',
+    trigger: 'When a spec is approved',
+    icon: 'git-branch',
     responsibilities: [
-      'Reads changelogs for outdated packages',
-      'Groups safe patch + minor bumps into one PR',
-      'Flags major-version changes for you',
+      'Clones the repo into an isolated workspace',
+      'Makes the change and runs your tests',
+      'Opens a pull request with green checks',
+    ],
+  },
+  {
+    name: 'Reviewer',
+    trigger: 'When the Builder opens a PR',
+    icon: 'eye',
+    responsibilities: [
+      'Reads the diff against your conventions',
+      'Leaves review comments',
+      'Routes the card for your approval',
     ],
   },
 ];
@@ -107,38 +121,40 @@ function StatusBadge({ label, tone = 'success' }: { label: string; tone?: 'succe
   );
 }
 
-// Mock artifact each agent produces — shows the output, not just describes it.
+// Mock artifact for each stage of the loop: the pipeline board, the test run, and
+// the already-green PR. Shows the outcome, not a feature grid.
 function MockVisual({ index }: { index: number }) {
   if (index === 0) {
+    const columns: { title: string; cards: string[] }[] = [
+      { title: 'Backlog', cards: ['Null deref in billing', 'Flaky payments test', 'Stale dep: zod'] },
+      { title: 'Scoped', cards: ['Retry on gateway timeout', 'Add refund edge cases'] },
+      { title: 'Building', cards: ['fix/billing-null'] },
+      { title: 'In review', cards: ['#441 tests green'] },
+    ];
     return (
       <div className="w-full overflow-hidden rounded-(--radius-card) border border-(--color-border) bg-(--color-bg-elev)">
         <div className="flex items-center justify-between border-b border-(--color-border) bg-(--color-bg-soft) px-4 py-3">
           <div className="flex items-center gap-2">
-            <Icon name="git-branch" className="h-3.5 w-3.5 text-(--color-fg-subtle)" />
-            <span className="text-sm font-semibold text-(--color-fg)">#432 auth refactor</span>
+            <Icon name="list" className="h-3.5 w-3.5 text-(--color-fg-subtle)" />
+            <span className="text-sm font-semibold text-(--color-fg)">Engineering pipeline</span>
           </div>
-          <StatusBadge label="reviewed" />
+          <StatusBadge label="7 in flight" />
         </div>
-        <div className="flex items-center gap-3 border-b border-(--color-border) px-4 py-2.5 font-mono text-xs">
-          <span className="text-(--color-success)">+142</span>
-          <span className="text-(--color-warn)">−38</span>
-          <span className="text-(--color-fg-subtle)">6 files</span>
-        </div>
-        <div className="space-y-2.5 p-4 text-sm">
-          {[
-            { tone: 'ok', text: 'Token rotation looks correct' },
-            { tone: 'warn', text: 'Missing null check on line 88' },
-            { tone: 'ok', text: 'Edge cases are covered' },
-          ].map((c) => (
-            <div key={c.text} className="flex items-start gap-2.5">
-              <span
-                className={`mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full ${
-                  c.tone === 'warn' ? 'bg-(--color-warn)/15 text-(--color-warn)' : 'bg-(--color-success)/15 text-(--color-success)'
-                }`}
-              >
-                {c.tone === 'warn' ? '!' : <Icon name="check" className="h-2.5 w-2.5" />}
-              </span>
-              <span className="text-(--color-fg-muted)">{c.text}</span>
+        <div className="grid grid-cols-2 gap-3 p-4 sm:grid-cols-4">
+          {columns.map((col) => (
+            <div key={col.title} className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="font-brand text-[11px] uppercase tracking-widest text-(--color-fg-subtle)">{col.title}</span>
+                <span className="font-mono text-[11px] text-(--color-fg-subtle)">{col.cards.length}</span>
+              </div>
+              {col.cards.map((c) => (
+                <div
+                  key={c}
+                  className="rounded-md border border-(--color-border) bg-(--color-bg) px-2.5 py-2 text-xs leading-snug text-(--color-fg-muted)"
+                >
+                  {c}
+                </div>
+              ))}
             </div>
           ))}
         </div>
@@ -150,24 +166,24 @@ function MockVisual({ index }: { index: number }) {
       <div className="w-full overflow-hidden rounded-(--radius-card) border border-(--color-border) bg-(--color-bg-elev)">
         <div className="flex items-center justify-between border-b border-(--color-border) bg-(--color-bg-soft) px-4 py-3">
           <div className="flex items-center gap-2">
-            <Icon name="file-text" className="h-3.5 w-3.5 text-(--color-fg-subtle)" />
-            <span className="font-mono text-sm font-semibold text-(--color-fg)">billing.test.ts</span>
+            <Icon name="git-branch" className="h-3.5 w-3.5 text-(--color-fg-subtle)" />
+            <span className="font-mono text-sm font-semibold text-(--color-fg)">fix/billing-null</span>
           </div>
-          <StatusBadge label="opened PR" />
+          <StatusBadge label="tests green" />
         </div>
         <div className="space-y-1 p-4 font-mono text-xs">
-          <p className="text-(--color-success)">+ describe(&lsquo;charges&rsquo;)</p>
-          <p className="text-(--color-success)">+ it(&lsquo;handles partial refunds&rsquo;)</p>
-          <p className="text-(--color-success)">+ it(&lsquo;rejects expired cards&rsquo;)</p>
-          <p className="text-(--color-success)">+ it(&lsquo;retries on gateway timeout&rsquo;)</p>
+          <p className="text-(--color-fg-muted)">$ pnpm test</p>
+          <p className="text-(--color-success)">PASS billing.test.ts</p>
+          <p className="text-(--color-success)">PASS payments.test.ts</p>
+          <p className="text-(--color-fg-subtle)">Tests: 142 passed, 142 total</p>
         </div>
         <div className="border-t border-(--color-border) px-4 py-3">
           <div className="flex items-center justify-between text-xs">
-            <span className="text-(--color-fg-subtle)">Coverage</span>
-            <span className="font-mono text-(--color-fg)">72% → 89%</span>
+            <span className="text-(--color-fg-subtle)">Run on a real checkout</span>
+            <span className="font-mono text-(--color-fg)">142 / 142</span>
           </div>
           <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-(--color-border)">
-            <div className="h-full rounded-full bg-(--color-success)" style={{ width: '89%' }} />
+            <div className="h-full rounded-full bg-(--color-success)" style={{ width: '100%' }} />
           </div>
         </div>
       </div>
@@ -177,33 +193,32 @@ function MockVisual({ index }: { index: number }) {
     <div className="w-full overflow-hidden rounded-(--radius-card) border border-(--color-border) bg-(--color-bg-elev)">
       <div className="flex items-center justify-between border-b border-(--color-border) bg-(--color-bg-soft) px-4 py-3">
         <div className="flex items-center gap-2">
-          <Icon name="package" className="h-3.5 w-3.5 text-(--color-fg-subtle)" />
-          <span className="text-sm font-semibold text-(--color-fg)">#511 weekly upgrades</span>
+          <Icon name="git-branch" className="h-3.5 w-3.5 text-(--color-fg-subtle)" />
+          <span className="text-sm font-semibold text-(--color-fg)">#441 fix null deref in billing</span>
         </div>
-        <StatusBadge label="opened PR" />
+        <StatusBadge label="ready to merge" />
       </div>
-      <div className="space-y-2.5 p-4 font-mono text-xs">
+      <div className="flex items-center gap-3 border-b border-(--color-border) px-4 py-2.5 font-mono text-xs">
+        <span className="text-(--color-success)">+38</span>
+        <span className="text-(--color-warn)">−4</span>
+        <span className="text-(--color-fg-subtle)">2 files</span>
+      </div>
+      <div className="space-y-2.5 p-4 text-sm">
         {[
-          { name: 'next', bump: '15.4.0 → 16.0.0', flag: false },
-          { name: 'lodash', bump: '4.17.20 → 4.17.21', flag: false },
-          { name: 'zod', bump: '3.22.4 → 3.23.8', flag: false },
-          { name: 'react', bump: '18.3 → 19.0', flag: true },
-        ].map((d) => (
-          <div key={d.name} className="flex items-center gap-2.5">
-            <span
-              className={`inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full ${
-                d.flag ? 'bg-(--color-warn)/15 text-(--color-warn)' : 'bg-(--color-success)/15 text-(--color-success)'
-              }`}
-            >
-              {d.flag ? '!' : <Icon name="check" className="h-2.5 w-2.5" />}
+          { text: 'Tests passed (142)' },
+          { text: 'Build passed' },
+          { text: 'Reviewed against your conventions' },
+        ].map((c) => (
+          <div key={c.text} className="flex items-start gap-2.5">
+            <span className="mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-(--color-success)/15 text-(--color-success)">
+              <Icon name="check" className="h-2.5 w-2.5" />
             </span>
-            <span className="text-(--color-fg)">{d.name}</span>
-            <span className="ml-auto text-(--color-fg-subtle)">{d.bump}</span>
+            <span className="text-(--color-fg-muted)">{c.text}</span>
           </div>
         ))}
       </div>
       <div className="border-t border-(--color-border) px-4 py-3 text-xs text-(--color-fg-subtle)">
-        3 safe bumps grouped · 1 major flagged for you
+        You review a PR that already builds and passes. You merge.
       </div>
     </div>
   );
@@ -216,7 +231,7 @@ function AgentsHeading() {
         Meet your engineering crew.
       </FadeIn>
       <FadeIn as="span" className="block text-(--color-fg-muted)" delay={90}>
-        Each agent owns a beat.
+        Each one owns a stage of the pipeline.
       </FadeIn>
     </h2>
   );
@@ -264,9 +279,9 @@ function AgentsCards() {
           </span>
           <h3 className="mt-4 text-lg font-semibold text-(--color-fg)">Create your own agent</h3>
           <p className="mt-2 max-w-xs text-[15px] text-(--color-fg-muted)">
-            Build your own for the workflows
+            Add a stage to the pipeline
             <br />
-            unique to your team.
+            for the way your team ships.
           </p>
           <span className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-(--color-accent)">
             Get started
@@ -295,19 +310,20 @@ export default function ForDevelopersPage() {
           </FadeIn>
           <h1 className="mt-4 text-4xl font-semibold leading-[1.05] tracking-tight sm:text-5xl md:text-6xl">
             <FadeIn as="span" delay={80} className="block">
-              Your codebase has a
+              Your backlog
             </FadeIn>
             <FadeIn as="span" delay={160} className="block">
-              maintenance problem.
+              ships itself.
             </FadeIn>
             <FadeIn as="span" delay={240} className="block text-(--color-fg-muted)">
-              Starships fixes it.
+              Every PR already green.
             </FadeIn>
           </h1>
           <FadeIn delay={320}>
             <p className="mt-8 max-w-2xl text-lg text-(--color-fg-muted) leading-relaxed">
-              PR reviews that never block. Tests written before you ask. Dependencies upgraded before they become a problem.
-              Security scans on every push. The Engineering room runs 24 hours a day so your engineers can focus on the product.
+              The Engineering room runs a crew of agents that triage your issues, scope the work, write the change, and run
+              your own tests on a real checkout before opening a pull request. You review work that already builds and passes,
+              then merge. It runs on a schedule, so your engineers can focus on the product.
             </p>
           </FadeIn>
           <div className="mt-10 flex flex-wrap items-center gap-3">
@@ -341,7 +357,7 @@ export default function ForDevelopersPage() {
         wallpaper="linear-gradient(180deg, rgba(7,8,11,0.45) 0%, rgba(7,8,11,0.75) 100%), url(/wallpaper-engineering.jpg)"
       />
 
-      {/* Use Cases */}
+      {/* The loop */}
       <UseCasesScroller items={useCases} visuals={useCases.map((_, i) => <MockVisual key={i} index={i} />)} />
 
       {/* Agents */}
@@ -365,11 +381,12 @@ export default function ForDevelopersPage() {
               building,
             </FadeIn>
             <FadeIn as="span" delay={180} className="block text-6xl sm:text-7xl md:text-8xl">
-              not babysitting.
+              not babysitting the backlog.
             </FadeIn>
           </h2>
           <FadeIn as="p" delay={270} className="mt-8 max-w-2xl text-lg text-(--color-fg-muted) leading-relaxed">
-            Tell us how your team works. We&rsquo;ll configure the Engineering room and hand you the keys.
+            Tell us how your team ships. We&rsquo;ll configure the Engineering room around your repo and your conventions, and
+            hand you the keys.
           </FadeIn>
           <div className="mt-10 flex flex-wrap items-center gap-3">
             <FadeIn delay={360}>

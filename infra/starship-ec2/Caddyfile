@@ -1,0 +1,18 @@
+# Auto-TLS reverse proxy for a starship box.
+# Routes mirror the local reverse-proxy: /api -> server, /docs -> docs, / -> client.
+# Prefixes are preserved (the server mounts routes under /api/v1).
+{$STARSHIP_DOMAIN} {
+	encode zstd gzip
+
+	handle /api/* {
+		reverse_proxy app:4000
+	}
+
+	handle /docs/* {
+		reverse_proxy app:3001
+	}
+
+	handle {
+		reverse_proxy app:3000
+	}
+}

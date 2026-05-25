@@ -52,8 +52,13 @@ export class LocalContainerExecutionProvider implements ExecutionProvider {
       configJson,
     });
 
-    const hostJobDir = await mkdtemp(join(tmpdir(), 'sjob-'));
-    const hostWorkspaceDir = await mkdtemp(join(tmpdir(), 'swork-'));
+    // When the server runs inside a container and launches sibling sandbox
+    // containers via the host Docker socket, the -v paths are resolved on the
+    // HOST. RUNNER_JOB_BASE_DIR must therefore be a path bind-mounted into this
+    // container at the identical path (see infra/starship-ec2/docker-compose.yml).
+    const baseDir = process.env.RUNNER_JOB_BASE_DIR || tmpdir();
+    const hostJobDir = await mkdtemp(join(baseDir, 'sjob-'));
+    const hostWorkspaceDir = await mkdtemp(join(baseDir, 'swork-'));
     const jobFile = join(hostJobDir, 'job.json');
     await writeFile(jobFile, jobPayload, { mode: 0o644 });
     // The sandbox runs as an unprivileged uid that differs from the server's;

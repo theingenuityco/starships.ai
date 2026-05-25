@@ -241,7 +241,7 @@ function AgentsCards() {
       {/* Special slot — invite the user to commission a new agent. */}
       <FadeIn delay={agents.length * 80}>
         <Link
-          href="/contact"
+          href="/request-demo?room=sales"
           className="group flex h-full flex-col items-center justify-center rounded-(--radius-card) border border-dashed border-(--color-border-strong) bg-(--color-bg) p-6 text-center transition-colors hover:border-(--color-accent) hover:bg-(--color-bg-elev)"
         >
           <span className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-(--color-accent-soft) text-(--color-fg) transition-colors group-hover:bg-(--color-accent) group-hover:text-(--color-bg)">
@@ -298,7 +298,7 @@ export default function ForSalesPage() {
           <div className="mt-10 flex flex-wrap items-center gap-3">
             <FadeIn delay={400}>
               <a
-                href="/contact"
+                href="/request-demo?room=sales"
                 className="inline-flex items-center justify-center gap-2 rounded-(--radius-button) bg-(--color-accent) px-5 py-3 text-sm font-medium text-(--color-bg) shadow-sm hover:bg-(--color-accent-strong) transition-colors"
               >
                 Request demo
@@ -359,7 +359,7 @@ export default function ForSalesPage() {
           <div className="mt-10 flex flex-wrap items-center gap-3">
             <FadeIn delay={360}>
               <a
-                href="/contact"
+                href="/request-demo?room=sales"
                 className="inline-flex items-center justify-center gap-2 rounded-(--radius-button) bg-(--color-accent) px-5 py-3 text-sm font-medium text-(--color-bg) shadow-sm hover:bg-(--color-accent-strong) transition-colors"
               >
                 Request demo

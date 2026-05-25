@@ -45,7 +45,7 @@ export function Footer() {
               <a href="mailto:hello@starships.ai" className="text-sm text-(--color-fg-muted) hover:text-(--color-fg) transition-colors">
                 hello@starships.ai
               </a>
-              <a href="/contact" className="text-sm text-(--color-fg-muted) hover:text-(--color-fg) transition-colors">
+              <a href="/request-demo" className="text-sm text-(--color-fg-muted) hover:text-(--color-fg) transition-colors">
                 Request demo
               </a>
             </div>

@@ -228,6 +228,7 @@ export function ContactForm() {
                 onError={() => {
                   setStatus('error');
                   setErrorMessage('CAPTCHA verification failed. Please try again.');
+                  turnstileRef.current?.reset();
                 }}
                 onExpire={() => {
                   setStatus('error');

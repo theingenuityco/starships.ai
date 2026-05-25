@@ -1,5 +1,6 @@
 import { createSign } from 'node:crypto';
 import type { GitCredentials } from '@starships/autopilot';
+import { PlatformSecretService } from './PlatformSecretService';
 
 /**
  * GitCredentialService
@@ -12,7 +13,8 @@ import type { GitCredentials } from '@starships/autopilot';
  * Flow: sign a 10-minute App JWT (RS256) with the App private key, then exchange
  * it at POST /app/installations/{installation_id}/access_tokens.
  *
- * Platform credentials are read from env (platform secrets):
+ * Platform credentials are read from PLATFORM SECRETS (encrypted, in the DB,
+ * managed at runtime via the platform-secrets admin), not env:
  *   - GH_APP_ID                   GitHub App id
  *   - GH_APP_PRIVATE_KEY_BASE64   base64-encoded PEM private key
  *
@@ -23,30 +25,36 @@ export interface MintedGitToken extends GitCredentials {
   expiresAt: string;
 }
 
+const APP_ID_SECRET_KEY = 'GH_APP_ID';
+const PRIVATE_KEY_SECRET_KEY = 'GH_APP_PRIVATE_KEY_BASE64';
+
 export class GitCredentialService {
-  private readonly appId: string;
-  private readonly privateKeyPem: string;
+  private readonly platformSecrets = new PlatformSecretService();
 
-  constructor() {
-    this.appId = process.env.GH_APP_ID || '';
-    const b64 = process.env.GH_APP_PRIVATE_KEY_BASE64 || '';
-    this.privateKeyPem = b64 ? Buffer.from(b64, 'base64').toString('utf-8') : '';
-  }
-
-  isConfigured(): boolean {
-    return Boolean(this.appId && this.privateKeyPem);
+  async isConfigured(): Promise<boolean> {
+    const [appId, privateKey] = await Promise.all([
+      this.platformSecrets.getSecret(APP_ID_SECRET_KEY),
+      this.platformSecrets.getSecret(PRIVATE_KEY_SECRET_KEY),
+    ]);
+    return Boolean(appId && privateKey);
   }
 
   /** Mint an installation access token for the given installation id. */
   async getInstallationToken(installationId: string): Promise<MintedGitToken> {
-    if (!this.isConfigured()) {
-      throw new Error('GitHub App is not configured (set GH_APP_ID and GH_APP_PRIVATE_KEY_BASE64)');
-    }
     if (!installationId) {
       throw new Error('installationId is required to mint a GitHub installation token');
     }
 
-    const appJwt = this.signAppJwt();
+    const [appId, privateKeyB64] = await Promise.all([
+      this.platformSecrets.getSecret(APP_ID_SECRET_KEY),
+      this.platformSecrets.getSecret(PRIVATE_KEY_SECRET_KEY),
+    ]);
+    const privateKeyPem = privateKeyB64 ? Buffer.from(privateKeyB64, 'base64').toString('utf-8') : '';
+    if (!appId || !privateKeyPem) {
+      throw new Error(`GitHub App is not configured (set ${APP_ID_SECRET_KEY} and ${PRIVATE_KEY_SECRET_KEY} platform secrets)`);
+    }
+
+    const appJwt = this.signAppJwt(appId, privateKeyPem);
     const res = await fetch(`https://api.github.com/app/installations/${encodeURIComponent(installationId)}/access_tokens`, {
       method: 'POST',
       headers: {
@@ -66,21 +74,21 @@ export class GitCredentialService {
   }
 
   /** Sign a short-lived GitHub App JWT (RS256). */
-  private signAppJwt(): string {
+  private signAppJwt(appId: string, privateKeyPem: string): string {
     const now = Math.floor(Date.now() / 1000);
     const header = { alg: 'RS256', typ: 'JWT' };
     const payload = {
       // Allow 60s clock drift on iat per GitHub guidance.
       iat: now - 60,
       exp: now + 9 * 60,
-      iss: this.appId,
+      iss: appId,
     };
     const encode = (obj: unknown) => Buffer.from(JSON.stringify(obj)).toString('base64url');
     const signingInput = `${encode(header)}.${encode(payload)}`;
     const signer = createSign('RSA-SHA256');
     signer.update(signingInput);
     signer.end();
-    const signature = signer.sign(this.privateKeyPem).toString('base64url');
+    const signature = signer.sign(privateKeyPem).toString('base64url');
     return `${signingInput}.${signature}`;
   }
 }

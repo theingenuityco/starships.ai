@@ -26,9 +26,9 @@ x-app-env: &app-env
   # Remote runner used by headless automation workers (co-located on the box).
   RUNNER_URL: http://runner:50051
   RUNNER_AUTH_TOKEN: ${RUNNER_AUTH_TOKEN:?set in .env}
-  # GitHub App (native code execution: clone/push + installation tokens).
-  GH_APP_ID: ${GH_APP_ID:-}
-  GH_APP_PRIVATE_KEY_BASE64: ${GH_APP_PRIVATE_KEY_BASE64:-}
+  # GitHub App credentials (GH_APP_ID, GH_APP_PRIVATE_KEY_BASE64) are NOT set here.
+  # They are platform secrets stored encrypted in the DB and added at runtime via
+  # the platform-secrets admin; GitCredentialService reads them from there.
   # Native execution sandbox.
   RUNNER_SANDBOX_IMAGE: ${RUNNER_SANDBOX_IMAGE:-starships-sandbox:latest}
   RUNNER_SANDBOX_NETWORK: ${RUNNER_SANDBOX_NETWORK:-bridge}

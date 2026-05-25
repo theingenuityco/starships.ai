@@ -5,9 +5,8 @@ import { fileURLToPath } from 'node:url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const monorepoRoot = path.resolve(__dirname, '../..');
 const isDev = process.env.NODE_ENV !== 'production';
-nextEnv.loadEnvConfig(monorepoRoot, isDev);
+nextEnv.loadEnvConfig(__dirname, isDev);
 
 /** @type {import('next').NextConfig} */
 const config = {

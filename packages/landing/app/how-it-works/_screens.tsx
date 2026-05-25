@@ -396,7 +396,7 @@ export function Hero() {
         <div className="mt-10 flex flex-wrap items-center gap-3">
           <FadeIn delay={320}>
             <Link
-              href="/contact"
+              href="/request-demo"
               className="inline-flex items-center justify-center gap-2 rounded-(--radius-button) bg-(--color-accent) px-5 py-3 text-sm font-medium text-(--color-bg) shadow-sm transition-colors hover:bg-(--color-accent-strong)"
             >
               Request demo

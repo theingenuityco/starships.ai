@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { useState, useRef, useEffect } from 'react';
 import { Logo } from '@/components/Logo';
 import { Icon } from '@/components/Icon';
@@ -11,6 +12,14 @@ const USE_CASES = [
   { label: 'For marketers', href: '/use-cases/for-marketers' },
   { label: 'For sales', href: '/use-cases/for-sales' },
 ];
+
+// Carry the room context when the demo CTA is clicked from a use-case page, so
+// the request-demo form prefills the right room.
+const ROOM_BY_PATH: Record<string, string> = {
+  '/use-cases/for-developers': 'engineering',
+  '/use-cases/for-sales': 'sales',
+  '/use-cases/for-marketers': 'marketing',
+};
 
 function UseCasesDropdown() {
   const [open, setOpen] = useState(false);
@@ -58,6 +67,10 @@ function UseCasesDropdown() {
 }
 
 export function Nav() {
+  const pathname = usePathname();
+  const room = ROOM_BY_PATH[pathname];
+  const demoHref = room ? `/request-demo?room=${room}` : '/request-demo';
+
   return (
     <header className="fixed top-8 left-0 right-0 z-50 px-4">
       <nav className="mx-auto max-w-5xl flex items-center justify-between rounded-full bg-black/30 backdrop-blur-xl pl-6 pr-4 py-3.5 sm:py-4">
@@ -81,7 +94,7 @@ export function Nav() {
         </div>
 
         <Link
-          href="/contact"
+          href={demoHref}
           className="rounded-full bg-(--color-accent) px-5 py-2.5 text-[15px] font-medium text-(--color-bg) shadow-sm hover:bg-(--color-accent-strong) transition-colors"
         >
           Request demo

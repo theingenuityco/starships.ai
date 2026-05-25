@@ -78,3 +78,4 @@ github-runners/lambda/package/
 github-runners/**/terraform.tfvars
 
 backups/
+.vercel

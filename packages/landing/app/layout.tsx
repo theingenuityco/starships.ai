@@ -3,6 +3,7 @@ import { Inter, Orbitron } from 'next/font/google';
 import Script from 'next/script';
 import { Analytics } from '@vercel/analytics/next';
 import { Nav } from '@/components/Nav';
+import { PostHogProvider } from '@/components/PostHogProvider';
 import './globals.css';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
@@ -36,8 +37,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body suppressHydrationWarning>
         {/* Runs synchronously before browser scroll restoration fires — always start at top on reload */}
         <Script id="scroll-restoration" strategy="beforeInteractive">{`history.scrollRestoration='manual'`}</Script>
-        <Nav />
-        {children}
+        <PostHogProvider>
+          <Nav />
+          {children}
+        </PostHogProvider>
         <Analytics />
       </body>
     </html>

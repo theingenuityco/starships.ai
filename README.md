@@ -219,7 +219,8 @@ curl -N \
 ## Deployment
 
 - **Docker** — the root `Dockerfile` builds a single image (client + server + docs); Postgres and Redis are external. Exposes ports 3000 (client), 3001 (docs), 4000 (API).
-- **Kubernetes** — manifests in `k8s/` (dev and prod). Ingress routes `/api/*` to the server and `/docs/*` to the docs site.
+- **Per-starship EC2** — production runs the full stack (Postgres, Redis, server, web, workers, sandbox) on one EC2 per starship; see `infra/starship-ec2/`.
+- **Legacy (EKS)** — the retired Kubernetes/EKS manifests are kept for reference only under `legacy/k8s/` and `legacy/infra/`.
 
 ---
 

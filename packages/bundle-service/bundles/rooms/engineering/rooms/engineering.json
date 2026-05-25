@@ -1,0 +1,146 @@
+{
+  "schemaVersion": "1",
+  "kind": "room",
+  "exportedAt": "2026-05-26T00:00:00.000Z",
+  "metadata": {
+    "fromSlug": "engineering",
+    "fromStarshipSlug": "starborn-eng"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "room": {
+      "name": "Engineering",
+      "isPrivate": false,
+      "topic": "Backlog execution: triage, scope, build (with your tests), review, merge."
+    },
+    "viewPins": [],
+    "datasetPins": [
+      {
+        "datasetSlug": "repos",
+        "position": 0
+      },
+      {
+        "datasetSlug": "tracking",
+        "position": 1
+      },
+      {
+        "datasetSlug": "ownership",
+        "position": 2
+      }
+    ],
+    "taskBoardPins": [
+      {
+        "taskBoardSlug": "engineering-pipeline",
+        "position": 0
+      }
+    ],
+    "toolAssignments": [
+      {
+        "toolSlug": "search-room-resources",
+        "permission": "allow"
+      },
+      {
+        "toolSlug": "web-search",
+        "permission": "allow"
+      },
+      {
+        "toolSlug": "web-fetch",
+        "permission": "allow"
+      },
+      {
+        "toolSlug": "call-agent",
+        "permission": "allow"
+      },
+      {
+        "toolSlug": "read-conversation-messages",
+        "permission": "allow"
+      },
+      {
+        "toolSlug": "search-conversations-threads",
+        "permission": "allow"
+      },
+      {
+        "toolSlug": "get-doc",
+        "permission": "allow"
+      },
+      {
+        "toolSlug": "search-docs",
+        "permission": "allow"
+      },
+      {
+        "toolSlug": "create-doc",
+        "permission": "allow"
+      },
+      {
+        "toolSlug": "edit-doc",
+        "permission": "allow"
+      },
+      {
+        "toolSlug": "add-task",
+        "permission": "allow"
+      },
+      {
+        "toolSlug": "move-task-card",
+        "permission": "allow"
+      },
+      {
+        "toolSlug": "show-dataset-card",
+        "permission": "allow"
+      },
+      {
+        "toolSlug": "search-agents",
+        "permission": "allow"
+      },
+      {
+        "toolSlug": "get-agent",
+        "permission": "allow"
+      },
+      {
+        "toolSlug": "read-file",
+        "permission": "allow"
+      },
+      {
+        "toolSlug": "write-file",
+        "permission": "allow"
+      },
+      {
+        "toolSlug": "list-directory",
+        "permission": "allow"
+      },
+      {
+        "toolSlug": "run-terminal-command",
+        "permission": "allow"
+      },
+      {
+        "toolSlug": "run-tests",
+        "permission": "allow"
+      },
+      {
+        "toolSlug": "open-pr-with-changes",
+        "permission": "allow"
+      },
+      {
+        "toolSlug": "post-pr-review",
+        "permission": "allow"
+      },
+      {
+        "toolSlug": "list-repo-issues",
+        "permission": "allow"
+      },
+      {
+        "toolSlug": "list-pr-files",
+        "permission": "allow"
+      }
+    ],
+    "agentParticipantSlugs": [
+      "forge",
+      "sift",
+      "quill",
+      "anvil",
+      "lens"
+    ]
+  }
+}

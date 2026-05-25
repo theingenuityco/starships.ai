@@ -9,46 +9,216 @@
     "taskBoards": [],
     "agents": [],
     "tools": [
-      { "kind": "tool", "fromSlug": "web-search", "file": "tools/web-search.json" },
-      { "kind": "tool", "fromSlug": "web-fetch", "file": "tools/web-fetch.json" },
-      { "kind": "tool", "fromSlug": "call-agent", "file": "tools/call-agent.json" },
-      { "kind": "tool", "fromSlug": "search-conversations-threads", "file": "tools/search-conversations-threads.json" },
-      { "kind": "tool", "fromSlug": "read-conversation-messages", "file": "tools/read-conversation-messages.json" },
-      { "kind": "tool", "fromSlug": "search-room-resources", "file": "tools/search-room-resources.json" },
-      { "kind": "tool", "fromSlug": "add-task", "file": "tools/add-task.json" },
-      { "kind": "tool", "fromSlug": "move-task-card", "file": "tools/move-task-card.json" },
-      { "kind": "tool", "fromSlug": "get-doc", "file": "tools/get-doc.json" },
-      { "kind": "tool", "fromSlug": "search-docs", "file": "tools/search-docs.json" },
-      { "kind": "tool", "fromSlug": "get-context7-doc", "file": "tools/get-context7-doc.json" },
-      { "kind": "tool", "fromSlug": "search-context7-docs", "file": "tools/search-context7-docs.json" },
-      { "kind": "tool", "fromSlug": "list-models", "file": "tools/list-models.json" },
-      { "kind": "tool", "fromSlug": "show-dataset-card", "file": "tools/show-dataset-card.json" },
-      { "kind": "tool", "fromSlug": "create-agent", "file": "tools/create-agent.json" },
-      { "kind": "tool", "fromSlug": "edit-agent", "file": "tools/edit-agent.json" },
-      { "kind": "tool", "fromSlug": "get-agent", "file": "tools/get-agent.json" },
-      { "kind": "tool", "fromSlug": "search-agents", "file": "tools/search-agents.json" },
-      { "kind": "tool", "fromSlug": "create-tool", "file": "tools/create-tool.json" },
-      { "kind": "tool", "fromSlug": "edit-tool", "file": "tools/edit-tool.json" },
-      { "kind": "tool", "fromSlug": "get-tool", "file": "tools/get-tool.json" },
-      { "kind": "tool", "fromSlug": "search-tools", "file": "tools/search-tools.json" },
-      { "kind": "tool", "fromSlug": "test-tool", "file": "tools/test-tool.json" },
-      { "kind": "tool", "fromSlug": "modify-tool-blueprint-node", "file": "tools/modify-tool-blueprint-node.json" },
-      { "kind": "tool", "fromSlug": "modify-tool-blueprint-edge", "file": "tools/modify-tool-blueprint-edge.json" },
-      { "kind": "tool", "fromSlug": "get-connector-action", "file": "tools/get-connector-action.json" },
-      { "kind": "tool", "fromSlug": "get-connector-template", "file": "tools/get-connector-template.json" },
-      { "kind": "tool", "fromSlug": "list-connector-templates", "file": "tools/list-connector-templates.json" },
-      { "kind": "tool", "fromSlug": "search-connector-actions", "file": "tools/search-connector-actions.json" },
-      { "kind": "tool", "fromSlug": "assign-agent-tool", "file": "tools/assign-agent-tool.json" },
-      { "kind": "tool", "fromSlug": "unassign-agent-tool", "file": "tools/unassign-agent-tool.json" },
-      { "kind": "tool", "fromSlug": "run-terminal-command", "file": "tools/run-terminal-command.json" },
-      { "kind": "tool", "fromSlug": "read-file", "file": "tools/read-file.json" },
-      { "kind": "tool", "fromSlug": "write-file", "file": "tools/write-file.json" },
-      { "kind": "tool", "fromSlug": "list-directory", "file": "tools/list-directory.json" },
-      { "kind": "tool", "fromSlug": "create-doc", "file": "tools/create-doc.json" },
-      { "kind": "tool", "fromSlug": "edit-doc", "file": "tools/edit-doc.json" },
-      { "kind": "tool", "fromSlug": "run-tests", "file": "tools/run-tests.json" },
-      { "kind": "tool", "fromSlug": "open-pr-with-changes", "file": "tools/open-pr-with-changes.json" },
-      { "kind": "tool", "fromSlug": "post-pr-review", "file": "tools/post-pr-review.json" }
+      {
+        "kind": "tool",
+        "fromSlug": "web-search",
+        "file": "tools/web-search.json"
+      },
+      {
+        "kind": "tool",
+        "fromSlug": "web-fetch",
+        "file": "tools/web-fetch.json"
+      },
+      {
+        "kind": "tool",
+        "fromSlug": "call-agent",
+        "file": "tools/call-agent.json"
+      },
+      {
+        "kind": "tool",
+        "fromSlug": "search-conversations-threads",
+        "file": "tools/search-conversations-threads.json"
+      },
+      {
+        "kind": "tool",
+        "fromSlug": "read-conversation-messages",
+        "file": "tools/read-conversation-messages.json"
+      },
+      {
+        "kind": "tool",
+        "fromSlug": "search-room-resources",
+        "file": "tools/search-room-resources.json"
+      },
+      {
+        "kind": "tool",
+        "fromSlug": "add-task",
+        "file": "tools/add-task.json"
+      },
+      {
+        "kind": "tool",
+        "fromSlug": "move-task-card",
+        "file": "tools/move-task-card.json"
+      },
+      {
+        "kind": "tool",
+        "fromSlug": "get-doc",
+        "file": "tools/get-doc.json"
+      },
+      {
+        "kind": "tool",
+        "fromSlug": "search-docs",
+        "file": "tools/search-docs.json"
+      },
+      {
+        "kind": "tool",
+        "fromSlug": "get-context7-doc",
+        "file": "tools/get-context7-doc.json"
+      },
+      {
+        "kind": "tool",
+        "fromSlug": "search-context7-docs",
+        "file": "tools/search-context7-docs.json"
+      },
+      {
+        "kind": "tool",
+        "fromSlug": "list-models",
+        "file": "tools/list-models.json"
+      },
+      {
+        "kind": "tool",
+        "fromSlug": "show-dataset-card",
+        "file": "tools/show-dataset-card.json"
+      },
+      {
+        "kind": "tool",
+        "fromSlug": "create-agent",
+        "file": "tools/create-agent.json"
+      },
+      {
+        "kind": "tool",
+        "fromSlug": "edit-agent",
+        "file": "tools/edit-agent.json"
+      },
+      {
+        "kind": "tool",
+        "fromSlug": "get-agent",
+        "file": "tools/get-agent.json"
+      },
+      {
+        "kind": "tool",
+        "fromSlug": "search-agents",
+        "file": "tools/search-agents.json"
+      },
+      {
+        "kind": "tool",
+        "fromSlug": "create-tool",
+        "file": "tools/create-tool.json"
+      },
+      {
+        "kind": "tool",
+        "fromSlug": "edit-tool",
+        "file": "tools/edit-tool.json"
+      },
+      {
+        "kind": "tool",
+        "fromSlug": "get-tool",
+        "file": "tools/get-tool.json"
+      },
+      {
+        "kind": "tool",
+        "fromSlug": "search-tools",
+        "file": "tools/search-tools.json"
+      },
+      {
+        "kind": "tool",
+        "fromSlug": "test-tool",
+        "file": "tools/test-tool.json"
+      },
+      {
+        "kind": "tool",
+        "fromSlug": "modify-tool-blueprint-node",
+        "file": "tools/modify-tool-blueprint-node.json"
+      },
+      {
+        "kind": "tool",
+        "fromSlug": "modify-tool-blueprint-edge",
+        "file": "tools/modify-tool-blueprint-edge.json"
+      },
+      {
+        "kind": "tool",
+        "fromSlug": "get-connector-action",
+        "file": "tools/get-connector-action.json"
+      },
+      {
+        "kind": "tool",
+        "fromSlug": "get-connector-template",
+        "file": "tools/get-connector-template.json"
+      },
+      {
+        "kind": "tool",
+        "fromSlug": "list-connector-templates",
+        "file": "tools/list-connector-templates.json"
+      },
+      {
+        "kind": "tool",
+        "fromSlug": "search-connector-actions",
+        "file": "tools/search-connector-actions.json"
+      },
+      {
+        "kind": "tool",
+        "fromSlug": "assign-agent-tool",
+        "file": "tools/assign-agent-tool.json"
+      },
+      {
+        "kind": "tool",
+        "fromSlug": "unassign-agent-tool",
+        "file": "tools/unassign-agent-tool.json"
+      },
+      {
+        "kind": "tool",
+        "fromSlug": "run-terminal-command",
+        "file": "tools/run-terminal-command.json"
+      },
+      {
+        "kind": "tool",
+        "fromSlug": "read-file",
+        "file": "tools/read-file.json"
+      },
+      {
+        "kind": "tool",
+        "fromSlug": "write-file",
+        "file": "tools/write-file.json"
+      },
+      {
+        "kind": "tool",
+        "fromSlug": "list-directory",
+        "file": "tools/list-directory.json"
+      },
+      {
+        "kind": "tool",
+        "fromSlug": "create-doc",
+        "file": "tools/create-doc.json"
+      },
+      {
+        "kind": "tool",
+        "fromSlug": "edit-doc",
+        "file": "tools/edit-doc.json"
+      },
+      {
+        "kind": "tool",
+        "fromSlug": "run-tests",
+        "file": "tools/run-tests.json"
+      },
+      {
+        "kind": "tool",
+        "fromSlug": "open-pr-with-changes",
+        "file": "tools/open-pr-with-changes.json"
+      },
+      {
+        "kind": "tool",
+        "fromSlug": "post-pr-review",
+        "file": "tools/post-pr-review.json"
+      },
+      {
+        "kind": "tool",
+        "fromSlug": "list-repo-issues",
+        "file": "tools/list-repo-issues.json"
+      },
+      {
+        "kind": "tool",
+        "fromSlug": "list-pr-files",
+        "file": "tools/list-pr-files.json"
+      }
     ]
   }
 }

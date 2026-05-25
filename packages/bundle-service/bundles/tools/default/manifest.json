@@ -43,7 +43,12 @@
       { "kind": "tool", "fromSlug": "run-terminal-command", "file": "tools/run-terminal-command.json" },
       { "kind": "tool", "fromSlug": "read-file", "file": "tools/read-file.json" },
       { "kind": "tool", "fromSlug": "write-file", "file": "tools/write-file.json" },
-      { "kind": "tool", "fromSlug": "list-directory", "file": "tools/list-directory.json" }
+      { "kind": "tool", "fromSlug": "list-directory", "file": "tools/list-directory.json" },
+      { "kind": "tool", "fromSlug": "create-doc", "file": "tools/create-doc.json" },
+      { "kind": "tool", "fromSlug": "edit-doc", "file": "tools/edit-doc.json" },
+      { "kind": "tool", "fromSlug": "run-tests", "file": "tools/run-tests.json" },
+      { "kind": "tool", "fromSlug": "open-pr-with-changes", "file": "tools/open-pr-with-changes.json" },
+      { "kind": "tool", "fromSlug": "post-pr-review", "file": "tools/post-pr-review.json" }
     ]
   }
 }

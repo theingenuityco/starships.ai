@@ -1,0 +1,108 @@
+{
+  "schemaVersion": "1",
+  "kind": "tool",
+  "exportedAt": "2026-05-26T00:00:00.000Z",
+  "metadata": {
+    "fromSlug": "open-pr-with-changes",
+    "fromStarshipSlug": "starborn-dvlif0"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "tool": {
+      "name": "Open PR with changes",
+      "description": "Commit the current workspace changes, push the branch, and open a GitHub pull request. Only meaningful in a workspace-backed run (Builder).",
+      "parameters": {
+        "type": "object",
+        "required": [
+          "owner",
+          "repo",
+          "branch",
+          "title",
+          "commitMessage"
+        ],
+        "properties": {
+          "owner": { "type": "string", "description": "Repository owner" },
+          "repo": { "type": "string", "description": "Repository name" },
+          "branch": { "type": "string", "description": "Working branch to push (head)" },
+          "base": { "type": "string", "description": "Base branch (default: main)" },
+          "title": { "type": "string", "description": "Pull request title" },
+          "body": { "type": "string", "description": "Pull request body" },
+          "commitMessage": { "type": "string", "description": "Commit message for the staged changes" },
+          "draft": { "type": "boolean", "description": "Open as a draft PR (default false)" }
+        }
+      },
+      "blueprint": {
+        "edges": [
+          { "to": "normalize_input", "ref": "e1", "from": "start" },
+          { "to": "git_commit", "ref": "e2", "from": "normalize_input" },
+          { "to": "git_push", "ref": "e3", "from": "git_commit" },
+          { "to": "create_pr", "ref": "e4", "from": "git_push" },
+          { "to": "format_result", "ref": "e5", "from": "create_pr" },
+          { "to": "end", "ref": "e6", "from": "format_result" }
+        ],
+        "nodes": [
+          { "ref": "start", "name": "Start", "type": "start", "parameters": {} },
+          {
+            "ref": "normalize_input",
+            "name": "Normalize input",
+            "type": "code",
+            "parameters": {
+              "code": "async function main(ctx) {\n  const input = ctx.input || {};\n  const owner = String(input.owner || '').trim();\n  const repo = String(input.repo || '').trim();\n  const branch = String(input.branch || '').trim();\n  const title = String(input.title || '').trim();\n  const commitMessage = String(input.commitMessage || '').trim();\n  if (!owner) throw new Error('owner is required');\n  if (!repo) throw new Error('repo is required');\n  if (!branch) throw new Error('branch is required');\n  if (!title) throw new Error('title is required');\n  if (!commitMessage) throw new Error('commitMessage is required');\n  return {\n    owner, repo, branch, title, commitMessage,\n    base: String(input.base || 'main').trim(),\n    body: input.body != null ? String(input.body) : '',\n    draft: Boolean(input.draft)\n  };\n}",
+              "timeout": 3000
+            }
+          },
+          {
+            "ref": "git_commit",
+            "name": "Stage and commit",
+            "type": "terminal",
+            "parameters": {
+              "command": "git add -A && (git diff --cached --quiet && echo 'nothing to commit' || git commit -m \"$COMMIT_MSG\")",
+              "env": { "COMMIT_MSG": "{{ String((lastOutputOf('normalize_input') || {}).commitMessage || '') }}" },
+              "timeout": 60000
+            }
+          },
+          {
+            "ref": "git_push",
+            "name": "Push branch",
+            "type": "terminal",
+            "parameters": {
+              "command": "git push -u origin \"$BRANCH\"",
+              "env": { "BRANCH": "{{ String((lastOutputOf('normalize_input') || {}).branch || '') }}" },
+              "timeout": 120000
+            }
+          },
+          {
+            "ref": "create_pr",
+            "name": "Create pull request (GitHub)",
+            "type": "connector_action",
+            "parameters": {
+              "args": "{{ ({ owner: (lastOutputOf('normalize_input')||{}).owner, repo: (lastOutputOf('normalize_input')||{}).repo, title: (lastOutputOf('normalize_input')||{}).title, head: (lastOutputOf('normalize_input')||{}).branch, base: (lastOutputOf('normalize_input')||{}).base, body: (lastOutputOf('normalize_input')||{}).body, draft: (lastOutputOf('normalize_input')||{}).draft }) }}",
+              "action": "create-pull-request",
+              "timeout": 20000,
+              "connector": "github",
+              "failOnNon2xx": true
+            }
+          },
+          {
+            "ref": "format_result",
+            "name": "Format result",
+            "type": "code",
+            "parameters": {
+              "code": "async function main(ctx) {\n  const resp = ctx.lastOutputOf('create_pr') || {};\n  const pr = (resp.body && typeof resp.body === 'object') ? resp.body : {};\n  const push = ctx.lastOutputOf('git_push') || {};\n  return {\n    success: true,\n    prNumber: pr.number ?? null,\n    prUrl: pr.html_url || null,\n    branch: (ctx.lastOutputOf('normalize_input') || {}).branch || null,\n    pushExitCode: push.exitCode ?? null\n  };\n}",
+              "timeout": 3000
+            }
+          },
+          { "ref": "end", "name": "End", "type": "end", "parameters": { "output": "{{ lastOutputOf('format_result') }}" } }
+        ]
+      },
+      "transforms": null,
+      "mutations": null,
+      "condition": null,
+      "isEnabled": true,
+      "status": "active"
+    }
+  }
+}

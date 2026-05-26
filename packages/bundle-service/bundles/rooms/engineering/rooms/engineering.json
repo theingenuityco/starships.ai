@@ -99,6 +99,10 @@
         "permission": "allow"
       },
       {
+        "toolSlug": "checkout-repo",
+        "permission": "allow"
+      },
+      {
         "toolSlug": "read-file",
         "permission": "allow"
       },

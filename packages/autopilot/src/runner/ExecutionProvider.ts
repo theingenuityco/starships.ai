@@ -15,14 +15,29 @@ import type { WorkspaceSpec, GitCredentials } from '@/workspace/Workspace';
 
 export type ExecutionProviderKind = 'inline' | 'local_container' | 'user_machine' | 'github_actions';
 
+/**
+ * Workspace-backed (native code) job context. The run operates inside a cloned
+ * repo checkout that PERSISTS across the many separate tool-call jobs of a single
+ * agent run (read -> write -> test -> PR). `hostDir` is the per-conversation
+ * directory the provider mounts into the sandbox. On the first (provisioning)
+ * job `spec`+`git` are present so the sandbox clones the repo; on subsequent
+ * jobs they are omitted and the existing checkout inside `hostDir` is reused.
+ */
+export interface ExecutionWorkspace {
+  /** Persistent host dir mounted into the sandbox at a fixed path. */
+  hostDir: string;
+  /** Present only on the provisioning job: clone this repo. */
+  spec?: WorkspaceSpec;
+  /** Short-lived git credentials for clone + push. Provider-only; never persisted. */
+  git?: GitCredentials;
+}
+
 export interface ExecutionJob {
   blueprint: Blueprint;
   execution: Execution;
   config: EngineConfig;
-  /** Present => workspace-backed (native code) job: clone, edit, test, commit, push. */
-  workspace?: WorkspaceSpec;
-  /** Short-lived git credentials for the workspace. Provider-only; never persisted. */
-  git?: GitCredentials;
+  /** Present => workspace-backed (native code) job. */
+  workspace?: ExecutionWorkspace;
 }
 
 export interface ExecutionResult {

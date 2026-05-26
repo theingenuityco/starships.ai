@@ -70,7 +70,10 @@
             "type": "terminal",
             "parameters": {
               "command": "git push -u origin \"$BRANCH\"",
-              "env": { "BRANCH": "{{ String((lastOutputOf('normalize_input') || {}).branch || '') }}" },
+              "env": {
+                "BRANCH": "{{ String((lastOutputOf('normalize_input') || {}).branch || '') }}",
+                "GIT_TERMINAL_PROMPT": "0"
+              },
               "timeout": 120000
             }
           },

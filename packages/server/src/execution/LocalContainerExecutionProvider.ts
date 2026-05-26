@@ -1,9 +1,14 @@
 import { spawn } from 'node:child_process';
-import { mkdtemp, writeFile, rm, chmod } from 'node:fs/promises';
+import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import type { ExecutionItem, ExecutionProvider, ExecutionJob, ExecutionResult, EngineConfig, AutopilotEvent } from '@starships/autopilot';
+import { WORKSPACE_CHECKOUT_SUBDIR } from './WorkspaceSessionManager';
+
+/** Where the persistent per-conversation workspace is mounted inside the sandbox. */
+const CONTAINER_WORKSPACE_BASE = '/workspace';
+const CONTAINER_CHECKOUT_DIR = `${CONTAINER_WORKSPACE_BASE}/${WORKSPACE_CHECKOUT_SUBDIR}`;
 
 /**
  * Runs a workspace-backed job inside a hardened, single-use Docker sandbox on
@@ -30,6 +35,7 @@ export class LocalContainerExecutionProvider implements ExecutionProvider {
     if (!job.workspace) {
       throw new Error('LocalContainerExecutionProvider requires job.workspace');
     }
+    const { hostDir, spec, git } = job.workspace;
 
     // Separate the in-process callback (not serializable) from the config the
     // container receives, and strip function-valued engine fields.
@@ -39,9 +45,14 @@ export class LocalContainerExecutionProvider implements ExecutionProvider {
     delete serializableConfig.runner;
     delete serializableConfig.onCancel;
 
+    // First (provisioning) job carries spec+git so the sandbox clones into the
+    // mounted checkout; later jobs carry neither and reuse the existing checkout.
     const configJson = JSON.stringify({
       ...serializableConfig,
-      workspace: { spec: job.workspace, git: job.git },
+      workspace: {
+        root: CONTAINER_CHECKOUT_DIR,
+        ...(spec ? { spec, git } : {}),
+      },
     });
 
     const requestId = randomUUID();
@@ -58,19 +69,16 @@ export class LocalContainerExecutionProvider implements ExecutionProvider {
     // container at the identical path (see infra/starship-ec2/docker-compose.yml).
     const baseDir = process.env.RUNNER_JOB_BASE_DIR || tmpdir();
     const hostJobDir = await mkdtemp(join(baseDir, 'sjob-'));
-    const hostWorkspaceDir = await mkdtemp(join(baseDir, 'swork-'));
     const jobFile = join(hostJobDir, 'job.json');
     await writeFile(jobFile, jobPayload, { mode: 0o644 });
-    // The sandbox runs as an unprivileged uid that differs from the server's;
-    // make the bind-mounted workspace writable to it.
-    await chmod(hostWorkspaceDir, 0o777);
 
     try {
-      const items = await this.runContainer(jobFile, hostWorkspaceDir, eventCallback);
+      // The workspace (hostDir) is the persistent, per-conversation mount owned
+      // by WorkspaceSessionManager; only the ephemeral job dir is cleaned here.
+      const items = await this.runContainer(jobFile, hostDir, eventCallback);
       return { items };
     } finally {
       await rm(hostJobDir, { recursive: true, force: true }).catch(() => undefined);
-      await rm(hostWorkspaceDir, { recursive: true, force: true }).catch(() => undefined);
     }
   }
 

@@ -56,6 +56,7 @@ export type { WorkspaceSpec, ProvisionedWorkspace, GitCredentials, WorkspaceProv
 export type {
   ExecutionProvider,
   ExecutionProviderKind,
+  ExecutionWorkspace,
   ExecutionJob,
   ExecutionResult,
 } from './runner/ExecutionProvider';

@@ -196,6 +196,11 @@
       },
       {
         "kind": "tool",
+        "fromSlug": "checkout-repo",
+        "file": "tools/checkout-repo.json"
+      },
+      {
+        "kind": "tool",
         "fromSlug": "run-tests",
         "file": "tools/run-tests.json"
       },

@@ -1,0 +1,76 @@
+{
+  "schemaVersion": "1",
+  "kind": "tool",
+  "exportedAt": "2026-05-26T00:00:00.000Z",
+  "metadata": {
+    "fromSlug": "checkout-repo",
+    "fromStarshipSlug": "starborn-dvlif0"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "tool": {
+      "name": "Checkout Repo",
+      "description": "Clone a GitHub repository into an isolated workspace for this conversation and create a working branch. Call this FIRST before read-file/write-file/run-tests/open-pr-with-changes. The workspace persists for the rest of the run; subsequent file/terminal/test/PR tools operate inside this checkout. Returns the actual working branch to use when opening the PR.",
+      "parameters": {
+        "type": "object",
+        "required": ["owner", "repo"],
+        "properties": {
+          "owner": { "type": "string", "description": "GitHub repository owner/org" },
+          "repo": { "type": "string", "description": "GitHub repository name" },
+          "base": { "type": "string", "description": "Base branch or commit to check out (default: repo default branch)" },
+          "branch": {
+            "type": "string",
+            "description": "Working branch to create off base where changes land. If omitted, a unique branch is generated and returned."
+          }
+        }
+      },
+      "blueprint": {
+        "edges": [
+          { "to": "normalize_input", "ref": "e1", "from": "start" },
+          { "to": "confirm", "ref": "e2", "from": "normalize_input" },
+          { "to": "format_result", "ref": "e3", "from": "confirm" },
+          { "to": "end", "ref": "e4", "from": "format_result" }
+        ],
+        "nodes": [
+          { "ref": "start", "name": "Start", "type": "start", "parameters": {} },
+          {
+            "ref": "normalize_input",
+            "name": "Normalize input",
+            "type": "code",
+            "parameters": {
+              "code": "async function main(ctx) {\n  const i = ctx.input || {};\n  const owner = String(i.owner || '').trim();\n  const repo = String(i.repo || '').trim();\n  if (!owner) throw new Error('owner is required');\n  if (!repo) throw new Error('repo is required');\n  return {\n    owner,\n    repo,\n    base: String(i.base || '').trim() || null,\n    requestedBranch: String(i.branch || '').trim() || null\n  };\n}",
+              "timeout": 3000
+            }
+          },
+          {
+            "ref": "confirm",
+            "name": "Confirm checkout",
+            "type": "terminal",
+            "parameters": {
+              "command": "git rev-parse --abbrev-ref HEAD && git rev-parse HEAD && git remote get-url origin",
+              "timeout": 60000
+            }
+          },
+          {
+            "ref": "format_result",
+            "name": "Format result",
+            "type": "code",
+            "parameters": {
+              "code": "async function main(ctx) {\n  const r = ctx.lastOutputOf('confirm') || {};\n  const n = ctx.lastOutputOf('normalize_input') || {};\n  const lines = String(r.stdout || '').split('\\n').map((s) => s.trim()).filter(Boolean);\n  const ok = Number(r.exitCode ?? 1) === 0;\n  return {\n    success: ok,\n    owner: n.owner,\n    repo: n.repo,\n    base: n.base,\n    branch: lines[0] || n.requestedBranch || null,\n    head: lines[1] || null,\n    remote: lines[2] || null,\n    message: ok ? 'Workspace ready. Use the returned branch when opening the PR.' : (r.stderr || 'checkout failed')\n  };\n}",
+              "timeout": 3000
+            }
+          },
+          { "ref": "end", "name": "End", "type": "end", "parameters": { "output": "{{ lastOutputOf('format_result') }}" } }
+        ]
+      },
+      "transforms": null,
+      "mutations": null,
+      "condition": null,
+      "isEnabled": true,
+      "status": "active"
+    }
+  }
+}

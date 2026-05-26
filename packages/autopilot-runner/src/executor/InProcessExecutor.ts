@@ -1,5 +1,5 @@
 import { Executor, ExecuteInput } from './Executor';
-import { CancelledError, Engine, type Execution, type WorkspaceSpec, type GitCredentials, type ProvisionedWorkspace } from '@starships/autopilot';
+import { CancelledError, Engine, type Execution, type WorkspaceSpec, type GitCredentials } from '@starships/autopilot';
 import {
   createRunnerHostRuntime,
   type AwsRuntimeConfig,
@@ -70,11 +70,14 @@ export class InProcessExecutor implements Executor {
        */
       modelRoutes?: Record<string, ProviderRoute[] | undefined>;
       /**
-       * When present, provision a per-task workspace (clone the repo) and run the
-       * blueprint with FileSystem/Terminal nodes confined to it. Runner-only;
+       * Workspace-backed (native code) run. `root` is the absolute checkout path
+       * inside the sandbox (a persistent, mounted per-conversation dir). On the
+       * first (provisioning) job `spec`+`git` are present so we clone into `root`;
+       * on subsequent jobs only `root` is present and the existing checkout is
+       * reused. FileSystem/Terminal nodes are confined to it. Runner-only;
        * git.token is a secret that MUST NOT be placed in runtimeEnv or the blueprint.
        */
-      workspace?: { spec: WorkspaceSpec; git?: GitCredentials };
+      workspace?: { root?: string; spec?: WorkspaceSpec; git?: GitCredentials };
       [key: string]: unknown;
     };
 
@@ -94,11 +97,16 @@ export class InProcessExecutor implements Executor {
       ...engineConfig
     } = rawConfig;
 
-    // Provision a per-task workspace (clone) when requested, before execution.
-    let provisioned: ProvisionedWorkspace | undefined;
+    // Provision the workspace (clone) on the first job; reuse the existing
+    // checkout on subsequent jobs of the same agent run. The directory is a
+    // persistent, host-managed mount, so we never tear it down here.
+    let workspaceRoot: string | undefined;
     if (workspace?.spec) {
       const provider = new LocalWorkspaceProvider();
-      provisioned = await provider.provision(workspace.spec, workspace.git ?? { token: '' });
+      const provisioned = await provider.provision(workspace.spec, workspace.git ?? { token: '' }, workspace.root);
+      workspaceRoot = provisioned.root;
+    } else if (workspace?.root) {
+      workspaceRoot = workspace.root;
     }
 
     const controller = new AbortController();
@@ -120,7 +128,7 @@ export class InProcessExecutor implements Executor {
       // Ensure env("...") templates resolve inside the Engine (Eval uses Engine.runtimeEnv).
       runtimeEnv: runtimeEnv ?? {},
       hostRuntime,
-      workspaceRoot: provisioned?.root,
+      workspaceRoot,
       eventCallback: input.onEvent
         ? async (event: unknown) => {
             try {
@@ -147,13 +155,9 @@ export class InProcessExecutor implements Executor {
       throw err;
     } finally {
       executionRegistry.unregister(requestId);
-      if (provisioned) {
-        await provisioned.cleanup().catch((err) => {
-          console.error('[InProcessExecutor] Failed to clean up workspace', {
-            error: err instanceof Error ? err.message : String(err),
-          });
-        });
-      }
+      // The workspace is a persistent, host-managed mount reused across the
+      // agent run's tool calls; teardown is owned by the server-side session
+      // manager, never here.
     }
   }
 }

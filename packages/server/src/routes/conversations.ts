@@ -26,8 +26,11 @@ import {
   TurnRepository,
 } from '@starships/models';
 import { ExecutionItemUtils } from '@starships/autopilot';
-import type { Blueprint, EngineConfig } from '@starships/autopilot';
+import type { Blueprint, EngineConfig, ExecutionWorkspace } from '@starships/autopilot';
 import { executionProviderRouter } from '@/execution/ExecutionProviderRouter';
+import { workspaceSessionManager, type WorkspaceSession } from '@/execution/WorkspaceSessionManager';
+import { resolveGitCredentials } from '@/execution/gitCredentials';
+import type { ConnectorSession } from '@/services/ConnectorActionSessionService';
 import { AppError } from '@starships/errors';
 import { StarshipService } from '@/services/StarshipService';
 import { UserService } from '@/services/UserService';
@@ -248,6 +251,79 @@ function extractConnectorActionApiError(error: unknown): { code?: string; messag
 
 // tool execution uses the same runner config bundle as agent execution
 
+// `checkout-repo` clones a repo into a per-conversation workspace; the tools below
+// then operate inside that same checkout for the rest of the agent run. They only
+// become workspace-confined once a session is active — outside a workspace they
+// keep their legacy (server cwd) behavior, so generic use is unaffected.
+const WORKSPACE_CHECKOUT_TOOL_SLUG = 'checkout-repo';
+const WORKSPACE_CONFINED_TOOL_SLUGS = new Set<string>([
+  'read-file',
+  'write-file',
+  'list-directory',
+  'run-terminal-command',
+  'run-tests',
+  'open-pr-with-changes',
+]);
+
+function optionalString(value: unknown): string | undefined {
+  const s = typeof value === 'string' ? value.trim() : '';
+  return s.length > 0 ? s : undefined;
+}
+
+/**
+ * Decide whether a tool call runs inside a native-code workspace and, if so,
+ * return the mount + (for checkout-repo) the clone spec. `checkout-repo` binds
+ * and provisions the per-conversation session; other workspace tools reuse it.
+ */
+async function resolveToolWorkspace(args: {
+  toolSlug?: string;
+  toolArgs: Record<string, unknown>;
+  conversationId?: string;
+  connectorSessions?: Record<string, ConnectorSession | undefined>;
+}): Promise<ExecutionWorkspace | undefined> {
+  const { toolSlug, conversationId } = args;
+  if (!toolSlug || !conversationId) return undefined;
+
+  if (toolSlug === WORKSPACE_CHECKOUT_TOOL_SLUG) {
+    const owner = optionalString(args.toolArgs.owner);
+    const repo = optionalString(args.toolArgs.repo);
+    if (!owner || !repo) {
+      throw new AppError('checkout-repo requires "owner" and "repo"', 'VALIDATION_ERROR', 400);
+    }
+    const ref = optionalString(args.toolArgs.base) ?? optionalString(args.toolArgs.ref);
+    // A dedicated working branch keeps commits off the base; generate one when
+    // the caller doesn't specify it. The tool reports the actual branch back.
+    const branch = optionalString(args.toolArgs.branch) ?? `starships/work-${Date.now().toString(36)}`;
+    const repoUrl = `https://github.com/${owner}/${repo}.git`;
+
+    // If this conversation already has this repo cloned, reuse it (re-cloning
+    // into a non-empty checkout would fail).
+    const existing = workspaceSessionManager.get(conversationId);
+    if (existing && existing.repoUrl === repoUrl && workspaceSessionManager.isProvisioned(existing)) {
+      return { hostDir: existing.hostDir };
+    }
+
+    const git = resolveGitCredentials(args.connectorSessions);
+    const session = await workspaceSessionManager.bind({ key: conversationId, repoUrl, ref, branch });
+    return {
+      hostDir: session.hostDir,
+      spec: { repoUrl, ...(ref ? { ref } : {}), branch },
+      ...(git ? { git } : {}),
+    };
+  }
+
+  if (WORKSPACE_CONFINED_TOOL_SLUGS.has(toolSlug)) {
+    const session: WorkspaceSession | undefined = workspaceSessionManager.get(conversationId);
+    if (!session) return undefined; // no active workspace -> legacy (server cwd) behavior
+    if (!workspaceSessionManager.isProvisioned(session)) {
+      throw new AppError(`Workspace is not ready. Call '${WORKSPACE_CHECKOUT_TOOL_SLUG}' first.`, 'VALIDATION_ERROR', 400);
+    }
+    return { hostDir: session.hostDir };
+  }
+
+  return undefined;
+}
+
 async function executeToolBlueprint(args: {
   blueprint: Blueprint;
   toolConfig: Record<string, unknown>;
@@ -255,14 +331,25 @@ async function executeToolBlueprint(args: {
   runnerConfig: Record<string, unknown>;
   eventCallback?: EngineConfig['eventCallback'];
   starshipId?: string;
-  requiresWorkspace?: boolean;
+  toolSlug?: string;
+  conversationId?: string;
 }): Promise<unknown> {
   const execution = ExecutionItemUtils.createExecution();
   const initial = ExecutionItemUtils.wrapSingle({ ...args.toolArgs, config: args.toolConfig });
   execution.results.push({ nodeRef: '__initial__', items: initial });
+
+  const connectorSessions = (args.runnerConfig as { connectorSessions?: Record<string, ConnectorSession | undefined> })
+    .connectorSessions;
+  const workspace = await resolveToolWorkspace({
+    toolSlug: args.toolSlug,
+    toolArgs: args.toolArgs,
+    conversationId: args.conversationId,
+    connectorSessions,
+  });
+
   const provider = await executionProviderRouter.getProvider({
     starshipId: args.starshipId ?? '',
-    requiresWorkspace: args.requiresWorkspace ?? false,
+    requiresWorkspace: Boolean(workspace),
   });
   const { items } = await provider.runJob({
     blueprint: args.blueprint,
@@ -272,6 +359,7 @@ async function executeToolBlueprint(args: {
       eventCallback: args.eventCallback,
       ...(args.runnerConfig as unknown as EngineConfig),
     },
+    ...(workspace ? { workspace } : {}),
   });
   return ExecutionItemUtils.unwrapSingle(items);
 }
@@ -1336,6 +1424,9 @@ router.post(
             toolConfig: (toolById.configuration || {}) as Record<string, unknown>,
             toolArgs: existing.argsJson || {},
             runnerConfig: engineConfig,
+            starshipId: conversation.starshipId,
+            toolSlug,
+            conversationId,
           });
 
           const normalized = await replaceBase64ImagesWithAttachments({
@@ -1422,6 +1513,9 @@ router.post(
         toolConfig: (tool.configuration || {}) as Record<string, unknown>,
         toolArgs: args || {},
         runnerConfig: engineConfig,
+        starshipId: conversation.starshipId,
+        toolSlug,
+        conversationId,
         eventCallback: async (evt: unknown) => {
           try {
             if (!evt || typeof evt !== 'object') return;
@@ -1576,6 +1670,9 @@ async function executeOneToolCallForBatch(params: {
           toolConfig: (toolById.configuration || {}) as Record<string, unknown>,
           toolArgs: existing.argsJson || {},
           runnerConfig: toolEngineConfig,
+          starshipId,
+          toolSlug,
+          conversationId,
         });
         const normalized = await replaceBase64ImagesWithAttachments({ value: result, starshipId, conversationId, maxImages: 8 });
         return { kind: 'success', toolCallId, result: normalized.value, attachments: normalized.attachments, attachmentErrors: normalized.attachmentErrors };
@@ -1637,6 +1734,9 @@ async function executeOneToolCallForBatch(params: {
       toolConfig: (tool.configuration || {}) as Record<string, unknown>,
       toolArgs: args || {},
       runnerConfig: toolEngineConfig,
+      starshipId,
+      toolSlug,
+      conversationId,
       eventCallback: async (evt: unknown) => {
         try {
           if (!evt || typeof evt !== 'object') return;

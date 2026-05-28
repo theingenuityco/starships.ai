@@ -1,10 +1,11 @@
 import { Worker } from 'bullmq';
 import { getEnvConfig } from '@starships/env';
 import { createConnection, AutopilotAwaitRepository } from '@starships/models';
-import { autopilot, ExecutionItemUtils, RunnerFactory, type AutopilotEvent } from '@starships/autopilot';
+import { autopilot, ExecutionItemUtils, type AutopilotEvent } from '@starships/autopilot';
 import type { Execution, ExecutionEvent, ExecutionEventType } from '@starships/autopilot';
 import type { AutopilotAwaitConnectorEventSpec, AutopilotAwaitRequest } from '@starships/protocol';
 import { buildAutopilotExecutionBundle } from '@/services/autopilot-execution-bundle';
+import { executionProviderRouter } from '@/execution/ExecutionProviderRouter';
 import { extractPersistableState } from '@/utils/conversation-state';
 import {
   AUTOPILOT_AUTOMATION_QUEUE_NAME,
@@ -122,11 +123,18 @@ async function main(): Promise<void> {
         }
       };
 
-      const runner = RunnerFactory.getTopLevelRunner(0);
-      await runner.run(data.blueprint, execution, {
-        ...engineConfig,
-        eventCallback,
-        failOnNodeError: true,
+      const provider = await executionProviderRouter.getProvider({
+        starshipId: data.starshipId,
+        requiresWorkspace: false,
+      });
+      await provider.runJob({
+        blueprint: data.blueprint,
+        execution,
+        config: {
+          ...engineConfig,
+          eventCallback,
+          failOnNodeError: true,
+        },
       });
 
       const awaitRequest = capture.awaitRequest;

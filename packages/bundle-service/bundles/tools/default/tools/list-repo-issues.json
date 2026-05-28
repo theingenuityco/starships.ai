@@ -1,0 +1,93 @@
+{
+  "schemaVersion": "1",
+  "kind": "tool",
+  "exportedAt": "2026-05-26T00:00:00.000Z",
+  "metadata": {
+    "fromSlug": "list-repo-issues",
+    "fromStarshipSlug": "starborn-dvlif0"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "tool": {
+      "name": "List Repo Issues",
+      "description": "List issues for a GitHub repository.",
+      "parameters": {
+        "type": "object",
+        "required": [
+          "owner",
+          "repo"
+        ],
+        "properties": {
+          "owner": {
+            "type": "string",
+            "description": "Repo owner"
+          },
+          "repo": {
+            "type": "string",
+            "description": "Repo name"
+          },
+          "state": {
+            "type": "string",
+            "description": "open | closed | all"
+          },
+          "per_page": {
+            "type": "number"
+          },
+          "page": {
+            "type": "number"
+          }
+        }
+      },
+      "blueprint": {
+        "edges": [
+          {
+            "to": "call",
+            "ref": "e1",
+            "from": "start"
+          },
+          {
+            "to": "end",
+            "ref": "e2",
+            "from": "call"
+          }
+        ],
+        "nodes": [
+          {
+            "ref": "start",
+            "name": "Start",
+            "type": "start",
+            "parameters": {}
+          },
+          {
+            "ref": "call",
+            "name": "List Repo Issues",
+            "type": "connector_action",
+            "parameters": {
+              "args": "{{ ({ owner: ctx.input.owner, repo: ctx.input.repo, state: ctx.input.state, per_page: ctx.input.per_page, page: ctx.input.page }) }}",
+              "action": "list-repo-issues",
+              "timeout": 20000,
+              "connector": "github",
+              "failOnNon2xx": true
+            }
+          },
+          {
+            "ref": "end",
+            "name": "End",
+            "type": "end",
+            "parameters": {
+              "output": "{{ (lastOutputOf('call') || {}).body }}"
+            }
+          }
+        ]
+      },
+      "transforms": null,
+      "mutations": null,
+      "condition": null,
+      "isEnabled": true,
+      "status": "active"
+    }
+  }
+}

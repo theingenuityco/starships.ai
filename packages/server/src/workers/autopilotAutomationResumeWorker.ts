@@ -1,10 +1,11 @@
 import { Worker } from 'bullmq';
 import { getEnvConfig } from '@starships/env';
 import { createConnection, AutopilotAwaitFiringRepository, AutopilotAwaitRepository, ConnectorEventRepository } from '@starships/models';
-import { autopilot, RunnerFactory, type AutopilotEvent } from '@starships/autopilot';
+import { autopilot, type AutopilotEvent } from '@starships/autopilot';
 import type { Blueprint, Execution, ExecutionEvent, ExecutionEventType, ExecutionItem } from '@starships/autopilot';
 import type { AutopilotAwaitConnectorEventSpec, AutopilotAwaitRequest, ConnectorEventModel } from '@starships/protocol';
 import { buildAutopilotExecutionBundle } from '@/services/autopilot-execution-bundle';
+import { executionProviderRouter } from '@/execution/ExecutionProviderRouter';
 import { extractPersistableState } from '@/utils/conversation-state';
 import {
   AUTOPILOT_AUTOMATION_QUEUE_NAME,
@@ -197,16 +198,23 @@ async function main(): Promise<void> {
       };
 
       try {
-        const runner = RunnerFactory.getTopLevelRunner(0);
+        const provider = await executionProviderRouter.getProvider({
+          starshipId: aw.starshipId,
+          requiresWorkspace: false,
+        });
         const executionTimeoutMs = process.env.AUTOPILOT_EXECUTION_TIMEOUT_MS
           ? parseInt(process.env.AUTOPILOT_EXECUTION_TIMEOUT_MS, 10)
           : 10 * 60_000; // 10 minutes
 
         await withTimeout(
-          runner.run(aw.blueprintJson as unknown as Blueprint, execution, {
-          ...engineConfig,
-          eventCallback,
-          failOnNodeError: true,
+          provider.runJob({
+            blueprint: aw.blueprintJson as unknown as Blueprint,
+            execution,
+            config: {
+              ...engineConfig,
+              eventCallback,
+              failOnNodeError: true,
+            },
           }),
           executionTimeoutMs,
           'Autopilot execution'

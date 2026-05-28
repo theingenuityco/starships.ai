@@ -1,0 +1,90 @@
+{
+  "schemaVersion": "1",
+  "kind": "tool",
+  "exportedAt": "2026-05-26T00:00:00.000Z",
+  "metadata": {
+    "fromSlug": "edit-doc",
+    "fromStarshipSlug": "starborn-dvlif0"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "tool": {
+      "name": "Edit Doc",
+      "description": "Update an existing Starships doc by id (title, content, or archived state).",
+      "parameters": {
+        "type": "object",
+        "required": [
+          "docId"
+        ],
+        "properties": {
+          "docId": {
+            "type": "string",
+            "description": "The id of the doc to update"
+          },
+          "title": {
+            "type": "string",
+            "description": "New title (optional)"
+          },
+          "content": {
+            "type": "string",
+            "description": "New markdown content (optional)"
+          },
+          "archived": {
+            "type": "boolean",
+            "description": "Set archived state (optional)"
+          }
+        }
+      },
+      "blueprint": {
+        "edges": [
+          { "to": "normalize_input", "ref": "e1", "from": "start" },
+          { "to": "edit_doc", "ref": "e2", "from": "normalize_input" },
+          { "to": "format_result", "ref": "e3", "from": "edit_doc" },
+          { "to": "end", "ref": "e4", "from": "format_result" }
+        ],
+        "nodes": [
+          { "ref": "start", "name": "Start", "type": "start", "parameters": {} },
+          {
+            "ref": "normalize_input",
+            "name": "Validate input",
+            "type": "code",
+            "parameters": {
+              "code": "async function main(ctx) {\n  const input = ctx.input || {};\n  const docId = String(input.docId || '').trim();\n  if (!docId) throw new Error('docId is required');\n  const out = { docId };\n  if (input.title != null) out.title = String(input.title);\n  if (input.content != null) out.content = String(input.content);\n  if (input.archived !== undefined) out.archived = Boolean(input.archived);\n  return out;\n}",
+              "timeout": 3000
+            }
+          },
+          {
+            "ref": "edit_doc",
+            "name": "Edit Doc (Starships)",
+            "type": "connector_action",
+            "parameters": {
+              "args": "{{ (lastOutputOf('normalize_input') || {}) }}",
+              "action": "edit-doc",
+              "timeout": 10000,
+              "connector": "starships",
+              "failOnNon2xx": true
+            }
+          },
+          {
+            "ref": "format_result",
+            "name": "Format result",
+            "type": "code",
+            "parameters": {
+              "code": "async function main(ctx) {\n  const resp = ctx.lastOutputOf('edit_doc') || {};\n  const body = resp.body || {};\n  const data = body && body.data ? body.data : body;\n  const doc = data.doc || data || {};\n  return {\n    success: true,\n    id: doc.id || null,\n    slug: doc.slug || null,\n    title: doc.title || null,\n    archived: Boolean(doc.archived)\n  };\n}",
+              "timeout": 3000
+            }
+          },
+          { "ref": "end", "name": "End", "type": "end", "parameters": { "output": "{{ lastOutputOf('format_result') }}" } }
+        ]
+      },
+      "transforms": null,
+      "mutations": null,
+      "condition": null,
+      "isEnabled": true,
+      "status": "active"
+    }
+  }
+}

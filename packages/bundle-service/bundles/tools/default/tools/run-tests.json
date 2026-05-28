@@ -1,0 +1,82 @@
+{
+  "schemaVersion": "1",
+  "kind": "tool",
+  "exportedAt": "2026-05-26T00:00:00.000Z",
+  "metadata": {
+    "fromSlug": "run-tests",
+    "fromStarshipSlug": "starborn-dvlif0"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "tool": {
+      "name": "Run Tests",
+      "description": "Run the repository's test (or build) command inside the current workspace and report pass/fail with output. Only meaningful in a workspace-backed run (Builder).",
+      "parameters": {
+        "type": "object",
+        "required": [],
+        "properties": {
+          "command": {
+            "type": "string",
+            "description": "Test command to run (default: npm test)"
+          },
+          "workingDirectory": {
+            "type": "string",
+            "description": "Optional subdirectory within the workspace to run in"
+          },
+          "timeout": {
+            "type": "number",
+            "description": "Timeout in ms (default 600000)"
+          }
+        }
+      },
+      "blueprint": {
+        "edges": [
+          { "to": "normalize_input", "ref": "e1", "from": "start" },
+          { "to": "run", "ref": "e2", "from": "normalize_input" },
+          { "to": "format_result", "ref": "e3", "from": "run" },
+          { "to": "end", "ref": "e4", "from": "format_result" }
+        ],
+        "nodes": [
+          { "ref": "start", "name": "Start", "type": "start", "parameters": {} },
+          {
+            "ref": "normalize_input",
+            "name": "Normalize input",
+            "type": "code",
+            "parameters": {
+              "code": "async function main(ctx) {\n  const input = ctx.input || {};\n  const command = String(input.command || 'npm test').trim();\n  const out = { command };\n  if (input.workingDirectory != null && String(input.workingDirectory).trim() !== '') out.workingDirectory = String(input.workingDirectory).trim();\n  const t = Number(input.timeout);\n  out.timeout = Number.isFinite(t) && t >= 1000 ? t : 600000;\n  return out;\n}",
+              "timeout": 3000
+            }
+          },
+          {
+            "ref": "run",
+            "name": "Run test command",
+            "type": "terminal",
+            "parameters": {
+              "command": "{{ String((lastOutputOf('normalize_input') || {}).command || 'npm test') }}",
+              "workingDirectory": "{{ (lastOutputOf('normalize_input') || {}).workingDirectory }}",
+              "timeout": "{{ (lastOutputOf('normalize_input') || {}).timeout }}"
+            }
+          },
+          {
+            "ref": "format_result",
+            "name": "Format result",
+            "type": "code",
+            "parameters": {
+              "code": "async function main(ctx) {\n  const r = ctx.lastOutputOf('run') || {};\n  const exitCode = Number(r.exitCode ?? 1);\n  const tail = (s) => { const str = String(s || ''); return str.length > 4000 ? str.slice(-4000) : str; };\n  return {\n    passed: exitCode === 0,\n    exitCode,\n    command: r.command || null,\n    stdout: tail(r.stdout),\n    stderr: tail(r.stderr)\n  };\n}",
+              "timeout": 3000
+            }
+          },
+          { "ref": "end", "name": "End", "type": "end", "parameters": { "output": "{{ lastOutputOf('format_result') }}" } }
+        ]
+      },
+      "transforms": null,
+      "mutations": null,
+      "condition": null,
+      "isEnabled": true,
+      "status": "active"
+    }
+  }
+}

@@ -81,7 +81,7 @@ export function NavigationItem({ href, label, icon, isActive, badgeCount, showLa
             ? 'text-primary bg-primary/10 border-transparent'
             : hasBadge
               ? 'text-foreground border-transparent hover:bg-muted/70 dark:hover:bg-[#2C2C30]'
-              : 'text-muted-foreground border-transparent hover:text-foreground hover:bg-muted/70 dark:hover:bg-[#2C2C30]'
+              : 'text-foreground border-transparent hover:bg-muted/70 dark:hover:bg-[#2C2C30]'
       )}
       style={{
         justifyContent: 'flex-start',

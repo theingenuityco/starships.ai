@@ -2,10 +2,13 @@
 
 /**
  * Mission-control composite page — staged single-frame demo surface used for the
- * hero-video shoot. Mock-fed and gated off in production. Keyboard control:
+ * hero-video shoot. Mock-fed and gated off in production. It auto-plays on
+ * load: one granular step every 2s, holds on the final state, then loops back.
+ * Keyboard control (any key pauses auto-play):
  *   Space / ArrowRight  — advance to the next beat
  *   Backspace / ArrowLeft — go back one beat
- *   R                   — reset to beat 0
+ *   P                   — toggle auto-play
+ *   R                   — restart from the top (re-enables auto-play)
  *
  * Frame (Variation D — cards as a unified global feed):
  *   ┌────────────────────────────────────────────────┬───────────────────┐
@@ -28,6 +31,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { notFound, useParams } from 'next/navigation'
 import Link from 'next/link'
+import { AnimatePresence, motion, type Variants } from 'motion/react'
 import { cn } from '@/lib/utils'
 import { avatarColour, agentChipColour } from '@/components/dashboard/utils'
 import Icon from '@/components/primitives/Icon'
@@ -39,10 +43,48 @@ import { useStarshipBySlug } from '@/hooks/useStarships'
 import { useStarshipRooms } from '@/hooks/useRooms'
 import type { AgentModel } from '@starships/protocol'
 
+// ─── Shared animation variants ───────────────────────────────────────────────
+
+const CARD_VARIANTS: Variants = {
+  hidden: { opacity: 0, y: 12, scale: 0.98 },
+  visible: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.3, ease: [0.25, 0.46, 0.45, 0.94] } },
+  exit: { opacity: 0, y: -8, scale: 0.97, transition: { duration: 0.2, ease: 'easeIn' } },
+}
+
+const SECTION_VARIANTS: Variants = {
+  hidden: { opacity: 0, y: 8 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.25, ease: 'easeOut' } },
+  exit: { opacity: 0, transition: { duration: 0.15 } },
+}
+
+const TIMELINE_VARIANTS: Variants = {
+  hidden: { opacity: 0, x: -10 },
+  visible: { opacity: 1, x: 0, transition: { duration: 0.3, ease: [0.25, 0.46, 0.45, 0.94] } },
+  exit: { opacity: 0, x: -6, transition: { duration: 0.2, ease: 'easeIn' } },
+}
+
+// One-shot tint that replays whenever `signal` changes (and on mount). The
+// keyed span remounts on each new signal, so it draws the eye to the row/card
+// that just changed state, then fades out. Sits behind content (crisp text).
+function ChangeFlash({ signal, className }: { signal: React.Key; className?: string }) {
+  return (
+    <motion.span
+      key={signal}
+      aria-hidden
+      className={cn('pointer-events-none absolute', className)}
+      initial={{ opacity: 1 }}
+      animate={{ opacity: 0 }}
+      transition={{ duration: 2.6, ease: 'easeOut' }}
+    />
+  )
+}
+
 // ─── Beats ───────────────────────────────────────────────────────────────────
 
-type Beat = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7
-const MAX_BEAT: Beat = 7
+type Beat = number
+const MAX_BEAT: Beat = 10
+const STEP_MS = 2000
+const HOLD_MS = 4500
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -133,13 +175,19 @@ function UnifiedCard({ card }: { card: FeedCard }) {
   const isDone = DONE_KINDS.has(card.statusKind)
 
   return (
-    <div
+    <motion.div
+      layout
+      variants={CARD_VARIANTS}
+      initial="hidden"
+      animate="visible"
+      exit="exit"
       className={cn(
-        'group relative overflow-hidden transition-all duration-500',
+        'group relative overflow-hidden',
         CARD_SURFACE,
         isDone && 'opacity-60'
       )}
     >
+      <ChangeFlash signal={card.statusKind} className="inset-0 rounded-lg bg-primary/15" />
       <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-2.5 py-2.5 pl-3 pr-2.5">
         {/* Checkbox */}
         <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center">
@@ -199,7 +247,7 @@ function UnifiedCard({ card }: { card: FeedCard }) {
         </div>
       </div>
 
-    </div>
+    </motion.div>
   )
 }
 
@@ -285,7 +333,9 @@ function BucketSeparator({ label, count, tone = 'muted' }: { label: string; coun
         <span className={cn('whitespace-nowrap text-[11px] font-semibold uppercase tracking-[0.14em]', textCls)}>
           {label}
         </span>
-        <span className="inline-flex h-4 min-w-[16px] items-center justify-center rounded-full bg-muted px-1 font-mono text-[9px] tabular-nums text-muted-foreground/60">{count}</span>
+        {count > 0 ? (
+          <span className="inline-flex h-4 min-w-[16px] items-center justify-center rounded-full bg-muted px-1 font-mono text-[9px] tabular-nums text-muted-foreground/60">{count}</span>
+        ) : null}
         <div className="h-px flex-1 bg-border/30" />
       </div>
     </div>
@@ -296,7 +346,15 @@ function TimelineItem({ item, isLast, starshipSlug }: { item: GlobalActivityItem
   const roomHref = starshipSlug ? `/ship/${starshipSlug}/rooms/${item.room.toLowerCase()}` : null
 
   return (
-    <div className={cn('flex items-start gap-3', TIMELINE_ITEM_LEFT)}>
+    <motion.div
+      layout
+      variants={TIMELINE_VARIANTS}
+      initial="hidden"
+      animate="visible"
+      exit="exit"
+      className={cn('relative flex items-start gap-3', TIMELINE_ITEM_LEFT)}
+    >
+      <ChangeFlash signal={item.state} className="inset-x-1 inset-y-1 rounded-md bg-primary/10" />
       <div className="flex w-6 shrink-0 flex-col items-center self-stretch">
         <div className="w-px bg-border/60" style={{ height: 8 }} />
         <Avatar name={item.agent} className="h-6 w-6 text-[10px]" />
@@ -324,10 +382,10 @@ function TimelineItem({ item, isLast, starshipSlug }: { item: GlobalActivityItem
           <span className="ml-auto shrink-0 pl-2 font-mono text-[10px] tabular-nums text-muted-foreground">{formatAgo(item.at)}</span>
         </div>
         {item.detail ? (
-          <p className="truncate text-xs text-muted-foreground">{item.detail}</p>
+          <p className="truncate text-xs text-muted-foreground/50">{item.detail}</p>
         ) : null}
       </div>
-    </div>
+    </motion.div>
   )
 }
 
@@ -369,9 +427,7 @@ function ActivityPane({
     }
 
     const out: ActivityBucket[] = []
-    if (live.length > 0) {
-      out.push({ key: 'live', label: 'Running now', tone: 'live', items: live })
-    }
+    out.push({ key: 'live', label: 'Running now', tone: live.length > 0 ? 'live' : 'muted', items: live })
     const order: TimeBucket[] = ['hour', 'today', 'older']
     for (const b of order) {
       const arr = grouped.get(b)
@@ -386,17 +442,31 @@ function ActivityPane({
   return (
     <section className={cn('min-w-0', className)}>
       <div className="pt-1 pb-2">
-        {attention}
+        <AnimatePresence mode="popLayout">
+          {attention ? <motion.div key="attention" variants={TIMELINE_VARIANTS} initial="hidden" animate="visible" exit="exit">{attention}</motion.div> : null}
+        </AnimatePresence>
         {total === 0 ? (
           <p className="px-1 pt-2 text-xs text-muted-foreground/40">No activity yet.</p>
         ) : (
           buckets.map((bucket, groupIdx) => (
             <div key={bucket.key}>
               <BucketSeparator label={bucket.label} count={bucket.items.length} tone={bucket.tone} />
-              {bucket.items.map((it, i) => {
-                const isLast = groupIdx === buckets.length - 1 && i === bucket.items.length - 1
-                return <TimelineItem key={it.id} item={it} isLast={isLast} starshipSlug={starshipSlug} />
-              })}
+              <AnimatePresence mode="popLayout" initial={false}>
+                {bucket.key === 'live' && bucket.items.length === 0 ? (
+                  <div key="live-empty" className={cn('flex items-start gap-3', TIMELINE_ITEM_LEFT)}>
+                    <div className="flex w-6 shrink-0 flex-col items-center self-stretch">
+                      <div className="w-px bg-border/60" style={{ height: 8 }} />
+                      <div className="w-px flex-1 bg-border/60" />
+                    </div>
+                    <p className="py-2 text-xs text-muted-foreground/40">All quiet. No agents running right now.</p>
+                  </div>
+                ) : (
+                  bucket.items.map((it, i) => {
+                    const isLast = groupIdx === buckets.length - 1 && i === bucket.items.length - 1
+                    return <TimelineItem key={it.id} item={it} isLast={isLast} starshipSlug={starshipSlug} />
+                  })
+                )}
+              </AnimatePresence>
             </div>
           ))
         )}
@@ -478,32 +548,51 @@ function NeedsAttention({
 
 function useBeatMachine() {
   const [beat, setBeat] = useState<Beat>(0)
+  const [auto, setAuto] = useState(true)
+
   const advance = useCallback(() => {
-    setBeat((b) => (b < MAX_BEAT ? ((b + 1) as Beat) : b))
+    setBeat((b) => (b < MAX_BEAT ? b + 1 : b))
   }, [])
   const rewind = useCallback(() => {
-    setBeat((b) => (b > 0 ? ((b - 1) as Beat) : b))
+    setBeat((b) => (b > 0 ? b - 1 : b))
   }, [])
   const reset = useCallback(() => setBeat(0), [])
 
+  // Manual keyboard control. Scrubbing pauses auto-play; R restarts it.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement | null)?.tagName?.toLowerCase()
       if (tag === 'input' || tag === 'textarea') return
       if (e.key === ' ' || e.key === 'ArrowRight' || e.key === 'Enter') {
         e.preventDefault()
+        setAuto(false)
         advance()
       } else if (e.key === 'Backspace' || e.key === 'ArrowLeft') {
         e.preventDefault()
+        setAuto(false)
         rewind()
+      } else if (e.key === 'p' || e.key === 'P') {
+        e.preventDefault()
+        setAuto((a) => !a)
       } else if (e.key === 'r' || e.key === 'R') {
         e.preventDefault()
         reset()
+        setAuto(true)
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [advance, rewind, reset])
+
+  // Auto-play: one step every STEP_MS, hold longer on the final beat, then loop.
+  useEffect(() => {
+    if (!auto) return
+    const atEnd = beat >= MAX_BEAT
+    const id = setTimeout(() => {
+      setBeat((b) => (b >= MAX_BEAT ? 0 : b + 1))
+    }, atEnd ? HOLD_MS : STEP_MS)
+    return () => clearTimeout(id)
+  }, [auto, beat])
 
   return { beat, advance, rewind, reset }
 }
@@ -540,9 +629,9 @@ export default function MissionControlPage(): React.JSX.Element {
     return raw.split(/\s+/)[0] ?? ''
   }, [userName])
 
-  // YOUR REVIEW state — pending at b=4, shipping flash at b=5, idle elsewhere.
+  // YOUR REVIEW state — pending at b=8, shipping flash at b=9, idle elsewhere.
   const reviewState: ReviewState = useMemo(() => {
-    if (beat === 4) {
+    if (beat === 8) {
       return {
         kind: 'pending',
         agent: 'Anvil',
@@ -554,7 +643,7 @@ export default function MissionControlPage(): React.JSX.Element {
         diff: '+38 −4 · 2 files',
       }
     }
-    if (beat === 5) return { kind: 'shipping' }
+    if (beat === 9) return { kind: 'shipping' }
     return { kind: 'idle' }
   }, [beat])
 
@@ -565,10 +654,10 @@ export default function MissionControlPage(): React.JSX.Element {
 
     // Support principal: ticket #1042 (Priya) on the Support Tickets board.
     if (beat >= 1) {
-      const status = beat >= 6 ? 'RESOLVED' : beat >= 2 ? 'TRIAGED' : 'NEW'
-      const statusKind: StatusKind = beat >= 6 ? 'resolved' : beat >= 2 ? 'triaged' : 'new'
-      const assignee = beat >= 6 ? 'Reply' : 'Triage'
-      const indicators: FeedCardIndicator[] = beat >= 2
+      const status = beat >= 10 ? 'RESOLVED' : beat >= 3 ? 'TRIAGED' : 'NEW'
+      const statusKind: StatusKind = beat >= 10 ? 'resolved' : beat >= 3 ? 'triaged' : 'new'
+      const assignee = beat >= 10 ? 'Reply' : 'Triage'
+      const indicators: FeedCardIndicator[] = beat >= 3
         ? [
             { label: 'bug · mobile · auth' },
             { icon: 'alert-circle', label: 'priority high' },
@@ -588,21 +677,21 @@ export default function MissionControlPage(): React.JSX.Element {
         status,
         statusKind,
         primary: true,
-        at: beat >= 6 ? 0 : beat >= 2 ? 60 : 30,
+        at: beat >= 10 ? 0 : beat >= 3 ? 60 : 30,
       })
     }
 
     // Engineering principal: fix/mobile-signin on the Engineering Pipeline.
-    if (beat >= 2) {
+    if (beat >= 4) {
       const status =
-        beat >= 6 ? 'MERGED' : beat >= 4 ? 'IN REVIEW' : beat >= 3 ? 'BUILDING' : 'SCOPED'
+        beat >= 10 ? 'MERGED' : beat >= 8 ? 'IN REVIEW' : beat >= 5 ? 'BUILDING' : 'SCOPED'
       const statusKind: StatusKind =
-        beat >= 6 ? 'merged' : beat >= 4 ? 'in-review' : beat >= 3 ? 'building' : 'scoped'
-      const assignee = beat >= 3 ? 'Anvil' : 'Quill'
+        beat >= 10 ? 'merged' : beat >= 8 ? 'in-review' : beat >= 5 ? 'building' : 'scoped'
+      const assignee = beat >= 5 ? 'Anvil' : 'Quill'
       const indicators: FeedCardIndicator[] = []
-      if (beat >= 3) indicators.push({ icon: 'git-branch', label: '+38 −4 · 2 files' })
-      if (beat > 3) indicators.push({ icon: 'check', label: '142 / 142 tests' })
-      if (beat >= 4) indicators.push({ icon: 'check', label: '12 checks' })
+      if (beat >= 5) indicators.push({ icon: 'git-branch', label: '+38 −4 · 2 files' })
+      if (beat >= 7) indicators.push({ icon: 'check', label: '142 / 142 tests' })
+      if (beat >= 8) indicators.push({ icon: 'check', label: '12 checks' })
       cards.push({
         id: 'eng-mobile-signin',
         type: 'pr',
@@ -617,8 +706,8 @@ export default function MissionControlPage(): React.JSX.Element {
         status,
         statusKind,
         primary: true,
-        needsYou: beat === 4,
-        at: beat >= 6 ? 0 : beat >= 4 ? 60 : beat >= 3 ? 30 : 120,
+        needsYou: beat === 8,
+        at: beat >= 10 ? 0 : beat >= 8 ? 60 : beat >= 5 ? 30 : 120,
       })
     }
 
@@ -691,13 +780,13 @@ export default function MissionControlPage(): React.JSX.Element {
         type: 'run',
         room: 'Ops',
         board: 'Operations',
-        title: 'May invoices · 38 / 42',
+        title: 'May invoices · 42 / 42',
         description:
-          'Weekly invoice sweep. 38 of 42 May invoices sent so far. 4 invoices on EU customers awaiting tax-id confirmation — emailed for VAT IDs, queued for retry tomorrow.',
+          'Weekly invoice sweep complete. All 42 May invoices sent. 4 EU customers confirmed VAT IDs — final invoices delivered.',
         assignee: 'Janus',
-        indicators: [{ icon: 'check', label: '38 sent' }, { label: '4 pending VAT' }],
-        status: 'RUNNING',
-        statusKind: 'running',
+        indicators: [{ icon: 'check', label: '42 sent' }],
+        status: 'RESOLVED',
+        statusKind: 'resolved',
         at: 60,
       }
     )
@@ -705,44 +794,44 @@ export default function MissionControlPage(): React.JSX.Element {
     return cards
   }, [beat])
 
-  // Group cards by attention level for section headers.
+  // Group cards into ongoing (live), active (queued/scoped), and done.
   const grouped = useMemo(() => {
-    const needsYou: FeedCard[] = []
+    const ongoing: FeedCard[] = []
     const active: FeedCard[] = []
     const done: FeedCard[] = []
     for (const c of feedCards) {
-      if (c.needsYou) needsYou.push(c)
-      else if (DONE_KINDS.has(c.statusKind)) done.push(c)
+      if (DONE_KINDS.has(c.statusKind)) done.push(c)
+      else if (LIVE_KINDS.has(c.statusKind)) ongoing.push(c)
       else active.push(c)
     }
     const byRecency = (a: FeedCard, b: FeedCard) => a.at - b.at
-    needsYou.sort(byRecency)
+    ongoing.sort(byRecency)
     active.sort(byRecency)
     done.sort(byRecency)
-    return { needsYou, active, done }
+    return { ongoing, active, done }
   }, [feedCards])
 
   // ── Activity items (right pane) ──────────────────────────────────────────
 
   const supportItems: ActivityItem[] = useMemo(() => {
     const out: ActivityItem[] = []
-    if (beat >= 6) out.push({
+    if (beat >= 10) out.push({
       id: 's-reply', agent: 'Reply', state: 'done', at: 0,
       action: 'Replying to Priya R. on #1042',
       detail: 'Sent a 47-word reply confirming the iOS Safari fix is live as of today\'s deploy. Used her exact wording for the issue, named the fix specifically, no support theatre. Ticket closed and resolved_at stamped.',
     })
-    if (beat >= 2) out.push({
-      id: 's-triage-done', agent: 'Triage', state: 'done', at: beat >= 6 ? 240 : 60,
+    if (beat >= 3) out.push({
+      id: 's-triage-done', agent: 'Triage', state: 'done', at: beat >= 10 ? 240 : 0,
       action: 'Triaging ticket #1042',
       detail: 'Classified as bug · mobile · auth · priority high. The "Sign in button does nothing" pattern matches 2 other open tickets — flagging Engineering with a note to look at iOS Safari resize handling.',
     })
-    if (beat === 1) out.push({
+    if (beat === 2) out.push({
       id: 's-triage-working', agent: 'Triage', state: 'working', at: 0,
       action: 'Triaging ticket #1042',
       detail: 'Reading the body now. Looks like a UI event-handler issue on the sign-in button specific to mobile Safari. Repro-ing on the iOS simulator to confirm category and priority.',
     })
     if (beat >= 1) out.push({
-      id: 's-arrival', agent: 'Inbox', state: 'done', at: beat >= 6 ? 300 : beat >= 2 ? 120 : 0,
+      id: 's-arrival', agent: 'Inbox', state: 'done', at: beat >= 10 ? 300 : beat >= 4 ? 180 : beat >= 3 ? 120 : beat === 2 ? 60 : 0,
       action: 'New ticket #1042 from Priya R.',
       detail: 'Subject: Can\'t log in on mobile. Body: "Sign in button does nothing on iPhone Safari, tried Chrome too, no luck. This started after the update yesterday."',
     })
@@ -761,43 +850,48 @@ export default function MissionControlPage(): React.JSX.Element {
 
   const engineeringItems: ActivityItem[] = useMemo(() => {
     const out: ActivityItem[] = []
-    if (beat >= 6) out.push({
+    if (beat >= 10) out.push({
       id: 'e-deploy', agent: 'CI', state: 'done', at: 0,
       action: 'Deploying PR #432 to production',
       detail: 'Build 4823 done, edge cache flushed, post-deploy smoke tests all green. Monitoring sign-in latency for the next 5 minutes — currently flat at 38ms p95.',
     })
-    if (beat >= 6) out.push({
+    if (beat === 9) out.push({
+      id: 'e-merge', agent: 'Anvil', state: 'working', at: 0,
+      action: 'Merging fix/mobile-signin to main',
+      detail: 'Squash-merging onto main and cleaning up the branch. Linked ticket #1042 will auto-close on merge. Kicking off the production deploy right after.',
+    })
+    if (beat >= 10) out.push({
       id: 'e-merge', agent: 'Anvil', state: 'done', at: 30,
       action: 'Merging fix/mobile-signin to main',
       detail: 'Squash-merged onto main. Cleanup branch deleted. Linked ticket #1042 auto-closed. Picking up the next item from the engineering backlog now.',
     })
-    if (beat === 4) out.push({
+    if (beat === 8) out.push({
       id: 'e-open', agent: 'Anvil', state: 'needs-you', at: 0,
       action: 'Opening PR #432 for review',
       detail: 'All 12 checks are green and the full test suite passed on a real checkout. The diff is +38 −4 across 2 files — should take 30 seconds to skim, it\'s a tight UI fix. Ready when you are.',
     })
-    if (beat > 4) out.push({
-      id: 'e-open-done', agent: 'Anvil', state: 'done', at: beat >= 6 ? 120 : 60,
+    if (beat >= 9) out.push({
+      id: 'e-open-done', agent: 'Anvil', state: 'done', at: beat >= 10 ? 120 : 60,
       action: 'Opening PR #432 for review',
       detail: 'All 12 checks are green and the full test suite passed on a real checkout. Diff is +38 −4 across 2 files.',
     })
-    if (beat === 3) out.push({
+    if (beat === 6) out.push({
       id: 'e-tests', agent: 'Anvil', state: 'working', at: 0,
       action: 'Running tests on fix/mobile-signin',
       detail: 'Spinning up iOS Safari at 390×844, replaying the resize sequence. 47 of 142 tests passed so far. Estimated 18 more seconds before the regression test runs.',
     })
-    if (beat > 3) out.push({
-      id: 'e-tests-done', agent: 'Anvil', state: 'done', at: beat >= 6 ? 180 : 30,
+    if (beat >= 7) out.push({
+      id: 'e-tests-done', agent: 'Anvil', state: 'done', at: beat >= 10 ? 180 : 30,
       action: 'Running tests on fix/mobile-signin',
       detail: 'All 142 tests passed in 24.3 seconds. The new Safari-resize regression test passes cleanly. Pushing the branch now.',
     })
-    if (beat >= 3) out.push({
-      id: 'e-fix', agent: 'Anvil', state: 'done', at: beat >= 6 ? 240 : 60,
+    if (beat >= 5) out.push({
+      id: 'e-fix', agent: 'Anvil', state: 'done', at: beat >= 10 ? 240 : 60,
       action: 'Implementing fix for mobile sign-in',
       detail: 'Three-line change inside SignInButton.tsx — guarding the resize handler against a stale ref. Wrote a regression test that reproduces the original failure before the fix.',
     })
-    if (beat >= 2) out.push({
-      id: 'e-spec', agent: 'Quill', state: 'done', at: beat >= 6 ? 300 : 120,
+    if (beat >= 4) out.push({
+      id: 'e-spec', agent: 'Quill', state: 'done', at: beat >= 10 ? 300 : 120,
       action: 'Scoping ticket #1042',
       detail: 'Reproduced on iPhone 14 Pro Safari at 390×844. The button stops responding after a viewport resize because the handler ref is captured before the resize, not after. Acceptance: button stays responsive across orientation and resize.',
     })
@@ -812,7 +906,7 @@ export default function MissionControlPage(): React.JSX.Element {
   const opsItems: ActivityItem[] = useMemo(
     () => [
       {
-        id: 'o-1', agent: 'Janus', state: 'working', at: 60,
+        id: 'o-1', agent: 'Janus', state: 'done', at: 60,
         action: 'Running weekly invoice sweep',
         detail: 'Stripe API responsive. 38 of 42 May invoices sent so far. 4 invoices on EU customers awaiting tax-id confirmation — emailed for VAT IDs, will retry tomorrow.',
       },
@@ -865,44 +959,67 @@ export default function MissionControlPage(): React.JSX.Element {
                 newConversationTitleOverride="New conversation"
               />
             </div>
-            <ActivityPane
-              className="mx-auto w-full max-w-3xl"
-              items={unifiedActivity}
-              starshipSlug={slug}
-              attention={
-                reviewState.kind === 'pending' ? (
-                  <NeedsAttention state={reviewState} onApprove={advance} onRequestChanges={rewind} />
-                ) : null
-              }
-            />
+            <div className="mx-auto mt-4 w-full max-w-3xl rounded-xl border border-border/50 bg-background">
+              <div className="border-b border-border/50 px-4 py-1.5">
+                <span className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground/70">Activity</span>
+              </div>
+              <ActivityPane
+                items={unifiedActivity}
+                starshipSlug={slug}
+                attention={
+                  reviewState.kind === 'pending' ? (
+                    <NeedsAttention state={reviewState} onApprove={advance} onRequestChanges={rewind} />
+                  ) : null
+                }
+              />
+            </div>
           </div>
 
           <div className="w-[480px] shrink-0 flex flex-col gap-4">
-            <div className="space-y-2">
-              {grouped.needsYou.length > 0 ? (
-                <>
-                  <SectionHeader label="Needs your attention" icon="alert-circle" tone="primary" count={grouped.needsYou.length} />
-                  {grouped.needsYou.map((card) => (
-                    <UnifiedCard key={card.id} card={card} />
-                  ))}
-                </>
-              ) : null}
-              {grouped.active.length > 0 ? (
-                <>
-                  <SectionHeader label="Active" tone="active" count={grouped.active.length} />
-                  {grouped.active.map((card) => (
-                    <UnifiedCard key={card.id} card={card} />
-                  ))}
-                </>
-              ) : null}
-              {grouped.done.length > 0 ? (
-                <>
-                  <SectionHeader label="Recently done" tone="done" count={grouped.done.length} />
-                  {grouped.done.map((card) => (
-                    <UnifiedCard key={card.id} card={card} />
-                  ))}
-                </>
-              ) : null}
+            <div className="rounded-xl border border-border/50 bg-background space-y-0">
+              <div className="border-b border-border/50 px-4 py-1.5">
+                <span className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground/70">Tasks</span>
+              </div>
+              <div className="p-3 space-y-2">
+              <AnimatePresence mode="popLayout" initial={false}>
+                {grouped.ongoing.length > 0 ? (
+                  <motion.div key="section-ongoing" variants={SECTION_VARIANTS} initial="hidden" animate="visible" exit="exit">
+                    <SectionHeader label="Ongoing" tone="active" count={grouped.ongoing.length} />
+                    <div className="space-y-2 pt-2">
+                      <AnimatePresence mode="popLayout" initial={false}>
+                        {grouped.ongoing.map((card) => (
+                          <UnifiedCard key={card.id} card={card} />
+                        ))}
+                      </AnimatePresence>
+                    </div>
+                  </motion.div>
+                ) : null}
+                {grouped.active.length > 0 ? (
+                  <motion.div key="section-active" variants={SECTION_VARIANTS} initial="hidden" animate="visible" exit="exit">
+                    <SectionHeader label="Active" tone="active" count={grouped.active.length} />
+                    <div className="space-y-2 pt-2">
+                      <AnimatePresence mode="popLayout" initial={false}>
+                        {grouped.active.map((card) => (
+                          <UnifiedCard key={card.id} card={card} />
+                        ))}
+                      </AnimatePresence>
+                    </div>
+                  </motion.div>
+                ) : null}
+                {grouped.done.length > 0 ? (
+                  <motion.div key="section-done" variants={SECTION_VARIANTS} initial="hidden" animate="visible" exit="exit">
+                    <SectionHeader label="Recently done" tone="done" count={grouped.done.length} />
+                    <div className="space-y-2 pt-2">
+                      <AnimatePresence mode="popLayout" initial={false}>
+                        {grouped.done.map((card) => (
+                          <UnifiedCard key={card.id} card={card} />
+                        ))}
+                      </AnimatePresence>
+                    </div>
+                  </motion.div>
+                ) : null}
+              </AnimatePresence>
+              </div>
             </div>
           </div>
         </div>

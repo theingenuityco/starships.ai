@@ -866,9 +866,9 @@ kubectl exec postgres-0 -n starships-prod -- psql -U postgres -c "SELECT 1"
 
 ### Related Documentation
 
-- [k8s/prod/03-deployment.yaml](../k8s/prod/03-deployment.yaml) - Application Deployment configuration
-- [k8s/prod/13-postgres-statefulset.yaml](../k8s/prod/13-postgres-statefulset.yaml) - Postgres StatefulSet configuration
-- [k8s/prod/01-storage-class.yaml](../k8s/prod/01-storage-class.yaml) - Storage class configuration
+- [k8s/prod/03-deployment.yaml](../legacy/k8s/prod/03-deployment.yaml) - Application Deployment configuration
+- [k8s/prod/13-postgres-statefulset.yaml](../legacy/k8s/prod/13-postgres-statefulset.yaml) - Postgres StatefulSet configuration
+- [k8s/prod/01-storage-class.yaml](../legacy/k8s/prod/01-storage-class.yaml) - Storage class configuration
 - [Dockerfile](../Dockerfile) - Application container configuration
 
 ### External Resources

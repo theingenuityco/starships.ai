@@ -1,0 +1,83 @@
+{
+  "schemaVersion": "1",
+  "kind": "tool",
+  "exportedAt": "2026-05-26T00:00:00.000Z",
+  "metadata": {
+    "fromSlug": "create-doc",
+    "fromStarshipSlug": "starborn-dvlif0"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "tool": {
+      "name": "Create Doc",
+      "description": "Create a Starships doc (unstructured markdown) with a title and content. Use for specs, conventions, runbooks, and decision logs.",
+      "parameters": {
+        "type": "object",
+        "required": [
+          "title",
+          "content"
+        ],
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "Document title (max 300 chars)"
+          },
+          "content": {
+            "type": "string",
+            "description": "Document content (markdown)"
+          }
+        }
+      },
+      "blueprint": {
+        "edges": [
+          { "to": "normalize_input", "ref": "e1", "from": "start" },
+          { "to": "create_doc", "ref": "e2", "from": "normalize_input" },
+          { "to": "format_result", "ref": "e3", "from": "create_doc" },
+          { "to": "end", "ref": "e4", "from": "format_result" }
+        ],
+        "nodes": [
+          { "ref": "start", "name": "Start", "type": "start", "parameters": {} },
+          {
+            "ref": "normalize_input",
+            "name": "Validate input",
+            "type": "code",
+            "parameters": {
+              "code": "async function main(ctx) {\n  const input = ctx.input || {};\n  const title = String(input.title || '').trim();\n  const content = String(input.content || '').trim();\n  if (!title) throw new Error('title is required');\n  if (!content) throw new Error('content is required');\n  return { title, content };\n}",
+              "timeout": 3000
+            }
+          },
+          {
+            "ref": "create_doc",
+            "name": "Create Doc (Starships)",
+            "type": "connector_action",
+            "parameters": {
+              "args": "{{ (lastOutputOf('normalize_input') || {}) }}",
+              "action": "create-doc",
+              "timeout": 10000,
+              "connector": "starships",
+              "failOnNon2xx": true
+            }
+          },
+          {
+            "ref": "format_result",
+            "name": "Format result",
+            "type": "code",
+            "parameters": {
+              "code": "async function main(ctx) {\n  const resp = ctx.lastOutputOf('create_doc') || {};\n  const body = resp.body || {};\n  const data = body && body.data ? body.data : body;\n  const doc = data.doc || data || {};\n  return {\n    success: true,\n    id: doc.id || null,\n    slug: doc.slug || null,\n    title: doc.title || null\n  };\n}",
+              "timeout": 3000
+            }
+          },
+          { "ref": "end", "name": "End", "type": "end", "parameters": { "output": "{{ lastOutputOf('format_result') }}" } }
+        ]
+      },
+      "transforms": null,
+      "mutations": null,
+      "condition": null,
+      "isEnabled": true,
+      "status": "active"
+    }
+  }
+}

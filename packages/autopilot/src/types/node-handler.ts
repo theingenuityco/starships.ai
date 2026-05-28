@@ -165,6 +165,15 @@ export interface NodeHandlerOptions {
   hostRuntime?: HostRuntime;
 
   /**
+   * Absolute filesystem root for per-task workspace isolation. When set,
+   * FileSystem/Terminal nodes sandbox all operations to this directory
+   * (replacing process.cwd() as the boundary) and Terminal runs with a
+   * scrubbed env. Set only by workspace-backed runs; must be an absolute,
+   * runner-local path. Never serialized into Execution.
+   */
+  workspaceRoot?: string;
+
+  /**
    * Optional runner override for Agent execution.
    * Useful when the embedding host wants explicit isolation/cancellation behavior
    * (e.g., ChildProcessRunner with runWithController).

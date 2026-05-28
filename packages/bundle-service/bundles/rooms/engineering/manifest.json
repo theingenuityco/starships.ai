@@ -1,0 +1,77 @@
+{
+  "schemaVersion": "1",
+  "kind": "bundle",
+  "exportedAt": "2026-05-26T00:00:00.000Z",
+  "entities": {
+    "rooms": [
+      {
+        "kind": "room",
+        "fromSlug": "engineering",
+        "fromStarshipSlug": "starborn-eng",
+        "file": "rooms/engineering.json"
+      }
+    ],
+    "agents": [
+      {
+        "kind": "agent",
+        "fromSlug": "forge",
+        "fromStarshipSlug": "starborn-eng",
+        "file": "agents/forge.json"
+      },
+      {
+        "kind": "agent",
+        "fromSlug": "sift",
+        "fromStarshipSlug": "starborn-eng",
+        "file": "agents/sift.json"
+      },
+      {
+        "kind": "agent",
+        "fromSlug": "quill",
+        "fromStarshipSlug": "starborn-eng",
+        "file": "agents/quill.json"
+      },
+      {
+        "kind": "agent",
+        "fromSlug": "anvil",
+        "fromStarshipSlug": "starborn-eng",
+        "file": "agents/anvil.json"
+      },
+      {
+        "kind": "agent",
+        "fromSlug": "lens",
+        "fromStarshipSlug": "starborn-eng",
+        "file": "agents/lens.json"
+      }
+    ],
+    "views": [],
+    "datasets": [
+      {
+        "kind": "dataset",
+        "fromSlug": "repos",
+        "fromStarshipSlug": "starborn-eng",
+        "file": "datasets/repos.json"
+      },
+      {
+        "kind": "dataset",
+        "fromSlug": "ownership",
+        "fromStarshipSlug": "starborn-eng",
+        "file": "datasets/ownership.json"
+      },
+      {
+        "kind": "dataset",
+        "fromSlug": "tracking",
+        "fromStarshipSlug": "starborn-eng",
+        "file": "datasets/tracking.json"
+      }
+    ],
+    "taskBoards": [
+      {
+        "kind": "task_board",
+        "fromSlug": "engineering-pipeline",
+        "fromStarshipSlug": "starborn-eng",
+        "file": "task-boards/engineering-pipeline.json"
+      }
+    ],
+    "tools": []
+  }
+}

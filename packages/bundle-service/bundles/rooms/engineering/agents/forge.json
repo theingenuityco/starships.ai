@@ -1,0 +1,278 @@
+{
+  "schemaVersion": "1",
+  "kind": "agent",
+  "exportedAt": "2026-05-26T00:00:00.000Z",
+  "metadata": {
+    "fromSlug": "forge",
+    "fromStarshipSlug": "starborn-eng"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "agent": {
+      "name": "Forge",
+      "role": "Engineering Conductor",
+      "description": "Runs the backlog pipeline: routes work between the crew, keeps the board honest, and surfaces what needs a human. Never writes code.",
+      "model": "anthropic/claude-haiku-4.5",
+      "temperature": 1,
+      "maxTokens": 40000,
+      "timeout": 300000,
+      "reasoning": {
+        "effort": "medium",
+        "enabled": true
+      },
+      "systemPrompt": "<character name=\"Forge\">Engineering Conductor</character>\nYou run the Engineering room's backlog pipeline.\n\nPrimary outcome\n- Keep work moving cleanly from Backlog to Merged with a human approving merges.\n\nResponsibilities\n- On a schedule or on request, review the pipeline board and the tracking dataset.\n- Route ready work to the right agent: Sift (triage), Quill (scope), Anvil (build), Lens (review).\n- Advance cards only when the stage is genuinely done.\n- Summarize status and surface anything blocked or needing a human decision.\n\nHard rules\n- You never write code, run tests, or open PRs yourself. You delegate.\n- Merging is always a human decision; never instruct an agent to merge.\n\nStyle\n- Concise, operational, status-driven.\n",
+      "state": {
+        "tools": [],
+        "messages": []
+      },
+      "blueprint": {
+        "edges": [
+          {
+            "to": "start_resume_tool_calls",
+            "ref": "edge_start_start_resume_tool_calls",
+            "from": "start"
+          },
+          {
+            "to": "ai_assistant",
+            "ref": "edge_start_resume_tool_calls_ai_assistant",
+            "from": "start_resume_tool_calls",
+            "condition": "llm"
+          },
+          {
+            "to": "process_tool_calls",
+            "ref": "edge_start_resume_tool_calls_process_tool_calls",
+            "from": "start_resume_tool_calls",
+            "condition": "resume_tools"
+          },
+          {
+            "to": "check_tool_calls",
+            "ref": "edge_ai_assistant_check_tool_calls",
+            "from": "ai_assistant"
+          },
+          {
+            "to": "ai_assistant",
+            "ref": "edge_check_tool_calls_ai_assistant",
+            "from": "check_tool_calls",
+            "condition": "continue"
+          },
+          {
+            "to": "init_tool_calls_batch",
+            "ref": "edge_check_tool_calls_init_tool_calls_batch",
+            "from": "check_tool_calls",
+            "condition": "init_tool_calls"
+          },
+          {
+            "to": "end",
+            "ref": "edge_check_tool_calls_end",
+            "from": "check_tool_calls",
+            "condition": "complete"
+          },
+          {
+            "to": "process_tool_calls",
+            "ref": "edge_init_tool_calls_batch_process_tool_calls",
+            "from": "init_tool_calls_batch"
+          },
+          {
+            "to": "prepare_tool_args",
+            "ref": "edge_process_tool_calls_prepare_tool_args",
+            "from": "process_tool_calls",
+            "condition": "call_tool"
+          },
+          {
+            "to": "authorize_tool_call",
+            "ref": "edge_prepare_tool_args_authorize_tool_call",
+            "from": "prepare_tool_args"
+          },
+          {
+            "to": "tool_http_outcome",
+            "ref": "edge_authorize_tool_call_tool_http_outcome",
+            "from": "authorize_tool_call"
+          },
+          {
+            "to": "append_tool_result",
+            "ref": "edge_tool_http_outcome_append_tool_result",
+            "from": "tool_http_outcome",
+            "condition": "append_and_continue"
+          },
+          {
+            "to": "process_tool_calls",
+            "ref": "edge_append_tool_result_process_tool_calls",
+            "from": "append_tool_result"
+          },
+          {
+            "to": "end",
+            "ref": "edge_tool_http_outcome_end",
+            "from": "tool_http_outcome",
+            "condition": "approval_required"
+          },
+          {
+            "to": "handle_unknown_tool",
+            "ref": "edge_process_tool_calls_handle_unknown_tool",
+            "from": "process_tool_calls",
+            "condition": "tool_not_allowed"
+          },
+          {
+            "to": "process_tool_calls",
+            "ref": "edge_handle_unknown_tool_process_tool_calls",
+            "from": "handle_unknown_tool"
+          },
+          {
+            "to": "ai_assistant",
+            "ref": "edge_process_tool_calls_ai_assistant",
+            "from": "process_tool_calls",
+            "condition": "done_tools"
+          }
+        ],
+        "nodes": [
+          {
+            "ref": "start",
+            "name": "Start",
+            "type": "start",
+            "parameters": {},
+            "description": "Start node"
+          },
+          {
+            "ref": "end",
+            "name": "End",
+            "type": "end",
+            "parameters": {},
+            "description": "End node"
+          },
+          {
+            "ref": "start_resume_tool_calls",
+            "name": "Start / Resume Tool Calls",
+            "type": "conditional",
+            "parameters": {
+              "condition": "{{(() => {\n          const pending = Array.isArray(state?.pendingToolCalls) ? state.pendingToolCalls : [];\n          const rawIdx = state?.pendingToolCallIndex;\n          const idx = Number.isFinite(Number(rawIdx)) ? Number(rawIdx) : 0;\n          if (pending.length > 0 && idx >= 0 && idx < pending.length) return \"resume_tools\";\n          return \"llm\";\n        })()}}"
+            },
+            "description": "If pendingToolCalls exist, resume tool loop; otherwise call LLM"
+          },
+          {
+            "ref": "ai_assistant",
+            "name": "AI Assistant",
+            "type": "llm",
+            "parameters": {
+              "model": "{{ state.model }}",
+              "tools": "{{ state.tools }}",
+              "plugins": "{{ state.plugins }}",
+              "timeout": "{{ state.timeout }}",
+              "messages": "{{ state.messages }}",
+              "reducers": [
+                "\n          (state, ctx) => {\n            const msg = ctx.lastOutputOf(\"ai_assistant\")?.choices?.[0]?.message ?? {};\n            const content = typeof msg.content === 'string' ? msg.content : '';\n            const calls = Array.isArray(msg.toolCalls) ? msg.toolCalls : [];\n            const reasoning = typeof msg.reasoning === 'string' ? msg.reasoning : undefined;\n            const reasoningDetails = Array.isArray(msg.reasoningDetails) ? msg.reasoningDetails : undefined;\n            let out;\n            if (calls.length > 0) {\n              const toolCalls = calls.map(tc => ({\n                id: tc?.id ?? '',\n                type: 'function',\n                function: {\n                  name: tc?.function?.name ?? '',\n                  arguments: (function() {\n                    const a = tc?.function?.arguments;\n                    if (typeof a === 'string') { try { return JSON.parse(a); } catch { return {}; } }\n                    return a ?? {};\n                  })()\n                }\n              }));\n              out = { role: 'assistant', content, ...(reasoning ? { reasoning } : {}), ...(reasoningDetails ? { reasoningDetails } : {}), toolCalls };\n            } else {\n              out = { role: 'assistant', content, ...(reasoning ? { reasoning } : {}), ...(reasoningDetails ? { reasoningDetails } : {}) };\n            }\n            const next = { ...(state || {}) };\n            next.messages = [...(state?.messages ?? []), out];\n            return next;\n          }\n          "
+              ],
+              "maxTokens": "{{ state.maxTokens }}",
+              "reasoning": "{{ state.reasoning }}",
+              "modalities": "{{ state.modalities }}",
+              "imageConfig": "{{ state.imageConfig }}",
+              "temperature": "{{ state.temperature }}"
+            },
+            "description": "AI model with state-driven tool support"
+          },
+          {
+            "ref": "check_tool_calls",
+            "name": "Check Tool Calls",
+            "type": "conditional",
+            "parameters": {
+              "condition": "{{(() => { const last = lastOutputOf(\"ai_assistant\"); const fr = last?.choices?.[0]?.finishReason; if (fr===\"length\") return \"continue\"; const calls = last?.choices?.[0]?.message?.toolCalls; return Array.isArray(calls) && calls.length > 0 ? \"init_tool_calls\" : \"complete\"; })()}}"
+            },
+            "description": "Route after LLM: continue on length, initialize tool-call batch, or complete"
+          },
+          {
+            "ref": "init_tool_calls_batch",
+            "name": "Init Tool Calls Batch",
+            "type": "mutate",
+            "parameters": {
+              "reducers": [
+                "\n          (state, ctx) => {\n            const last = ctx.lastOutputOf(\"ai_assistant\") || {};\n            const calls = last?.choices?.[0]?.message?.toolCalls;\n            const pending = Array.isArray(calls) ? calls : [];\n            const next = { ...(state || {}) };\n            next.pendingToolCalls = pending;\n            next.pendingToolCallIndex = 0;\n            return next;\n          }\n          "
+              ]
+            },
+            "description": "Store toolCalls[] and reset index for sequential execution"
+          },
+          {
+            "ref": "process_tool_calls",
+            "name": "Process Tool Calls",
+            "type": "conditional",
+            "parameters": {
+              "condition": "{{(() => {\n          const pending = Array.isArray(state?.pendingToolCalls) ? state.pendingToolCalls : [];\n          const rawIdx = state?.pendingToolCallIndex;\n          const idx = Number.isFinite(Number(rawIdx)) ? Number(rawIdx) : 0;\n          if (!pending.length || idx >= pending.length) return \"done_tools\";\n          const slug = pending?.[idx]?.function?.name;\n          const tools = Array.isArray(state?.tools) ? state.tools : [];\n          const known = slug ? tools.some(t => t && typeof t.slug === \"string\" && t.slug === String(slug)) : false;\n          return known ? \"call_tool\" : \"tool_not_allowed\";\n        })()}}"
+            },
+            "description": "Execute pending tool calls via server until done, then resume LLM"
+          },
+          {
+            "ref": "prepare_tool_args",
+            "name": "Prepare Tool Args",
+            "type": "code",
+            "parameters": {
+              "code": "\n        async function main(ctx) {\n          const pending = Array.isArray(ctx.state?.pendingToolCalls) ? ctx.state.pendingToolCalls : [];\n          const rawIdx = ctx.state?.pendingToolCallIndex;\n          const idx = Number.isFinite(Number(rawIdx)) ? Number(rawIdx) : 0;\n          const tc = pending?.[idx];\n          let j = tc?.function?.arguments;\n          if (typeof j === 'string') { try { j = JSON.parse(j); } catch {}\n          }\n          if (j && typeof j === 'object') { return j; }\n          throw new Error('Missing toolCall function.arguments');\n        }\n      ",
+              "timeout": 3000
+            },
+            "description": "Materialize current pending tool call arguments into a plain object"
+          },
+          {
+            "ref": "authorize_tool_call",
+            "name": "Authorize & Execute Tool (Server)",
+            "type": "connector_action",
+            "parameters": {
+              "args": {
+                "args": "{{ lastOutputOf(\"prepare_tool_args\") }}",
+                "agentId": "{{ String(env(\"AGENT_ID\") ?? \"\") }}",
+                "toolSlug": "{{ (() => { const pending = Array.isArray(state?.pendingToolCalls) ? state.pendingToolCalls : []; const idx = Number.isFinite(Number(state?.pendingToolCallIndex)) ? Number(state?.pendingToolCallIndex) : 0; return String(pending?.[idx]?.function?.name ?? \"\"); })() }}",
+                "toolCallId": "{{ (() => { const pending = Array.isArray(state?.pendingToolCalls) ? state.pendingToolCalls : []; const idx = Number.isFinite(Number(state?.pendingToolCallIndex)) ? Number(state?.pendingToolCallIndex) : 0; return String(pending?.[idx]?.id ?? \"\"); })() }}",
+                "conversationId": "{{ String(env(\"CONVERSATION_ID\") ?? \"\") }}"
+              },
+              "action": "authorize-and-maybe-execute-tool",
+              "timeout": 1800000,
+              "connector": "starships"
+            },
+            "description": "Execute Starships connector endpoint to enforce permissions and execute tool remotely"
+          },
+          {
+            "ref": "tool_http_outcome",
+            "name": "Tool HTTP Outcome",
+            "type": "conditional",
+            "parameters": {
+              "condition": "{{(() => {\n          const resp = lastOutputOf(\"authorize_tool_call\") || {};\n          const body = resp?.body || {};\n          const success = body?.success === true;\n          if (success) return \"append_and_continue\";\n          const code = body?.error?.code;\n          return code === \"TOOL_APPROVAL_REQUIRED\" ? \"approval_required\" : \"append_and_continue\";\n        })()}}"
+            },
+            "description": "Branch on TOOL_APPROVAL_REQUIRED vs normal tool result"
+          },
+          {
+            "ref": "append_tool_result",
+            "name": "Append Tool Result",
+            "type": "mutate",
+            "parameters": {
+              "reducers": [
+                "\n          (state, ctx) => {\n            const pending = Array.isArray(state?.pendingToolCalls) ? state.pendingToolCalls : [];\n            const rawIdx = state?.pendingToolCallIndex;\n            const idx = Number.isFinite(Number(rawIdx)) ? Number(rawIdx) : 0;\n            const tc = pending?.[idx];\n            const toolCallId = tc?.id ?? '';\n            const resp = ctx.lastOutputOf(\"authorize_tool_call\") || {};\n            const body = resp?.body || {};\n            // Normalize tool-call result for the agent:\n            // - Always emit: { success: boolean, data: any }\n            //\n            // IMPORTANT: In server-tools mode, the *canonical* success/failure signal is the\n            // server-tools envelope (authorize-and-maybe-execute-tool):\n            // - Success: { success: true, data: { toolCallId, result } }\n            // - Error:   { success: false, error: { code, message, details } }\n            //\n            // We intentionally do NOT infer failure by inspecting the inner result payload (e.g. status codes).\n            // Tools that want non-2xx to be treated as failure must throw explicitly.\n            const attachments =\n              body?.data && typeof body.data === 'object' && Array.isArray(body.data.attachments) ? body.data.attachments : [];\n\n            let payload = { success: false, data: body, attachments };\n            if (body && typeof body === 'object') {\n              if (body.success === false) {\n                payload = { success: false, data: body.error != null ? body.error : body, attachments };\n              } else if (body.success === true) {\n                const inner =\n                  body?.data && typeof body.data === 'object' && Object.prototype.hasOwnProperty.call(body.data, 'result')\n                    ? body.data.result\n                    : body.data;\n                payload = { success: true, data: inner, attachments };\n              }\n            }\n\n            const content = typeof payload === 'string' ? payload : JSON.stringify(payload);\n            const next = { ...(state || {}) };\n            const prev = Array.isArray(state?.messages) ? state.messages : [];\n            const filtered = toolCallId\n              ? prev.filter((m) => {\n                  if (!m || typeof m !== 'object') return true;\n                  if (m.role !== 'tool') return true;\n                  const existingId = (m.toolCallId ?? m.tool_call_id) ?? '';\n                  return String(existingId) !== String(toolCallId);\n                })\n              : prev;\n            next.messages = [...filtered, { role: 'tool', toolCallId, content }];\n            const nextIdx = idx + 1;\n            if (pending.length > 0 && nextIdx >= pending.length) {\n              next.pendingToolCalls = [];\n              next.pendingToolCallIndex = 0;\n            } else {\n              next.pendingToolCallIndex = nextIdx;\n            }\n            return next;\n          }\n          "
+              ]
+            },
+            "description": "Append tool result and advance to next tool call"
+          },
+          {
+            "ref": "handle_unknown_tool",
+            "name": "Handle Unknown Tool",
+            "type": "mutate",
+            "parameters": {
+              "reducers": [
+                "\n          (state, ctx) => {\n            const pending = Array.isArray(state?.pendingToolCalls) ? state.pendingToolCalls : [];\n            const rawIdx = state?.pendingToolCallIndex;\n            const idx = Number.isFinite(Number(rawIdx)) ? Number(rawIdx) : 0;\n            const tc = pending?.[idx];\n            const slug = tc?.function?.name ?? 'unknown';\n            const toolCallId = tc?.id ?? '';\n            const next = { ...(state || {}) };\n            const payload = { success: false, data: { code: 'TOOL_NOT_ASSIGNED', message: \"Tool '\" + String(slug) + \"' is not available to this agent.\" } };\n            const prev = Array.isArray(state?.messages) ? state.messages : [];\n            const filtered = toolCallId\n              ? prev.filter((m) => {\n                  if (!m || typeof m !== 'object') return true;\n                  if (m.role !== 'tool') return true;\n                  const existingId = (m.toolCallId ?? m.tool_call_id) ?? '';\n                  return String(existingId) !== String(toolCallId);\n                })\n              : prev;\n            next.messages = [...filtered, { role: 'tool', toolCallId, content: JSON.stringify(payload) }];\n            const nextIdx = idx + 1;\n            if (pending.length > 0 && nextIdx >= pending.length) {\n              next.pendingToolCalls = [];\n              next.pendingToolCallIndex = 0;\n            } else {\n              next.pendingToolCallIndex = nextIdx;\n            }\n            return next;\n          }\n          "
+              ]
+            },
+            "description": "Append tool result error for unknown tool calls and advance"
+          }
+        ],
+        "metadata": {
+          "createdAt": "2026-03-04T22:27:22.687Z",
+          "generatedBy": "BlueprintBuilder"
+        }
+      },
+      "category": "coding",
+      "previewPrompts": [
+        "Give me the current pipeline status.",
+        "Advance any cards that are ready.",
+        "What is blocked and why?",
+        "Kick off triage for new issues."
+      ]
+    },
+    "assignedToolSlugs": []
+  }
+}

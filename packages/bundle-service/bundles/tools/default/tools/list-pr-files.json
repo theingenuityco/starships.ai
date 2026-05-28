@@ -1,0 +1,94 @@
+{
+  "schemaVersion": "1",
+  "kind": "tool",
+  "exportedAt": "2026-05-26T00:00:00.000Z",
+  "metadata": {
+    "fromSlug": "list-pr-files",
+    "fromStarshipSlug": "starborn-dvlif0"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "tool": {
+      "name": "List PR Files",
+      "description": "List the files (diff) changed in a GitHub pull request.",
+      "parameters": {
+        "type": "object",
+        "required": [
+          "owner",
+          "repo",
+          "pull_number"
+        ],
+        "properties": {
+          "owner": {
+            "type": "string",
+            "description": "Repo owner"
+          },
+          "repo": {
+            "type": "string",
+            "description": "Repo name"
+          },
+          "pull_number": {
+            "type": "number",
+            "description": "PR number"
+          },
+          "per_page": {
+            "type": "number"
+          },
+          "page": {
+            "type": "number"
+          }
+        }
+      },
+      "blueprint": {
+        "edges": [
+          {
+            "to": "call",
+            "ref": "e1",
+            "from": "start"
+          },
+          {
+            "to": "end",
+            "ref": "e2",
+            "from": "call"
+          }
+        ],
+        "nodes": [
+          {
+            "ref": "start",
+            "name": "Start",
+            "type": "start",
+            "parameters": {}
+          },
+          {
+            "ref": "call",
+            "name": "List PR Files",
+            "type": "connector_action",
+            "parameters": {
+              "args": "{{ ({ owner: ctx.input.owner, repo: ctx.input.repo, pull_number: ctx.input.pull_number, per_page: ctx.input.per_page, page: ctx.input.page }) }}",
+              "action": "list-pull-request-files",
+              "timeout": 20000,
+              "connector": "github",
+              "failOnNon2xx": true
+            }
+          },
+          {
+            "ref": "end",
+            "name": "End",
+            "type": "end",
+            "parameters": {
+              "output": "{{ (lastOutputOf('call') || {}).body }}"
+            }
+          }
+        ]
+      },
+      "transforms": null,
+      "mutations": null,
+      "condition": null,
+      "isEnabled": true,
+      "status": "active"
+    }
+  }
+}

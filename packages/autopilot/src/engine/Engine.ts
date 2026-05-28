@@ -60,6 +60,13 @@ export interface EngineConfig {
    */
   runtimeEnv?: Record<string, unknown>;
   hostRuntime?: HostRuntime;
+  /**
+   * Absolute filesystem root for per-task workspace isolation. When set,
+   * FileSystem/Terminal nodes sandbox all operations to this directory
+   * (replacing process.cwd() as the boundary). Set only by workspace-backed
+   * runs; must be an absolute, runner-local path. Never serialized into Execution.
+   */
+  workspaceRoot?: string;
 }
 
 export class Engine {
@@ -71,6 +78,7 @@ export class Engine {
   private onCancel?: (cancel: () => void) => void;
   private runtimeEnv?: Record<string, unknown>;
   private hostRuntime?: HostRuntime;
+  private workspaceRoot?: string;
   /**
    * In-memory (non-serialized) latest results by nodeRef.
    *
@@ -88,6 +96,7 @@ export class Engine {
     this.onCancel = config.onCancel;
     this.runtimeEnv = config.runtimeEnv;
     this.hostRuntime = config.hostRuntime;
+    this.workspaceRoot = config.workspaceRoot;
     this.eval = new Eval(this.runtimeEnv);
   }
 
@@ -126,6 +135,7 @@ export class Engine {
       onCancel: this.onCancel,
       runtimeEnv: this.runtimeEnv,
       hostRuntime: this.hostRuntime,
+      workspaceRoot: this.workspaceRoot,
     } as NodeHandlerOptions;
 
     return new handlerConstructor(resolvedParams, handlerOptions);

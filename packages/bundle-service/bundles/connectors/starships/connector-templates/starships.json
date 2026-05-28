@@ -523,6 +523,85 @@
         "timeoutMs": 10000
       },
       {
+        "name": "create-doc",
+        "description": "Create a doc (unstructured markdown) within a starship",
+        "method": "POST",
+        "path": "/starships/{starshipId}/docs",
+        "requestStyle": "json",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "title",
+            "content"
+          ],
+          "properties": {
+            "title": {
+              "type": "string"
+            },
+            "content": {
+              "type": "string"
+            },
+            "starshipId": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": true
+        },
+        "mapping": {
+          "body": {
+            "title": "{{ args.title }}",
+            "content": "{{ args.content }}"
+          },
+          "path": {
+            "starshipId": "{{ String(args.starshipId ?? runtimeEnv.STARSHIP_ID ?? \"\") }}"
+          }
+        },
+        "timeoutMs": 10000
+      },
+      {
+        "name": "edit-doc",
+        "description": "Update a doc by id (title, content, archived)",
+        "method": "PATCH",
+        "path": "/starships/{starshipId}/docs/{docId}",
+        "requestStyle": "json",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "docId"
+          ],
+          "properties": {
+            "docId": {
+              "type": "string"
+            },
+            "title": {
+              "type": "string"
+            },
+            "content": {
+              "type": "string"
+            },
+            "archived": {
+              "type": "boolean"
+            },
+            "starshipId": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": true
+        },
+        "mapping": {
+          "body": {
+            "title": "{{ args.title }}",
+            "content": "{{ args.content }}",
+            "archived": "{{ args.archived }}"
+          },
+          "path": {
+            "starshipId": "{{ String(args.starshipId ?? runtimeEnv.STARSHIP_ID ?? \"\") }}",
+            "docId": "{{ String(args.docId ?? \"\") }}"
+          }
+        },
+        "timeoutMs": 10000
+      },
+      {
         "name": "list-agents",
         "description": "List agents for a starship",
         "method": "GET",

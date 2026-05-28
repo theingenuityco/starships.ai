@@ -689,6 +689,202 @@
         "timeoutMs": 15000
       },
       {
+        "name": "list-pull-request-files",
+        "description": "List the files (diff) changed in a pull request.",
+        "method": "GET",
+        "path": "/repos/{owner}/{repo}/pulls/{pull_number}/files",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "owner",
+            "repo",
+            "pull_number"
+          ],
+          "properties": {
+            "repo": {
+              "type": "string",
+              "description": "The name of the repository"
+            },
+            "owner": {
+              "type": "string",
+              "description": "The account owner of the repository"
+            },
+            "pull_number": {
+              "type": "number",
+              "description": "The number that identifies the pull request"
+            },
+            "per_page": {
+              "type": "number",
+              "description": "Results per page (max 100)"
+            },
+            "page": {
+              "type": "number",
+              "description": "Page number of the results to fetch"
+            }
+          }
+        },
+        "mapping": {
+          "path": {
+            "repo": "{{ String(args.repo) }}",
+            "owner": "{{ String(args.owner) }}",
+            "pull_number": "{{ String(args.pull_number) }}"
+          },
+          "query": {
+            "per_page": "{{ args.per_page ? String(args.per_page) : undefined }}",
+            "page": "{{ args.page ? String(args.page) : undefined }}"
+          },
+          "headers": {
+            "Accept": "application/vnd.github+json"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "create-pull-request-review",
+        "description": "Create a review on a pull request, optionally with line-anchored inline comments. Requires push access.",
+        "method": "POST",
+        "path": "/repos/{owner}/{repo}/pulls/{pull_number}/reviews",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "owner",
+            "repo",
+            "pull_number"
+          ],
+          "properties": {
+            "repo": {
+              "type": "string",
+              "description": "The name of the repository"
+            },
+            "owner": {
+              "type": "string",
+              "description": "The account owner of the repository"
+            },
+            "pull_number": {
+              "type": "number",
+              "description": "The number that identifies the pull request"
+            },
+            "body": {
+              "type": "string",
+              "description": "The body text of the review"
+            },
+            "event": {
+              "enum": [
+                "APPROVE",
+                "REQUEST_CHANGES",
+                "COMMENT"
+              ],
+              "type": "string",
+              "description": "The review action to perform. Omit to leave the review pending."
+            },
+            "comments": {
+              "type": "array",
+              "description": "Line-anchored inline comments: array of { path, line, side?, body }",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "path": {
+                    "type": "string",
+                    "description": "The relative path to the file being commented on"
+                  },
+                  "line": {
+                    "type": "number",
+                    "description": "The line of the blob in the pull request diff to comment on"
+                  },
+                  "side": {
+                    "type": "string",
+                    "description": "Which side of the diff: LEFT or RIGHT"
+                  },
+                  "body": {
+                    "type": "string",
+                    "description": "Text of the inline comment"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "mapping": {
+          "body": {
+            "body": "{{ args.body ? String(args.body) : undefined }}",
+            "event": "{{ args.event ? String(args.event) : undefined }}",
+            "comments": "{{ args.comments }}"
+          },
+          "path": {
+            "repo": "{{ String(args.repo) }}",
+            "owner": "{{ String(args.owner) }}",
+            "pull_number": "{{ String(args.pull_number) }}"
+          },
+          "headers": {
+            "Accept": "application/vnd.github+json"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
+        "name": "create-or-update-file",
+        "description": "Create or update a single file in a repository (connector-side fallback to git push). Content is sent as UTF-8 and base64-encoded automatically.",
+        "method": "PUT",
+        "path": "/repos/{owner}/{repo}/contents/{path}",
+        "parameters": {
+          "type": "object",
+          "required": [
+            "owner",
+            "repo",
+            "path",
+            "message",
+            "content"
+          ],
+          "properties": {
+            "repo": {
+              "type": "string",
+              "description": "The name of the repository"
+            },
+            "owner": {
+              "type": "string",
+              "description": "The account owner of the repository"
+            },
+            "path": {
+              "type": "string",
+              "description": "The file path within the repository"
+            },
+            "message": {
+              "type": "string",
+              "description": "The commit message"
+            },
+            "content": {
+              "type": "string",
+              "description": "The new file contents as UTF-8 text"
+            },
+            "branch": {
+              "type": "string",
+              "description": "The branch to commit to (defaults to the repository default branch)"
+            },
+            "sha": {
+              "type": "string",
+              "description": "Blob SHA of the file being replaced (required when updating an existing file)"
+            }
+          }
+        },
+        "mapping": {
+          "body": {
+            "message": "{{ String(args.message) }}",
+            "content": "{{ Buffer.from(String(args.content), 'utf-8').toString('base64') }}",
+            "branch": "{{ args.branch ? String(args.branch) : undefined }}",
+            "sha": "{{ args.sha ? String(args.sha) : undefined }}"
+          },
+          "path": {
+            "repo": "{{ String(args.repo) }}",
+            "owner": "{{ String(args.owner) }}",
+            "path": "{{ String(args.path) }}"
+          },
+          "headers": {
+            "Accept": "application/vnd.github+json"
+          }
+        },
+        "timeoutMs": 15000
+      },
+      {
         "name": "update-pull-request",
         "description": "Update a pull request. Users with push access can update pull requests.",
         "method": "PATCH",

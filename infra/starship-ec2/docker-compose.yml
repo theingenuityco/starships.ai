@@ -1,0 +1,131 @@
+# Per-starship EC2 stack.
+#
+# One EC2 box runs the entire stack for a single starship (single-tenant deploy;
+# the app stays multi-tenant-capable in code). Native code execution runs in
+# hardened sibling Docker containers launched by the server/workers via the host
+# Docker socket (see LocalContainerExecutionProvider).
+#
+# NOTE on the shared work dir: because the server launches sibling containers via
+# the host Docker socket, bind-mount paths it passes to `docker run` resolve on
+# the HOST. RUNNER_JOB_BASE_DIR is therefore mounted at the IDENTICAL path in the
+# app/workers containers and on the host (/var/starships/work).
+
+x-app-env: &app-env
+  POSTGRES_HOST: postgres
+  POSTGRES_PORT: "5432"
+  POSTGRES_USER: ${POSTGRES_USER:-postgres}
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in .env}
+  POSTGRES_DATABASE: ${POSTGRES_DATABASE:-starships}
+  POSTGRES_SSL: "false"
+  REDIS_HOST: redis
+  REDIS_PORT: "6379"
+  JWT_SECRET: ${JWT_SECRET:?set in .env}
+  ENCRYPTION_KEY: ${ENCRYPTION_KEY:?set in .env}
+  OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:?set in .env}
+  SERVER_URL: ${SERVER_URL:?set in .env}
+  # Remote runner used by headless automation workers (co-located on the box).
+  RUNNER_URL: http://runner:50051
+  RUNNER_AUTH_TOKEN: ${RUNNER_AUTH_TOKEN:?set in .env}
+  # GitHub is connected per-starship via the connectors UI (OAuth). The connector's
+  # resolved token is reused for git (clone/push) inside the sandbox, so no GitHub
+  # credentials are set here.
+  # Native execution sandbox.
+  RUNNER_SANDBOX_IMAGE: ${RUNNER_SANDBOX_IMAGE:-starships-sandbox:latest}
+  RUNNER_SANDBOX_NETWORK: ${RUNNER_SANDBOX_NETWORK:-bridge}
+  RUNNER_SANDBOX_MEMORY: ${RUNNER_SANDBOX_MEMORY:-2g}
+  RUNNER_SANDBOX_CPUS: ${RUNNER_SANDBOX_CPUS:-2}
+  RUNNER_JOB_BASE_DIR: /var/starships/work
+
+services:
+  postgres:
+    image: postgres:18
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in .env}
+      POSTGRES_DB: ${POSTGRES_DATABASE:-starships}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - redisdata:/data
+
+  runner:
+    image: ${RUNNER_IMAGE:-starships-runner:latest}
+    restart: unless-stopped
+    environment:
+      RUNNER_PORT: "50051"
+      RUNNER_AUTH_TOKEN: ${RUNNER_AUTH_TOKEN:?set in .env}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:?set in .env}
+    depends_on:
+      - postgres
+      - redis
+
+  app:
+    image: ${APP_IMAGE:-starships-app:latest}
+    restart: unless-stopped
+    environment:
+      <<: *app-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    # Native execution launches sibling sandbox containers on the host.
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /var/starships/work:/var/starships/work
+    expose:
+      - "3000"
+      - "3001"
+      - "4000"
+
+  workers:
+    image: ${APP_IMAGE:-starships-app:latest}
+    restart: unless-stopped
+    command: >
+      sh -lc "pnpm --filter @starships/server run schedule:scheduler &
+              pnpm --filter @starships/server run schedule:worker &
+              pnpm --filter @starships/server run autopilot:worker &
+              pnpm --filter @starships/server run autopilot:resume-worker &
+              pnpm --filter @starships/server run heartbeat:scheduler &
+              pnpm --filter @starships/server run heartbeat:worker &
+              wait -n"
+    environment:
+      <<: *app-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /var/starships/work:/var/starships/work
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      STARSHIP_DOMAIN: ${STARSHIP_DOMAIN:?set in .env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddydata:/data
+      - caddyconfig:/config
+    depends_on:
+      - app
+
+volumes:
+  pgdata:
+  redisdata:
+  caddydata:
+  caddyconfig:

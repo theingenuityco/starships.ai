@@ -67,8 +67,8 @@ kubeconfig*
 # Kubernetes sensitive files
 do-deployment/*secret*.yaml
 do-deployment/*.secret
-k8s/**/secrets/
-k8s/**/*-secrets.yaml
+legacy/k8s/**/secrets/
+legacy/k8s/**/*-secrets.yaml
 
 # github-runners build artifacts (never commit)
 github-runners/**/lambda_function.zip

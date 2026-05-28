@@ -1,0 +1,86 @@
+{
+  "schemaVersion": "1",
+  "kind": "tool",
+  "exportedAt": "2026-05-26T00:00:00.000Z",
+  "metadata": {
+    "fromSlug": "post-pr-review",
+    "fromStarshipSlug": "starborn-dvlif0"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "tool": {
+      "name": "Post PR review",
+      "description": "Post a review on a GitHub pull request, optionally with line-anchored inline comments. event is APPROVE, REQUEST_CHANGES, or COMMENT.",
+      "parameters": {
+        "type": "object",
+        "required": [
+          "owner",
+          "repo",
+          "pull_number"
+        ],
+        "properties": {
+          "owner": { "type": "string", "description": "Repository owner" },
+          "repo": { "type": "string", "description": "Repository name" },
+          "pull_number": { "type": "number", "description": "Pull request number" },
+          "body": { "type": "string", "description": "Overall review summary" },
+          "event": { "type": "string", "description": "APPROVE | REQUEST_CHANGES | COMMENT" },
+          "comments": {
+            "type": "array",
+            "description": "Inline comments: array of { path, line, side?, body }",
+            "items": { "type": "object" }
+          }
+        }
+      },
+      "blueprint": {
+        "edges": [
+          { "to": "normalize_input", "ref": "e1", "from": "start" },
+          { "to": "post_review", "ref": "e2", "from": "normalize_input" },
+          { "to": "format_result", "ref": "e3", "from": "post_review" },
+          { "to": "end", "ref": "e4", "from": "format_result" }
+        ],
+        "nodes": [
+          { "ref": "start", "name": "Start", "type": "start", "parameters": {} },
+          {
+            "ref": "normalize_input",
+            "name": "Normalize input",
+            "type": "code",
+            "parameters": {
+              "code": "async function main(ctx) {\n  const input = ctx.input || {};\n  const owner = String(input.owner || '').trim();\n  const repo = String(input.repo || '').trim();\n  const pull_number = Number(input.pull_number);\n  if (!owner) throw new Error('owner is required');\n  if (!repo) throw new Error('repo is required');\n  if (!Number.isFinite(pull_number)) throw new Error('pull_number is required');\n  const out = { owner, repo, pull_number };\n  if (input.body != null) out.body = String(input.body);\n  if (input.event != null && String(input.event).trim() !== '') out.event = String(input.event).trim();\n  if (Array.isArray(input.comments) && input.comments.length > 0) out.comments = input.comments;\n  return out;\n}",
+              "timeout": 3000
+            }
+          },
+          {
+            "ref": "post_review",
+            "name": "Create PR review (GitHub)",
+            "type": "connector_action",
+            "parameters": {
+              "args": "{{ (lastOutputOf('normalize_input') || {}) }}",
+              "action": "create-pull-request-review",
+              "timeout": 20000,
+              "connector": "github",
+              "failOnNon2xx": true
+            }
+          },
+          {
+            "ref": "format_result",
+            "name": "Format result",
+            "type": "code",
+            "parameters": {
+              "code": "async function main(ctx) {\n  const resp = ctx.lastOutputOf('post_review') || {};\n  const review = (resp.body && typeof resp.body === 'object') ? resp.body : {};\n  return {\n    success: true,\n    reviewId: review.id ?? null,\n    state: review.state || null,\n    htmlUrl: review.html_url || null\n  };\n}",
+              "timeout": 3000
+            }
+          },
+          { "ref": "end", "name": "End", "type": "end", "parameters": { "output": "{{ lastOutputOf('format_result') }}" } }
+        ]
+      },
+      "transforms": null,
+      "mutations": null,
+      "condition": null,
+      "isEnabled": true,
+      "status": "active"
+    }
+  }
+}

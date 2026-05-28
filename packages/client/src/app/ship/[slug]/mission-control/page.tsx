@@ -110,12 +110,6 @@ type FeedCard = {
   at: number
 }
 
-const TYPE_ICON: Record<CardType, string> = {
-  ticket: 'mail',
-  pr: 'git-branch',
-  run: 'list',
-}
-
 const STATUS_CLS: Record<StatusKind, string> = {
   new:         'bg-amber-500/15 text-amber-600 dark:text-amber-300 border-amber-500/40',
   triaged:     'bg-blue-500/15 text-blue-600 dark:text-blue-300 border-blue-500/40',
@@ -143,67 +137,60 @@ function UnifiedCard({ card }: { card: FeedCard }) {
       className={cn(
         'group relative overflow-hidden transition-all duration-500',
         CARD_SURFACE,
-        card.needsYou
-          ? 'border-primary/60 ring-2 ring-primary/40 shadow-md shadow-primary/15'
-          : card.primary
-            ? 'border-primary/40 ring-1 ring-primary/20'
-            : null,
-        isDone && !card.primary && !card.needsYou && 'opacity-60'
+        isDone && 'opacity-60'
       )}
     >
       <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-2.5 py-2.5 pl-3 pr-2.5">
-        {/* Type icon — neutral framing */}
-        <span
-          className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border/60 bg-muted/40 text-muted-foreground"
-          title={`${card.room} · ${card.type}`}
-        >
-          <Icon name={TYPE_ICON[card.type]} weight="bold" className="h-3.5 w-3.5" />
+        {/* Checkbox */}
+        <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center">
+          <span
+            className={cn(
+              'inline-flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-all duration-300',
+              isDone
+                ? 'border-emerald-500 bg-emerald-500'
+                : isLive
+                  ? 'border-amber-500'
+                  : 'border-border/60'
+            )}
+          >
+            {isDone ? (
+              <svg viewBox="0 0 16 16" fill="none" className="h-2.5 w-2.5 text-white" aria-hidden>
+                <path d="M3 8.5l3 3 7-7" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            ) : isLive ? (
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-amber-500" />
+            ) : null}
+          </span>
         </span>
 
-        {/* Body: title, board+id meta, description, footer */}
+        {/* Body: title, board + assignee, indicators */}
         <div className="min-w-0 space-y-1.5">
           {/* Title */}
-          <p className="truncate text-xs font-semibold leading-snug">{card.title}</p>
+          <p className={cn('truncate text-sm font-normal leading-snug', isDone && 'line-through text-muted-foreground')}>{card.title}</p>
 
-          {/* Board · displayId */}
-          <p className="truncate text-[10px] text-muted-foreground/60">
+          {/* Assignee · Board */}
+          <div className="flex items-center gap-1.5 truncate text-xs text-muted-foreground/60">
+            {card.assignee ? (
+              <>
+                <Avatar name={card.assignee} className="h-4 w-4 text-[8px]" />
+                <span className="font-medium text-foreground/80">{card.assignee}</span>
+                <span>·</span>
+              </>
+            ) : null}
             <span className="text-muted-foreground/80">{card.board}</span>
-            {card.displayId ? <span className="font-mono"> · {card.displayId}</span> : null}
-          </p>
+          </div>
 
-          {/* Description */}
-          {card.description ? (
-            <p className="line-clamp-2 text-[11px] leading-snug text-muted-foreground">{card.description}</p>
-          ) : null}
-
-          {/* Footer: assignee + indicators */}
-          {card.assignee || (card.indicators && card.indicators.length > 0) ? (
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pt-0.5">
-              {card.assignee ? (
-                <span className="inline-flex items-center gap-1.5">
-                  <Avatar name={card.assignee} className="h-4 w-4 text-[8px]" />
-                  <span className="text-[10px] font-medium text-foreground/80">{card.assignee}</span>
-                </span>
-              ) : null}
-              {card.indicators?.map((ind) => (
-                <span key={ind.label} className="inline-flex items-center gap-1 text-[10px] text-muted-foreground/70">
-                  {ind.icon ? <Icon name={ind.icon} weight="bold" className="h-3 w-3" /> : null}
-                  {ind.label}
-                </span>
-              ))}
-            </div>
-          ) : null}
         </div>
 
         {/* Status badge + age */}
         <div className="flex shrink-0 flex-col items-end gap-1">
           <span
             className={cn(
-              'inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider',
+              'inline-flex shrink-0 items-center gap-1 rounded-full border px-1.5 py-px text-[10px] font-medium transition-colors duration-500',
               STATUS_CLS[card.statusKind]
             )}
           >
-            {isLive ? <span className="h-1 w-1 rounded-full bg-current animate-pulse" /> : null}
+            {isLive ? <span className="inline-block h-1.5 w-1.5 rounded-full bg-current animate-pulse transition-colors duration-500" /> : null}
             {card.status}
           </span>
           <span className="font-mono text-[10px] tabular-nums text-muted-foreground/40">
@@ -212,14 +199,6 @@ function UnifiedCard({ card }: { card: FeedCard }) {
         </div>
       </div>
 
-      {/* Needs-you action footer */}
-      {card.needsYou ? (
-        <div className="flex items-center gap-2 border-t border-primary/30 bg-primary/10 px-3 py-1.5">
-          <Icon name="alert-circle" weight="bold" className="h-3 w-3 animate-pulse text-primary" />
-          <span className="text-[11px] font-medium text-primary">Awaiting your review</span>
-          <span className="ml-auto text-[10px] text-muted-foreground">in your queue →</span>
-        </div>
-      ) : null}
     </div>
   )
 }
@@ -232,12 +211,12 @@ function SectionHeader({ label, icon, tone, count }: { label: string; icon?: str
       ? 'text-primary'
       : tone === 'active'
         ? 'text-foreground/70'
-        : 'text-muted-foreground/50'
+        : 'text-muted-foreground/70'
   return (
     <div className="flex items-center gap-2 px-1 pt-3 pb-1.5">
       {icon ? <Icon name={icon} weight="bold" className={cn('h-3.5 w-3.5', toneCls)} /> : null}
       <span className={cn('text-[11px] font-semibold uppercase tracking-[0.14em]', toneCls)}>{label}</span>
-      <span className="font-mono text-[10px] tabular-nums text-muted-foreground/40">{count}</span>
+      <span className="inline-flex h-4 min-w-[16px] items-center justify-center rounded-full bg-muted px-1 font-mono text-[9px] tabular-nums text-muted-foreground/60">{count}</span>
       <span className="h-px flex-1 bg-border/30" />
     </div>
   )
@@ -276,30 +255,38 @@ function bucketFor(at: number): TimeBucket {
 // The timeline line is centred at: px-3 (12px) + half of w-6 (12px) = 24px from left.
 const TIMELINE_ITEM_LEFT = 'px-3'
 
-function BucketSeparator({ label, count, tone = 'muted' }: { label: string; count: number; tone?: 'muted' | 'live' }) {
+function BucketSeparator({ label, count, tone = 'muted' }: { label: string; count: number; tone?: 'muted' | 'live' | 'attention' }) {
   const isLive = tone === 'live'
+  const isAttention = tone === 'attention'
+  const isAccent = isLive || isAttention
+  const textCls = isLive
+    ? 'text-emerald-600 dark:text-emerald-400'
+    : isAttention
+      ? 'text-amber-600 dark:text-amber-400'
+      : 'text-muted-foreground/70'
+  const dotCls = isLive
+    ? 'bg-emerald-500'
+    : isAttention
+      ? 'bg-amber-500'
+      : 'bg-border/60'
+  const countCls = isLive
+    ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+    : isAttention
+      ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
+      : 'bg-muted text-muted-foreground/60'
   return (
     <div className={cn('flex items-start gap-3', TIMELINE_ITEM_LEFT)}>
       <div className="flex w-6 shrink-0 flex-col items-center self-stretch">
         <div className="w-px bg-border/60" style={{ height: 22 }} />
-        {isLive ? (
-          <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-500 animate-pulse" />
-        ) : (
-          <div className="h-2 w-2 shrink-0 rounded-full bg-border/60" />
-        )}
+        <span className={cn('h-2 w-2 shrink-0 rounded-full', dotCls, isAccent && 'animate-pulse')} />
         <div className="w-px bg-border/60" style={{ height: 22 }} />
       </div>
       <div className="flex min-w-0 flex-1 items-center gap-2" style={{ paddingTop: 19 }}>
-        <span className={cn('whitespace-nowrap text-xs font-semibold uppercase tracking-widest', isLive ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground/70')}>
+        <span className={cn('whitespace-nowrap text-[11px] font-semibold uppercase tracking-[0.14em]', textCls)}>
           {label}
         </span>
-        <span className={cn(
-          'inline-flex h-[16px] min-w-[16px] items-center justify-center rounded-full px-1 font-mono text-[9px] font-bold tabular-nums',
-          isLive
-            ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
-            : 'bg-muted text-muted-foreground/60'
-        )}>{count}</span>
-        <div className="h-px flex-1 bg-border/60" />
+        <span className="inline-flex h-4 min-w-[16px] items-center justify-center rounded-full bg-muted px-1 font-mono text-[9px] tabular-nums text-muted-foreground/60">{count}</span>
+        <div className="h-px flex-1 bg-border/30" />
       </div>
     </div>
   )
@@ -351,7 +338,17 @@ type ActivityBucket = {
   items: GlobalActivityItem[]
 }
 
-function ActivityPane({ items, className, starshipSlug = '' }: { items: GlobalActivityItem[]; className?: string; starshipSlug?: string }) {
+function ActivityPane({
+  items,
+  className,
+  starshipSlug = '',
+  attention,
+}: {
+  items: GlobalActivityItem[]
+  className?: string
+  starshipSlug?: string
+  attention?: React.ReactNode
+}) {
   const { buckets, liveCount } = useMemo(() => {
     const live: GlobalActivityItem[] = []
     const past: GlobalActivityItem[] = []
@@ -387,8 +384,9 @@ function ActivityPane({ items, className, starshipSlug = '' }: { items: GlobalAc
   const total = items.length
 
   return (
-    <section className={cn('min-w-0 flex flex-col', className)}>
-      <div className="flex-1 min-h-0 overflow-y-auto pt-1 pb-2">
+    <section className={cn('min-w-0', className)}>
+      <div className="pt-1 pb-2">
+        {attention}
         {total === 0 ? (
           <p className="px-1 pt-2 text-xs text-muted-foreground/40">No activity yet.</p>
         ) : (
@@ -407,7 +405,7 @@ function ActivityPane({ items, className, starshipSlug = '' }: { items: GlobalAc
   )
 }
 
-// ─── YOUR REVIEW banner (top of right column) ─────────────────────────────────
+// ─── Needs Attention (top of activity timeline, only when an approval is pending) ──
 
 type ReviewState =
   | { kind: 'idle' }
@@ -423,103 +421,56 @@ type ReviewState =
     }
   | { kind: 'shipping' }
 
-function ReviewBanner({
+function NeedsAttention({
   state,
   onApprove,
   onRequestChanges,
-  className,
 }: {
-  state: ReviewState
+  state: Extract<ReviewState, { kind: 'pending' }>
   onApprove: () => void
   onRequestChanges: () => void
-  className?: string
 }) {
-  // Matches the ApprovalsPanel pattern on /dashboard: header row (label + status chip),
-  // then content below — no outer card chrome.
-
-  if (state.kind === 'idle') {
-    return (
-      <section className={cn('flex flex-col', className)}>
-        <div className="flex items-center gap-2 px-1 py-2.5">
-          <Icon name="alert-circle" weight="bold" className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60" />
-          <span className="text-sm font-semibold tracking-tight">Your Queue</span>
-          <span className="ml-2 inline-flex h-[18px] items-center gap-1.5 rounded-full bg-emerald-500/15 px-2 text-[10px] font-bold text-emerald-500">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-            up to date
-          </span>
-        </div>
-        <p className="px-1 pt-1 pb-2 text-xs text-muted-foreground/70">Nothing waiting on you.</p>
-      </section>
-    )
-  }
-
-  if (state.kind === 'shipping') {
-    return (
-      <section className={cn('flex flex-col', className)}>
-        <div className="flex items-center gap-2 px-1 py-2.5">
-          <Icon name="alert-circle" weight="bold" className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60" />
-          <span className="text-sm font-semibold tracking-tight">Your Queue</span>
-          <span className="ml-2 inline-flex h-[18px] items-center gap-1.5 rounded-full bg-emerald-500/15 px-2 text-[10px] font-bold text-emerald-500">
-            <Icon name="check" weight="bold" className="h-3 w-3" />
-            approved
-          </span>
-        </div>
-        <p className="px-1 pt-1 pb-2 text-xs font-medium text-emerald-700 dark:text-emerald-300">Shipping…</p>
-      </section>
-    )
-  }
-
   return (
-    <section className={cn('flex flex-col', className)}>
-      <div className="flex items-center gap-2 px-1 py-2.5">
-        <Icon name="alert-circle" weight="bold" className="h-3.5 w-3.5 shrink-0 animate-pulse text-primary" />
-        <span className="text-sm font-semibold tracking-tight">Your Queue</span>
-        <span className="ml-2 inline-flex h-[18px] items-center gap-1.5 rounded-full bg-primary/15 px-2 text-[10px] font-bold text-primary">
-          <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
-          review needed
-        </span>
-        <span className="ml-auto font-mono text-[10px] text-muted-foreground/50">{state.pr}</span>
-      </div>
-
-      <div className="space-y-3 px-1 pt-1 pb-2">
-        {/* Agent + branch */}
-        <div className="flex items-center gap-2.5">
-          <Avatar name={state.agent} className="h-7 w-7 text-[10px]" />
-          <div className="min-w-0">
-            <p className="text-xs leading-tight text-muted-foreground">
-              <span className="font-semibold text-foreground">{state.agent}</span> opened a pull request
-            </p>
-            <p className="mt-0.5 truncate font-mono text-[11px] text-muted-foreground/70">{state.branch}</p>
+    <>
+      <BucketSeparator label="Needs Attention" count={1} tone="attention" />
+      <div className={cn('flex items-start gap-3', TIMELINE_ITEM_LEFT)}>
+        <div className="flex w-6 shrink-0 flex-col items-center self-stretch">
+          <div className="w-px bg-border/60" style={{ height: 8 }} />
+          <Avatar name={state.agent} className="h-6 w-6 text-[10px]" />
+          <div className="w-px flex-1 bg-border/60" />
+        </div>
+        <div className="min-w-0 flex-1 py-2">
+          <div className={cn(CARD_SURFACE, 'space-y-2.5 p-3')}>
+            <div className="flex items-baseline gap-1 min-w-0 text-sm leading-snug">
+              <span className="shrink-0 font-bold">{state.agent}</span>
+              <span className="shrink-0 text-muted-foreground">opened</span>
+              <span className="shrink-0 font-mono text-xs">{state.pr}</span>
+              <span className="ml-auto shrink-0 truncate pl-2 font-mono text-[11px] text-muted-foreground/70">{state.branch}</span>
+            </div>
+            <p className="text-sm font-medium leading-snug">{state.title}</p>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
+              <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
+                <Icon name="check" weight="bold" className="h-3 w-3" />
+                {state.checks}
+              </span>
+              <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
+                <Icon name="check" weight="bold" className="h-3 w-3" />
+                tests {state.tests}
+              </span>
+              <span className="font-mono text-muted-foreground/60">{state.diff}</span>
+            </div>
+            <div className="flex items-center justify-end gap-2 pt-0.5">
+              <Button variant="outline" size="sm" onClick={onRequestChanges}>
+                Request changes
+              </Button>
+              <Button variant="default" size="sm" onClick={onApprove}>
+                Approve
+              </Button>
+            </div>
           </div>
         </div>
-
-        {/* PR title + stats */}
-        <div>
-          <p className="text-sm font-medium leading-snug">{state.title}</p>
-          <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
-            <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
-              <Icon name="check" weight="bold" className="h-3 w-3" />
-              {state.checks}
-            </span>
-            <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
-              <Icon name="check" weight="bold" className="h-3 w-3" />
-              tests {state.tests}
-            </span>
-            <span className="font-mono text-muted-foreground/60">{state.diff}</span>
-          </div>
-        </div>
-
-        {/* Actions */}
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" className="flex-1" onClick={onRequestChanges}>
-            Request changes
-          </Button>
-          <Button variant="default" size="sm" className="flex-1" onClick={onApprove}>
-            Approve
-          </Button>
-        </div>
       </div>
-    </section>
+    </>
   )
 }
 
@@ -890,14 +841,14 @@ export default function MissionControlPage(): React.JSX.Element {
   }, [supportItems, engineeringItems, opsItems])
 
   return (
-    <div className="relative h-full w-full bg-background text-foreground">
+    <div className="relative w-full bg-background text-foreground">
 
-      <div className="relative h-full flex flex-col">
+      <div className="relative flex flex-col">
         <PageHeader icon="dashboard" title="Mission Control" />
 
         {/* Body: greeting + input + activity (left) + approval + cards (right). */}
-        <div className="flex-1 min-h-0 flex gap-4 p-5 overflow-hidden">
-          <div className="flex-1 min-w-0 flex flex-col min-h-0">
+        <div className="flex gap-4 p-5">
+          <div className="flex-1 min-w-0 flex flex-col">
             <div className="mx-auto w-full max-w-3xl pt-2 space-y-3">
               <h2 className="text-2xl font-normal text-foreground">
                 {firstName ? `${greeting}, ${firstName}.` : `${greeting}.`}
@@ -914,12 +865,20 @@ export default function MissionControlPage(): React.JSX.Element {
                 newConversationTitleOverride="New conversation"
               />
             </div>
-            <ActivityPane className="flex-1 min-h-0 mx-auto w-full max-w-3xl" items={unifiedActivity} starshipSlug={slug} />
+            <ActivityPane
+              className="mx-auto w-full max-w-3xl"
+              items={unifiedActivity}
+              starshipSlug={slug}
+              attention={
+                reviewState.kind === 'pending' ? (
+                  <NeedsAttention state={reviewState} onApprove={advance} onRequestChanges={rewind} />
+                ) : null
+              }
+            />
           </div>
 
-          <div className="w-[480px] shrink-0 flex flex-col gap-4 min-h-0">
-            <ReviewBanner state={reviewState} onApprove={advance} onRequestChanges={rewind} />
-            <div className="flex-1 min-h-0 overflow-y-auto space-y-2">
+          <div className="w-[480px] shrink-0 flex flex-col gap-4">
+            <div className="space-y-2">
               {grouped.needsYou.length > 0 ? (
                 <>
                   <SectionHeader label="Needs your attention" icon="alert-circle" tone="primary" count={grouped.needsYou.length} />

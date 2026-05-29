@@ -69,7 +69,7 @@ function ChangeFlash({ signal, className }: { signal: React.Key; className?: str
 // ─── Beats ───────────────────────────────────────────────────────────────────
 
 type Beat = number
-const MAX_BEAT: Beat = 10
+const MAX_BEAT: Beat = 12
 const STEP_MS = 2000
 const HOLD_MS = 4500
 
@@ -487,75 +487,6 @@ function ActivityPane({
   )
 }
 
-// ─── Needs Attention (top of activity timeline, only when an approval is pending) ──
-
-type ReviewState =
-  | { kind: 'idle' }
-  | {
-      kind: 'pending'
-      agent: string
-      pr: string
-      branch: string
-      title: string
-      checks: string
-      tests: string
-      diff: string
-    }
-  | { kind: 'shipping' }
-
-function NeedsAttention({
-  state,
-  onApprove,
-  onRequestChanges,
-}: {
-  state: Extract<ReviewState, { kind: 'pending' }>
-  onApprove: () => void
-  onRequestChanges: () => void
-}) {
-  return (
-    <>
-      <BucketSeparator label="Needs Attention" count={1} tone="attention" />
-      <div className={cn('flex items-start gap-3', TIMELINE_ITEM_LEFT)}>
-        <div className="flex w-6 shrink-0 flex-col items-center self-stretch">
-          <div className="w-px bg-border/60" style={{ height: 8 }} />
-          <Avatar name={state.agent} className="h-6 w-6 text-[10px]" />
-          <div className="w-px flex-1 bg-border/60" />
-        </div>
-        <div className="min-w-0 flex-1 py-2">
-          <div className={cn(CARD_SURFACE, 'space-y-2.5 p-3')}>
-            <div className="flex items-baseline gap-1 min-w-0 text-sm leading-snug">
-              <span className="shrink-0 font-bold">{state.agent}</span>
-              <span className="shrink-0 text-muted-foreground">opened</span>
-              <span className="shrink-0 font-mono text-xs">{state.pr}</span>
-              <span className="ml-auto shrink-0 truncate pl-2 font-mono text-[11px] text-muted-foreground/70">{state.branch}</span>
-            </div>
-            <p className="text-sm font-medium leading-snug">{state.title}</p>
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
-              <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
-                <Icon name="check" weight="bold" className="h-3 w-3" />
-                {state.checks}
-              </span>
-              <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
-                <Icon name="check" weight="bold" className="h-3 w-3" />
-                tests {state.tests}
-              </span>
-              <span className="font-mono text-muted-foreground/60">{state.diff}</span>
-            </div>
-            <div className="flex items-center justify-end gap-2 pt-0.5">
-              <Button variant="outline" size="sm" onClick={onRequestChanges}>
-                Request changes
-              </Button>
-              <Button variant="default" size="sm" onClick={onApprove}>
-                Approve
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </>
-  )
-}
-
 // ─── Demo state ──────────────────────────────────────────────────────────────
 
 function useBeatMachine() {
@@ -641,24 +572,6 @@ export default function MissionControlPage(): React.JSX.Element {
     return raw.split(/\s+/)[0] ?? ''
   }, [userName])
 
-  // YOUR REVIEW state — pending at b=8, shipping flash at b=9, idle elsewhere.
-  const reviewState: ReviewState = useMemo(() => {
-    if (beat === 8) {
-      return {
-        kind: 'pending',
-        agent: 'Anvil',
-        pr: 'PR #432',
-        branch: 'fix/mobile-signin',
-        title: 'Fix mobile sign-in button',
-        checks: '12 checks passed',
-        tests: '142 / 142',
-        diff: '+38 −4 · 2 files',
-      }
-    }
-    if (beat === 9) return { kind: 'shipping' }
-    return { kind: 'idle' }
-  }, [beat])
-
   // ── Unified feed cards ────────────────────────────────────────────────────
 
   const feedCards: FeedCard[] = useMemo(() => {
@@ -666,9 +579,9 @@ export default function MissionControlPage(): React.JSX.Element {
 
     // Support principal: ticket #1042 (Priya) on the Support Tickets board.
     if (beat >= 1) {
-      const status = beat >= 10 ? 'RESOLVED' : beat >= 3 ? 'TRIAGED' : 'NEW'
-      const statusKind: StatusKind = beat >= 10 ? 'resolved' : beat >= 3 ? 'triaged' : 'new'
-      const assignee = beat >= 10 ? 'Reply' : 'Triage'
+      const status = beat >= 12 ? 'RESOLVED' : beat >= 3 ? 'TRIAGED' : 'NEW'
+      const statusKind: StatusKind = beat >= 12 ? 'resolved' : beat >= 3 ? 'triaged' : 'new'
+      const assignee = beat >= 11 ? 'Reply' : 'Triage'
       const indicators: FeedCardIndicator[] = beat >= 3
         ? [
             { label: 'bug · mobile · auth' },
@@ -689,7 +602,7 @@ export default function MissionControlPage(): React.JSX.Element {
         status,
         statusKind,
         primary: true,
-        at: (beat - (beat >= 10 ? 10 : beat >= 3 ? 3 : 1)) * 30,
+        at: (beat - (beat >= 12 ? 12 : beat >= 3 ? 3 : 1)) * 30,
       })
     }
 
@@ -718,7 +631,6 @@ export default function MissionControlPage(): React.JSX.Element {
         status,
         statusKind,
         primary: true,
-        needsYou: beat === 8,
         at: (beat - (beat >= 10 ? 10 : beat >= 8 ? 8 : beat >= 5 ? 5 : 4)) * 30,
       })
     }
@@ -764,10 +676,12 @@ export default function MissionControlPage(): React.JSX.Element {
 
   const supportItems: ActivityItem[] = useMemo(() => {
     const out: ActivityItem[] = []
-    if (beat >= 10) out.push({
-      id: 's-reply', agent: 'Reply', state: 'done', at: 0,
+    if (beat >= 11) out.push({
+      id: 's-reply', agent: 'Reply', state: beat >= 12 ? 'done' : 'working', at: (beat - (beat >= 12 ? 12 : 11)) * 30,
       action: 'Replying to Priya R. on #1042',
-      detail: 'Sent a 47-word reply confirming the iOS Safari fix is live as of today\'s deploy. Used her exact wording for the issue, named the fix specifically, no support theatre. Ticket closed and resolved_at stamped.',
+      detail: beat >= 12
+        ? 'Sent a reply confirming the iOS Safari fix is live. Ticket closed and resolved_at stamped.'
+        : 'Drafting a reply to Priya R. confirming the iOS Safari fix is live. Keeping it to her exact issue and the specific fix — no filler.',
     })
     if (beat >= 2) out.push({
       id: 's-triage', agent: 'Triage', state: beat >= 3 ? 'done' : 'working', at: (beat - (beat >= 3 ? 3 : 2)) * 30,
@@ -787,9 +701,11 @@ export default function MissionControlPage(): React.JSX.Element {
   const engineeringItems: ActivityItem[] = useMemo(() => {
     const out: ActivityItem[] = []
     if (beat >= 10) out.push({
-      id: 'e-deploy', agent: 'CI', state: 'done', at: 0,
+      id: 'e-deploy', agent: 'CI', state: beat >= 11 ? 'done' : 'working', at: (beat - (beat >= 11 ? 11 : 10)) * 30,
       action: 'Deploying PR #432 to production',
-      detail: 'Build 4823 done, edge cache flushed, post-deploy smoke tests all green. Monitoring sign-in latency for the next 5 minutes — currently flat at 38ms p95.',
+      detail: beat >= 11
+        ? 'Build 4823 done, edge cache flushed, post-deploy smoke tests all green. Sign-in latency flat at 38ms p95.'
+        : 'Build 4823 queued. Deploying to edge, flushing cache, and running post-deploy smoke tests.',
     })
     if (beat === 9) out.push({
       id: 'e-merge', agent: 'Anvil', state: 'working', at: 0,
@@ -797,16 +713,16 @@ export default function MissionControlPage(): React.JSX.Element {
       detail: 'Squash-merging onto main and cleaning up the branch. Linked ticket #1042 will auto-close on merge. Kicking off the production deploy right after.',
     })
     if (beat >= 10) out.push({
-      id: 'e-merge', agent: 'Anvil', state: 'done', at: 0,
+      id: 'e-merge', agent: 'Anvil', state: 'done', at: (beat - 10) * 30,
       action: 'Merging fix/mobile-signin to main',
       detail: 'Squash-merged onto main. Cleanup branch deleted. Linked ticket #1042 auto-closed. Picking up the next item from the engineering backlog now.',
     })
     if (beat >= 8) out.push({
-      id: 'e-open', agent: 'Anvil', state: beat >= 9 ? 'done' : 'needs-you', at: (beat - (beat >= 9 ? 9 : 8)) * 30,
-      action: 'Opening PR #432 for review',
+      id: 'e-open', agent: 'Anvil', state: beat >= 9 ? 'done' : 'working', at: (beat - (beat >= 9 ? 9 : 8)) * 30,
+      action: beat >= 9 ? 'Opened PR #432' : 'Opening PR #432',
       detail: beat >= 9
         ? 'All 12 checks are green and the full test suite passed on a real checkout. Diff is +38 −4 across 2 files.'
-        : 'All 12 checks are green and the full test suite passed on a real checkout. The diff is +38 −4 across 2 files — should take 30 seconds to skim, it\'s a tight UI fix. Ready when you are.',
+        : 'Pushing fix/mobile-signin and opening the PR. CI checks queued — 12 checks, estimated 90 seconds.',
     })
     if (beat >= 6) out.push({
       id: 'e-tests', agent: 'Anvil', state: beat >= 7 ? 'done' : 'working', at: (beat - (beat >= 7 ? 7 : 6)) * 30,
@@ -816,14 +732,18 @@ export default function MissionControlPage(): React.JSX.Element {
         : 'Spinning up iOS Safari at 390×844, replaying the resize sequence. 47 of 142 tests passed so far. Estimated 18 more seconds before the regression test runs.',
     })
     if (beat >= 5) out.push({
-      id: 'e-fix', agent: 'Anvil', state: 'done', at: (beat - 5) * 30,
+      id: 'e-fix', agent: 'Anvil', state: beat >= 6 ? 'done' : 'working', at: (beat - (beat >= 6 ? 6 : 5)) * 30,
       action: 'Implementing fix for mobile sign-in',
-      detail: 'Three-line change inside SignInButton.tsx — guarding the resize handler against a stale ref. Wrote a regression test that reproduces the original failure before the fix.',
+      detail: beat >= 6
+        ? 'Three-line change inside SignInButton.tsx — guarding the resize handler against a stale ref. Wrote a regression test that reproduces the original failure before the fix.'
+        : 'Patching the stale handler ref inside SignInButton.tsx. Writing a regression test that reproduces the original failure before applying the fix.',
     })
     if (beat >= 4) out.push({
-      id: 'e-spec', agent: 'Quill', state: 'done', at: (beat - 4) * 30,
+      id: 'e-spec', agent: 'Quill', state: beat >= 5 ? 'done' : 'working', at: (beat - (beat >= 5 ? 5 : 4)) * 30,
       action: 'Scoping ticket #1042',
-      detail: 'Reproduced on iPhone 14 Pro Safari at 390×844. The button stops responding after a viewport resize because the handler ref is captured before the resize, not after. Acceptance: button stays responsive across orientation and resize.',
+      detail: beat >= 5
+        ? 'Reproduced on iPhone 14 Pro Safari at 390×844. The button stops responding after a viewport resize because the handler ref is captured before the resize, not after. Acceptance: button stays responsive across orientation and resize.'
+        : 'Reproducing on iPhone 14 Pro Safari at 390×844. Tracing the resize event timing to pin down why the handler ref goes stale after orientation change.',
     })
     return out
   }, [beat])
@@ -905,11 +825,6 @@ export default function MissionControlPage(): React.JSX.Element {
               <ActivityPane
                 items={unifiedActivity}
                 starshipSlug={slug}
-                attention={
-                  reviewState.kind === 'pending' ? (
-                    <NeedsAttention state={reviewState} onApprove={advance} onRequestChanges={rewind} />
-                  ) : null
-                }
               />
             </div>
           </div>

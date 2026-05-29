@@ -61,7 +61,7 @@ function ChangeFlash({ signal, className }: { signal: React.Key; className?: str
       className={cn('pointer-events-none absolute', className)}
       initial={{ opacity: 1 }}
       animate={{ opacity: 0 }}
-      transition={{ duration: 2.6, ease: 'easeOut' }}
+      transition={{ duration: 1.4, ease: 'easeOut' }}
     />
   )
 }
@@ -70,7 +70,7 @@ function ChangeFlash({ signal, className }: { signal: React.Key; className?: str
 
 type Beat = number
 const MAX_BEAT: Beat = 12
-const STEP_MS = 2000
+const STEP_MS = 3000
 const HOLD_MS = 4500
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -174,7 +174,7 @@ function UnifiedCard({ card }: { card: FeedCard }) {
         isDone && 'opacity-60'
       )}
     >
-      <ChangeFlash signal={card.statusKind} className="inset-0 rounded-lg bg-primary/15" />
+      <ChangeFlash signal={card.statusKind} className="inset-0 rounded-lg bg-amber-600/20" />
       <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-2.5 py-2.5 pl-3 pr-2.5">
         {/* Checkbox */}
         <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center">
@@ -347,7 +347,7 @@ function TimelineItem({ item, isLast, starshipSlug }: { item: GlobalActivityItem
       transition={{ duration: 0.3, ease: 'easeOut' }}
       className={cn('relative flex items-start gap-3', TIMELINE_ITEM_LEFT)}
     >
-      <ChangeFlash signal={item.state} className="inset-x-1 inset-y-1 rounded-md bg-primary/10" />
+      <ChangeFlash signal={item.state} className="inset-x-1 inset-y-1 rounded-md bg-amber-600/15" />
       <div className="flex w-6 shrink-0 flex-col items-center self-stretch">
         <div className="w-px bg-border/60" style={{ height: 8 }} />
         <Avatar name={item.agent} className="h-6 w-6 text-[10px]" />
@@ -478,7 +478,7 @@ function ActivityPane({
         {total === 0 ? (
           <p className="px-1 pt-2 text-xs text-muted-foreground/40">No activity yet.</p>
         ) : (
-          <AnimatePresence initial={false}>
+          <AnimatePresence initial={false} mode="popLayout">
             {rows}
           </AnimatePresence>
         )}
@@ -835,7 +835,7 @@ export default function MissionControlPage(): React.JSX.Element {
                 <span className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground/70">Tasks</span>
               </div>
               <div className="relative flex flex-col gap-2 p-3">
-                <AnimatePresence initial={false}>
+                <AnimatePresence initial={false} mode="popLayout">
                   {taskRows}
                 </AnimatePresence>
               </div>

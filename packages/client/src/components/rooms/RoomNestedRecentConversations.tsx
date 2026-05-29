@@ -110,7 +110,7 @@ export function RoomNestedRecentConversations(props: {
                 type="button"
                 className={cn(
                   'flex items-center w-full h-7 px-2 gap-1.5 rounded-lg border border-transparent text-xs font-normal transition-colors overflow-hidden',
-                  isActive ? 'text-primary' : 'text-muted-foreground hover:text-foreground hover:bg-muted/70 dark:hover:bg-[#2C2C30]'
+                  isActive && !isDemoRoom ? 'text-primary' : 'text-muted-foreground hover:text-foreground hover:bg-muted/70 dark:hover:bg-[#2C2C30]'
                 )}
                 onClick={() => openConversation(id)}
                 title={title}

@@ -19,17 +19,24 @@
  * inactive it serves a frozen `beat: 0` value and attaches no timers or
  * keyboard listeners, so real users and every other route are untouched.
  *
- * Keyboard control (active only; any key pauses auto-play):
+ * Playback is prototype-style: the demo holds on beat 0 and only moves when you
+ * press a key, so you drive it like a click-through prototype during the shoot.
+ * Auto-play is still available as an opt-in via `P`.
+ *
+ * Keyboard control (active only):
  *   Space / ArrowRight / Enter — advance one beat
  *   Backspace / ArrowLeft      — back one beat
- *   P                          — toggle auto-play
- *   R                          — restart from the top (re-enables auto-play)
+ *   P                          — toggle auto-play (off by default)
+ *   R                          — restart from the top (stays manual)
  */
 
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { usePathname } from 'next/navigation'
 
 export const DEMO_MAX_BEAT = 12
+// The demo opens on beat 1, not 0: beat 0 is a blank state (every activity
+// builder starts at `beat >= 1`), and we never want the demo to start empty.
+export const DEMO_MIN_BEAT = 1
 export const DEMO_STEP_MS = 3000
 export const DEMO_HOLD_MS = 4500
 
@@ -99,23 +106,24 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
   const onMissionControl = typeof pathname === 'string' && pathname.endsWith('/mission-control')
   const active = isDev && (onMissionControl || searchDemo)
 
-  const [beat, setBeat] = useState(0)
-  const [auto, setAuto] = useState(true)
+  const [beat, setBeat] = useState(DEMO_MIN_BEAT)
+  // Prototype-style by default: hold until a key press. Auto-play is opt-in via P.
+  const [auto, setAuto] = useState(false)
 
   const advance = useCallback(() => setBeat((b) => (b < DEMO_MAX_BEAT ? b + 1 : b)), [])
-  const rewind = useCallback(() => setBeat((b) => (b > 0 ? b - 1 : b)), [])
-  const reset = useCallback(() => setBeat(0), [])
+  const rewind = useCallback(() => setBeat((b) => (b > DEMO_MIN_BEAT ? b - 1 : b)), [])
+  const reset = useCallback(() => setBeat(DEMO_MIN_BEAT), [])
 
   // When the demo deactivates (navigated off a demo surface), rewind so a later
-  // re-entry starts clean from beat 0 with auto-play on.
+  // re-entry starts clean from the opening beat in manual prototype mode.
   useEffect(() => {
     if (!active) {
-      setBeat(0)
-      setAuto(true)
+      setBeat(DEMO_MIN_BEAT)
+      setAuto(false)
     }
   }, [active])
 
-  // Manual keyboard control. Scrubbing pauses auto-play; R restarts it.
+  // Manual keyboard control. Scrubbing pauses auto-play; R restarts from the top.
   useEffect(() => {
     if (!active) return
     const onKey = (e: KeyboardEvent) => {
@@ -135,7 +143,7 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
       } else if (e.key === 'r' || e.key === 'R') {
         e.preventDefault()
         reset()
-        setAuto(true)
+        setAuto(false)
       }
     }
     window.addEventListener('keydown', onKey)
@@ -147,7 +155,7 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
     if (!active || !auto) return
     const atEnd = beat >= DEMO_MAX_BEAT
     const id = setTimeout(() => {
-      setBeat((b) => (b >= DEMO_MAX_BEAT ? 0 : b + 1))
+      setBeat((b) => (b >= DEMO_MAX_BEAT ? DEMO_MIN_BEAT : b + 1))
     }, atEnd ? DEMO_HOLD_MS : DEMO_STEP_MS)
     return () => clearTimeout(id)
   }, [active, auto, beat])

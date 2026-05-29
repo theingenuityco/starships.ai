@@ -6,7 +6,8 @@ import { useStarshipRooms } from '@/hooks/useRooms'
 import { RoomNestedRecentConversations } from '@/components/rooms/RoomNestedRecentConversations'
 import { useDemo } from '@/components/demo/DemoContext'
 import { DEMO_ROOMS } from '@/components/demo/demoRooms'
-import { demoRoomOngoingCount } from '@/components/demo/demoActivity'
+import { demoRoomAttentionStatus } from '@/components/demo/demoActivity'
+import { DemoStatusIndicator } from '@/components/demo/DemoStatusIndicator'
 import type { RoomModel } from '@starships/protocol'
 import { AnimatePresence, motion } from 'motion/react'
 import { usePathname, useRouter } from 'next/navigation'
@@ -80,6 +81,8 @@ export function RoomSidebarList(props: { starshipId: string; starshipSlug: strin
   }, [activeRoomSlug, pathname])
 
   const openRoom = (roomSlug: string) => {
+    // Demo room nav is non-interactive: clicking a room should do nothing.
+    if (demoActive) return
     const slug = String(roomSlug || '').trim()
     if (!slug) return
     router.push(`/ship/${encodeURIComponent(props.starshipSlug)}/rooms/${encodeURIComponent(slug)}`)
@@ -126,8 +129,8 @@ export function RoomSidebarList(props: { starshipId: string; starshipSlug: strin
                     : false
                 const href = `/ship/${encodeURIComponent(props.starshipSlug)}/rooms/${encodeURIComponent(slug)}`
                 const roomConversationId = typeof (r as any)?.conversationId === 'string' ? String((r as any).conversationId).trim() : ''
-                // Demo: number of tasks actively running in the room, shown as a pill.
-                const ongoingCount = demoActive ? demoRoomOngoingCount(slug, beat) : 0
+                // Demo: a single dot when the room has something needing you or just completed.
+                const attentionStatus = demoActive ? demoRoomAttentionStatus(slug, beat) : 'idle'
                 return (
                   <motion.div
                     key={String(r.conversationId || slug)}
@@ -142,21 +145,16 @@ export function RoomSidebarList(props: { starshipId: string; starshipSlug: strin
                       href={href}
                       label={name}
                       icon="hash"
-                      isActive={isActive}
+                      isActive={demoActive ? false : isActive}
                       expanded
                       onClick={() => openRoom(slug)}
                       trailing={
-                        ongoingCount > 0 || r.isPrivate ? (
-                          <span className="flex items-center gap-1">
-                            {ongoingCount > 0 ? (
-                              <span
-                                className="inline-flex items-center justify-center min-w-[16px] h-[16px] px-1 rounded-full bg-muted text-muted-foreground text-[10px] leading-none font-semibold tabular-nums"
-                                aria-label={`${ongoingCount} task${ongoingCount === 1 ? '' : 's'} running`}
-                                title={`${ongoingCount} task${ongoingCount === 1 ? '' : 's'} running`}
-                              >
-                                {ongoingCount}
-                              </span>
-                            ) : null}
+                        attentionStatus !== 'idle' || r.isPrivate ? (
+                          <span
+                            className="flex items-center gap-1"
+                            title={attentionStatus === 'needs-you' ? 'Needs your attention' : attentionStatus === 'done' ? 'Task completed' : undefined}
+                          >
+                            <DemoStatusIndicator status={attentionStatus} />
                             {r.isPrivate ? (
                               <span className="flex-shrink-0 text-muted-foreground" title="Private room" aria-label="Private room">
                                 <Icon name="lock" weight="fill" className="h-3 w-3" />

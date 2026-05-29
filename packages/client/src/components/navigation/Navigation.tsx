@@ -68,6 +68,81 @@ export function Navigation(props: NavigationProps) {
   const [isCollapsing, setIsCollapsing] = useState(false)
   const [addRoomOpen, setAddRoomOpen] = useState(false)
 
+  // Resizable expanded width (drag the right edge). Persisted to localStorage.
+  const MIN_SIDEBAR_WIDTH = 240
+  const MAX_SIDEBAR_WIDTH = 480
+  const DEFAULT_SIDEBAR_WIDTH = 320
+  const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_SIDEBAR_WIDTH)
+  const [isResizing, setIsResizing] = useState(false)
+  const resizeStateRef = useRef<{ startX: number; startWidth: number } | null>(null)
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      const stored = Number(localStorage.getItem('navSidebarWidth'))
+      if (Number.isFinite(stored) && stored >= MIN_SIDEBAR_WIDTH && stored <= MAX_SIDEBAR_WIDTH) {
+        setSidebarWidth(stored)
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [])
+
+  const handleResizeMove = useCallback((e: PointerEvent) => {
+    const state = resizeStateRef.current
+    if (!state) return
+    const next = Math.min(MAX_SIDEBAR_WIDTH, Math.max(MIN_SIDEBAR_WIDTH, state.startWidth + (e.clientX - state.startX)))
+    setSidebarWidth(next)
+  }, [])
+
+  const handleResizeEnd = useCallback(() => {
+    resizeStateRef.current = null
+    setIsResizing(false)
+    window.removeEventListener('pointermove', handleResizeMove)
+    window.removeEventListener('pointerup', handleResizeEnd)
+    setSidebarWidth(current => {
+      try {
+        localStorage.setItem('navSidebarWidth', String(current))
+      } catch {
+        /* ignore */
+      }
+      return current
+    })
+  }, [handleResizeMove])
+
+  const handleResizeStart = useCallback(
+    (e: React.PointerEvent) => {
+      if (isMobile || !isExpanded) return
+      e.preventDefault()
+      resizeStateRef.current = { startX: e.clientX, startWidth: sidebarWidth }
+      setIsResizing(true)
+      window.addEventListener('pointermove', handleResizeMove)
+      window.addEventListener('pointerup', handleResizeEnd)
+    },
+    [isMobile, isExpanded, sidebarWidth, handleResizeMove, handleResizeEnd]
+  )
+
+  useEffect(
+    () => () => {
+      window.removeEventListener('pointermove', handleResizeMove)
+      window.removeEventListener('pointerup', handleResizeEnd)
+    },
+    [handleResizeMove, handleResizeEnd]
+  )
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return
+    if (!isResizing) return
+    const prevCursor = document.body.style.cursor
+    const prevSelect = document.body.style.userSelect
+    document.body.style.cursor = 'col-resize'
+    document.body.style.userSelect = 'none'
+    return () => {
+      document.body.style.cursor = prevCursor
+      document.body.style.userSelect = prevSelect
+    }
+  }, [isResizing])
+
   // Keep logo stable during collapse animation.
   const collapseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const clearCollapseTimeout = useCallback(() => {
@@ -384,9 +459,9 @@ export function Navigation(props: NavigationProps) {
         {/* Top: rail + main column */}
         <div className="flex flex-1 min-h-0 flex-row overflow-hidden">
           <div
-            className="flex flex-col transition-all duration-300 ease-in-out"
+            className={cn('relative flex flex-col', !isResizing && 'transition-all duration-300 ease-in-out')}
             style={{
-              width: isExpanded ? '17rem' : '3.25rem',
+              width: isExpanded ? `${sidebarWidth}px` : '3.25rem',
               height: '100%',
               willChange: 'width',
               contain: 'layout style paint',
@@ -525,6 +600,26 @@ export function Navigation(props: NavigationProps) {
 
             {/* Spacer to push content toward bottom when needed */}
             {(!isExpanded || !starshipData?.id) && <div className="flex-1 min-h-0"></div>}
+
+            {/* Resize handle on the right edge (expanded, desktop only) */}
+            {!isMobile && isExpanded && (
+              <div
+                role="separator"
+                aria-orientation="vertical"
+                aria-label="Resize sidebar"
+                onPointerDown={handleResizeStart}
+                className="group/resize absolute top-0 right-0 z-10 flex h-full w-2 items-center justify-center cursor-col-resize translate-x-1/2"
+              >
+                {/* Grabber pill: hidden until hover/drag */}
+                <span
+                  aria-hidden
+                  className={cn(
+                    'h-10 w-1 rounded-full bg-muted-foreground/30 transition-opacity duration-150',
+                    isResizing ? 'opacity-100' : 'opacity-0 group-hover/resize:opacity-100'
+                  )}
+                />
+              </div>
+            )}
           </div>
         </div>
 

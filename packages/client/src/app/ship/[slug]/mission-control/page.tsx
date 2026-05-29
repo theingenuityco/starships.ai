@@ -368,7 +368,7 @@ function TimelineItem({ item, isLast, starshipSlug }: { item: GlobalActivityItem
           ) : (
             <span className="truncate font-bold min-w-0">{item.action}</span>
           )}
-          <span className="shrink-0 text-muted-foreground">at</span>
+          <span className="shrink-0 text-muted-foreground">in</span>
           {roomHref ? (
             <Link href={roomHref} className="shrink-0 hover:underline">#{item.room}</Link>
           ) : (
@@ -478,7 +478,7 @@ function ActivityPane({
           ) : null}
         </AnimatePresence>
         {total === 0 ? (
-          <p className="px-1 pt-2 text-xs text-muted-foreground/40">No activity yet.</p>
+          <p className="px-3 pt-2 text-xs text-muted-foreground/40">No activity yet.</p>
         ) : (
           <AnimatePresence initial={false} mode="popLayout">
             {rows}
@@ -531,14 +531,17 @@ export default function MissionControlPage(): React.JSX.Element {
     const cards: FeedCard[] = []
 
     // Support principal: ticket #1042 (Priya) on the Support Tickets board.
-    // Becomes a gate at the pivot (beat 9): the drafted reply is waiting on you.
-    if (beat >= 1) {
+    // Opens on beat 2 (beat 1 belongs to the Growth TAM card alone): the ticket
+    // first lands in Ongoing as it's being received (beat 2), settles to NEW in
+    // Active (beat 3), then is triaged (beat 4). Becomes a gate at the pivot
+    // (beat 9): the drafted reply is waiting on you.
+    if (beat >= 2) {
       const status =
-        beat >= 11 ? 'RESOLVED' : beat >= 10 ? 'REPLYING' : beat >= 9 ? 'REPLY READY' : beat >= 3 ? 'TRIAGED' : 'NEW'
+        beat >= 11 ? 'RESOLVED' : beat >= 10 ? 'REPLYING' : beat >= 9 ? 'REPLY READY' : beat >= 4 ? 'TRIAGED' : beat >= 3 ? 'NEW' : 'RECEIVING'
       const statusKind: StatusKind =
-        beat >= 11 ? 'resolved' : beat >= 10 ? 'running' : beat >= 3 ? 'triaged' : 'new'
-      const assignee = beat >= 9 ? 'Reply' : 'Triage'
-      const indicators: FeedCardIndicator[] = beat >= 3
+        beat >= 11 ? 'resolved' : beat >= 10 ? 'running' : beat >= 4 ? 'triaged' : beat >= 3 ? 'new' : 'running'
+      const assignee = 'Sara: Customer Support'
+      const indicators: FeedCardIndicator[] = beat >= 4
         ? [
             { label: 'bug · mobile · auth' },
             { icon: 'alert-circle', label: 'priority high' },
@@ -559,7 +562,7 @@ export default function MissionControlPage(): React.JSX.Element {
         statusKind,
         primary: true,
         needsYou: beat === 9,
-        at: (beat - (beat >= 11 ? 11 : beat >= 10 ? 10 : beat >= 9 ? 9 : beat >= 3 ? 3 : 1)) * 30,
+        at: (beat - (beat >= 11 ? 11 : beat >= 10 ? 10 : beat >= 9 ? 9 : beat >= 4 ? 4 : beat >= 3 ? 3 : 2)) * 30,
       })
     }
 
@@ -570,7 +573,7 @@ export default function MissionControlPage(): React.JSX.Element {
         beat >= 11 ? 'MERGED' : beat >= 10 ? 'MERGING' : beat >= 9 ? 'READY TO MERGE' : beat >= 8 ? 'IN REVIEW' : beat >= 5 ? 'BUILDING' : 'SCOPED'
       const statusKind: StatusKind =
         beat >= 11 ? 'merged' : beat >= 10 ? 'running' : beat >= 8 ? 'in-review' : beat >= 5 ? 'building' : 'scoped'
-      const assignee = beat >= 10 ? 'Anvil' : beat >= 8 ? 'Lens' : beat >= 5 ? 'Anvil' : 'Quill'
+      const assignee = beat >= 10 ? 'Mason: Software Engineer' : beat >= 8 ? 'Clara: Code Review' : beat >= 5 ? 'Mason: Software Engineer' : 'Drew: Tech Lead'
       const indicators: FeedCardIndicator[] = []
       if (beat >= 5) indicators.push({ icon: 'git-branch', label: '+38 −4 · 2 files' })
       if (beat >= 7) indicators.push({ icon: 'check', label: '142 / 142 tests' })
@@ -601,7 +604,7 @@ export default function MissionControlPage(): React.JSX.Element {
         beat >= 8 ? 'LIST READY' : beat >= 7 ? 'QA' : beat >= 5 ? 'VERIFYING' : beat >= 3 ? 'FINDING CONTACTS' : 'BUILDING TAM'
       const statusKind: StatusKind = beat >= 8 ? 'resolved' : 'running'
       const assignee =
-        beat >= 8 ? 'Nora' : beat >= 7 ? 'Mira' : beat >= 5 ? 'Vera' : beat >= 3 ? 'Hunter' : 'Atlas'
+        beat >= 8 ? 'Mercer: Outreach Lead' : beat >= 7 ? 'Mira: List QA' : beat >= 5 ? 'Vera: Email Verification' : beat >= 3 ? 'Hunter: Contact Sourcing' : 'Carter: Market Research'
       const indicators: FeedCardIndicator[] = []
       if (beat >= 2) indicators.push({ label: '1,240 accounts' })
       if (beat >= 4) indicators.push({ label: '3,800 contacts' })

@@ -573,7 +573,8 @@ export default function MissionControlPage(): React.JSX.Element {
         beat >= 11 ? 'MERGED' : beat >= 10 ? 'MERGING' : beat >= 9 ? 'READY TO MERGE' : beat >= 8 ? 'IN REVIEW' : beat >= 5 ? 'BUILDING' : 'SCOPED'
       const statusKind: StatusKind =
         beat >= 11 ? 'merged' : beat >= 10 ? 'running' : beat >= 8 ? 'in-review' : beat >= 5 ? 'building' : 'scoped'
-      const assignee = beat >= 10 ? 'Mason: Software Engineer' : beat >= 8 ? 'Clara: Code Review' : beat >= 5 ? 'Mason: Software Engineer' : 'Drew: Tech Lead'
+      const assignee =
+        beat >= 9 ? 'Ravi: Release Engineer' : beat >= 5 ? 'Mason: Product Engineer' : 'Avery: Product Manager'
       const indicators: FeedCardIndicator[] = []
       if (beat >= 5) indicators.push({ icon: 'git-branch', label: '+38 −4 · 2 files' })
       if (beat >= 7) indicators.push({ icon: 'check', label: '142 / 142 tests' })
@@ -603,8 +604,7 @@ export default function MissionControlPage(): React.JSX.Element {
       const status =
         beat >= 8 ? 'LIST READY' : beat >= 7 ? 'QA' : beat >= 5 ? 'VERIFYING' : beat >= 3 ? 'FINDING CONTACTS' : 'BUILDING TAM'
       const statusKind: StatusKind = beat >= 8 ? 'resolved' : 'running'
-      const assignee =
-        beat >= 8 ? 'Mercer: Outreach Lead' : beat >= 7 ? 'Mira: List QA' : beat >= 5 ? 'Vera: Email Verification' : beat >= 3 ? 'Hunter: Contact Sourcing' : 'Carter: Market Research'
+      const assignee = beat >= 7 ? 'Otis: Lead Enrichment' : 'Nisha: Lead Generation'
       const indicators: FeedCardIndicator[] = []
       if (beat >= 2) indicators.push({ label: '1,240 accounts' })
       if (beat >= 4) indicators.push({ label: '3,800 contacts' })

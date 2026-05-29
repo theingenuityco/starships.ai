@@ -73,7 +73,7 @@ export function supportActivity(beat: number): DemoActivityItem[] {
       id: 's-arrival', agent: 'Sara: Customer Support',
       state: received ? 'done' : 'working',
       at: received ? (beat - 3) * 30 : 0,
-      action: 'Triaging login issue ticket from Priya R.',
+      action: 'Triaging mobile login issue from Priya R.',
       detail: 'Subject: Can\'t log in on mobile. Body: "Sign in button does nothing on iPhone Safari, tried Chrome too, no luck. This started after the update yesterday."',
     })
   }
@@ -92,97 +92,55 @@ export function supportActivity(beat: number): DemoActivityItem[] {
 
 export function engineeringActivity(beat: number): DemoActivityItem[] {
   const out: DemoActivityItem[] = []
-  // Deploy only after the merge lands (beat 11+).
-  if (beat >= 11) out.push({
-    id: 'e-deploy', agent: 'Marshall: Release Engineer', state: beat >= 12 ? 'done' : 'working', at: (beat - (beat >= 12 ? 12 : 11)) * 30,
-    action: 'Deploying PR #432 to production',
-    detail: beat >= 12
-      ? 'Build 4823 shipped, edge cache flushed, post-deploy smoke tests all green. Sign-in latency flat at 38ms p95.'
-      : 'Build 4823 queued. Deploying to edge, flushing cache, and running post-deploy smoke tests.',
-  })
-  // The merge is GATED on your approval at the pivot (beat 9). It does not
-  // happen on its own — it waits, then lands on your yes (beat 10), then closes.
+  // Beat 9 is the pivot: the review is GATED on your approval. The reviewer
+  // holds, merges on your yes (beat 10), then it lands and closes out (beat 11).
   if (beat >= 9) {
     const merged = beat >= 11
     const merging = beat >= 10
     out.push({
-      id: 'e-merge', agent: 'Mason: Software Engineer',
+      id: 'e-review', agent: 'Ravi: Release Engineer',
       state: merged ? 'done' : beat === 9 ? 'needs-you' : 'working',
       at: (beat - (merged ? 11 : merging ? 10 : 9)) * 30,
-      action: 'Merging fix/mobile-signin to main',
+      action: 'Reviewing and merging fix/mobile-signin',
       detail: merged
         ? 'Squash-merged onto main, branch deleted, linked ticket #1042 auto-closed. Picking up the next item from the engineering backlog now.'
         : merging
-          ? 'You approved the merge. Squash-merging onto main and kicking off the production deploy.'
-          : 'All 12 checks green and the full suite passed on a real checkout. Holding for your okay before it lands on main.',
+          ? 'You approved the merge. Squash-merging fix/mobile-signin onto main and kicking off the production deploy.'
+          : 'Reviewed the diff and the regression test: the fix is tight and all 12 checks are green. Holding for your okay before it lands on main.',
     })
   }
-  if (beat >= 8) out.push({
-    id: 'e-review', agent: 'Clara: Code Review', state: beat >= 9 ? 'done' : 'working', at: (beat - (beat >= 9 ? 9 : 8)) * 30,
-    action: 'Reviewing PR #432',
-    detail: beat >= 9
-      ? 'Diff is tight: a stale-ref guard plus a regression test that fails without the fix. No blocking comments. Approved.'
-      : 'Reading the diff on fix/mobile-signin — checking the stale-ref guard holds across orientation changes and the regression test actually reproduces the original failure.',
-  })
-  if (beat >= 8) out.push({
-    id: 'e-open', agent: 'Mason: Software Engineer', state: 'done', at: (beat - 8) * 30,
-    action: 'Opened PR #432',
-    detail: 'Pushed fix/mobile-signin and opened the PR. All 12 checks green, diff +38 −4 across 2 files.',
-  })
-  if (beat >= 6) out.push({
-    id: 'e-tests', agent: 'Mason: Software Engineer', state: beat >= 7 ? 'done' : 'working', at: (beat - (beat >= 7 ? 7 : 6)) * 30,
-    action: 'Running tests on fix/mobile-signin',
-    detail: beat >= 7
-      ? 'All 142 tests passed in 24.3 seconds. The new Safari-resize regression test passes cleanly. Pushing the branch now.'
-      : 'Spinning up iOS Safari at 390×844, replaying the resize sequence. 47 of 142 tests passed so far. Estimated 18 more seconds before the regression test runs.',
-  })
+  // The product engineer implements against the plan, writing a failing
+  // regression test first, then raises the PR once the suite is green.
   if (beat >= 5) out.push({
-    id: 'e-fix', agent: 'Mason: Software Engineer', state: beat >= 6 ? 'done' : 'working', at: (beat - (beat >= 6 ? 6 : 5)) * 30,
+    id: 'e-fix', agent: 'Mason: Product Engineer', state: beat >= 7 ? 'done' : 'working', at: (beat - (beat >= 7 ? 7 : 5)) * 30,
     action: 'Implementing fix for mobile sign-in',
-    detail: beat >= 6
-      ? 'Three-line change inside SignInButton.tsx — guarding the resize handler against a stale ref. Wrote a regression test that reproduces the original failure before the fix.'
-      : 'Patching the stale handler ref inside SignInButton.tsx. Writing a regression test that reproduces the original failure before applying the fix.',
+    detail: beat >= 7
+      ? 'Three-line fix in SignInButton.tsx guarding the resize handler against a stale ref, plus a regression test that fails without it. Opened PR fix/mobile-signin: all 12 checks green.'
+      : 'Following the plan: writing a regression test that reproduces the failure first, then patching the stale handler ref in SignInButton.tsx.',
   })
-  if (beat >= 4) out.push({
-    id: 'e-spec', agent: 'Drew: Tech Lead', state: beat >= 5 ? 'done' : 'working', at: (beat - (beat >= 5 ? 5 : 4)) * 30,
-    action: 'Scoping ticket #1042',
+  // The product manager scopes the bug from the support ticket, reproduces it,
+  // and hands engineering a root-cause writeup and a fix plan.
+  if (beat >= 3) out.push({
+    id: 'e-plan', agent: 'Avery: Product Manager', state: beat >= 5 ? 'done' : 'working', at: (beat - (beat >= 5 ? 5 : 3)) * 30,
+    action: 'Scoping the mobile sign-in issue',
     detail: beat >= 5
-      ? 'Reproduced on iPhone 14 Pro Safari at 390×844. The button stops responding after a viewport resize because the handler ref is captured before the resize, not after. Acceptance: button stays responsive across orientation and resize.'
-      : 'Reproducing on iPhone 14 Pro Safari at 390×844. Tracing the resize event timing to pin down why the handler ref goes stale after orientation change.',
+      ? 'Root cause isolated to a stale resize-handler ref in SignInButton.tsx. Wrote up the fix plan and handed it to engineering.'
+      : 'Reproducing Priya R.\'s report and tracing where mobile Safari sign-in breaks. Will write up the root cause and a fix plan for engineering.',
   })
   return out
 }
 
 export function growthActivity(beat: number): DemoActivityItem[] {
   const out: DemoActivityItem[] = []
-  if (beat >= 8) out.push({
-    id: 'g-handover', agent: 'Mercer: Outreach Lead', state: beat >= 9 ? 'done' : 'working', at: (beat - (beat >= 9 ? 9 : 8)) * 30,
-    action: 'Handing over the Q2 outbound list',
-    detail: '1,240 target accounts, 3,800 contacts, 3,640 verified emails. Clean list ready for outreach — staged for your sign-off before the first send.',
-  })
   if (beat >= 7) out.push({
-    id: 'g-qa', agent: 'Mira: List QA', state: beat >= 8 ? 'done' : 'working', at: (beat - (beat >= 8 ? 8 : 7)) * 30,
-    action: 'QA on the verified contact list',
-    detail: beat >= 8
-      ? 'Spot-checked 200 rows against source pages — no fabricated names or titles, every email maps to a real person. List passes.'
-      : 'Sampling the verified list to confirm every name, title, and company is grounded in a real source. Zero tolerance for fabricated contacts.',
-  })
-  if (beat >= 5) out.push({
-    id: 'g-verify', agent: 'Vera: Email Verification', state: beat >= 7 ? 'done' : 'working', at: (beat - (beat >= 7 ? 7 : 5)) * 30,
+    id: 'g-verify', agent: 'Otis: Lead Enrichment', state: beat >= 9 ? 'done' : 'working', at: (beat - (beat >= 9 ? 9 : 7)) * 30,
     action: 'Verifying contact emails',
-    detail: beat >= 7
+    detail: beat >= 9
       ? '3,640 of 3,800 emails verified deliverable. Dropped 160 catch-all and bounced addresses.'
       : 'Running deliverability checks across 3,800 contacts — MX, SMTP, and catch-all detection. About 96% verifying clean so far.',
   })
-  if (beat >= 3) out.push({
-    id: 'g-contacts', agent: 'Hunter: Contact Sourcing', state: beat >= 5 ? 'done' : 'working', at: (beat - (beat >= 5 ? 5 : 3)) * 30,
-    action: 'Finding contacts at target accounts',
-    detail: beat >= 5
-      ? 'Found 3,800 decision-makers across 1,240 accounts — VP Eng, Head of Support, and Founder titles prioritised.'
-      : 'Pulling decision-makers at each target account, prioritising VP Eng, Head of Support, and Founder titles.',
-  })
   if (beat >= 1) out.push({
-    id: 'g-tam', agent: 'Carter: Market Research', state: beat >= 3 ? 'done' : 'working', at: (beat - (beat >= 3 ? 3 : 1)) * 30,
+    id: 'g-tam', agent: 'Nisha: Lead Generation', state: beat >= 3 ? 'done' : 'working', at: (beat - (beat >= 3 ? 3 : 1)) * 30,
     action: 'Building the target account list',
     detail: beat >= 3
       ? 'Expanded the ICP into 1,240 accounts — B2B SaaS, 50-500 employees, with recent funding or hiring signals.'

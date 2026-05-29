@@ -9,6 +9,7 @@ import { DEMO_ROOMS } from '@/components/demo/demoRooms'
 import { demoRoomAggregateStatus } from '@/components/demo/demoActivity'
 import { DemoStatusIndicator } from '@/components/demo/DemoStatusIndicator'
 import type { RoomModel } from '@starships/protocol'
+import { AnimatePresence, motion } from 'motion/react'
 import { usePathname, useRouter } from 'next/navigation'
 import { useMemo } from 'react'
 
@@ -113,54 +114,66 @@ export function RoomSidebarList(props: { starshipId: string; starshipSlug: strin
             {!isLoading && sorted.length === 0 ? (
               <div className="text-xs text-muted-foreground px-1 py-2">No rooms yet</div>
             ) : null}
-            {sorted.map((r) => {
-              const slug = String(r.slug || '').trim()
-              const name = String(r.name || '').trim() || slug || 'Room'
-              const isActive = demoSlugCandidates
-                ? demoSlugCandidates.includes(slug.toLowerCase())
-                : activeRoomSlug
-                  ? String(activeRoomSlug).toLowerCase() === slug.toLowerCase()
-                  : false
-              const href = `/ship/${encodeURIComponent(props.starshipSlug)}/rooms/${encodeURIComponent(slug)}`
-              const roomConversationId = typeof (r as any)?.conversationId === 'string' ? String((r as any).conversationId).trim() : ''
-              // Demo: show a live status indicator on rooms with something happening.
-              const roomStatus = demoActive ? demoRoomAggregateStatus(slug, beat) : 'idle'
-              const showRoomStatus = demoActive && roomStatus !== 'idle'
-              return (
-                <div key={String(r.conversationId || slug)} className="w-full">
-                  <NavigationItem
-                    href={href}
-                    label={name}
-                    icon="hash"
-                    isActive={isActive}
-                    expanded
-                    onClick={() => openRoom(slug)}
-                    trailing={
-                      showRoomStatus || r.isPrivate ? (
-                        <span className="flex items-center gap-1">
-                          {showRoomStatus ? <DemoStatusIndicator status={roomStatus} /> : null}
-                          {r.isPrivate ? (
-                            <span className="flex-shrink-0 text-muted-foreground" title="Private room" aria-label="Private room">
-                              <Icon name="lock" weight="fill" className="h-3 w-3" />
-                            </span>
-                          ) : null}
-                        </span>
-                      ) : null
-                    }
-                  />
-                  {roomConversationId ? (
-                    <RoomNestedRecentConversations
-                      starshipSlug={props.starshipSlug}
-                      roomSlug={slug}
-                      roomConversationId={roomConversationId}
-                      activeConversationId={isActive ? (demoSlugCandidates ? demoConversationId : activeConversationId) : null}
-                      highlightFirst={Boolean(isActive && demoSlugCandidates && !demoConversationId)}
-                      onNavigate={props.onNavigate}
+            {/* Rooms enter/exit and reorder with the same opacity + `layout="position"`
+                language as Mission Control's activity log. */}
+            <AnimatePresence initial={false} mode="popLayout">
+              {sorted.map((r) => {
+                const slug = String(r.slug || '').trim()
+                const name = String(r.name || '').trim() || slug || 'Room'
+                const isActive = demoSlugCandidates
+                  ? demoSlugCandidates.includes(slug.toLowerCase())
+                  : activeRoomSlug
+                    ? String(activeRoomSlug).toLowerCase() === slug.toLowerCase()
+                    : false
+                const href = `/ship/${encodeURIComponent(props.starshipSlug)}/rooms/${encodeURIComponent(slug)}`
+                const roomConversationId = typeof (r as any)?.conversationId === 'string' ? String((r as any).conversationId).trim() : ''
+                // Demo: show a live status indicator on rooms with something happening.
+                const roomStatus = demoActive ? demoRoomAggregateStatus(slug, beat) : 'idle'
+                const showRoomStatus = demoActive && roomStatus !== 'idle'
+                return (
+                  <motion.div
+                    key={String(r.conversationId || slug)}
+                    layout="position"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.25, ease: 'easeOut' }}
+                    className="w-full"
+                  >
+                    <NavigationItem
+                      href={href}
+                      label={name}
+                      icon="hash"
+                      isActive={isActive}
+                      expanded
+                      onClick={() => openRoom(slug)}
+                      trailing={
+                        showRoomStatus || r.isPrivate ? (
+                          <span className="flex items-center gap-1">
+                            {showRoomStatus ? <DemoStatusIndicator status={roomStatus} /> : null}
+                            {r.isPrivate ? (
+                              <span className="flex-shrink-0 text-muted-foreground" title="Private room" aria-label="Private room">
+                                <Icon name="lock" weight="fill" className="h-3 w-3" />
+                              </span>
+                            ) : null}
+                          </span>
+                        ) : null
+                      }
                     />
-                  ) : null}
-                </div>
-              )
-            })}
+                    {roomConversationId ? (
+                      <RoomNestedRecentConversations
+                        starshipSlug={props.starshipSlug}
+                        roomSlug={slug}
+                        roomConversationId={roomConversationId}
+                        activeConversationId={isActive ? (demoSlugCandidates ? demoConversationId : activeConversationId) : null}
+                        highlightFirst={Boolean(isActive && demoSlugCandidates && !demoConversationId)}
+                        onNavigate={props.onNavigate}
+                      />
+                    ) : null}
+                  </motion.div>
+                )
+              })}
+            </AnimatePresence>
           </div>
         </div>
       </div>

@@ -7,6 +7,7 @@ import { normalizeConversationTitle } from '@/lib/normalizeConversationTitle'
 import { useDemo } from '@/components/demo/DemoContext'
 import { activityStatus, demoRoomActivity, isDemoRoomSlug } from '@/components/demo/demoActivity'
 import { DemoStatusIndicator } from '@/components/demo/DemoStatusIndicator'
+import { AnimatePresence, motion } from 'motion/react'
 import { useRouter } from 'next/navigation'
 import { useMemo } from 'react'
 
@@ -73,56 +74,83 @@ export function RoomNestedRecentConversations(props: {
   }
 
   return (
-    <div className="ml-2 pl-2 pr-1 pb-1 overflow-hidden">
+    <motion.div
+      layout="position"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.25, ease: 'easeOut' }}
+      className="ml-2 pl-2 pr-1 pb-1 overflow-hidden"
+    >
+      {/* Entry/exit + reorder animation mirrors Mission Control's activity log:
+          opacity-only enter/exit with `layout="position"` so rows slide to their
+          new slot as the beat clock adds/removes conversations. */}
       <div className="space-y-0.5">
-        {recent.map((c: any, idx: number) => {
-          const id = String(c?.id || '').trim()
-          if (!id) return null
-          const matchesActive = Boolean(props.activeConversationId && String(props.activeConversationId) === id)
-          const isActive = matchesActive || Boolean(props.highlightFirst && !props.activeConversationId && idx === 0)
-          const titleRaw = String(c?.action ?? c?.title ?? '').trim()
-          const titleNorm = isDemoRoom ? titleRaw : normalizeConversationTitle(titleRaw)
-          const title = titleNorm || 'Untitled conversation'
-          // Demo: live/needs-you/just-completed get a status marker; everything
-          // else (idle, already-done) falls back to the normal conversation icon.
-          const demoStatus = isDemoRoom ? activityStatus(c.state, c.at) : 'idle'
-          const showDemoMarker = isDemoRoom && demoStatus !== 'idle'
-          return (
-            <button
-              key={`room:${props.roomSlug}:recent:${id}`}
-              type="button"
-              className={cn(
-                'flex items-center w-full h-7 px-2 gap-1.5 rounded-lg border border-transparent text-xs font-normal transition-colors overflow-hidden',
-                isActive ? 'text-primary' : 'text-muted-foreground hover:text-foreground hover:bg-muted/70 dark:hover:bg-[#2C2C30]'
-              )}
-              onClick={() => openConversation(id)}
-              title={title}
-            >
-              {showDemoMarker ? (
-                <DemoStatusIndicator status={demoStatus} className="opacity-90" />
-              ) : (
-                <Icon name="message-square" className="h-3 w-3 flex-shrink-0 opacity-80" />
-              )}
-              <span className="flex-1 min-w-0 truncate text-left">{title}</span>
-            </button>
-          )
-        })}
+        <AnimatePresence initial={false} mode="popLayout">
+          {recent.map((c: any, idx: number) => {
+            const id = String(c?.id || '').trim()
+            if (!id) return null
+            const matchesActive = Boolean(props.activeConversationId && String(props.activeConversationId) === id)
+            const isActive = matchesActive || Boolean(props.highlightFirst && !props.activeConversationId && idx === 0)
+            const titleRaw = String(c?.action ?? c?.title ?? '').trim()
+            const titleNorm = isDemoRoom ? titleRaw : normalizeConversationTitle(titleRaw)
+            const title = titleNorm || 'Untitled conversation'
+            // Demo: live/needs-you/just-completed get a status marker; everything
+            // else (idle, already-done) falls back to the normal conversation icon.
+            // The marker cross-fades between states via DemoStatusIndicator.
+            const demoStatus = isDemoRoom ? activityStatus(c.state, c.at) : 'idle'
+            return (
+              <motion.button
+                key={`room:${props.roomSlug}:recent:${id}`}
+                layout="position"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.25, ease: 'easeOut' }}
+                type="button"
+                className={cn(
+                  'flex items-center w-full h-7 px-2 gap-1.5 rounded-lg border border-transparent text-xs font-normal transition-colors overflow-hidden',
+                  isActive ? 'text-primary' : 'text-muted-foreground hover:text-foreground hover:bg-muted/70 dark:hover:bg-[#2C2C30]'
+                )}
+                onClick={() => openConversation(id)}
+                title={title}
+              >
+                {isDemoRoom ? (
+                  <DemoStatusIndicator
+                    status={demoStatus}
+                    className="opacity-90"
+                    idleFallback={<Icon name="message-square" className="h-3 w-3 opacity-80" />}
+                  />
+                ) : (
+                  <Icon name="message-square" className="h-3 w-3 flex-shrink-0 opacity-80" />
+                )}
+                <span className="flex-1 min-w-0 truncate text-left">{title}</span>
+              </motion.button>
+            )
+          })}
 
-        {moreCount > 0 ? (
-          <button
-            type="button"
-            onClick={openHistoryPane}
-            className={cn(
-              "ml-2 mt-0.5 text-[11px] font-medium text-muted-foreground hover:text-foreground transition-colors"
-            )}
-            aria-label={`Open history for room ${props.roomSlug}`}
-            title="Open history"
-          >
-            +{moreCount} more
-          </button>
-        ) : null}
+          {moreCount > 0 ? (
+            <motion.button
+              key={`room:${props.roomSlug}:more`}
+              layout="position"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.25, ease: 'easeOut' }}
+              type="button"
+              onClick={openHistoryPane}
+              className={cn(
+                "ml-2 mt-0.5 text-[11px] font-medium text-muted-foreground hover:text-foreground transition-colors"
+              )}
+              aria-label={`Open history for room ${props.roomSlug}`}
+              title="Open history"
+            >
+              +{moreCount} more
+            </motion.button>
+          ) : null}
+        </AnimatePresence>
       </div>
-    </div>
+    </motion.div>
   )
 }
 

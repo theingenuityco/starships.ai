@@ -6,8 +6,7 @@ import { useStarshipRooms } from '@/hooks/useRooms'
 import { RoomNestedRecentConversations } from '@/components/rooms/RoomNestedRecentConversations'
 import { useDemo } from '@/components/demo/DemoContext'
 import { DEMO_ROOMS } from '@/components/demo/demoRooms'
-import { demoRoomAggregateStatus } from '@/components/demo/demoActivity'
-import { DemoStatusIndicator } from '@/components/demo/DemoStatusIndicator'
+import { demoRoomOngoingCount } from '@/components/demo/demoActivity'
 import type { RoomModel } from '@starships/protocol'
 import { AnimatePresence, motion } from 'motion/react'
 import { usePathname, useRouter } from 'next/navigation'
@@ -127,9 +126,8 @@ export function RoomSidebarList(props: { starshipId: string; starshipSlug: strin
                     : false
                 const href = `/ship/${encodeURIComponent(props.starshipSlug)}/rooms/${encodeURIComponent(slug)}`
                 const roomConversationId = typeof (r as any)?.conversationId === 'string' ? String((r as any).conversationId).trim() : ''
-                // Demo: show a live status indicator on rooms with something happening.
-                const roomStatus = demoActive ? demoRoomAggregateStatus(slug, beat) : 'idle'
-                const showRoomStatus = demoActive && roomStatus !== 'idle'
+                // Demo: number of tasks actively running in the room, shown as a pill.
+                const ongoingCount = demoActive ? demoRoomOngoingCount(slug, beat) : 0
                 return (
                   <motion.div
                     key={String(r.conversationId || slug)}
@@ -148,9 +146,17 @@ export function RoomSidebarList(props: { starshipId: string; starshipSlug: strin
                       expanded
                       onClick={() => openRoom(slug)}
                       trailing={
-                        showRoomStatus || r.isPrivate ? (
+                        ongoingCount > 0 || r.isPrivate ? (
                           <span className="flex items-center gap-1">
-                            {showRoomStatus ? <DemoStatusIndicator status={roomStatus} /> : null}
+                            {ongoingCount > 0 ? (
+                              <span
+                                className="inline-flex items-center justify-center min-w-[16px] h-[16px] px-1 rounded-full bg-muted text-muted-foreground text-[10px] leading-none font-semibold tabular-nums"
+                                aria-label={`${ongoingCount} task${ongoingCount === 1 ? '' : 's'} running`}
+                                title={`${ongoingCount} task${ongoingCount === 1 ? '' : 's'} running`}
+                              >
+                                {ongoingCount}
+                              </span>
+                            ) : null}
                             {r.isPrivate ? (
                               <span className="flex-shrink-0 text-muted-foreground" title="Private room" aria-label="Private room">
                                 <Icon name="lock" weight="fill" className="h-3 w-3" />

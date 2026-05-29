@@ -217,15 +217,11 @@ export function demoRoomActivity(roomSlug: string, beat: number): DemoActivityIt
 }
 
 /**
- * The room's headline status: needs-you wins, then live, then a transient done
- * (only on the beat something completes), else idle. Keeping `done` transient
- * means a room doesn't carry a lingering blue dot after its work finishes.
+ * How many of the room's conversations are actively in progress right now
+ * (an agent is working it). Drives the numbered pill on each room in the nav
+ * sidebar. `needs-you` items are excluded — they're paused on you, not running.
  */
-export function demoRoomAggregateStatus(roomSlug: string, beat: number): DemoConvStatus {
-  const items = demoRoomActivity(roomSlug, beat)
-  if (items.length === 0) return 'idle'
-  if (items.some((i) => i.state === 'needs-you')) return 'needs-you'
-  if (items.some((i) => i.state === 'working')) return 'live'
-  if (items.some((i) => i.state === 'done' && i.at === 0)) return 'done'
-  return 'idle'
+export function demoRoomOngoingCount(roomSlug: string, beat: number): number {
+  return demoRoomActivity(roomSlug, beat).filter((i) => i.state === 'working').length
 }
+

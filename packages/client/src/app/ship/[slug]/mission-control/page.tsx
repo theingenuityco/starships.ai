@@ -31,7 +31,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { notFound, useParams } from 'next/navigation'
 import Link from 'next/link'
-import { AnimatePresence, motion, type Variants } from 'motion/react'
+import { AnimatePresence, motion } from 'motion/react'
 import { cn } from '@/lib/utils'
 import { avatarColour, agentChipColour } from '@/components/dashboard/utils'
 import Icon from '@/components/primitives/Icon'
@@ -45,23 +45,10 @@ import type { AgentModel } from '@starships/protocol'
 
 // ─── Shared animation variants ───────────────────────────────────────────────
 
-const CARD_VARIANTS: Variants = {
-  hidden: { opacity: 0, y: 12, scale: 0.98 },
-  visible: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.3, ease: [0.25, 0.46, 0.45, 0.94] } },
-  exit: { opacity: 0, y: -8, scale: 0.97, transition: { duration: 0.2, ease: 'easeIn' } },
-}
-
-const SECTION_VARIANTS: Variants = {
-  hidden: { opacity: 0, y: 8 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.25, ease: 'easeOut' } },
-  exit: { opacity: 0, transition: { duration: 0.15 } },
-}
-
-const TIMELINE_VARIANTS: Variants = {
-  hidden: { opacity: 0, x: -10 },
-  visible: { opacity: 1, x: 0, transition: { duration: 0.3, ease: [0.25, 0.46, 0.45, 0.94] } },
-  exit: { opacity: 0, x: -6, transition: { duration: 0.2, ease: 'easeIn' } },
-}
+// Every animated row/card uses `layout="position"` (animate position only, let
+// height snap) + opacity-only enter/exit, all inside a single AnimatePresence
+// per pane with stable keys. So an item that changes stage stays mounted and
+// slides to its new slot rather than exiting one list and entering another.
 
 // One-shot tint that replays whenever `signal` changes (and on mount). The
 // keyed span remounts on each new signal, so it draws the eye to the row/card
@@ -176,11 +163,11 @@ function UnifiedCard({ card }: { card: FeedCard }) {
 
   return (
     <motion.div
-      layout
-      variants={CARD_VARIANTS}
-      initial="hidden"
-      animate="visible"
-      exit="exit"
+      layout="position"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.3, ease: 'easeOut' }}
       className={cn(
         'group relative overflow-hidden',
         CARD_SURFACE,
@@ -246,7 +233,6 @@ function UnifiedCard({ card }: { card: FeedCard }) {
           </span>
         </div>
       </div>
-
     </motion.div>
   )
 }
@@ -323,7 +309,14 @@ function BucketSeparator({ label, count, tone = 'muted' }: { label: string; coun
       ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
       : 'bg-muted text-muted-foreground/60'
   return (
-    <div className={cn('flex items-start gap-3', TIMELINE_ITEM_LEFT)}>
+    <motion.div
+      layout="position"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.25, ease: 'easeOut' }}
+      className={cn('flex items-start gap-3', TIMELINE_ITEM_LEFT)}
+    >
       <div className="flex w-6 shrink-0 flex-col items-center self-stretch">
         <div className="w-px bg-border/60" style={{ height: 22 }} />
         <span className={cn('h-2 w-2 shrink-0 rounded-full', dotCls, isAccent && 'animate-pulse')} />
@@ -338,7 +331,7 @@ function BucketSeparator({ label, count, tone = 'muted' }: { label: string; coun
         ) : null}
         <div className="h-px flex-1 bg-border/30" />
       </div>
-    </div>
+    </motion.div>
   )
 }
 
@@ -347,11 +340,11 @@ function TimelineItem({ item, isLast, starshipSlug }: { item: GlobalActivityItem
 
   return (
     <motion.div
-      layout
-      variants={TIMELINE_VARIANTS}
-      initial="hidden"
-      animate="visible"
-      exit="exit"
+      layout="position"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.3, ease: 'easeOut' }}
       className={cn('relative flex items-start gap-3', TIMELINE_ITEM_LEFT)}
     >
       <ChangeFlash signal={item.state} className="inset-x-1 inset-y-1 rounded-md bg-primary/10" />
@@ -439,36 +432,55 @@ function ActivityPane({
 
   const total = items.length
 
+  // Flatten separators + items into one presence tree so an item that changes
+  // bucket (e.g. working → done) stays mounted and slides via `layout`, rather
+  // than exiting one bucket's AnimatePresence and re-entering another's.
+  const lastBucketIdx = buckets.length - 1
+  const rows: React.ReactNode[] = []
+  buckets.forEach((bucket, groupIdx) => {
+    rows.push(<BucketSeparator key={`sep-${bucket.key}`} label={bucket.label} count={bucket.items.length} tone={bucket.tone} />)
+    if (bucket.key === 'live' && bucket.items.length === 0) {
+      rows.push(
+        <motion.div
+          key="live-empty"
+          layout="position"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.25 }}
+          className={cn('flex items-start gap-3', TIMELINE_ITEM_LEFT)}
+        >
+          <div className="flex w-6 shrink-0 flex-col items-center self-stretch">
+            <div className="w-px bg-border/60" style={{ height: 8 }} />
+            <div className="w-px flex-1 bg-border/60" />
+          </div>
+          <p className="py-2 text-xs text-muted-foreground/40">All quiet. No agents running right now.</p>
+        </motion.div>
+      )
+    } else {
+      bucket.items.forEach((it, i) => {
+        const isLast = groupIdx === lastBucketIdx && i === bucket.items.length - 1
+        rows.push(<TimelineItem key={it.id} item={it} isLast={isLast} starshipSlug={starshipSlug} />)
+      })
+    }
+  })
+
   return (
     <section className={cn('min-w-0', className)}>
-      <div className="pt-1 pb-2">
-        <AnimatePresence mode="popLayout">
-          {attention ? <motion.div key="attention" variants={TIMELINE_VARIANTS} initial="hidden" animate="visible" exit="exit">{attention}</motion.div> : null}
+      <div className="relative pt-1 pb-2">
+        <AnimatePresence>
+          {attention ? (
+            <motion.div key="attention" layout="position" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3, ease: 'easeOut' }}>
+              {attention}
+            </motion.div>
+          ) : null}
         </AnimatePresence>
         {total === 0 ? (
           <p className="px-1 pt-2 text-xs text-muted-foreground/40">No activity yet.</p>
         ) : (
-          buckets.map((bucket, groupIdx) => (
-            <div key={bucket.key}>
-              <BucketSeparator label={bucket.label} count={bucket.items.length} tone={bucket.tone} />
-              <AnimatePresence mode="popLayout" initial={false}>
-                {bucket.key === 'live' && bucket.items.length === 0 ? (
-                  <div key="live-empty" className={cn('flex items-start gap-3', TIMELINE_ITEM_LEFT)}>
-                    <div className="flex w-6 shrink-0 flex-col items-center self-stretch">
-                      <div className="w-px bg-border/60" style={{ height: 8 }} />
-                      <div className="w-px flex-1 bg-border/60" />
-                    </div>
-                    <p className="py-2 text-xs text-muted-foreground/40">All quiet. No agents running right now.</p>
-                  </div>
-                ) : (
-                  bucket.items.map((it, i) => {
-                    const isLast = groupIdx === buckets.length - 1 && i === bucket.items.length - 1
-                    return <TimelineItem key={it.id} item={it} isLast={isLast} starshipSlug={starshipSlug} />
-                  })
-                )}
-              </AnimatePresence>
-            </div>
-          ))
+          <AnimatePresence initial={false}>
+            {rows}
+          </AnimatePresence>
         )}
       </div>
     </section>
@@ -677,7 +689,7 @@ export default function MissionControlPage(): React.JSX.Element {
         status,
         statusKind,
         primary: true,
-        at: beat >= 10 ? 0 : beat >= 3 ? 60 : 30,
+        at: (beat - (beat >= 10 ? 10 : beat >= 3 ? 3 : 1)) * 30,
       })
     }
 
@@ -707,89 +719,26 @@ export default function MissionControlPage(): React.JSX.Element {
         statusKind,
         primary: true,
         needsYou: beat === 8,
-        at: beat >= 10 ? 0 : beat >= 8 ? 60 : beat >= 5 ? 30 : 120,
+        at: (beat - (beat >= 10 ? 10 : beat >= 8 ? 8 : beat >= 5 ? 5 : 4)) * 30,
       })
     }
 
-    // Ambient cards — real work happening in parallel across the fleet.
-    cards.push(
-      {
-        id: 'ticket-1041',
-        type: 'ticket',
-        room: 'Support',
-        board: 'Support Tickets',
-        displayId: '#1041',
-        title: "CSV export missing column 'plan'",
-        description:
-          'Marco V. — "After yesterday\'s update my billing-page CSV exports are missing the \'plan\' column. Need it for internal reconciliation." Flagged for engineering as a data-layer issue.',
-        assignee: 'Triage',
-        indicators: [{ label: 'bug · data' }, { label: 'priority medium' }],
-        status: 'TRIAGED',
-        statusKind: 'triaged',
-        at: 3600,
-      },
-      {
-        id: 'ticket-1040',
-        type: 'ticket',
-        room: 'Support',
-        board: 'Support Tickets',
-        displayId: '#1040',
-        title: "Billing receipt PDF won't open",
-        description:
-          'Sam K. — "Both Chrome and Firefox download the PDF but it opens blank. Worked fine last week." Fix shipped in today\'s deploy; replied with a fresh download link.',
-        assignee: 'Reply',
-        indicators: [{ icon: 'check', label: 'resolved 1h ago' }],
-        status: 'RESOLVED',
-        statusKind: 'resolved',
-        at: 3600,
-      },
-      {
-        id: 'eng-billing',
-        type: 'pr',
-        room: 'Engineering',
-        board: 'Engineering Pipeline',
-        displayId: 'fix/billing-null',
-        title: 'Null deref in billing',
-        description:
-          'Payment-retry path can deref a null charge when the upstream gateway times out mid-request. Adds a null-guard and a tracking event for the timeout case.',
-        assignee: 'Anvil',
-        indicators: [
-          { icon: 'git-branch', label: '+24 −6 · 3 files' },
-          { icon: 'check', label: '142 / 142 tests' },
-        ],
-        status: 'IN REVIEW',
-        statusKind: 'in-review',
-        at: 1800,
-      },
-      {
-        id: 'eng-zod',
-        type: 'pr',
-        room: 'Engineering',
-        board: 'Engineering Pipeline',
-        displayId: 'chore/dep-zod',
-        title: 'Bump zod to latest',
-        description:
-          'Pin zod to 3.23.x for the new discriminated-union helpers. No breaking changes expected — schemas pass type-check on the upgraded version.',
-        assignee: 'Sift',
-        status: 'SCOPED',
-        statusKind: 'scoped',
-        at: 5400,
-      },
-      {
-        id: 'ops-invoices',
-        type: 'run',
-        room: 'Ops',
-        board: 'Operations',
-        title: 'May invoices · 42 / 42',
-        description:
-          'Weekly invoice sweep complete. All 42 May invoices sent. 4 EU customers confirmed VAT IDs — final invoices delivered.',
-        assignee: 'Janus',
-        indicators: [{ icon: 'check', label: '42 sent' }],
-        status: 'RESOLVED',
-        statusKind: 'resolved',
-        at: 60,
-      }
-    )
+    // Ambient card — one piece of parallel fleet work (Ops), kept calm so it
+    // doesn't compete with the narrative principals.
+    cards.push({
+      id: 'ops-invoices',
+      type: 'run',
+      room: 'Ops',
+      board: 'Operations',
+      title: 'May invoices · 42 / 42',
+      description:
+        'Weekly invoice sweep complete. All 42 May invoices sent. 4 EU customers confirmed VAT IDs — final invoices delivered.',
+      assignee: 'Janus',
+      indicators: [{ icon: 'check', label: '42 sent' }],
+      status: 'RESOLVED',
+      statusKind: 'resolved',
+      at: 60,
+    })
 
     return cards
   }, [beat])
@@ -820,30 +769,17 @@ export default function MissionControlPage(): React.JSX.Element {
       action: 'Replying to Priya R. on #1042',
       detail: 'Sent a 47-word reply confirming the iOS Safari fix is live as of today\'s deploy. Used her exact wording for the issue, named the fix specifically, no support theatre. Ticket closed and resolved_at stamped.',
     })
-    if (beat >= 3) out.push({
-      id: 's-triage-done', agent: 'Triage', state: 'done', at: beat >= 10 ? 240 : 0,
+    if (beat >= 2) out.push({
+      id: 's-triage', agent: 'Triage', state: beat >= 3 ? 'done' : 'working', at: (beat - (beat >= 3 ? 3 : 2)) * 30,
       action: 'Triaging ticket #1042',
-      detail: 'Classified as bug · mobile · auth · priority high. The "Sign in button does nothing" pattern matches 2 other open tickets — flagging Engineering with a note to look at iOS Safari resize handling.',
-    })
-    if (beat === 2) out.push({
-      id: 's-triage-working', agent: 'Triage', state: 'working', at: 0,
-      action: 'Triaging ticket #1042',
-      detail: 'Reading the body now. Looks like a UI event-handler issue on the sign-in button specific to mobile Safari. Repro-ing on the iOS simulator to confirm category and priority.',
+      detail: beat >= 3
+        ? 'Classified as bug · mobile · auth · priority high. The "Sign in button does nothing" pattern matches 2 other open tickets — flagging Engineering with a note to look at iOS Safari resize handling.'
+        : 'Reading the body now. Looks like a UI event-handler issue on the sign-in button specific to mobile Safari. Repro-ing on the iOS simulator to confirm category and priority.',
     })
     if (beat >= 1) out.push({
-      id: 's-arrival', agent: 'Inbox', state: 'done', at: beat >= 10 ? 300 : beat >= 4 ? 180 : beat >= 3 ? 120 : beat === 2 ? 60 : 0,
+      id: 's-arrival', agent: 'Inbox', state: 'done', at: (beat - 1) * 30,
       action: 'New ticket #1042 from Priya R.',
       detail: 'Subject: Can\'t log in on mobile. Body: "Sign in button does nothing on iPhone Safari, tried Chrome too, no luck. This started after the update yesterday."',
-    })
-    out.push({
-      id: 's-old-1', agent: 'Reply', state: 'done', at: 3600,
-      action: 'Replying on #1040 (billing PDF)',
-      detail: 'Confirmed to Sam K. that the billing-receipt PDF render fix is in today\'s deploy. Provided a fresh download link and closed the ticket. NPS survey scheduled for tomorrow.',
-    })
-    out.push({
-      id: 's-old-2', agent: 'Triage', state: 'done', at: 10800,
-      action: 'Flagging #1041 for engineering',
-      detail: 'Marco V.\'s CSV export — the column "plan" went missing after yesterday\'s update. Routed to Engineering as a data-layer issue and added a tracking dataset row.',
     })
     return out
   }, [beat])
@@ -861,44 +797,33 @@ export default function MissionControlPage(): React.JSX.Element {
       detail: 'Squash-merging onto main and cleaning up the branch. Linked ticket #1042 will auto-close on merge. Kicking off the production deploy right after.',
     })
     if (beat >= 10) out.push({
-      id: 'e-merge', agent: 'Anvil', state: 'done', at: 30,
+      id: 'e-merge', agent: 'Anvil', state: 'done', at: 0,
       action: 'Merging fix/mobile-signin to main',
       detail: 'Squash-merged onto main. Cleanup branch deleted. Linked ticket #1042 auto-closed. Picking up the next item from the engineering backlog now.',
     })
-    if (beat === 8) out.push({
-      id: 'e-open', agent: 'Anvil', state: 'needs-you', at: 0,
+    if (beat >= 8) out.push({
+      id: 'e-open', agent: 'Anvil', state: beat >= 9 ? 'done' : 'needs-you', at: (beat - (beat >= 9 ? 9 : 8)) * 30,
       action: 'Opening PR #432 for review',
-      detail: 'All 12 checks are green and the full test suite passed on a real checkout. The diff is +38 −4 across 2 files — should take 30 seconds to skim, it\'s a tight UI fix. Ready when you are.',
+      detail: beat >= 9
+        ? 'All 12 checks are green and the full test suite passed on a real checkout. Diff is +38 −4 across 2 files.'
+        : 'All 12 checks are green and the full test suite passed on a real checkout. The diff is +38 −4 across 2 files — should take 30 seconds to skim, it\'s a tight UI fix. Ready when you are.',
     })
-    if (beat >= 9) out.push({
-      id: 'e-open-done', agent: 'Anvil', state: 'done', at: beat >= 10 ? 120 : 60,
-      action: 'Opening PR #432 for review',
-      detail: 'All 12 checks are green and the full test suite passed on a real checkout. Diff is +38 −4 across 2 files.',
-    })
-    if (beat === 6) out.push({
-      id: 'e-tests', agent: 'Anvil', state: 'working', at: 0,
+    if (beat >= 6) out.push({
+      id: 'e-tests', agent: 'Anvil', state: beat >= 7 ? 'done' : 'working', at: (beat - (beat >= 7 ? 7 : 6)) * 30,
       action: 'Running tests on fix/mobile-signin',
-      detail: 'Spinning up iOS Safari at 390×844, replaying the resize sequence. 47 of 142 tests passed so far. Estimated 18 more seconds before the regression test runs.',
-    })
-    if (beat >= 7) out.push({
-      id: 'e-tests-done', agent: 'Anvil', state: 'done', at: beat >= 10 ? 180 : 30,
-      action: 'Running tests on fix/mobile-signin',
-      detail: 'All 142 tests passed in 24.3 seconds. The new Safari-resize regression test passes cleanly. Pushing the branch now.',
+      detail: beat >= 7
+        ? 'All 142 tests passed in 24.3 seconds. The new Safari-resize regression test passes cleanly. Pushing the branch now.'
+        : 'Spinning up iOS Safari at 390×844, replaying the resize sequence. 47 of 142 tests passed so far. Estimated 18 more seconds before the regression test runs.',
     })
     if (beat >= 5) out.push({
-      id: 'e-fix', agent: 'Anvil', state: 'done', at: beat >= 10 ? 240 : 60,
+      id: 'e-fix', agent: 'Anvil', state: 'done', at: (beat - 5) * 30,
       action: 'Implementing fix for mobile sign-in',
       detail: 'Three-line change inside SignInButton.tsx — guarding the resize handler against a stale ref. Wrote a regression test that reproduces the original failure before the fix.',
     })
     if (beat >= 4) out.push({
-      id: 'e-spec', agent: 'Quill', state: 'done', at: beat >= 10 ? 300 : 120,
+      id: 'e-spec', agent: 'Quill', state: 'done', at: (beat - 4) * 30,
       action: 'Scoping ticket #1042',
       detail: 'Reproduced on iPhone 14 Pro Safari at 390×844. The button stops responding after a viewport resize because the handler ref is captured before the resize, not after. Acceptance: button stays responsive across orientation and resize.',
-    })
-    out.push({
-      id: 'e-old-1', agent: 'Sift', state: 'done', at: 7200,
-      action: 'Queuing fix/billing-null',
-      detail: 'Small, test-verifiable, isolated to packages/server/src/billing. Created card in Backlog and dataset row in tracking. No blockers, picking next from the issues feed.',
     })
     return out
   }, [beat])
@@ -906,22 +831,12 @@ export default function MissionControlPage(): React.JSX.Element {
   const opsItems: ActivityItem[] = useMemo(
     () => [
       {
-        id: 'o-1', agent: 'Janus', state: 'done', at: 60,
+        id: 'o-1', agent: 'Janus', state: 'done', at: Math.max(0, beat - 1) * 30,
         action: 'Running weekly invoice sweep',
-        detail: 'Stripe API responsive. 38 of 42 May invoices sent so far. 4 invoices on EU customers awaiting tax-id confirmation — emailed for VAT IDs, will retry tomorrow.',
-      },
-      {
-        id: 'o-2', agent: 'Lin', state: 'done', at: 2400,
-        action: 'Reconciling May Stripe payouts',
-        detail: 'Reconciled $24,830.42 across 142 charges and 3 refunds totaling $89 against the accounting ledger. No discrepancies. Posted summary to the finance Notion page.',
-      },
-      {
-        id: 'o-3', agent: 'Janus', state: 'done', at: 7200,
-        action: 'Quarterly access-key rotation',
-        detail: 'Rotated prod and staging IAM keys per the security runbook. New keys deployed to GitHub Actions, Vercel, and Datadog. Old keys revoked, audit log entry created.',
+        detail: 'All 42 May invoices sent. The 4 EU customers awaiting tax-id confirmation came back with VAT IDs, so the final invoices went out and the sweep is complete.',
       },
     ],
-    []
+    [beat]
   )
 
   const unifiedActivity: GlobalActivityItem[] = useMemo(() => {
@@ -933,6 +848,30 @@ export default function MissionControlPage(): React.JSX.Element {
     combined.sort((a, b) => a.at - b.at)
     return combined
   }, [supportItems, engineeringItems, opsItems])
+
+  // Flatten the three task sections into one presence tree so a card that
+  // changes stage (e.g. Active → Done) stays mounted and slides to its new
+  // section via `layout`, instead of exiting one section and re-entering another.
+  const taskRows: React.ReactNode[] = []
+  const pushTaskSection = (key: string, label: string, tone: 'active' | 'done', cards: FeedCard[], emptyText: string) => {
+    taskRows.push(
+      <motion.div key={`hdr-${key}`} layout="position" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
+        <SectionHeader label={label} tone={tone} count={cards.length} />
+      </motion.div>
+    )
+    if (cards.length === 0) {
+      taskRows.push(
+        <motion.p key={`empty-${key}`} layout="position" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }} className="px-1 py-1 text-xs text-muted-foreground/40">
+          {emptyText}
+        </motion.p>
+      )
+    } else {
+      cards.forEach((card) => taskRows.push(<UnifiedCard key={card.id} card={card} />))
+    }
+  }
+  pushTaskSection('ongoing', 'Ongoing', 'active', grouped.ongoing, 'No ongoing tasks.')
+  pushTaskSection('active', 'Active', 'active', grouped.active, 'No active tasks.')
+  pushTaskSection('done', 'Recently done', 'done', grouped.done, 'Nothing done yet.')
 
   return (
     <div className="relative w-full bg-background text-foreground">
@@ -980,45 +919,10 @@ export default function MissionControlPage(): React.JSX.Element {
               <div className="border-b border-border/50 px-4 py-1.5">
                 <span className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground/70">Tasks</span>
               </div>
-              <div className="p-3 space-y-2">
-              <AnimatePresence mode="popLayout" initial={false}>
-                {grouped.ongoing.length > 0 ? (
-                  <motion.div key="section-ongoing" variants={SECTION_VARIANTS} initial="hidden" animate="visible" exit="exit">
-                    <SectionHeader label="Ongoing" tone="active" count={grouped.ongoing.length} />
-                    <div className="space-y-2 pt-2">
-                      <AnimatePresence mode="popLayout" initial={false}>
-                        {grouped.ongoing.map((card) => (
-                          <UnifiedCard key={card.id} card={card} />
-                        ))}
-                      </AnimatePresence>
-                    </div>
-                  </motion.div>
-                ) : null}
-                {grouped.active.length > 0 ? (
-                  <motion.div key="section-active" variants={SECTION_VARIANTS} initial="hidden" animate="visible" exit="exit">
-                    <SectionHeader label="Active" tone="active" count={grouped.active.length} />
-                    <div className="space-y-2 pt-2">
-                      <AnimatePresence mode="popLayout" initial={false}>
-                        {grouped.active.map((card) => (
-                          <UnifiedCard key={card.id} card={card} />
-                        ))}
-                      </AnimatePresence>
-                    </div>
-                  </motion.div>
-                ) : null}
-                {grouped.done.length > 0 ? (
-                  <motion.div key="section-done" variants={SECTION_VARIANTS} initial="hidden" animate="visible" exit="exit">
-                    <SectionHeader label="Recently done" tone="done" count={grouped.done.length} />
-                    <div className="space-y-2 pt-2">
-                      <AnimatePresence mode="popLayout" initial={false}>
-                        {grouped.done.map((card) => (
-                          <UnifiedCard key={card.id} card={card} />
-                        ))}
-                      </AnimatePresence>
-                    </div>
-                  </motion.div>
-                ) : null}
-              </AnimatePresence>
+              <div className="relative flex flex-col gap-2 p-3">
+                <AnimatePresence initial={false}>
+                  {taskRows}
+                </AnimatePresence>
               </div>
             </div>
           </div>

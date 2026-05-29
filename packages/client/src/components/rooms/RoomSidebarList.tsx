@@ -5,7 +5,9 @@ import { NavigationItem } from '@/components/navigation/NavigationItem'
 import { useStarshipRooms } from '@/hooks/useRooms'
 import { RoomNestedRecentConversations } from '@/components/rooms/RoomNestedRecentConversations'
 import { useDemo } from '@/components/demo/DemoContext'
-import { mergeDemoRooms } from '@/components/demo/demoRooms'
+import { DEMO_ROOMS } from '@/components/demo/demoRooms'
+import { demoRoomAggregateStatus } from '@/components/demo/demoActivity'
+import { DemoStatusIndicator } from '@/components/demo/DemoStatusIndicator'
 import type { RoomModel } from '@starships/protocol'
 import { usePathname, useRouter } from 'next/navigation'
 import { useMemo } from 'react'
@@ -19,14 +21,14 @@ export function RoomSidebarList(props: { starshipId: string; starshipSlug: strin
   // Demo clock: while the hero-video demo is running, the sidebar highlight
   // follows the "camera" (the room the VO is on for the current beat) instead
   // of the URL. Inert for real users — `active` is false off the demo surface.
-  const { active: demoActive, spotlight } = useDemo()
+  const { active: demoActive, beat, spotlight } = useDemo()
 
-  // When the demo is active, ensure the three toured rooms (Support / Engineering
-  // / Growth) appear in the sidebar without any DB seeding — they're merged in
-  // from client-side mock data, de-duped against any real rooms by slug.
+  // When the demo is active, the sidebar shows ONLY the three toured rooms
+  // (Support / Engineering / Growth) from client-side mock data — the real
+  // wired rooms are hidden so the demo navigation stays clean and scripted.
   const rooms = useMemo<RoomModel[]>(() => {
     const real = (roomsData?.rooms || []) as RoomModel[]
-    return demoActive ? mergeDemoRooms(real) : real
+    return demoActive ? DEMO_ROOMS : real
   }, [roomsData?.rooms, demoActive])
   const demoConversationId = demoActive ? spotlight.conversationId : null
   // The spotlight names a lane ('support' | 'engineering' | 'growth'); map it to
@@ -87,7 +89,7 @@ export function RoomSidebarList(props: { starshipId: string; starshipSlug: strin
   return (
     <div className="flex flex-col min-h-0">
       <div className="flex items-center justify-between px-1 pb-1">
-        <div className="text-[11px] font-medium text-muted-foreground">Rooms</div>
+        <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/70">Rooms</div>
         <button
           type="button"
           onClick={() => {
@@ -121,6 +123,9 @@ export function RoomSidebarList(props: { starshipId: string; starshipSlug: strin
                   : false
               const href = `/ship/${encodeURIComponent(props.starshipSlug)}/rooms/${encodeURIComponent(slug)}`
               const roomConversationId = typeof (r as any)?.conversationId === 'string' ? String((r as any).conversationId).trim() : ''
+              // Demo: show a live status indicator on rooms with something happening.
+              const roomStatus = demoActive ? demoRoomAggregateStatus(slug, beat) : 'idle'
+              const showRoomStatus = demoActive && roomStatus !== 'idle'
               return (
                 <div key={String(r.conversationId || slug)} className="w-full">
                   <NavigationItem
@@ -131,9 +136,14 @@ export function RoomSidebarList(props: { starshipId: string; starshipSlug: strin
                     expanded
                     onClick={() => openRoom(slug)}
                     trailing={
-                      r.isPrivate ? (
-                        <span className="flex-shrink-0 text-muted-foreground" title="Private room" aria-label="Private room">
-                          <Icon name="lock" weight="fill" className="h-3 w-3" />
+                      showRoomStatus || r.isPrivate ? (
+                        <span className="flex items-center gap-1">
+                          {showRoomStatus ? <DemoStatusIndicator status={roomStatus} /> : null}
+                          {r.isPrivate ? (
+                            <span className="flex-shrink-0 text-muted-foreground" title="Private room" aria-label="Private room">
+                              <Icon name="lock" weight="fill" className="h-3 w-3" />
+                            </span>
+                          ) : null}
                         </span>
                       ) : null
                     }

@@ -39,7 +39,7 @@ import { useStarshipViews } from '@/hooks/useViews'
 import { useStarshipDatasets } from '@/hooks/useDatasets'
 import { useStarshipDocs } from '@/hooks/useDocs'
 import { useDemo } from '@/components/demo/DemoContext'
-import { mergeDemoRooms, demoRoomConversations } from '@/components/demo/demoRooms'
+import { DEMO_ROOMS, isDemoRoomConversationId } from '@/components/demo/demoRooms'
 import { cn } from '@/lib/utils'
 import type { AgentModel, MessageModel, RoomModel } from '@starships/protocol'
 import { useParams, usePathname, useRouter, useSearchParams } from 'next/navigation'
@@ -252,7 +252,7 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
 
   const mergedRooms = useMemo<RoomModel[]>(() => {
     const real = (roomsData?.rooms ?? []) as RoomModel[]
-    return demoActive ? mergeDemoRooms(real) : real
+    return demoActive ? DEMO_ROOMS : real
   }, [roomsData?.rooms, demoActive])
 
   const activeRoom = useMemo(() => {
@@ -270,7 +270,7 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
   // Is the resolved room one of the synthetic demo rooms? When so we bypass the
   // real-data gates (participation, pins, not-found) since it has no DB backing.
   const isDemoRoom = useMemo(
-    () => Boolean(demoActive && activeRoom?.conversationId && demoRoomConversations(String(activeRoom.conversationId))),
+    () => Boolean(demoActive && activeRoom?.conversationId && isDemoRoomConversationId(String(activeRoom.conversationId))),
     [demoActive, activeRoom?.conversationId]
   )
 

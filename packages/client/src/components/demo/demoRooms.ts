@@ -49,36 +49,9 @@ export const DEMO_ROOMS: RoomModel[] = [
   room('growth', 'Growth', DEMO_ROOM_CONVERSATION_IDS.growth, 'lead-generation'),
 ]
 
-/**
- * Merge the demo rooms into a real room list, de-duped by slug. Real rooms win
- * (they carry real conversationIds), so a starship that already has these rooms
- * navigates normally; missing ones are filled in by the mocks.
- */
-export function mergeDemoRooms(real: RoomModel[]): RoomModel[] {
-  const present = new Set(real.map((r) => String(r?.slug ?? '').trim().toLowerCase()).filter(Boolean))
-  const missing = DEMO_ROOMS.filter((r) => !present.has(r.slug.toLowerCase()))
-  return [...real, ...missing]
-}
+const DEMO_ROOM_CONVERSATION_ID_SET: ReadonlySet<string> = new Set(Object.values(DEMO_ROOM_CONVERSATION_IDS))
 
-/** A minimal conversation shape the sidebar's nested list renders. */
-export type DemoConversation = { id: string; title: string; updatedAt: string; createdAt: string }
-
-// One recent thread per demo room, so the spotlighted room shows a real-looking
-// nested conversation for the "camera" to land on. Keyed by the room's synthetic
-// conversationId so the nested list can look them up without a network call.
-const DEMO_ROOM_CONVERSATIONS: Record<string, DemoConversation[]> = {
-  [DEMO_ROOM_CONVERSATION_IDS.support]: [
-    { id: 'demo-conv-support-1042', title: 'Login button unresponsive on mobile', updatedAt: DEMO_TS, createdAt: DEMO_TS },
-  ],
-  [DEMO_ROOM_CONVERSATION_IDS.engineering]: [
-    { id: 'demo-conv-eng-432', title: 'Fix mobile sign-in button', updatedAt: DEMO_TS, createdAt: DEMO_TS },
-  ],
-  [DEMO_ROOM_CONVERSATION_IDS.growth]: [
-    { id: 'demo-conv-growth-q2', title: 'Q2 outbound pipeline', updatedAt: DEMO_TS, createdAt: DEMO_TS },
-  ],
-}
-
-/** Returns the mock recent conversations for a demo room, or null if not a demo room. */
-export function demoRoomConversations(roomConversationId: string): DemoConversation[] | null {
-  return DEMO_ROOM_CONVERSATIONS[roomConversationId] ?? null
+/** Is this synthetic conversation id one of the demo rooms? Used to bypass real-data gates. */
+export function isDemoRoomConversationId(conversationId: string): boolean {
+  return DEMO_ROOM_CONVERSATION_ID_SET.has(String(conversationId || '').trim())
 }

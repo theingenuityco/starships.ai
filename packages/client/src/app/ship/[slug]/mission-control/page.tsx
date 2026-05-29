@@ -41,6 +41,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { useStarshipBySlug } from '@/hooks/useStarships'
 import { useStarshipRooms } from '@/hooks/useRooms'
 import { useDemo } from '@/components/demo/DemoContext'
+import { supportActivity, engineeringActivity, growthActivity } from '@/components/demo/demoActivity'
 import type { AgentModel } from '@starships/protocol'
 
 // ─── Shared animation variants ───────────────────────────────────────────────
@@ -647,154 +648,11 @@ export default function MissionControlPage(): React.JSX.Element {
 
   // ── Activity items (right pane) ──────────────────────────────────────────
 
-  const supportItems: ActivityItem[] = useMemo(() => {
-    const out: ActivityItem[] = []
-    // Reply drafts the customer response, then waits on you at the pivot (beat 9),
-    // sends on approval (beat 10), and confirms sent (beat 11).
-    if (beat >= 8) {
-      const sent = beat >= 11
-      const sending = beat >= 10
-      out.push({
-        id: 's-reply', agent: 'Reply',
-        state: sent ? 'done' : beat === 9 ? 'needs-you' : 'working',
-        at: (beat - (sent ? 11 : sending ? 10 : beat >= 9 ? 9 : 8)) * 30,
-        action: sent
-          ? 'Replied to Priya R. on #1042'
-          : sending
-            ? 'Sending reply to Priya R.'
-            : beat === 9
-              ? 'Reply ready for #1042 — waiting on you'
-              : 'Drafting reply to Priya R.',
-        detail: sent
-          ? 'Reply sent confirming the mobile sign-in fix has shipped. Ticket #1042 closed and resolved_at stamped.'
-          : sending
-            ? 'You approved the reply. Sending it to Priya now and closing the ticket.'
-            : beat === 9
-              ? 'Draft is ready: confirms the mobile sign-in fix is shipping and thanks her for the clear repro. Holding for your okay before it goes out.'
-              : 'Writing a reply tied to Priya\'s exact issue and the specific fix — no filler. Will hold for your approval before anything sends.',
-      })
-    }
-    if (beat >= 2) out.push({
-      id: 's-triage', agent: 'Triage', state: beat >= 3 ? 'done' : 'working', at: (beat - (beat >= 3 ? 3 : 2)) * 30,
-      action: beat >= 3 ? 'Routed #1042 to Engineering' : 'Triaging ticket #1042',
-      detail: beat >= 3
-        ? 'Classified as bug · mobile · auth · priority high. The "Sign in button does nothing" pattern matches 2 other open tickets — handed to Engineering with a note to look at iOS Safari resize handling.'
-        : 'Reading the body now. Looks like a UI event-handler issue on the sign-in button specific to mobile Safari. Repro-ing on the iOS simulator to confirm category and priority.',
-    })
-    if (beat >= 1) out.push({
-      id: 's-arrival', agent: 'Inbox', state: 'done', at: (beat - 1) * 30,
-      action: 'New ticket #1042 from Priya R.',
-      detail: 'Subject: Can\'t log in on mobile. Body: "Sign in button does nothing on iPhone Safari, tried Chrome too, no luck. This started after the update yesterday."',
-    })
-    return out
-  }, [beat])
-
-  const engineeringItems: ActivityItem[] = useMemo(() => {
-    const out: ActivityItem[] = []
-    // Deploy only after the merge lands (beat 11+).
-    if (beat >= 11) out.push({
-      id: 'e-deploy', agent: 'CI', state: beat >= 12 ? 'done' : 'working', at: (beat - (beat >= 12 ? 12 : 11)) * 30,
-      action: beat >= 12 ? 'Deployed PR #432 to production' : 'Deploying PR #432 to production',
-      detail: beat >= 12
-        ? 'Build 4823 shipped, edge cache flushed, post-deploy smoke tests all green. Sign-in latency flat at 38ms p95.'
-        : 'Build 4823 queued. Deploying to edge, flushing cache, and running post-deploy smoke tests.',
-    })
-    // The merge is GATED on your approval at the pivot (beat 9). It does not
-    // happen on its own — it waits, then lands on your yes (beat 10), then closes.
-    if (beat >= 9) {
-      const merged = beat >= 11
-      const merging = beat >= 10
-      out.push({
-        id: 'e-merge', agent: 'Anvil',
-        state: merged ? 'done' : beat === 9 ? 'needs-you' : 'working',
-        at: (beat - (merged ? 11 : merging ? 10 : 9)) * 30,
-        action: merged
-          ? 'Merged fix/mobile-signin to main'
-          : merging
-            ? 'Merging fix/mobile-signin to main'
-            : 'PR #432 ready to merge — waiting on you',
-        detail: merged
-          ? 'Squash-merged onto main, branch deleted, linked ticket #1042 auto-closed. Picking up the next item from the engineering backlog now.'
-          : merging
-            ? 'You approved the merge. Squash-merging onto main and kicking off the production deploy.'
-            : 'All 12 checks green and the full suite passed on a real checkout. Holding for your okay before it lands on main.',
-      })
-    }
-    if (beat >= 8) out.push({
-      id: 'e-review', agent: 'Lens', state: beat >= 9 ? 'done' : 'working', at: (beat - (beat >= 9 ? 9 : 8)) * 30,
-      action: beat >= 9 ? 'Approved PR #432' : 'Reviewing PR #432',
-      detail: beat >= 9
-        ? 'Diff is tight: a stale-ref guard plus a regression test that fails without the fix. No blocking comments. Approved.'
-        : 'Reading the diff on fix/mobile-signin — checking the stale-ref guard holds across orientation changes and the regression test actually reproduces the original failure.',
-    })
-    if (beat >= 8) out.push({
-      id: 'e-open', agent: 'Anvil', state: 'done', at: (beat - 8) * 30,
-      action: 'Opened PR #432',
-      detail: 'Pushed fix/mobile-signin and opened the PR. All 12 checks green, diff +38 −4 across 2 files.',
-    })
-    if (beat >= 6) out.push({
-      id: 'e-tests', agent: 'Anvil', state: beat >= 7 ? 'done' : 'working', at: (beat - (beat >= 7 ? 7 : 6)) * 30,
-      action: 'Running tests on fix/mobile-signin',
-      detail: beat >= 7
-        ? 'All 142 tests passed in 24.3 seconds. The new Safari-resize regression test passes cleanly. Pushing the branch now.'
-        : 'Spinning up iOS Safari at 390×844, replaying the resize sequence. 47 of 142 tests passed so far. Estimated 18 more seconds before the regression test runs.',
-    })
-    if (beat >= 5) out.push({
-      id: 'e-fix', agent: 'Anvil', state: beat >= 6 ? 'done' : 'working', at: (beat - (beat >= 6 ? 6 : 5)) * 30,
-      action: 'Implementing fix for mobile sign-in',
-      detail: beat >= 6
-        ? 'Three-line change inside SignInButton.tsx — guarding the resize handler against a stale ref. Wrote a regression test that reproduces the original failure before the fix.'
-        : 'Patching the stale handler ref inside SignInButton.tsx. Writing a regression test that reproduces the original failure before applying the fix.',
-    })
-    if (beat >= 4) out.push({
-      id: 'e-spec', agent: 'Quill', state: beat >= 5 ? 'done' : 'working', at: (beat - (beat >= 5 ? 5 : 4)) * 30,
-      action: 'Scoping ticket #1042',
-      detail: beat >= 5
-        ? 'Reproduced on iPhone 14 Pro Safari at 390×844. The button stops responding after a viewport resize because the handler ref is captured before the resize, not after. Acceptance: button stays responsive across orientation and resize.'
-        : 'Reproducing on iPhone 14 Pro Safari at 390×844. Tracing the resize event timing to pin down why the handler ref goes stale after orientation change.',
-    })
-    return out
-  }, [beat])
-
-  // Growth runs the Q2 outbound pipeline in parallel the whole time: Atlas builds
-  // the TAM, Hunter finds contacts, Vera verifies emails, Mira QAs, Nora hands over.
-  const growthItems: ActivityItem[] = useMemo(() => {
-    const out: ActivityItem[] = []
-    if (beat >= 8) out.push({
-      id: 'g-handover', agent: 'Nora', state: beat >= 9 ? 'done' : 'working', at: (beat - (beat >= 9 ? 9 : 8)) * 30,
-      action: beat >= 9 ? 'Handed over the Q2 outbound list' : 'Handing over the Q2 outbound list',
-      detail: '1,240 target accounts, 3,800 contacts, 3,640 verified emails. Clean list ready for outreach — staged for your sign-off before the first send.',
-    })
-    if (beat >= 7) out.push({
-      id: 'g-qa', agent: 'Mira', state: beat >= 8 ? 'done' : 'working', at: (beat - (beat >= 8 ? 8 : 7)) * 30,
-      action: 'QA on the verified contact list',
-      detail: beat >= 8
-        ? 'Spot-checked 200 rows against source pages — no fabricated names or titles, every email maps to a real person. List passes.'
-        : 'Sampling the verified list to confirm every name, title, and company is grounded in a real source. Zero tolerance for fabricated contacts.',
-    })
-    if (beat >= 5) out.push({
-      id: 'g-verify', agent: 'Vera', state: beat >= 7 ? 'done' : 'working', at: (beat - (beat >= 7 ? 7 : 5)) * 30,
-      action: 'Verifying contact emails',
-      detail: beat >= 7
-        ? '3,640 of 3,800 emails verified deliverable. Dropped 160 catch-all and bounced addresses.'
-        : 'Running deliverability checks across 3,800 contacts — MX, SMTP, and catch-all detection. About 96% verifying clean so far.',
-    })
-    if (beat >= 3) out.push({
-      id: 'g-contacts', agent: 'Hunter', state: beat >= 5 ? 'done' : 'working', at: (beat - (beat >= 5 ? 5 : 3)) * 30,
-      action: 'Finding contacts at target accounts',
-      detail: beat >= 5
-        ? 'Found 3,800 decision-makers across 1,240 accounts — VP Eng, Head of Support, and Founder titles prioritised.'
-        : 'Pulling decision-makers at each target account, prioritising VP Eng, Head of Support, and Founder titles.',
-    })
-    if (beat >= 1) out.push({
-      id: 'g-tam', agent: 'Atlas', state: beat >= 3 ? 'done' : 'working', at: (beat - (beat >= 3 ? 3 : 1)) * 30,
-      action: 'Building the target account list',
-      detail: beat >= 3
-        ? 'Expanded the ICP into 1,240 accounts — B2B SaaS, 50-500 employees, with recent funding or hiring signals.'
-        : 'Expanding the ideal customer profile into a target account list — filtering B2B SaaS, 50-500 employees, with recent funding or hiring signals.',
-    })
-    return out
-  }, [beat])
+  // The three rooms' activity is built from the shared demoActivity module so the
+  // Mission Control feed and the nav sidebar's nested conversations never drift.
+  const supportItems: ActivityItem[] = useMemo(() => supportActivity(beat), [beat])
+  const engineeringItems: ActivityItem[] = useMemo(() => engineeringActivity(beat), [beat])
+  const growthItems: ActivityItem[] = useMemo(() => growthActivity(beat), [beat])
 
   const unifiedActivity: GlobalActivityItem[] = useMemo(() => {
     const combined: GlobalActivityItem[] = [

@@ -4,6 +4,8 @@ import Icon from '@/components/primitives/Icon'
 import { NavigationItem } from '@/components/navigation/NavigationItem'
 import { useStarshipRooms } from '@/hooks/useRooms'
 import { RoomNestedRecentConversations } from '@/components/rooms/RoomNestedRecentConversations'
+import { useDemo } from '@/components/demo/DemoContext'
+import { mergeDemoRooms } from '@/components/demo/demoRooms'
 import type { RoomModel } from '@starships/protocol'
 import { usePathname, useRouter } from 'next/navigation'
 import { useMemo } from 'react'
@@ -13,7 +15,31 @@ export function RoomSidebarList(props: { starshipId: string; starshipSlug: strin
   const pathname = usePathname()
 
   const { data: roomsData, isLoading } = useStarshipRooms(props.starshipId, Boolean(props.starshipId))
-  const rooms = (roomsData?.rooms || []) as RoomModel[]
+
+  // Demo clock: while the hero-video demo is running, the sidebar highlight
+  // follows the "camera" (the room the VO is on for the current beat) instead
+  // of the URL. Inert for real users — `active` is false off the demo surface.
+  const { active: demoActive, spotlight } = useDemo()
+
+  // When the demo is active, ensure the three toured rooms (Support / Engineering
+  // / Growth) appear in the sidebar without any DB seeding — they're merged in
+  // from client-side mock data, de-duped against any real rooms by slug.
+  const rooms = useMemo<RoomModel[]>(() => {
+    const real = (roomsData?.rooms || []) as RoomModel[]
+    return demoActive ? mergeDemoRooms(real) : real
+  }, [roomsData?.rooms, demoActive])
+  const demoConversationId = demoActive ? spotlight.conversationId : null
+  // The spotlight names a lane ('support' | 'engineering' | 'growth'); map it to
+  // the real room slugs those bundles produce (the Growth lane is the leadgen room).
+  const demoSlugCandidates = useMemo<string[] | null>(() => {
+    if (!demoActive || !spotlight.room) return null
+    const map: Record<string, string[]> = {
+      support: ['support'],
+      engineering: ['engineering', 'eng'],
+      growth: ['growth', 'leadgen', 'lead-generation'],
+    }
+    return map[spotlight.room] ?? [spotlight.room]
+  }, [demoActive, spotlight.room])
 
   const sorted = useMemo(() => {
     const list = Array.isArray(rooms) ? rooms.slice() : []
@@ -88,7 +114,11 @@ export function RoomSidebarList(props: { starshipId: string; starshipSlug: strin
             {sorted.map((r) => {
               const slug = String(r.slug || '').trim()
               const name = String(r.name || '').trim() || slug || 'Room'
-              const isActive = activeRoomSlug ? String(activeRoomSlug).toLowerCase() === slug.toLowerCase() : false
+              const isActive = demoSlugCandidates
+                ? demoSlugCandidates.includes(slug.toLowerCase())
+                : activeRoomSlug
+                  ? String(activeRoomSlug).toLowerCase() === slug.toLowerCase()
+                  : false
               const href = `/ship/${encodeURIComponent(props.starshipSlug)}/rooms/${encodeURIComponent(slug)}`
               const roomConversationId = typeof (r as any)?.conversationId === 'string' ? String((r as any).conversationId).trim() : ''
               return (
@@ -113,7 +143,8 @@ export function RoomSidebarList(props: { starshipId: string; starshipSlug: strin
                       starshipSlug={props.starshipSlug}
                       roomSlug={slug}
                       roomConversationId={roomConversationId}
-                      activeConversationId={isActive ? activeConversationId : null}
+                      activeConversationId={isActive ? (demoSlugCandidates ? demoConversationId : activeConversationId) : null}
+                      highlightFirst={Boolean(isActive && demoSlugCandidates && !demoConversationId)}
                       onNavigate={props.onNavigate}
                     />
                   ) : null}

@@ -28,19 +28,19 @@
  *   Activity log filling the rest.
  */
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useMemo, useState } from 'react'
 import { notFound, useParams } from 'next/navigation'
 import Link from 'next/link'
 import { AnimatePresence, motion } from 'motion/react'
 import { cn } from '@/lib/utils'
-import { avatarColour, agentChipColour } from '@/components/dashboard/utils'
+import { avatarColour } from '@/components/dashboard/utils'
 import Icon from '@/components/primitives/Icon'
-import { Button } from '@/components/ui/button'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { ConversationMessageInput } from '@/components/conversation/ConversationMessageInput'
 import { useAuth } from '@/hooks/useAuth'
 import { useStarshipBySlug } from '@/hooks/useStarships'
 import { useStarshipRooms } from '@/hooks/useRooms'
+import { useDemo } from '@/components/demo/DemoContext'
 import type { AgentModel } from '@starships/protocol'
 
 // ─── Shared animation variants ───────────────────────────────────────────────
@@ -65,13 +65,6 @@ function ChangeFlash({ signal, className }: { signal: React.Key; className?: str
     />
   )
 }
-
-// ─── Beats ───────────────────────────────────────────────────────────────────
-
-type Beat = number
-const MAX_BEAT: Beat = 12
-const STEP_MS = 3000
-const HOLD_MS = 4500
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -99,7 +92,7 @@ function formatAgo(secs: number): string {
 
 // ─── Unified feed card ───────────────────────────────────────────────────────
 
-type RoomKey = 'Support' | 'Engineering' | 'Ops'
+type RoomKey = 'Support' | 'Engineering' | 'Growth'
 
 type CardType = 'ticket' | 'pr' | 'run'
 
@@ -157,9 +150,10 @@ const DONE_KINDS = new Set<StatusKind>(['resolved', 'merged'])
 // elements all share the same bg + border treatment.
 const CARD_SURFACE = 'rounded-lg border border-border/60 bg-card shadow-sm'
 
-function UnifiedCard({ card }: { card: FeedCard }) {
+function UnifiedCard({ card, onApprove }: { card: FeedCard; onApprove?: () => void }) {
   const isLive = LIVE_KINDS.has(card.statusKind)
   const isDone = DONE_KINDS.has(card.statusKind)
+  const needsYou = Boolean(card.needsYou)
 
   return (
     <motion.div
@@ -171,10 +165,11 @@ function UnifiedCard({ card }: { card: FeedCard }) {
       className={cn(
         'group relative overflow-hidden',
         CARD_SURFACE,
-        isDone && 'opacity-60'
+        isDone && 'opacity-60',
+        needsYou && 'border-amber-500/60 ring-1 ring-amber-500/25 shadow-md'
       )}
     >
-      <ChangeFlash signal={card.statusKind} className="inset-0 rounded-lg bg-amber-600/20" />
+      <ChangeFlash signal={needsYou ? 'needs-you' : card.statusKind} className="inset-0 rounded-lg bg-amber-600/20" />
       <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-2.5 py-2.5 pl-3 pr-2.5">
         {/* Checkbox */}
         <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center">
@@ -217,20 +212,31 @@ function UnifiedCard({ card }: { card: FeedCard }) {
 
         </div>
 
-        {/* Status badge + age */}
-        <div className="flex shrink-0 flex-col items-end gap-1">
+        {/* Status badge + age, or the Approve gate when this card needs you */}
+        <div className="flex shrink-0 flex-col items-end gap-1.5">
           <span
             className={cn(
               'inline-flex shrink-0 items-center gap-1 rounded-full border px-1.5 py-px text-[10px] font-medium transition-colors duration-500',
-              STATUS_CLS[card.statusKind]
+              needsYou ? 'border-amber-500/40 bg-amber-500/15 text-amber-600 dark:text-amber-300' : STATUS_CLS[card.statusKind]
             )}
           >
             {isLive ? <span className="inline-block h-1.5 w-1.5 rounded-full bg-current animate-pulse transition-colors duration-500" /> : null}
             {card.status}
           </span>
-          <span className="font-mono text-[10px] tabular-nums text-muted-foreground/40">
-            {formatAgo(card.at)}
-          </span>
+          {needsYou ? (
+            <button
+              type="button"
+              onClick={onApprove}
+              className="inline-flex shrink-0 items-center gap-1 rounded-full bg-primary px-2.5 py-0.5 text-[11px] font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
+            >
+              <Icon name="check" weight="bold" className="h-3 w-3" />
+              Approve
+            </button>
+          ) : (
+            <span className="font-mono text-[10px] tabular-nums text-muted-foreground/40">
+              {formatAgo(card.at)}
+            </span>
+          )}
         </div>
       </div>
     </motion.div>
@@ -303,11 +309,6 @@ function BucketSeparator({ label, count, tone = 'muted' }: { label: string; coun
     : isAttention
       ? 'bg-amber-500'
       : 'bg-border/60'
-  const countCls = isLive
-    ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
-    : isAttention
-      ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
-      : 'bg-muted text-muted-foreground/60'
   return (
     <motion.div
       layout="position"
@@ -400,7 +401,7 @@ function ActivityPane({
   starshipSlug?: string
   attention?: React.ReactNode
 }) {
-  const { buckets, liveCount } = useMemo(() => {
+  const { buckets } = useMemo(() => {
     const live: GlobalActivityItem[] = []
     const past: GlobalActivityItem[] = []
     for (const it of items) {
@@ -487,65 +488,16 @@ function ActivityPane({
   )
 }
 
-// ─── Demo state ──────────────────────────────────────────────────────────────
-
-function useBeatMachine() {
-  const [beat, setBeat] = useState<Beat>(0)
-  const [auto, setAuto] = useState(true)
-
-  const advance = useCallback(() => {
-    setBeat((b) => (b < MAX_BEAT ? b + 1 : b))
-  }, [])
-  const rewind = useCallback(() => {
-    setBeat((b) => (b > 0 ? b - 1 : b))
-  }, [])
-  const reset = useCallback(() => setBeat(0), [])
-
-  // Manual keyboard control. Scrubbing pauses auto-play; R restarts it.
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const tag = (e.target as HTMLElement | null)?.tagName?.toLowerCase()
-      if (tag === 'input' || tag === 'textarea') return
-      if (e.key === ' ' || e.key === 'ArrowRight' || e.key === 'Enter') {
-        e.preventDefault()
-        setAuto(false)
-        advance()
-      } else if (e.key === 'Backspace' || e.key === 'ArrowLeft') {
-        e.preventDefault()
-        setAuto(false)
-        rewind()
-      } else if (e.key === 'p' || e.key === 'P') {
-        e.preventDefault()
-        setAuto((a) => !a)
-      } else if (e.key === 'r' || e.key === 'R') {
-        e.preventDefault()
-        reset()
-        setAuto(true)
-      }
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [advance, rewind, reset])
-
-  // Auto-play: one step every STEP_MS, hold longer on the final beat, then loop.
-  useEffect(() => {
-    if (!auto) return
-    const atEnd = beat >= MAX_BEAT
-    const id = setTimeout(() => {
-      setBeat((b) => (b >= MAX_BEAT ? 0 : b + 1))
-    }, atEnd ? HOLD_MS : STEP_MS)
-    return () => clearTimeout(id)
-  }, [auto, beat])
-
-  return { beat, advance, rewind, reset }
-}
-
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function MissionControlPage(): React.JSX.Element {
   if (process.env.NODE_ENV === 'production') notFound()
 
-  const { beat, advance, rewind } = useBeatMachine()
+  // The beat clock lives in DemoProvider (mounted in client-layout) so the same
+  // timeline drives this page, the nav sidebar, and the room boards together.
+  // `advance` lets the Approve gate move the story forward on click (the "you
+  // say yes" beat), in addition to auto-play.
+  const { beat, advance } = useDemo()
 
   // Wire up the real ConversationMessageInput (reused from the rooms page).
   // Mission-control is dev-only and sits under /ship/[slug], so we resolve the
@@ -578,10 +530,13 @@ export default function MissionControlPage(): React.JSX.Element {
     const cards: FeedCard[] = []
 
     // Support principal: ticket #1042 (Priya) on the Support Tickets board.
+    // Becomes a gate at the pivot (beat 9): the drafted reply is waiting on you.
     if (beat >= 1) {
-      const status = beat >= 12 ? 'RESOLVED' : beat >= 3 ? 'TRIAGED' : 'NEW'
-      const statusKind: StatusKind = beat >= 12 ? 'resolved' : beat >= 3 ? 'triaged' : 'new'
-      const assignee = beat >= 11 ? 'Reply' : 'Triage'
+      const status =
+        beat >= 11 ? 'RESOLVED' : beat >= 10 ? 'REPLYING' : beat >= 9 ? 'REPLY READY' : beat >= 3 ? 'TRIAGED' : 'NEW'
+      const statusKind: StatusKind =
+        beat >= 11 ? 'resolved' : beat >= 10 ? 'running' : beat >= 3 ? 'triaged' : 'new'
+      const assignee = beat >= 9 ? 'Reply' : 'Triage'
       const indicators: FeedCardIndicator[] = beat >= 3
         ? [
             { label: 'bug · mobile · auth' },
@@ -602,17 +557,19 @@ export default function MissionControlPage(): React.JSX.Element {
         status,
         statusKind,
         primary: true,
-        at: (beat - (beat >= 12 ? 12 : beat >= 3 ? 3 : 1)) * 30,
+        needsYou: beat === 9,
+        at: (beat - (beat >= 11 ? 11 : beat >= 10 ? 10 : beat >= 9 ? 9 : beat >= 3 ? 3 : 1)) * 30,
       })
     }
 
     // Engineering principal: fix/mobile-signin on the Engineering Pipeline.
+    // Reaches review, then waits at the pivot (beat 9) for your merge approval.
     if (beat >= 4) {
       const status =
-        beat >= 10 ? 'MERGED' : beat >= 8 ? 'IN REVIEW' : beat >= 5 ? 'BUILDING' : 'SCOPED'
+        beat >= 11 ? 'MERGED' : beat >= 10 ? 'MERGING' : beat >= 9 ? 'READY TO MERGE' : beat >= 8 ? 'IN REVIEW' : beat >= 5 ? 'BUILDING' : 'SCOPED'
       const statusKind: StatusKind =
-        beat >= 10 ? 'merged' : beat >= 8 ? 'in-review' : beat >= 5 ? 'building' : 'scoped'
-      const assignee = beat >= 5 ? 'Anvil' : 'Quill'
+        beat >= 11 ? 'merged' : beat >= 10 ? 'running' : beat >= 8 ? 'in-review' : beat >= 5 ? 'building' : 'scoped'
+      const assignee = beat >= 10 ? 'Anvil' : beat >= 8 ? 'Lens' : beat >= 5 ? 'Anvil' : 'Quill'
       const indicators: FeedCardIndicator[] = []
       if (beat >= 5) indicators.push({ icon: 'git-branch', label: '+38 −4 · 2 files' })
       if (beat >= 7) indicators.push({ icon: 'check', label: '142 / 142 tests' })
@@ -631,63 +588,97 @@ export default function MissionControlPage(): React.JSX.Element {
         status,
         statusKind,
         primary: true,
-        at: (beat - (beat >= 10 ? 10 : beat >= 8 ? 8 : beat >= 5 ? 5 : 4)) * 30,
+        needsYou: beat === 9,
+        at: (beat - (beat >= 11 ? 11 : beat >= 10 ? 10 : beat >= 9 ? 9 : beat >= 8 ? 8 : beat >= 5 ? 5 : 4)) * 30,
       })
     }
 
-    // Ambient card — one piece of parallel fleet work (Ops), kept calm so it
-    // doesn't compete with the narrative principals.
-    cards.push({
-      id: 'ops-invoices',
-      type: 'run',
-      room: 'Ops',
-      board: 'Operations',
-      title: 'May invoices · 42 / 42',
-      description:
-        'Weekly invoice sweep complete. All 42 May invoices sent. 4 EU customers confirmed VAT IDs — final invoices delivered.',
-      assignee: 'Janus',
-      indicators: [{ icon: 'check', label: '42 sent' }],
-      status: 'RESOLVED',
-      statusKind: 'resolved',
-      at: 60,
-    })
+    // Growth principal: the Q2 outbound pipeline running in parallel the whole
+    // time — TAM → contacts → verify → QA → a clean list ready for outreach.
+    if (beat >= 1) {
+      const status =
+        beat >= 8 ? 'LIST READY' : beat >= 7 ? 'QA' : beat >= 5 ? 'VERIFYING' : beat >= 3 ? 'FINDING CONTACTS' : 'BUILDING TAM'
+      const statusKind: StatusKind = beat >= 8 ? 'resolved' : 'running'
+      const assignee =
+        beat >= 8 ? 'Nora' : beat >= 7 ? 'Mira' : beat >= 5 ? 'Vera' : beat >= 3 ? 'Hunter' : 'Atlas'
+      const indicators: FeedCardIndicator[] = []
+      if (beat >= 2) indicators.push({ label: '1,240 accounts' })
+      if (beat >= 4) indicators.push({ label: '3,800 contacts' })
+      if (beat >= 6) indicators.push({ icon: 'check', label: '3,640 verified' })
+      cards.push({
+        id: 'growth-q2-outbound',
+        type: 'run',
+        room: 'Growth',
+        board: 'Growth Pipeline',
+        title: 'Build the Q2 outbound pipeline',
+        description:
+          'Expand the ideal customer profile into a target account list, find decision-makers at each, verify their emails, and hand over a clean list of buyers ready for outreach.',
+        assignee,
+        indicators,
+        status,
+        statusKind,
+        at: (beat - (beat >= 8 ? 8 : beat >= 7 ? 7 : beat >= 5 ? 5 : beat >= 3 ? 3 : 1)) * 30,
+      })
+    }
 
     return cards
   }, [beat])
 
-  // Group cards into ongoing (live), active (queued/scoped), and done.
+  // Group cards: anything waiting on you is pulled into its own bucket (rendered
+  // first), then ongoing (live), active (queued/scoped), and done.
   const grouped = useMemo(() => {
+    const needsAttention: FeedCard[] = []
     const ongoing: FeedCard[] = []
     const active: FeedCard[] = []
     const done: FeedCard[] = []
     for (const c of feedCards) {
-      if (DONE_KINDS.has(c.statusKind)) done.push(c)
+      if (c.needsYou) needsAttention.push(c)
+      else if (DONE_KINDS.has(c.statusKind)) done.push(c)
       else if (LIVE_KINDS.has(c.statusKind)) ongoing.push(c)
       else active.push(c)
     }
     const byRecency = (a: FeedCard, b: FeedCard) => a.at - b.at
+    needsAttention.sort(byRecency)
     ongoing.sort(byRecency)
     active.sort(byRecency)
     done.sort(byRecency)
-    return { ongoing, active, done }
+    return { needsAttention, ongoing, active, done }
   }, [feedCards])
 
   // ── Activity items (right pane) ──────────────────────────────────────────
 
   const supportItems: ActivityItem[] = useMemo(() => {
     const out: ActivityItem[] = []
-    if (beat >= 11) out.push({
-      id: 's-reply', agent: 'Reply', state: beat >= 12 ? 'done' : 'working', at: (beat - (beat >= 12 ? 12 : 11)) * 30,
-      action: 'Replying to Priya R. on #1042',
-      detail: beat >= 12
-        ? 'Sent a reply confirming the iOS Safari fix is live. Ticket closed and resolved_at stamped.'
-        : 'Drafting a reply to Priya R. confirming the iOS Safari fix is live. Keeping it to her exact issue and the specific fix — no filler.',
-    })
+    // Reply drafts the customer response, then waits on you at the pivot (beat 9),
+    // sends on approval (beat 10), and confirms sent (beat 11).
+    if (beat >= 8) {
+      const sent = beat >= 11
+      const sending = beat >= 10
+      out.push({
+        id: 's-reply', agent: 'Reply',
+        state: sent ? 'done' : beat === 9 ? 'needs-you' : 'working',
+        at: (beat - (sent ? 11 : sending ? 10 : beat >= 9 ? 9 : 8)) * 30,
+        action: sent
+          ? 'Replied to Priya R. on #1042'
+          : sending
+            ? 'Sending reply to Priya R.'
+            : beat === 9
+              ? 'Reply ready for #1042 — waiting on you'
+              : 'Drafting reply to Priya R.',
+        detail: sent
+          ? 'Reply sent confirming the mobile sign-in fix has shipped. Ticket #1042 closed and resolved_at stamped.'
+          : sending
+            ? 'You approved the reply. Sending it to Priya now and closing the ticket.'
+            : beat === 9
+              ? 'Draft is ready: confirms the mobile sign-in fix is shipping and thanks her for the clear repro. Holding for your okay before it goes out.'
+              : 'Writing a reply tied to Priya\'s exact issue and the specific fix — no filler. Will hold for your approval before anything sends.',
+      })
+    }
     if (beat >= 2) out.push({
       id: 's-triage', agent: 'Triage', state: beat >= 3 ? 'done' : 'working', at: (beat - (beat >= 3 ? 3 : 2)) * 30,
-      action: 'Triaging ticket #1042',
+      action: beat >= 3 ? 'Routed #1042 to Engineering' : 'Triaging ticket #1042',
       detail: beat >= 3
-        ? 'Classified as bug · mobile · auth · priority high. The "Sign in button does nothing" pattern matches 2 other open tickets — flagging Engineering with a note to look at iOS Safari resize handling.'
+        ? 'Classified as bug · mobile · auth · priority high. The "Sign in button does nothing" pattern matches 2 other open tickets — handed to Engineering with a note to look at iOS Safari resize handling.'
         : 'Reading the body now. Looks like a UI event-handler issue on the sign-in button specific to mobile Safari. Repro-ing on the iOS simulator to confirm category and priority.',
     })
     if (beat >= 1) out.push({
@@ -700,29 +691,46 @@ export default function MissionControlPage(): React.JSX.Element {
 
   const engineeringItems: ActivityItem[] = useMemo(() => {
     const out: ActivityItem[] = []
-    if (beat >= 10) out.push({
-      id: 'e-deploy', agent: 'CI', state: beat >= 11 ? 'done' : 'working', at: (beat - (beat >= 11 ? 11 : 10)) * 30,
-      action: 'Deploying PR #432 to production',
-      detail: beat >= 11
-        ? 'Build 4823 done, edge cache flushed, post-deploy smoke tests all green. Sign-in latency flat at 38ms p95.'
+    // Deploy only after the merge lands (beat 11+).
+    if (beat >= 11) out.push({
+      id: 'e-deploy', agent: 'CI', state: beat >= 12 ? 'done' : 'working', at: (beat - (beat >= 12 ? 12 : 11)) * 30,
+      action: beat >= 12 ? 'Deployed PR #432 to production' : 'Deploying PR #432 to production',
+      detail: beat >= 12
+        ? 'Build 4823 shipped, edge cache flushed, post-deploy smoke tests all green. Sign-in latency flat at 38ms p95.'
         : 'Build 4823 queued. Deploying to edge, flushing cache, and running post-deploy smoke tests.',
     })
-    if (beat === 9) out.push({
-      id: 'e-merge', agent: 'Anvil', state: 'working', at: 0,
-      action: 'Merging fix/mobile-signin to main',
-      detail: 'Squash-merging onto main and cleaning up the branch. Linked ticket #1042 will auto-close on merge. Kicking off the production deploy right after.',
-    })
-    if (beat >= 10) out.push({
-      id: 'e-merge', agent: 'Anvil', state: 'done', at: (beat - 10) * 30,
-      action: 'Merging fix/mobile-signin to main',
-      detail: 'Squash-merged onto main. Cleanup branch deleted. Linked ticket #1042 auto-closed. Picking up the next item from the engineering backlog now.',
+    // The merge is GATED on your approval at the pivot (beat 9). It does not
+    // happen on its own — it waits, then lands on your yes (beat 10), then closes.
+    if (beat >= 9) {
+      const merged = beat >= 11
+      const merging = beat >= 10
+      out.push({
+        id: 'e-merge', agent: 'Anvil',
+        state: merged ? 'done' : beat === 9 ? 'needs-you' : 'working',
+        at: (beat - (merged ? 11 : merging ? 10 : 9)) * 30,
+        action: merged
+          ? 'Merged fix/mobile-signin to main'
+          : merging
+            ? 'Merging fix/mobile-signin to main'
+            : 'PR #432 ready to merge — waiting on you',
+        detail: merged
+          ? 'Squash-merged onto main, branch deleted, linked ticket #1042 auto-closed. Picking up the next item from the engineering backlog now.'
+          : merging
+            ? 'You approved the merge. Squash-merging onto main and kicking off the production deploy.'
+            : 'All 12 checks green and the full suite passed on a real checkout. Holding for your okay before it lands on main.',
+      })
+    }
+    if (beat >= 8) out.push({
+      id: 'e-review', agent: 'Lens', state: beat >= 9 ? 'done' : 'working', at: (beat - (beat >= 9 ? 9 : 8)) * 30,
+      action: beat >= 9 ? 'Approved PR #432' : 'Reviewing PR #432',
+      detail: beat >= 9
+        ? 'Diff is tight: a stale-ref guard plus a regression test that fails without the fix. No blocking comments. Approved.'
+        : 'Reading the diff on fix/mobile-signin — checking the stale-ref guard holds across orientation changes and the regression test actually reproduces the original failure.',
     })
     if (beat >= 8) out.push({
-      id: 'e-open', agent: 'Anvil', state: beat >= 9 ? 'done' : 'working', at: (beat - (beat >= 9 ? 9 : 8)) * 30,
-      action: beat >= 9 ? 'Opened PR #432' : 'Opening PR #432',
-      detail: beat >= 9
-        ? 'All 12 checks are green and the full test suite passed on a real checkout. Diff is +38 −4 across 2 files.'
-        : 'Pushing fix/mobile-signin and opening the PR. CI checks queued — 12 checks, estimated 90 seconds.',
+      id: 'e-open', agent: 'Anvil', state: 'done', at: (beat - 8) * 30,
+      action: 'Opened PR #432',
+      detail: 'Pushed fix/mobile-signin and opened the PR. All 12 checks green, diff +38 −4 across 2 files.',
     })
     if (beat >= 6) out.push({
       id: 'e-tests', agent: 'Anvil', state: beat >= 7 ? 'done' : 'working', at: (beat - (beat >= 7 ? 7 : 6)) * 30,
@@ -748,35 +756,74 @@ export default function MissionControlPage(): React.JSX.Element {
     return out
   }, [beat])
 
-  const opsItems: ActivityItem[] = useMemo(
-    () => [
-      {
-        id: 'o-1', agent: 'Janus', state: 'done', at: Math.max(0, beat - 1) * 30,
-        action: 'Running weekly invoice sweep',
-        detail: 'All 42 May invoices sent. The 4 EU customers awaiting tax-id confirmation came back with VAT IDs, so the final invoices went out and the sweep is complete.',
-      },
-    ],
-    [beat]
-  )
+  // Growth runs the Q2 outbound pipeline in parallel the whole time: Atlas builds
+  // the TAM, Hunter finds contacts, Vera verifies emails, Mira QAs, Nora hands over.
+  const growthItems: ActivityItem[] = useMemo(() => {
+    const out: ActivityItem[] = []
+    if (beat >= 8) out.push({
+      id: 'g-handover', agent: 'Nora', state: beat >= 9 ? 'done' : 'working', at: (beat - (beat >= 9 ? 9 : 8)) * 30,
+      action: beat >= 9 ? 'Handed over the Q2 outbound list' : 'Handing over the Q2 outbound list',
+      detail: '1,240 target accounts, 3,800 contacts, 3,640 verified emails. Clean list ready for outreach — staged for your sign-off before the first send.',
+    })
+    if (beat >= 7) out.push({
+      id: 'g-qa', agent: 'Mira', state: beat >= 8 ? 'done' : 'working', at: (beat - (beat >= 8 ? 8 : 7)) * 30,
+      action: 'QA on the verified contact list',
+      detail: beat >= 8
+        ? 'Spot-checked 200 rows against source pages — no fabricated names or titles, every email maps to a real person. List passes.'
+        : 'Sampling the verified list to confirm every name, title, and company is grounded in a real source. Zero tolerance for fabricated contacts.',
+    })
+    if (beat >= 5) out.push({
+      id: 'g-verify', agent: 'Vera', state: beat >= 7 ? 'done' : 'working', at: (beat - (beat >= 7 ? 7 : 5)) * 30,
+      action: 'Verifying contact emails',
+      detail: beat >= 7
+        ? '3,640 of 3,800 emails verified deliverable. Dropped 160 catch-all and bounced addresses.'
+        : 'Running deliverability checks across 3,800 contacts — MX, SMTP, and catch-all detection. About 96% verifying clean so far.',
+    })
+    if (beat >= 3) out.push({
+      id: 'g-contacts', agent: 'Hunter', state: beat >= 5 ? 'done' : 'working', at: (beat - (beat >= 5 ? 5 : 3)) * 30,
+      action: 'Finding contacts at target accounts',
+      detail: beat >= 5
+        ? 'Found 3,800 decision-makers across 1,240 accounts — VP Eng, Head of Support, and Founder titles prioritised.'
+        : 'Pulling decision-makers at each target account, prioritising VP Eng, Head of Support, and Founder titles.',
+    })
+    if (beat >= 1) out.push({
+      id: 'g-tam', agent: 'Atlas', state: beat >= 3 ? 'done' : 'working', at: (beat - (beat >= 3 ? 3 : 1)) * 30,
+      action: 'Building the target account list',
+      detail: beat >= 3
+        ? 'Expanded the ICP into 1,240 accounts — B2B SaaS, 50-500 employees, with recent funding or hiring signals.'
+        : 'Expanding the ideal customer profile into a target account list — filtering B2B SaaS, 50-500 employees, with recent funding or hiring signals.',
+    })
+    return out
+  }, [beat])
 
   const unifiedActivity: GlobalActivityItem[] = useMemo(() => {
     const combined: GlobalActivityItem[] = [
       ...supportItems.map((i) => ({ ...i, room: 'Support' })),
       ...engineeringItems.map((i) => ({ ...i, room: 'Engineering' })),
-      ...opsItems.map((i) => ({ ...i, room: 'Ops' })),
+      ...growthItems.map((i) => ({ ...i, room: 'Growth' })),
     ]
     combined.sort((a, b) => a.at - b.at)
     return combined
-  }, [supportItems, engineeringItems, opsItems])
+  }, [supportItems, engineeringItems, growthItems])
 
   // Flatten the three task sections into one presence tree so a card that
   // changes stage (e.g. Active → Done) stays mounted and slides to its new
   // section via `layout`, instead of exiting one section and re-entering another.
   const taskRows: React.ReactNode[] = []
-  const pushTaskSection = (key: string, label: string, tone: 'active' | 'done', cards: FeedCard[], emptyText: string) => {
+  const pushTaskSection = (
+    key: string,
+    label: string,
+    tone: 'primary' | 'active' | 'done',
+    cards: FeedCard[],
+    emptyText: string | null,
+    opts?: { icon?: string; onApprove?: () => void }
+  ) => {
+    // emptyText === null means "hide the whole section when there's nothing in it"
+    // (used for the Needs-your-attention rail, which only exists at the pivot).
+    if (cards.length === 0 && emptyText === null) return
     taskRows.push(
       <motion.div key={`hdr-${key}`} layout="position" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
-        <SectionHeader label={label} tone={tone} count={cards.length} />
+        <SectionHeader label={label} tone={tone} count={cards.length} icon={opts?.icon} />
       </motion.div>
     )
     if (cards.length === 0) {
@@ -786,9 +833,10 @@ export default function MissionControlPage(): React.JSX.Element {
         </motion.p>
       )
     } else {
-      cards.forEach((card) => taskRows.push(<UnifiedCard key={card.id} card={card} />))
+      cards.forEach((card) => taskRows.push(<UnifiedCard key={card.id} card={card} onApprove={opts?.onApprove} />))
     }
   }
+  pushTaskSection('attention', 'Needs your attention', 'primary', grouped.needsAttention, null, { icon: 'bell', onApprove: advance })
   pushTaskSection('ongoing', 'Ongoing', 'active', grouped.ongoing, 'No ongoing tasks.')
   pushTaskSection('active', 'Active', 'active', grouped.active, 'No active tasks.')
   pushTaskSection('done', 'Recently done', 'done', grouped.done, 'Nothing done yet.')

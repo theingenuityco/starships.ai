@@ -4,6 +4,7 @@ import React, { useMemo } from 'react'
 import Link from 'next/link'
 import type { RoomPinnedDataset, RoomPinnedTaskBoard } from '@starships/protocol'
 import { useStarshipDatasets, useDatasetRows } from '@/hooks/useDatasets'
+import { useDemo } from '@/components/demo/DemoContext'
 import { cn } from '@/lib/utils'
 import { avatarColour } from '@/components/dashboard/utils'
 import Icon from '@/components/primitives/Icon'
@@ -141,7 +142,62 @@ function TicketColumn({ title, status, cls, rows }: { title: string; status: Sta
   )
 }
 
+// Demo beat-state: ticket #1042 (Priya R.) moves NEW → TRIAGED → RESOLVED in
+// lockstep with the Mission Control beats, alongside a few static tickets for
+// texture. Used only while the hero-video demo is running.
+function demoTickets(beat: number): Record<string, unknown>[] {
+  const principalStatus = beat >= 11 ? 'RESOLVED' : beat >= 3 ? 'TRIAGED' : 'NEW'
+  const minsAgo = (m: number) => new Date(Date.now() - m * 60_000).toISOString()
+  return [
+    {
+      ticket_id: '1042',
+      customer_name: 'Priya R.',
+      subject: 'Login button does nothing on mobile',
+      message: 'Sign in button does nothing on iPhone Safari, tried Chrome too, no luck. This started after the update yesterday.',
+      priority: 'high',
+      category: 'auth',
+      tags: 'mobile, bug',
+      status: principalStatus,
+      created_at: minsAgo(4),
+    },
+    {
+      ticket_id: '1043',
+      customer_name: 'Marcus T.',
+      subject: 'Billing page shows the wrong currency',
+      message: 'My invoices show USD but my account is set to EUR.',
+      priority: 'medium',
+      category: 'billing',
+      tags: 'billing',
+      status: 'NEW',
+      created_at: minsAgo(11),
+    },
+    {
+      ticket_id: '1039',
+      customer_name: 'Dana K.',
+      subject: 'Export to CSV times out on large workspaces',
+      message: 'Exporting more than ~50k rows just spins and then fails.',
+      priority: 'medium',
+      category: 'exports',
+      tags: 'performance',
+      status: 'TRIAGED',
+      created_at: minsAgo(38),
+    },
+    {
+      ticket_id: '1031',
+      customer_name: 'Owen B.',
+      subject: 'Password reset email not arriving',
+      message: 'Requested a reset three times, nothing in inbox or spam.',
+      priority: 'low',
+      category: 'auth',
+      tags: 'email',
+      status: 'RESOLVED',
+      created_at: minsAgo(140),
+    },
+  ]
+}
+
 export function SupportRoomDashboard({ starshipId, starshipSlug, roomSlug, roomName, pinnedDatasets }: SupportRoomDashboardProps) {
+  const { active: demoActive, beat } = useDemo()
   const { data: allDatasets = [] } = useStarshipDatasets(starshipId)
 
   const ticketsDataset = useMemo(() => {
@@ -156,12 +212,13 @@ export function SupportRoomDashboard({ starshipId, starshipSlug, roomSlug, roomN
     500,
     0,
     undefined,
-    Boolean(ticketsDataset?.id)
+    Boolean(ticketsDataset?.id) && !demoActive
   )
 
   const grouped = useMemo<Record<Status, Record<string, unknown>[]>>(() => {
     const empty: Record<Status, Record<string, unknown>[]> = { NEW: [], TRIAGED: [], RESOLVED: [] }
-    for (const row of ticketsPage?.data ?? []) {
+    const sourceRows = demoActive ? demoTickets(beat) : (ticketsPage?.data ?? [])
+    for (const row of sourceRows) {
       const raw = getStr(row, 'status').toUpperCase()
       const status: Status = raw === 'TRIAGED' ? 'TRIAGED' : raw === 'RESOLVED' ? 'RESOLVED' : 'NEW'
       empty[status].push(row)
@@ -175,7 +232,7 @@ export function SupportRoomDashboard({ starshipId, starshipSlug, roomSlug, roomN
     empty.TRIAGED.sort(byCreated)
     empty.RESOLVED.sort(byCreated)
     return empty
-  }, [ticketsPage?.data])
+  }, [ticketsPage?.data, demoActive, beat])
 
   const total = grouped.NEW.length + grouped.TRIAGED.length + grouped.RESOLVED.length
 
@@ -213,7 +270,7 @@ export function SupportRoomDashboard({ starshipId, starshipSlug, roomSlug, roomN
         <div className="h-full flex md:flex-row flex-col gap-4 px-4 py-4 md:overflow-x-auto">
           {isLoading && total === 0 ? (
             <div className="w-full text-center py-12 text-sm text-muted-foreground">Loading tickets…</div>
-          ) : !ticketsDataset ? (
+          ) : !demoActive && !ticketsDataset ? (
             <div className="w-full text-center py-12 text-sm text-muted-foreground">
               No tickets dataset pinned to this room.
             </div>

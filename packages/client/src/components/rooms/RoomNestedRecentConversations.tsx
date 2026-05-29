@@ -4,6 +4,8 @@ import Icon from '@/components/primitives/Icon'
 import { useChildConversationsPaged } from '@/hooks/useConversations'
 import { cn } from '@/lib/utils'
 import { normalizeConversationTitle } from '@/lib/normalizeConversationTitle'
+import { useDemo } from '@/components/demo/DemoContext'
+import { demoRoomConversations } from '@/components/demo/demoRooms'
 import { useRouter } from 'next/navigation'
 import { useMemo } from 'react'
 
@@ -12,14 +14,29 @@ export function RoomNestedRecentConversations(props: {
   roomSlug: string
   roomConversationId: string
   activeConversationId?: string | null
+  /**
+   * Demo only: when set and no explicit activeConversationId matches, highlight
+   * the most-recent conversation so the hero-video "camera" lands on a thread
+   * under the spotlighted room. Inert outside the demo.
+   */
+  highlightFirst?: boolean
   onNavigate?: () => void
 }) {
   const router = useRouter()
 
-  const history = useChildConversationsPaged(props.roomConversationId ?? null, { enabled: Boolean(props.roomConversationId), limit: 4 })
+  // Demo: a synthetic room id resolves to mock threads instead of a network
+  // fetch, so the spotlighted room shows a real-looking conversation on beat.
+  const { active: demoActive } = useDemo()
+  const demoConversations = demoActive ? demoRoomConversations(props.roomConversationId) : null
+  const isDemoRoom = Boolean(demoConversations)
+
+  const history = useChildConversationsPaged(props.roomConversationId ?? null, {
+    enabled: Boolean(props.roomConversationId) && !isDemoRoom,
+    limit: 4,
+  })
 
   const recent = useMemo(() => {
-    const list = Array.isArray(history.conversations) ? history.conversations : []
+    const list = isDemoRoom ? (demoConversations ?? []) : Array.isArray(history.conversations) ? history.conversations : []
     return list
       .slice()
       .sort((a: any, b: any) => {
@@ -28,9 +45,9 @@ export function RoomNestedRecentConversations(props: {
         return bt - at
       })
       .slice(0, 3)
-  }, [history.conversations])
+  }, [history.conversations, isDemoRoom, demoConversations])
 
-  const moreCount = Math.max(0, Number(history.total ?? 0) - 3)
+  const moreCount = isDemoRoom ? 0 : Math.max(0, Number(history.total ?? 0) - 3)
 
   const openConversation = (conversationId: string) => {
     const cid = String(conversationId || '').trim()
@@ -58,7 +75,8 @@ export function RoomNestedRecentConversations(props: {
         {recent.map((c: any, idx: number) => {
           const id = String(c?.id || '').trim()
           if (!id) return null
-          const isActive = Boolean(props.activeConversationId && String(props.activeConversationId) === id)
+          const matchesActive = Boolean(props.activeConversationId && String(props.activeConversationId) === id)
+          const isActive = matchesActive || Boolean(props.highlightFirst && !props.activeConversationId && idx === 0)
           const titleRaw = String(c?.title || '').trim()
           const titleNorm = normalizeConversationTitle(titleRaw)
           const title = titleNorm || 'Untitled conversation'

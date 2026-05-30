@@ -44,6 +44,7 @@ import { useStarshipBySlug } from '@/hooks/useStarships'
 import { useStarshipRooms } from '@/hooks/useRooms'
 import { useDemo } from '@/components/demo/DemoContext'
 import { supportActivity, engineeringActivity, growthActivity, taskBoardActivity } from '@/components/demo/demoActivity'
+import type { DemoConvApproval } from '@/components/demo/demoActivity'
 import type { AgentModel } from '@starships/protocol'
 
 // ─── Shared animation variants ───────────────────────────────────────────────
@@ -111,27 +112,6 @@ type StatusKind =
 
 type FeedCardIndicator = { icon?: string; label: string }
 
-// Use-case-specific payload for an approval gate. Lets the "Needs your
-// attention" rail show the actual thing you're signing off on (a drafted
-// reply, a merge) instead of a generic card with just a button.
-type ApprovalContent = {
-  /** Drives the eyebrow icon + framing: a customer reply vs. a code merge. */
-  kind: 'reply' | 'merge'
-  /** The conversation this approval lives in (mirrors the activity timeline's
-   *  action text). Rendered with the agent + room in the header line. */
-  conversation: string
-  /** Eyebrow above the content block, e.g. "Draft reply to Priya R.". */
-  summary: string
-  /** The core content you're approving — the reply text or the merge note. */
-  body: string
-  /** Primary button label, e.g. "Send reply" / "Approve & merge". */
-  actionLabel: string
-  /** Optional secondary, non-advancing action, e.g. "Edit" / "View diff". */
-  secondaryLabel?: string
-  /** Supporting facts shown as a check-row (tests/checks/diff stat). */
-  facts?: FeedCardIndicator[]
-}
-
 type FeedCard = {
   id: string
   type: CardType
@@ -151,9 +131,9 @@ type FeedCard = {
   status: string
   statusKind: StatusKind
   primary?: boolean
+  /** Flags the card as gated on you. Removes it from the Tasks panel so the
+   *  approval only surfaces in the activity log (on the conversation row). */
   needsYou?: boolean
-  /** Present only while this card is gated on you. Rendered by ApprovalCard. */
-  approval?: ApprovalContent
   /** Seconds ago. 0 = now. Smaller = more recent. */
   at: number
 }
@@ -270,15 +250,17 @@ function UnifiedCard({ card, onApprove }: { card: FeedCard; onApprove?: () => vo
 }
 
 // ─── Approval timeline item (rich, use-case-specific) ──────────────────────
-// An approval is a conversation moment, so it rides the same timeline rail as
-// the activity log: avatar on the rail, an "{agent} is {conversation} in #room"
-// line in the body (outside the card), and only the core artifact you're
-// signing off on (the drafted reply, or the merge summary + green checks)
-// inside the card below it. `isLast` controls whether the rail line continues.
-function ApprovalTimelineItem({ card, onApprove, isLast }: { card: FeedCard; onApprove?: () => void; isLast: boolean }) {
-  const ap = card.approval
+// An approval is a conversation moment in needs-you state, so the conversation
+// row itself transforms into this rich item — not a separate card alongside.
+// Rides the same timeline rail as a normal TimelineItem: avatar on the rail,
+// "{agent} is {action} in #room" header line, then the artifact you're signing
+// off on (the drafted reply, or the merge summary + green checks) below.
+// `isLast` controls whether the rail line continues.
+function ApprovalTimelineItem({ item, onApprove, isLast }: { item: GlobalActivityItem; onApprove?: () => void; isLast: boolean }) {
+  const ap = item.approval
   if (!ap) return null
   const eyebrowIcon = ap.kind === 'reply' ? 'chat' : 'git-branch'
+  const statusLabel = ap.kind === 'reply' ? 'REPLY READY' : 'READY TO MERGE'
 
   return (
     <motion.div
@@ -293,22 +275,22 @@ function ApprovalTimelineItem({ card, onApprove, isLast }: { card: FeedCard; onA
       {/* Rail: same geometry as TimelineItem so the line and avatar align. */}
       <div className="flex w-6 shrink-0 flex-col items-center self-stretch">
         <div className="w-px bg-border/60" style={{ height: 12 }} />
-        {card.assignee ? <Avatar name={card.assignee} className="h-6 w-6 text-[10px]" /> : null}
+        <Avatar name={item.agent} className="h-6 w-6 text-[10px]" />
         {!isLast ? <div className="w-px flex-1 bg-border/60" /> : null}
       </div>
 
       <div className="min-w-0 flex-1 space-y-2 py-3">
-        {/* Timeline line (outside the card): {agent} is {conversation} in #room,
+        {/* Timeline line (outside the card): {agent} is {action} in #room,
             with the gate status pill where the timestamp would sit. */}
         <div className="flex min-w-0 items-baseline gap-1 text-sm leading-snug text-foreground">
-          {card.assignee ? <span className="shrink-0 font-medium">{card.assignee}</span> : null}
+          <span className="shrink-0 font-medium">{item.agent}</span>
           <span className="shrink-0 text-muted-foreground">is</span>
-          <span className="truncate min-w-0">{ap.conversation}</span>
+          <span className="truncate min-w-0">{item.action}</span>
           <span className="shrink-0 text-muted-foreground">in</span>
-          <span className="shrink-0 font-medium">#{card.room}</span>
+          <span className="shrink-0 font-medium">#{item.room}</span>
           <span className="ml-auto shrink-0 pl-2">
             <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/40 bg-amber-500/15 px-1.5 py-px text-[10px] font-medium text-amber-600 dark:text-amber-300">
-              {card.status}
+              {statusLabel}
             </span>
           </span>
         </div>
@@ -396,6 +378,8 @@ type ActivityItem = {
   at: number
   /** 'board' renders as a muted one-liner (card created/reassigned/moved); absent = full conversation row. */
   kind?: 'board'
+  /** Present while this conversation is gated on you — drives ApprovalTimelineItem. */
+  approval?: DemoConvApproval
 }
 
 type GlobalActivityItem = ActivityItem & { room: string }
@@ -538,7 +522,7 @@ function TimelineBoardItem({ item, isLast }: { item: GlobalActivityItem; isLast:
 type ActivityBucket = {
   key: string
   label: string
-  tone: 'live' | 'muted'
+  tone: 'live' | 'muted' | 'attention'
   items: GlobalActivityItem[]
 }
 
@@ -546,21 +530,29 @@ function ActivityPane({
   items,
   className,
   starshipSlug = '',
-  attention,
+  onApprove,
 }: {
   items: GlobalActivityItem[]
   className?: string
   starshipSlug?: string
-  attention?: React.ReactNode
+  /** Click handler for the Approve button on a needs-you conversation row. */
+  onApprove?: () => void
 }) {
   const { buckets } = useMemo(() => {
+    const attention: GlobalActivityItem[] = []
     const live: GlobalActivityItem[] = []
     const past: GlobalActivityItem[] = []
+    // Needs-you items are pulled out of "Running now" and into their own
+    // "Needs your attention" bucket above it. The conversation row itself
+    // transforms into the rich approval card (see ApprovalTimelineItem) —
+    // never both at once.
     for (const it of items) {
-      if (it.state === 'working' || it.state === 'needs-you') live.push(it)
+      if (it.state === 'needs-you') attention.push(it)
+      else if (it.state === 'working') live.push(it)
       else past.push(it)
     }
     const byRecency = (a: GlobalActivityItem, b: GlobalActivityItem) => a.at - b.at
+    attention.sort(byRecency)
     live.sort(byRecency)
     past.sort(byRecency)
 
@@ -573,6 +565,7 @@ function ActivityPane({
     }
 
     const out: ActivityBucket[] = []
+    if (attention.length > 0) out.push({ key: 'attention', label: 'Needs your attention', tone: 'attention', items: attention })
     out.push({ key: 'live', label: 'Running now', tone: live.length > 0 ? 'live' : 'muted', items: live })
     const order: TimeBucket[] = ['hour', 'today', 'older']
     for (const b of order) {
@@ -586,8 +579,9 @@ function ActivityPane({
   const total = items.length
 
   // Flatten separators + items into one presence tree so an item that changes
-  // bucket (e.g. working → done) stays mounted and slides via `layout`, rather
-  // than exiting one bucket's AnimatePresence and re-entering another's.
+  // bucket (e.g. needs-you → working, or working → done) stays mounted and
+  // slides via `layout`, rather than exiting one bucket's AnimatePresence and
+  // re-entering another's.
   const lastBucketIdx = buckets.length - 1
   const rows: React.ReactNode[] = []
   buckets.forEach((bucket, groupIdx) => {
@@ -616,6 +610,8 @@ function ActivityPane({
         rows.push(
           it.kind === 'board' ? (
             <TimelineBoardItem key={it.id} item={it} isLast={isLast} />
+          ) : it.state === 'needs-you' && it.approval ? (
+            <ApprovalTimelineItem key={it.id} item={it} isLast={isLast} onApprove={onApprove} />
           ) : (
             <TimelineItem key={it.id} item={it} isLast={isLast} starshipSlug={starshipSlug} />
           )
@@ -627,13 +623,6 @@ function ActivityPane({
   return (
     <section className={cn('min-w-0', className)}>
       <div className="relative pt-1 pb-2">
-        <AnimatePresence>
-          {attention ? (
-            <motion.div key="attention" layout="position" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3, ease: 'easeOut' }}>
-              {attention}
-            </motion.div>
-          ) : null}
-        </AnimatePresence>
         {total === 0 ? (
           <p className="px-3 pt-2 text-xs text-muted-foreground/40">No activity yet.</p>
         ) : (
@@ -722,19 +711,6 @@ export default function MissionControlPage(): React.JSX.Element {
         statusKind,
         primary: true,
         needsYou: beat >= 31 && beat < 33,
-        approval:
-          beat >= 31 && beat < 33
-            ? {
-                kind: 'reply',
-                conversation: 'Replying to Priya R. on #1042',
-                summary: 'Draft reply to Priya R.',
-                body:
-                  'Hi Priya, thanks for flagging this. We tracked it down to a mobile Safari issue with the sign-in button and a fix is rolling out now. It should work again within the hour. Really sorry for the hassle, and thank you for the detailed report.',
-                actionLabel: 'Send reply',
-                secondaryLabel: 'Edit',
-                facts: [{ icon: 'git-branch', label: 'Linked to fix/mobile-signin' }],
-              }
-            : undefined,
         at: (beat - eventBeat) * 30,
       })
     }
@@ -776,23 +752,6 @@ export default function MissionControlPage(): React.JSX.Element {
         statusKind,
         primary: true,
         needsYou: beat >= 29 && beat < 35,
-        approval:
-          beat >= 29 && beat < 35
-            ? {
-                kind: 'merge',
-                conversation: 'Reviewing and merging fix/mobile-signin',
-                summary: 'Merge fix/mobile-signin → main',
-                body:
-                  'Guard the sign-in handler against the iOS Safari resize race, plus a regression test that reproduces the original failure.',
-                actionLabel: 'Approve & merge',
-                secondaryLabel: 'View diff',
-                facts: [
-                  { icon: 'check', label: '142 / 142 tests' },
-                  { icon: 'check', label: '12 checks passed' },
-                  { icon: 'git-branch', label: '+38 −4 · 2 files' },
-                ],
-              }
-            : undefined,
         at: (beat - eventBeat) * 30,
       })
     }
@@ -912,20 +871,11 @@ export default function MissionControlPage(): React.JSX.Element {
   pushTaskSection('active', 'Active', 'active', grouped.active, 'No active tasks.')
   pushTaskSection('done', 'Recently done', 'done', grouped.done, 'Nothing done yet.')
 
-  // Approvals are conversation moments, not board tasks, so the "Needs your
-  // attention" rail lives at the top of the Activity timeline (above "Running
-  // now") rather than in the Tasks column. It rides the same rail: a tinted
-  // BucketSeparator header, then the approval items. Only present at the pivot
-  // beats where a card is gated on you.
-  const attentionRail =
-    grouped.needsAttention.length > 0 ? (
-      <>
-        <BucketSeparator label="Needs your attention" count={grouped.needsAttention.length} tone="attention" />
-        {grouped.needsAttention.map((card) => (
-          <ApprovalTimelineItem key={card.id} card={card} onApprove={advance} isLast={false} />
-        ))}
-      </>
-    ) : null
+  // Note: `grouped.needsAttention` is intentionally NOT rendered in the Tasks
+  // panel. Approvals are conversation moments — the needs-you conversation
+  // row in the Activity log transforms into the rich approval card (see
+  // ApprovalTimelineItem inside ActivityPane). Hiding the card here avoids
+  // the duplication of showing the same gate in two surfaces at once.
 
   return (
     <div className="relative w-full bg-background text-foreground">
@@ -959,7 +909,7 @@ export default function MissionControlPage(): React.JSX.Element {
               <ActivityPane
                 items={unifiedActivity}
                 starshipSlug={slug}
-                attention={attentionRail}
+                onApprove={advance}
               />
             </div>
           </div>

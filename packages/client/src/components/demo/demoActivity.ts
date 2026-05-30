@@ -48,9 +48,9 @@
  *  29  Engineering card → READY TO MERGE (needsYou)
  *  30  s-reply → needs-you (draft ready, gate)
  *  31  Support card → REPLY READY (needsYou)
- *  32  s-reply → working (sending, post-approve)
+ *  32  s-reply → working (sending, post-approve) + tb-s-approved log
  *  33  Support card → REPLYING (gate clears)
- *  34  e-review → working (merging, post-approve)
+ *  34  e-review → working (merging, post-approve) + tb-e-approved log
  *  35  Engineering card → MERGING (gate clears)
  *  36  s-reply → done
  *  37  Support card → RESOLVED + tb-s-resolve log
@@ -59,6 +59,28 @@
  */
 
 export type DemoActivityState = 'done' | 'working' | 'needs-you'
+
+/**
+ * Use-case-specific payload an activity item carries while it's gated on you.
+ * Lets the "Needs your attention" rail show the actual artifact you're signing
+ * off on (a drafted reply, a merge) inline with the conversation, rather than
+ * a duplicate card alongside the running-now row. Present only when the item's
+ * state is `needs-you`.
+ */
+export type DemoConvApproval = {
+  /** Drives the eyebrow icon + framing: a customer reply vs. a code merge. */
+  kind: 'reply' | 'merge'
+  /** Eyebrow above the artifact, e.g. "Draft reply to Priya R.". */
+  summary: string
+  /** The core content you're approving — the reply text or the merge note. */
+  body: string
+  /** Primary button label, e.g. "Send reply" / "Approve & merge". */
+  actionLabel: string
+  /** Optional secondary, non-advancing action, e.g. "Edit" / "View diff". */
+  secondaryLabel?: string
+  /** Supporting facts shown as a check-row (tests/checks/diff stat). */
+  facts?: Array<{ icon?: string; label: string }>
+}
 
 export type DemoActivityItem = {
   id: string
@@ -70,6 +92,8 @@ export type DemoActivityItem = {
   state: DemoActivityState
   /** Seconds ago. 0 = now. Smaller = more recent. */
   at: number
+  /** Approval payload — present only while this conversation is gated on you. */
+  approval?: DemoConvApproval
 }
 
 export type DemoRoomKey = 'support' | 'engineering' | 'growth'
@@ -112,6 +136,15 @@ export function supportActivity(beat: number): DemoActivityItem[] {
       state, at: (beat - eventBeat) * 30,
       action: 'Replying to Priya R. on #1042',
       detail,
+      approval: state === 'needs-you' ? {
+        kind: 'reply',
+        summary: 'Draft reply to Priya R.',
+        body:
+          'Hi Priya, thanks for flagging this. We tracked it down to a mobile Safari issue with the sign-in button and a fix is rolling out now. It should work again within the hour. Really sorry for the hassle, and thank you for the detailed report.',
+        actionLabel: 'Send reply',
+        secondaryLabel: 'Edit',
+        facts: [{ icon: 'git-branch', label: 'Linked to fix/mobile-signin' }],
+      } : undefined,
     })
   }
   // s-arrival: appears beat 4 (ticket lands), → done beat 10 (triage finished).
@@ -161,6 +194,19 @@ export function engineeringActivity(beat: number): DemoActivityItem[] {
       state, at: (beat - eventBeat) * 30,
       action: 'Reviewing and merging fix/mobile-signin',
       detail,
+      approval: state === 'needs-you' ? {
+        kind: 'merge',
+        summary: 'Merge fix/mobile-signin → main',
+        body:
+          'Guard the sign-in handler against the iOS Safari resize race, plus a regression test that reproduces the original failure.',
+        actionLabel: 'Approve & merge',
+        secondaryLabel: 'View diff',
+        facts: [
+          { icon: 'check', label: '142 / 142 tests' },
+          { icon: 'check', label: '12 checks passed' },
+          { icon: 'git-branch', label: '+38 −4 · 2 files' },
+        ],
+      } : undefined,
     })
   }
   // e-fix: Mason implements from Avery's plan. Appears beat 16, done beat 20.
@@ -288,6 +334,18 @@ export function taskBoardActivity(beat: number): DemoGlobalActivityItem[] {
   ev(25, 'Engineering', 'tb-e-assign-ravi', 'Mason: Product Engineer',
     'assigned fix/mobile-signin to Ravi',
     'All 12 checks green, so he handed the card to release for the merge review.')
+
+  // Approval-acceptance logs. These fire on the same beat the conversation
+  // flips out of needs-you (when you click Approve), so the audit trail is
+  // framed from your perspective: "You approved {agent}'s {request}". The
+  // agent doing the work afterwards is implicit in the conversation row
+  // sliding back into Running now.
+  ev(32, 'Support', 'tb-s-approved', 'You',
+    'approved Sara\'s reply on #1042',
+    'Sara sent the draft to Priya R. Ticket is queued for resolution.')
+  ev(34, 'Engineering', 'tb-e-approved', 'You',
+    'approved Ravi\'s merge of fix/mobile-signin',
+    'Ravi started squash-merging onto main and kicking off the production deploy.')
 
   // Resolution logs.
   ev(37, 'Support', 'tb-s-resolve', 'Sara: Customer Support',

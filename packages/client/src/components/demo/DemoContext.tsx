@@ -19,26 +19,49 @@
  * inactive it serves a frozen `beat: 0` value and attaches no timers or
  * keyboard listeners, so real users and every other route are untouched.
  *
- * Playback is prototype-style: the demo holds on beat 0 and only moves when you
- * press a key, so you drive it like a click-through prototype during the shoot.
- * Auto-play is still available as an opt-in via `P`.
+ * Playback: auto-play is ON by default and ticks through the timeline, but
+ * hard-pauses on each beat in `MILESTONE_BEATS`. A keypress (Space / →) at a
+ * milestone advances one beat and auto-play resumes until the next milestone.
+ * This gives the presenter natural beats to talk over without micro-driving
+ * every step. `P` overrides (toggles auto-play); rewinding (←) pauses.
  *
  * Keyboard control (active only):
- *   Space / ArrowRight / Enter — advance one beat
- *   Backspace / ArrowLeft      — back one beat
- *   P                          — toggle auto-play (off by default)
- *   R                          — restart from the top (stays manual)
+ *   Space / ArrowRight / Enter — advance one beat (auto-play stays on)
+ *   Backspace / ArrowLeft      — back one beat (pauses auto-play)
+ *   P                          — toggle auto-play
+ *   R                          — restart from the top (auto-play resumes)
  */
 
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { usePathname } from 'next/navigation'
 
-export const DEMO_MAX_BEAT = 12
+// One animation per beat, with one deliberate bundling: a card status/assignee
+// change shares its beat with its matching task-board log line (e.g. the
+// Support card flipping to TRIAGED and the "Sara moved #1042 to Triaged" log
+// entry land together, since they're the same logical action). Everything else
+// — conversation rows, gate transitions, indicator-only card updates — stays
+// on its own beat. See `taskBoardActivity` for the full ordering.
+export const DEMO_MAX_BEAT = 39
 // The demo opens on beat 1, not 0: beat 0 is a blank state (every activity
 // builder starts at `beat >= 1`), and we never want the demo to start empty.
 export const DEMO_MIN_BEAT = 1
-export const DEMO_STEP_MS = 3000
-export const DEMO_HOLD_MS = 4500
+export const DEMO_STEP_MS = 1500
+export const DEMO_HOLD_MS = 3000
+
+/**
+ * Beats where auto-play hard-pauses for the presenter to talk over the moment
+ * before continuing on keypress. Picked to land on narrative inflection points
+ * (per the timeline in `demoActivity.ts`):
+ *   1   opening — Nisha appears in the activity log (demo opens here, paused)
+ *   3   "Checking for new support tickets" lands in the activity log
+ *   6   ticket #1042 card appears on the Support Tickets board
+ *  12   fix/mobile-signin card appears on the Engineering Pipeline
+ *  16   "Implementing fix for mobile sign-in" lands in the activity log
+ *  19   "Running final QA on the contact list" lands in the activity log
+ *  31   both approval gates are active in Needs your attention
+ *  39   end state — everything resolved, demo holds until R resets
+ */
+export const MILESTONE_BEATS: ReadonlySet<number> = new Set([1, 3, 6, 12, 16, 19, 31, 39])
 
 export type DemoRoom = 'support' | 'engineering' | 'growth'
 
@@ -60,12 +83,15 @@ export type DemoState = {
 }
 
 // Maps a beat to the room the camera should be focused on. Mirrors the VO:
-// Support spots the bug (1-3) → hands to Engineering, which fixes it (4-7) →
-// "meanwhile, Growth" (8) → pivot/resolve happen back at the hub (9-12, no room).
+// Growth opens with Nisha (1-2), Support gets the ticket and triages it (3-11),
+// Engineering scopes the bug and Mason starts building (12-15), Growth runs
+// verification and hands off the QA'd list (16-24), then everything converges
+// at the hub for the review handoff, pivot, and resolve (25+, no room).
 export function spotlightForBeat(beat: number): DemoSpotlight {
-  if (beat >= 1 && beat <= 3) return { room: 'support', conversationId: null }
-  if (beat >= 4 && beat <= 7) return { room: 'engineering', conversationId: null }
-  if (beat === 8) return { room: 'growth', conversationId: null }
+  if (beat >= 1 && beat <= 2) return { room: 'growth', conversationId: null }
+  if (beat >= 3 && beat <= 11) return { room: 'support', conversationId: null }
+  if (beat >= 12 && beat <= 15) return { room: 'engineering', conversationId: null }
+  if (beat >= 16 && beat <= 24) return { room: 'growth', conversationId: null }
   return { room: null, conversationId: null }
 }
 
@@ -107,23 +133,24 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
   const active = isDev && (onMissionControl || searchDemo)
 
   const [beat, setBeat] = useState(DEMO_MIN_BEAT)
-  // Prototype-style by default: hold until a key press. Auto-play is opt-in via P.
-  const [auto, setAuto] = useState(false)
+  // Auto-play is ON by default and self-pauses at each milestone beat. The
+  // presenter resumes by pressing Space / →. `P` overrides for full manual.
+  const [auto, setAuto] = useState(true)
 
   const advance = useCallback(() => setBeat((b) => (b < DEMO_MAX_BEAT ? b + 1 : b)), [])
   const rewind = useCallback(() => setBeat((b) => (b > DEMO_MIN_BEAT ? b - 1 : b)), [])
   const reset = useCallback(() => setBeat(DEMO_MIN_BEAT), [])
 
-  // When the demo deactivates (navigated off a demo surface), rewind so a later
-  // re-entry starts clean from the opening beat in manual prototype mode.
+  // When the demo activates, restart from the opening beat with auto-play on
+  // so each entry plays cleanly from the top. When it deactivates, freeze.
   useEffect(() => {
-    if (!active) {
-      setBeat(DEMO_MIN_BEAT)
-      setAuto(false)
-    }
+    setBeat(DEMO_MIN_BEAT)
+    setAuto(active)
   }, [active])
 
-  // Manual keyboard control. Scrubbing pauses auto-play; R restarts from the top.
+  // Keyboard control. Advancing (Space / → / Enter) keeps auto-play on so it
+  // resumes past the milestone. Rewinding (← / Backspace) pauses, since the
+  // presenter is likely scrubbing back to re-emphasize something.
   useEffect(() => {
     if (!active) return
     const onKey = (e: KeyboardEvent) => {
@@ -131,7 +158,6 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
       if (tag === 'input' || tag === 'textarea') return
       if (e.key === ' ' || e.key === 'ArrowRight' || e.key === 'Enter') {
         e.preventDefault()
-        setAuto(false)
         advance()
       } else if (e.key === 'Backspace' || e.key === 'ArrowLeft') {
         e.preventDefault()
@@ -143,16 +169,19 @@ export function DemoProvider({ children }: { children: React.ReactNode }) {
       } else if (e.key === 'r' || e.key === 'R') {
         e.preventDefault()
         reset()
-        setAuto(false)
+        setAuto(true)
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [active, advance, rewind, reset])
 
-  // Auto-play: one step every STEP_MS, hold longer on the final beat, then loop.
+  // Auto-play: one step every STEP_MS, hold longer on the final beat, then
+  // loop. Hard-pauses at each MILESTONE_BEATS entry — no timer is scheduled
+  // while on a milestone, so the demo sits there until the presenter advances.
   useEffect(() => {
     if (!active || !auto) return
+    if (MILESTONE_BEATS.has(beat)) return
     const atEnd = beat >= DEMO_MAX_BEAT
     const id = setTimeout(() => {
       setBeat((b) => (b >= DEMO_MAX_BEAT ? DEMO_MIN_BEAT : b + 1))

@@ -2,13 +2,15 @@
 
 /**
  * Mission-control composite page — staged single-frame demo surface used for the
- * hero-video shoot. Mock-fed and gated off in production. It auto-plays on
- * load: one granular step every 2s, holds on the final state, then loops back.
- * Keyboard control (any key pauses auto-play):
- *   Space / ArrowRight  — advance to the next beat
- *   Backspace / ArrowLeft — go back one beat
+ * hero-video shoot. Mock-fed and gated off in production. Auto-plays on load
+ * and hard-pauses at the milestone beats defined in DemoContext (one per
+ * narrative inflection point); a keypress at a milestone advances one beat
+ * and auto-play resumes until the next milestone.
+ * Keyboard control:
+ *   Space / ArrowRight  — advance one beat (auto-play stays on)
+ *   Backspace / ArrowLeft — back one beat (pauses auto-play)
  *   P                   — toggle auto-play
- *   R                   — restart from the top (re-enables auto-play)
+ *   R                   — restart from the top (auto-play resumes)
  *
  * Frame (Variation D — cards as a unified global feed):
  *   ┌────────────────────────────────────────────────┬───────────────────┐
@@ -41,7 +43,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { useStarshipBySlug } from '@/hooks/useStarships'
 import { useStarshipRooms } from '@/hooks/useRooms'
 import { useDemo } from '@/components/demo/DemoContext'
-import { supportActivity, engineeringActivity, growthActivity } from '@/components/demo/demoActivity'
+import { supportActivity, engineeringActivity, growthActivity, taskBoardActivity } from '@/components/demo/demoActivity'
 import type { AgentModel } from '@starships/protocol'
 
 // ─── Shared animation variants ───────────────────────────────────────────────
@@ -109,6 +111,27 @@ type StatusKind =
 
 type FeedCardIndicator = { icon?: string; label: string }
 
+// Use-case-specific payload for an approval gate. Lets the "Needs your
+// attention" rail show the actual thing you're signing off on (a drafted
+// reply, a merge) instead of a generic card with just a button.
+type ApprovalContent = {
+  /** Drives the eyebrow icon + framing: a customer reply vs. a code merge. */
+  kind: 'reply' | 'merge'
+  /** The conversation this approval lives in (mirrors the activity timeline's
+   *  action text). Rendered with the agent + room in the header line. */
+  conversation: string
+  /** Eyebrow above the content block, e.g. "Draft reply to Priya R.". */
+  summary: string
+  /** The core content you're approving — the reply text or the merge note. */
+  body: string
+  /** Primary button label, e.g. "Send reply" / "Approve & merge". */
+  actionLabel: string
+  /** Optional secondary, non-advancing action, e.g. "Edit" / "View diff". */
+  secondaryLabel?: string
+  /** Supporting facts shown as a check-row (tests/checks/diff stat). */
+  facts?: FeedCardIndicator[]
+}
+
 type FeedCard = {
   id: string
   type: CardType
@@ -129,6 +152,8 @@ type FeedCard = {
   statusKind: StatusKind
   primary?: boolean
   needsYou?: boolean
+  /** Present only while this card is gated on you. Rendered by ApprovalCard. */
+  approval?: ApprovalContent
   /** Seconds ago. 0 = now. Smaller = more recent. */
   at: number
 }
@@ -244,6 +269,100 @@ function UnifiedCard({ card, onApprove }: { card: FeedCard; onApprove?: () => vo
   )
 }
 
+// ─── Approval timeline item (rich, use-case-specific) ──────────────────────
+// An approval is a conversation moment, so it rides the same timeline rail as
+// the activity log: avatar on the rail, an "{agent} is {conversation} in #room"
+// line in the body (outside the card), and only the core artifact you're
+// signing off on (the drafted reply, or the merge summary + green checks)
+// inside the card below it. `isLast` controls whether the rail line continues.
+function ApprovalTimelineItem({ card, onApprove, isLast }: { card: FeedCard; onApprove?: () => void; isLast: boolean }) {
+  const ap = card.approval
+  if (!ap) return null
+  const eyebrowIcon = ap.kind === 'reply' ? 'chat' : 'git-branch'
+
+  return (
+    <motion.div
+      layout="position"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.3, ease: 'easeOut' }}
+      className={cn('relative flex items-start gap-3', TIMELINE_ITEM_LEFT)}
+    >
+      <ChangeFlash signal="needs-you" className="inset-x-1 inset-y-1 rounded-md bg-amber-600/15" />
+      {/* Rail: same geometry as TimelineItem so the line and avatar align. */}
+      <div className="flex w-6 shrink-0 flex-col items-center self-stretch">
+        <div className="w-px bg-border/60" style={{ height: 12 }} />
+        {card.assignee ? <Avatar name={card.assignee} className="h-6 w-6 text-[10px]" /> : null}
+        {!isLast ? <div className="w-px flex-1 bg-border/60" /> : null}
+      </div>
+
+      <div className="min-w-0 flex-1 space-y-2 py-3">
+        {/* Timeline line (outside the card): {agent} is {conversation} in #room,
+            with the gate status pill where the timestamp would sit. */}
+        <div className="flex min-w-0 items-baseline gap-1 text-sm leading-snug text-foreground">
+          {card.assignee ? <span className="shrink-0 font-medium">{card.assignee}</span> : null}
+          <span className="shrink-0 text-muted-foreground">is</span>
+          <span className="truncate min-w-0">{ap.conversation}</span>
+          <span className="shrink-0 text-muted-foreground">in</span>
+          <span className="shrink-0 font-medium">#{card.room}</span>
+          <span className="ml-auto shrink-0 pl-2">
+            <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/40 bg-amber-500/15 px-1.5 py-px text-[10px] font-medium text-amber-600 dark:text-amber-300">
+              {card.status}
+            </span>
+          </span>
+        </div>
+
+        {/* The card: core artifact only (no agent/room/board, those are above). */}
+        <div className={cn('relative overflow-hidden', CARD_SURFACE, 'border-amber-500/60 ring-1 ring-amber-500/25')}>
+          <div className="space-y-2.5 p-3">
+            {/* Core content you're approving */}
+            <div className="rounded-md border border-border/60 bg-muted/30 p-2.5">
+              <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground/60">
+                <Icon name={eyebrowIcon} weight="bold" className="h-3 w-3" />
+                {ap.summary}
+              </div>
+              <p className={cn('mt-1.5 text-xs leading-relaxed text-foreground/85', ap.kind === 'merge' && 'font-mono')}>{ap.body}</p>
+            </div>
+
+            {/* Supporting facts (tests / checks / diff stat) */}
+            {ap.facts && ap.facts.length > 0 ? (
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground/70">
+                {ap.facts.map((f) => (
+                  <span key={f.label} className="inline-flex items-center gap-1">
+                    {f.icon ? <Icon name={f.icon} weight="bold" className="h-3 w-3 text-emerald-500" /> : null}
+                    {f.label}
+                  </span>
+                ))}
+              </div>
+            ) : null}
+
+            {/* Action footer */}
+            <div className="flex items-center justify-end gap-2 pt-0.5">
+              {ap.secondaryLabel ? (
+                <button
+                  type="button"
+                  className="inline-flex shrink-0 items-center rounded-full border border-border/60 px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-muted"
+                >
+                  {ap.secondaryLabel}
+                </button>
+              ) : null}
+              <button
+                type="button"
+                onClick={onApprove}
+                className="inline-flex shrink-0 items-center gap-1 rounded-full bg-primary px-3 py-1 text-[11px] font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
+              >
+                <Icon name={ap.kind === 'reply' ? 'send' : 'check'} weight="bold" className="h-3 w-3" />
+                {ap.actionLabel}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  )
+}
+
 // ─── Section header for the feed (Needs your attention / Active / Done) ─────
 
 function SectionHeader({ label, icon, tone, count }: { label: string; icon?: string; tone: 'primary' | 'active' | 'done'; count: number }) {
@@ -275,6 +394,8 @@ type ActivityItem = {
   state: 'done' | 'working' | 'needs-you'
   /** Seconds ago. 0 = now. Used for bucketing & sorting. */
   at: number
+  /** 'board' renders as a muted one-liner (card created/reassigned/moved); absent = full conversation row. */
+  kind?: 'board'
 }
 
 type GlobalActivityItem = ActivityItem & { room: string }
@@ -351,11 +472,11 @@ function TimelineItem({ item, isLast, starshipSlug }: { item: GlobalActivityItem
     >
       <ChangeFlash signal={item.state} className="inset-x-1 inset-y-1 rounded-md bg-amber-600/15" />
       <div className="flex w-6 shrink-0 flex-col items-center self-stretch">
-        <div className="w-px bg-border/60" style={{ height: 8 }} />
+        <div className="w-px bg-border/60" style={{ height: 12 }} />
         <Avatar name={item.agent} className="h-6 w-6 text-[10px]" />
         {!isLast ? <div className="w-px flex-1 bg-border/60" /> : null}
       </div>
-      <div className="min-w-0 flex-1 space-y-1 py-2">
+      <div className="min-w-0 flex-1 space-y-1 py-3">
         <div className="flex items-baseline gap-1 min-w-0 text-sm leading-snug text-foreground">
           {starshipSlug ? (
             <Link href={`/ship/${starshipSlug}/agent/${item.agent.toLowerCase()}`} className="shrink-0 hover:underline">{item.agent}</Link>
@@ -379,6 +500,36 @@ function TimelineItem({ item, isLast, starshipSlug }: { item: GlobalActivityItem
         {item.detail ? (
           <p className="truncate text-xs text-muted-foreground/50">{item.detail}</p>
         ) : null}
+      </div>
+    </motion.div>
+  )
+}
+
+// A board action (card created / reassigned / moved). Rendered as a muted
+// one-liner on the same timeline rail so it reads as lightweight background
+// activity next to the richer conversation rows. `action` is past-tense, so the
+// line reads "{agent} {action}" (e.g. "Sara moved #1042 to Triaged").
+function TimelineBoardItem({ item, isLast }: { item: GlobalActivityItem; isLast: boolean }) {
+  const shortName = item.agent.split(':')[0]?.trim() || item.agent
+  return (
+    <motion.div
+      layout="position"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.3, ease: 'easeOut' }}
+      className={cn('relative flex items-start gap-3', TIMELINE_ITEM_LEFT)}
+    >
+      <div className="flex w-6 shrink-0 flex-col items-center self-stretch">
+        <div className="w-px bg-border/60" style={{ height: 15 }} />
+        <span className="h-1.5 w-1.5 shrink-0 rounded-full border border-border bg-background" />
+        {!isLast ? <div className="w-px flex-1 bg-border/60" /> : null}
+      </div>
+      <div className="min-w-0 flex-1 py-2" title={item.detail}>
+        <p className="truncate text-xs leading-snug text-muted-foreground/55">
+          <span className="font-medium text-muted-foreground/80">{shortName}</span> {item.action}
+          <span className="ml-1.5 font-mono text-[10px] tabular-nums text-muted-foreground/40">{formatAgo(item.at)}</span>
+        </p>
       </div>
     </motion.div>
   )
@@ -462,7 +613,13 @@ function ActivityPane({
     } else {
       bucket.items.forEach((it, i) => {
         const isLast = groupIdx === lastBucketIdx && i === bucket.items.length - 1
-        rows.push(<TimelineItem key={it.id} item={it} isLast={isLast} starshipSlug={starshipSlug} />)
+        rows.push(
+          it.kind === 'board' ? (
+            <TimelineBoardItem key={it.id} item={it} isLast={isLast} />
+          ) : (
+            <TimelineItem key={it.id} item={it} isLast={isLast} starshipSlug={starshipSlug} />
+          )
+        )
       })
     }
   })
@@ -530,23 +687,26 @@ export default function MissionControlPage(): React.JSX.Element {
   const feedCards: FeedCard[] = useMemo(() => {
     const cards: FeedCard[] = []
 
-    // Support principal: ticket #1042 (Priya) on the Support Tickets board.
-    // Opens on beat 2 (beat 1 belongs to the Growth TAM card alone): the ticket
-    // first lands in Ongoing as it's being received (beat 2), settles to NEW in
-    // Active (beat 3), then is triaged (beat 4). Becomes a gate at the pivot
-    // (beat 9): the drafted reply is waiting on you.
-    if (beat >= 2) {
+    // Support card — ticket #1042. See demoActivity.ts header for the full
+    // beat-by-beat timeline. Card events (status flips bundled with their
+    // matching task-board log line on the same beat):
+    //   beat 6   appears as NEW (+ tb-s-create log)
+    //   beat 11  → TRIAGED + indicators (+ tb-s-triage log)
+    //   beat 31  → REPLY READY (needsYou gate)
+    //   beat 33  → REPLYING (gate clears)
+    //   beat 37  → RESOLVED (+ tb-s-resolve log)
+    if (beat >= 6) {
       const status =
-        beat >= 11 ? 'RESOLVED' : beat >= 10 ? 'REPLYING' : beat >= 9 ? 'REPLY READY' : beat >= 4 ? 'TRIAGED' : beat >= 3 ? 'NEW' : 'RECEIVING'
+        beat >= 37 ? 'RESOLVED' : beat >= 33 ? 'REPLYING' : beat >= 31 ? 'REPLY READY' : beat >= 11 ? 'TRIAGED' : 'NEW'
       const statusKind: StatusKind =
-        beat >= 11 ? 'resolved' : beat >= 10 ? 'running' : beat >= 4 ? 'triaged' : beat >= 3 ? 'new' : 'running'
-      const assignee = 'Sara: Customer Support'
-      const indicators: FeedCardIndicator[] = beat >= 4
+        beat >= 37 ? 'resolved' : beat >= 33 ? 'running' : beat >= 11 ? 'triaged' : 'new'
+      const indicators: FeedCardIndicator[] = beat >= 11
         ? [
             { label: 'bug · mobile · auth' },
             { icon: 'alert-circle', label: 'priority high' },
           ]
         : []
+      const eventBeat = beat >= 37 ? 37 : beat >= 33 ? 33 : beat >= 31 ? 31 : beat >= 11 ? 11 : 6
       cards.push({
         id: 'ticket-1042',
         type: 'ticket',
@@ -556,29 +716,51 @@ export default function MissionControlPage(): React.JSX.Element {
         title: 'Login button does nothing on mobile',
         description:
           'Priya R. — "Sign in button does nothing on iPhone Safari, tried Chrome too, no luck. This started after the update yesterday." Repro confirmed on iOS 17.',
-        assignee,
+        assignee: 'Sara: Customer Support',
         indicators,
         status,
         statusKind,
         primary: true,
-        needsYou: beat === 9,
-        at: (beat - (beat >= 11 ? 11 : beat >= 10 ? 10 : beat >= 9 ? 9 : beat >= 4 ? 4 : beat >= 3 ? 3 : 2)) * 30,
+        needsYou: beat >= 31 && beat < 33,
+        approval:
+          beat >= 31 && beat < 33
+            ? {
+                kind: 'reply',
+                conversation: 'Replying to Priya R. on #1042',
+                summary: 'Draft reply to Priya R.',
+                body:
+                  'Hi Priya, thanks for flagging this. We tracked it down to a mobile Safari issue with the sign-in button and a fix is rolling out now. It should work again within the hour. Really sorry for the hassle, and thank you for the detailed report.',
+                actionLabel: 'Send reply',
+                secondaryLabel: 'Edit',
+                facts: [{ icon: 'git-branch', label: 'Linked to fix/mobile-signin' }],
+              }
+            : undefined,
+        at: (beat - eventBeat) * 30,
       })
     }
 
-    // Engineering principal: fix/mobile-signin on the Engineering Pipeline.
-    // Reaches review, then waits at the pivot (beat 9) for your merge approval.
-    if (beat >= 4) {
+    // Engineering card — fix/mobile-signin. Card events:
+    //   beat 12  appears SCOPED (Avery) (+ tb-e-create log)
+    //   beat 15  → BUILDING + git-branch, Mason (+ tb-e-assign-mason log)
+    //   beat 21  + "142 / 142 tests" indicator
+    //   beat 22  → IN REVIEW + "12 checks" (+ tb-e-review log)
+    //   beat 25  assignee → Ravi (+ tb-e-assign-ravi log)
+    //   beat 29  → READY TO MERGE (needsYou gate)
+    //   beat 35  → MERGING (gate clears)
+    //   beat 39  → MERGED (+ tb-e-merge log)
+    if (beat >= 12) {
       const status =
-        beat >= 11 ? 'MERGED' : beat >= 10 ? 'MERGING' : beat >= 9 ? 'READY TO MERGE' : beat >= 8 ? 'IN REVIEW' : beat >= 5 ? 'BUILDING' : 'SCOPED'
+        beat >= 39 ? 'MERGED' : beat >= 35 ? 'MERGING' : beat >= 29 ? 'READY TO MERGE' : beat >= 22 ? 'IN REVIEW' : beat >= 15 ? 'BUILDING' : 'SCOPED'
       const statusKind: StatusKind =
-        beat >= 11 ? 'merged' : beat >= 10 ? 'running' : beat >= 8 ? 'in-review' : beat >= 5 ? 'building' : 'scoped'
+        beat >= 39 ? 'merged' : beat >= 35 ? 'running' : beat >= 22 ? 'in-review' : beat >= 15 ? 'building' : 'scoped'
       const assignee =
-        beat >= 9 ? 'Ravi: Release Engineer' : beat >= 5 ? 'Mason: Product Engineer' : 'Avery: Product Manager'
+        beat >= 25 ? 'Ravi: Release Engineer' : beat >= 15 ? 'Mason: Product Engineer' : 'Avery: Product Manager'
       const indicators: FeedCardIndicator[] = []
-      if (beat >= 5) indicators.push({ icon: 'git-branch', label: '+38 −4 · 2 files' })
-      if (beat >= 7) indicators.push({ icon: 'check', label: '142 / 142 tests' })
-      if (beat >= 8) indicators.push({ icon: 'check', label: '12 checks' })
+      if (beat >= 15) indicators.push({ icon: 'git-branch', label: '+38 −4 · 2 files' })
+      if (beat >= 21) indicators.push({ icon: 'check', label: '142 / 142 tests' })
+      if (beat >= 22) indicators.push({ icon: 'check', label: '12 checks' })
+      const eventBeat =
+        beat >= 39 ? 39 : beat >= 35 ? 35 : beat >= 29 ? 29 : beat >= 25 ? 25 : beat >= 22 ? 22 : beat >= 21 ? 21 : beat >= 15 ? 15 : 12
       cards.push({
         id: 'eng-mobile-signin',
         type: 'pr',
@@ -593,22 +775,45 @@ export default function MissionControlPage(): React.JSX.Element {
         status,
         statusKind,
         primary: true,
-        needsYou: beat === 9,
-        at: (beat - (beat >= 11 ? 11 : beat >= 10 ? 10 : beat >= 9 ? 9 : beat >= 8 ? 8 : beat >= 5 ? 5 : 4)) * 30,
+        needsYou: beat >= 29 && beat < 35,
+        approval:
+          beat >= 29 && beat < 35
+            ? {
+                kind: 'merge',
+                conversation: 'Reviewing and merging fix/mobile-signin',
+                summary: 'Merge fix/mobile-signin → main',
+                body:
+                  'Guard the sign-in handler against the iOS Safari resize race, plus a regression test that reproduces the original failure.',
+                actionLabel: 'Approve & merge',
+                secondaryLabel: 'View diff',
+                facts: [
+                  { icon: 'check', label: '142 / 142 tests' },
+                  { icon: 'check', label: '12 checks passed' },
+                  { icon: 'git-branch', label: '+38 −4 · 2 files' },
+                ],
+              }
+            : undefined,
+        at: (beat - eventBeat) * 30,
       })
     }
 
-    // Growth principal: the Q2 outbound pipeline running in parallel the whole
-    // time — TAM → contacts → verify → QA → a clean list ready for outreach.
-    if (beat >= 1) {
+    // Growth card — Q2 outbound list. Card events:
+    //   beat 2   appears BUILDING TAM (Nisha) (+ tb-g-create log)
+    //   beat 8   → FINDING CONTACTS + "1,240 accounts"
+    //   beat 13  → VERIFYING + "3,800 contacts"
+    //   beat 17  + "3,640 verified" indicator
+    //   beat 18  → QA, Otis (+ tb-g-assign-otis log)
+    //   beat 24  → LIST READY (+ tb-g-ready log)
+    if (beat >= 2) {
       const status =
-        beat >= 8 ? 'LIST READY' : beat >= 7 ? 'QA' : beat >= 5 ? 'VERIFYING' : beat >= 3 ? 'FINDING CONTACTS' : 'BUILDING TAM'
-      const statusKind: StatusKind = beat >= 8 ? 'resolved' : 'running'
-      const assignee = beat >= 7 ? 'Otis: Lead Enrichment' : 'Nisha: Lead Generation'
+        beat >= 24 ? 'LIST READY' : beat >= 18 ? 'QA' : beat >= 13 ? 'VERIFYING' : beat >= 8 ? 'FINDING CONTACTS' : 'BUILDING TAM'
+      const statusKind: StatusKind = beat >= 24 ? 'resolved' : 'running'
+      const assignee = beat >= 18 ? 'Otis: Lead Enrichment' : 'Nisha: Lead Generation'
       const indicators: FeedCardIndicator[] = []
-      if (beat >= 2) indicators.push({ label: '1,240 accounts' })
-      if (beat >= 4) indicators.push({ label: '3,800 contacts' })
-      if (beat >= 6) indicators.push({ icon: 'check', label: '3,640 verified' })
+      if (beat >= 8) indicators.push({ label: '1,240 accounts' })
+      if (beat >= 13) indicators.push({ label: '3,800 contacts' })
+      if (beat >= 17) indicators.push({ icon: 'check', label: '3,640 verified' })
+      const eventBeat = beat >= 24 ? 24 : beat >= 18 ? 18 : beat >= 17 ? 17 : beat >= 13 ? 13 : beat >= 8 ? 8 : 2
       cards.push({
         id: 'growth-q2-outbound',
         type: 'run',
@@ -621,7 +826,7 @@ export default function MissionControlPage(): React.JSX.Element {
         indicators,
         status,
         statusKind,
-        at: (beat - (beat >= 8 ? 8 : beat >= 7 ? 7 : beat >= 5 ? 5 : beat >= 3 ? 3 : 1)) * 30,
+        at: (beat - eventBeat) * 30,
       })
     }
 
@@ -657,15 +862,21 @@ export default function MissionControlPage(): React.JSX.Element {
   const engineeringItems: ActivityItem[] = useMemo(() => engineeringActivity(beat), [beat])
   const growthItems: ActivityItem[] = useMemo(() => growthActivity(beat), [beat])
 
+  // Task-board actions (cards created, reassigned, moved between columns) live
+  // alongside the conversation activity so the log shows the agents working the
+  // boards, not just talking. Already room-tagged by the builder.
+  const taskBoardItems: GlobalActivityItem[] = useMemo(() => taskBoardActivity(beat), [beat])
+
   const unifiedActivity: GlobalActivityItem[] = useMemo(() => {
     const combined: GlobalActivityItem[] = [
       ...supportItems.map((i) => ({ ...i, room: 'Support' })),
       ...engineeringItems.map((i) => ({ ...i, room: 'Engineering' })),
       ...growthItems.map((i) => ({ ...i, room: 'Growth' })),
+      ...taskBoardItems,
     ]
     combined.sort((a, b) => a.at - b.at)
     return combined
-  }, [supportItems, engineeringItems, growthItems])
+  }, [supportItems, engineeringItems, growthItems, taskBoardItems])
 
   // Flatten the three task sections into one presence tree so a card that
   // changes stage (e.g. Active → Done) stays mounted and slides to its new
@@ -697,10 +908,24 @@ export default function MissionControlPage(): React.JSX.Element {
       cards.forEach((card) => taskRows.push(<UnifiedCard key={card.id} card={card} onApprove={opts?.onApprove} />))
     }
   }
-  pushTaskSection('attention', 'Needs your attention', 'primary', grouped.needsAttention, null, { icon: 'bell', onApprove: advance })
   pushTaskSection('ongoing', 'Ongoing', 'active', grouped.ongoing, 'No ongoing tasks.')
   pushTaskSection('active', 'Active', 'active', grouped.active, 'No active tasks.')
   pushTaskSection('done', 'Recently done', 'done', grouped.done, 'Nothing done yet.')
+
+  // Approvals are conversation moments, not board tasks, so the "Needs your
+  // attention" rail lives at the top of the Activity timeline (above "Running
+  // now") rather than in the Tasks column. It rides the same rail: a tinted
+  // BucketSeparator header, then the approval items. Only present at the pivot
+  // beats where a card is gated on you.
+  const attentionRail =
+    grouped.needsAttention.length > 0 ? (
+      <>
+        <BucketSeparator label="Needs your attention" count={grouped.needsAttention.length} tone="attention" />
+        {grouped.needsAttention.map((card) => (
+          <ApprovalTimelineItem key={card.id} card={card} onApprove={advance} isLast={false} />
+        ))}
+      </>
+    ) : null
 
   return (
     <div className="relative w-full bg-background text-foreground">
@@ -734,6 +959,7 @@ export default function MissionControlPage(): React.JSX.Element {
               <ActivityPane
                 items={unifiedActivity}
                 starshipSlug={slug}
+                attention={attentionRail}
               />
             </div>
           </div>

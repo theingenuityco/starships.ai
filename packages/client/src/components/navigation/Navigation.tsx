@@ -624,8 +624,8 @@ export function Navigation(props: NavigationProps) {
         </div>
 
         {/* Bottom bar: full width of sidebar (covers rail + column), content aligned with nav */}
-        <div className="flex-shrink-0 w-full border-t border-border/60 bg-card pt-3 pb-4 px-3">
-          <div className="flex flex-col gap-0 w-full">
+        <div className="flex-shrink-0 w-full border-t border-border/60 bg-card pt-3 pb-3 pl-2 pr-1.5">
+          <div className="flex flex-col gap-0 w-full pr-1">
             <div className={isExpanded ? 'w-full' : 'flex justify-center'}>
               {isExpanded ? (
                 <UserProfileMenu expanded />

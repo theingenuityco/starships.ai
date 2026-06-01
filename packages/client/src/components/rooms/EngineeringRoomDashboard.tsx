@@ -70,13 +70,14 @@ function AgentAvatar({ name }: { name: string }) {
 }
 
 // ── Demo pipeline ────────────────────────────────────────────────────────────
-// Mirrors the Mission Control beats: the fix/mobile-signin card moves Backlog →
-// Scoped → Building → In Review → (waits on you at beat 9) → Merged, while a few
-// static items give the board texture.
+// Mirrors the Mission Control beats (mission-control/page.tsx): the
+// fix/mobile-signin card moves Backlog → Scoped (12, Avery) → Building (15,
+// Mason) → In Review (22, → Ravi at 25) → (waits on you 29–34) → Merged (39),
+// while a few static items give the board texture.
 function demoCards(beat: number): PipelineCard[] {
   const principalColumn: ColKey =
-    beat >= 11 ? 'MERGED' : beat >= 8 ? 'IN_REVIEW' : beat >= 5 ? 'BUILDING' : beat >= 4 ? 'SCOPED' : 'BACKLOG'
-  const principalAssignee = beat >= 10 ? 'Anvil' : beat >= 8 ? 'Lens' : beat >= 5 ? 'Anvil' : beat >= 4 ? 'Quill' : undefined
+    beat >= 39 ? 'MERGED' : beat >= 22 ? 'IN_REVIEW' : beat >= 15 ? 'BUILDING' : beat >= 12 ? 'SCOPED' : 'BACKLOG'
+  const principalAssignee = beat >= 25 ? 'Ravi' : beat >= 15 ? 'Mason' : beat >= 12 ? 'Avery' : undefined
 
   const principal: PipelineCard = {
     id: 'eng-mobile-signin',
@@ -86,17 +87,17 @@ function demoCards(beat: number): PipelineCard[] {
     assignee: principalAssignee,
     priority: 'high',
     linkedTicket: '#1042',
-    diff: beat >= 5 ? '+38 −4' : undefined,
-    files: beat >= 5 ? 2 : undefined,
-    tests: beat >= 7 ? '142 / 142' : undefined,
-    checks: beat >= 8 ? '12 checks' : undefined,
-    needsYou: beat === 9,
+    diff: beat >= 15 ? '+38 −4' : undefined,
+    files: beat >= 15 ? 2 : undefined,
+    tests: beat >= 21 ? '142 / 142' : undefined,
+    checks: beat >= 22 ? '12 checks' : undefined,
+    needsYou: beat >= 29 && beat < 35,
   }
 
   const texture: PipelineCard[] = [
     { id: 'eng-rate-limit', column: 'BACKLOG', title: 'Add rate-limit headers to public API', priority: 'medium' },
-    { id: 'eng-node22',     column: 'SCOPED',  title: 'Upgrade build image to Node 22', assignee: 'Quill', priority: 'low', branch: 'chore/node-22' },
-    { id: 'eng-avatars',    column: 'MERGED',  title: 'Cache avatar thumbnails at the edge', assignee: 'Anvil', branch: 'perf/avatar-cache', diff: '+64 −12', files: 4 },
+    { id: 'eng-node22',     column: 'SCOPED',  title: 'Upgrade build image to Node 22', assignee: 'Mason', priority: 'low', branch: 'chore/node-22' },
+    { id: 'eng-avatars',    column: 'MERGED',  title: 'Cache avatar thumbnails at the edge', assignee: 'Ravi', branch: 'perf/avatar-cache', diff: '+64 −12', files: 4 },
   ]
 
   return [principal, ...texture]

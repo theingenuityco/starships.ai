@@ -39,7 +39,6 @@ import { avatarColour } from '@/components/dashboard/utils'
 import Icon from '@/components/primitives/Icon'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { ConversationMessageInput } from '@/components/conversation/ConversationMessageInput'
-import { useAuth } from '@/hooks/useAuth'
 import { useStarshipBySlug } from '@/hooks/useStarships'
 import { useStarshipRooms } from '@/hooks/useRooms'
 import { useDemo } from '@/components/demo/DemoContext'
@@ -657,20 +656,6 @@ export default function MissionControlPage(): React.JSX.Element {
   const firstRoom = roomsData?.rooms?.[0] ?? null
   const [starterSelectedAgent, setStarterSelectedAgent] = useState<AgentModel | null>(null)
 
-  const { userName } = useAuth()
-  const greeting = useMemo(() => {
-    const hour = new Date().getHours()
-    if (hour < 5) return 'Working late'
-    if (hour < 12) return 'Good morning'
-    if (hour < 18) return 'Good afternoon'
-    return 'Good evening'
-  }, [])
-  const firstName = useMemo(() => {
-    const raw = typeof userName === 'string' ? userName.trim() : ''
-    if (!raw) return ''
-    return raw.split(/\s+/)[0] ?? ''
-  }, [userName])
-
   // ── Unified feed cards ────────────────────────────────────────────────────
 
   const feedCards: FeedCard[] = useMemo(() => {
@@ -888,7 +873,7 @@ export default function MissionControlPage(): React.JSX.Element {
           <div className="flex-1 min-w-0 flex flex-col">
             <div className="mx-auto w-full max-w-3xl pt-2 space-y-3">
               <h2 className="text-2xl font-normal text-foreground">
-                {firstName ? `${greeting}, ${firstName}.` : `${greeting}.`}
+                Good morning, Rudra.
               </h2>
               <ConversationMessageInput
                 selectedAgent={starterSelectedAgent}

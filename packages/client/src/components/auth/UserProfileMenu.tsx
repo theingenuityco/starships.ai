@@ -85,14 +85,14 @@ export function UserProfileMenu({ expanded = false }: UserProfileMenuProps): Rea
             variant="ghost"
             size="sm"
             aria-label="Open user menu"
-            className="h-7 w-full justify-start gap-1.5 rounded-lg pl-1.5 pr-1 text-muted-foreground hover:text-foreground hover:bg-muted/70 dark:hover:bg-[#2C2C30]"
+            className="h-12 w-full justify-start gap-2 rounded-lg px-1 text-muted-foreground hover:text-foreground hover:bg-muted/70 dark:hover:bg-[#2C2C30]"
           >
-            <UserProfile mode="collapsed" collapsedSize="sm" />
+            <UserProfile mode="collapsed" collapsedSize="md" />
             <span className="min-w-0 flex-1 text-left">
-              <span className="block text-[13px] font-medium leading-[1.05] truncate text-foreground">{userName || userEmail || 'Account'}</span>
-              <span className="mt-[1px] block text-[10.5px] leading-[1.05] truncate text-muted-foreground">{userEmail || userName || 'Account email'}</span>
+              <span className="block text-sm font-medium tracking-tight leading-snug truncate text-foreground">{userName || userEmail || 'Account'}</span>
+              <span className="block text-xs leading-snug truncate text-muted-foreground">{userEmail || userName || 'Account email'}</span>
             </span>
-            <Icon name="chevron-up" className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
+            <Icon name="chevron-up" className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" aria-hidden />
           </Button>
         ) : (
           <Button type="button" variant="ghost" size="icon" aria-label="Open user menu" className={`${controlClassName} h-8 w-8`}>

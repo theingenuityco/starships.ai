@@ -81,11 +81,13 @@ export function RoomSidebarList(props: { starshipId: string; starshipSlug: strin
   }, [activeRoomSlug, pathname])
 
   const openRoom = (roomSlug: string) => {
-    // Demo room nav is non-interactive: clicking a room should do nothing.
-    if (demoActive) return
     const slug = String(roomSlug || '').trim()
     if (!slug) return
-    router.push(`/ship/${encodeURIComponent(props.starshipSlug)}/rooms/${encodeURIComponent(slug)}`)
+    const base = `/ship/${encodeURIComponent(props.starshipSlug)}/rooms/${encodeURIComponent(slug)}`
+    // During the demo we leave the /mission-control route, so we must carry
+    // `?demo=1` forward to keep the demo clock active. Without it the synthetic
+    // DEMO_ROOMS drop out of the room list and the slug resolves as not-found.
+    router.push(demoActive ? `${base}?demo=1` : base)
     props.onNavigate?.()
   }
 

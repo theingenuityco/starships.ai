@@ -144,9 +144,10 @@ function TicketColumn({ title, status, cls, rows }: { title: string; status: Sta
 
 // Demo beat-state: ticket #1042 (Priya R.) moves NEW → TRIAGED → RESOLVED in
 // lockstep with the Mission Control beats, alongside a few static tickets for
-// texture. Used only while the hero-video demo is running.
+// texture. Used only while the hero-video demo is running. Thresholds mirror the
+// hub card in mission-control/page.tsx: NEW @6, TRIAGED @11, RESOLVED @37.
 function demoTickets(beat: number): Record<string, unknown>[] {
-  const principalStatus = beat >= 11 ? 'RESOLVED' : beat >= 3 ? 'TRIAGED' : 'NEW'
+  const principalStatus = beat >= 37 ? 'RESOLVED' : beat >= 11 ? 'TRIAGED' : 'NEW'
   const minsAgo = (m: number) => new Date(Date.now() - m * 60_000).toISOString()
   return [
     {

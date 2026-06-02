@@ -17,6 +17,7 @@ import {
   StarshipRepository,
   ConnectorTemplateEntity,
   ConnectorWebhookBindingRepository,
+  PlatformSecretRepository,
 } from '@starships/models';
 import { ConnectorRegistryClient } from './ConnectorRegistryClient';
 import { ConnectorSecretService } from './ConnectorSecretService';
@@ -269,42 +270,63 @@ export class ConnectorService {
    */
   async getConnectorCatalog(): Promise<ConnectorCatalogItem[]> {
     const templates = await this.connectorTemplateRegistry.list();
-    const dbCatalog = templates
-      .filter((tpl) => tpl.isEnabled !== false)
-      .map((tpl): ConnectorCatalogItem => {
-        // Code connectors (e.g. GitHub App) surface their catalog auth kind so the UI can
-        // show the right CTA; declarative connectors fall back to their runtime auth type.
-        const codeDef = connectorRegistry.get(tpl.provider as ConnectorProvider);
-        const authType = (codeDef?.auth.catalogAuthType ??
-          ((tpl.authJson as unknown as { type?: string })?.type || 'none')) as ConnectorCatalogItem['auth']['type'];
-        const metadataSchema =
-          tpl.metadataSchemaJson && typeof tpl.metadataSchemaJson === 'object' && !Array.isArray(tpl.metadataSchemaJson)
-            ? (tpl.metadataSchemaJson as ConnectorCatalogItem['metadataSchema'])
-            : undefined;
-        return {
-          provider: tpl.provider as ConnectorProvider,
-          name: tpl.name,
-          description: tpl.description,
-          auth: { type: authType },
-          metadataSchema,
-          ...(tpl.demoVideoUrl ? { demoVideoUrl: tpl.demoVideoUrl } : {}),
-          ...(authType === 'oauth2' && (tpl.authJson as unknown as ConnectorAuthOAuth2V2)?.type === 'oauth2'
-            ? (() => {
-                const auth = tpl.authJson as unknown as ConnectorAuthOAuth2V2 & { authorizeUrl?: string };
-                const authUrl = auth?.authorizationUrl ?? auth?.authorizeUrl;
-                const tokenUrl = auth?.tokenUrl;
-                return {
-                  oauthRequiredMetadataKeys: Array.from(
-                    new Set([
-                      ...this.extractUrlTemplateVars(authUrl),
-                      ...this.extractUrlTemplateVars(tokenUrl),
-                    ])
-                  ),
-                };
-              })()
-            : {}),
-        };
-      });
+    const dbCatalog = await Promise.all(
+      templates
+        .filter((tpl) => tpl.isEnabled !== false)
+        .map(async (tpl): Promise<ConnectorCatalogItem> => {
+          // Code connectors (e.g. GitHub App) surface their catalog auth kind so the UI can
+          // show the right CTA; declarative connectors fall back to their runtime auth type.
+          const codeDef = connectorRegistry.get(tpl.provider as ConnectorProvider);
+          const authType = (codeDef?.auth.catalogAuthType ??
+            ((tpl.authJson as unknown as { type?: string })?.type || 'none')) as ConnectorCatalogItem['auth']['type'];
+          const metadataSchema =
+            tpl.metadataSchemaJson && typeof tpl.metadataSchemaJson === 'object' && !Array.isArray(tpl.metadataSchemaJson)
+              ? (tpl.metadataSchemaJson as ConnectorCatalogItem['metadataSchema'])
+              : undefined;
+
+          // Connectors that need instance-wide platform config (e.g. a GitHub App) report
+          // whether that setup is done so the UI can show "Not configured" + a Configure CTA.
+          let configFragment: Pick<ConnectorCatalogItem, 'configurable' | 'configured' | 'configFields'> = {};
+          if (codeDef?.auth.configFields && codeDef.auth.configFields.length > 0) {
+            const configured = codeDef.auth.isConfigured
+              ? await codeDef.auth.isConfigured({ env: connectorEnv, secrets: makeSecretResolver({}) }).catch(() => false)
+              : false;
+            configFragment = {
+              configurable: true,
+              configured,
+              configFields: codeDef.auth.configFields.map((f) => ({
+                key: f.key,
+                label: f.label,
+                type: f.type,
+                required: f.required,
+                ...(f.description ? { description: f.description } : {}),
+              })),
+            };
+          }
+
+          return {
+            provider: tpl.provider as ConnectorProvider,
+            name: tpl.name,
+            description: tpl.description,
+            auth: { type: authType },
+            metadataSchema,
+            ...configFragment,
+            ...(tpl.demoVideoUrl ? { demoVideoUrl: tpl.demoVideoUrl } : {}),
+            ...(authType === 'oauth2' && (tpl.authJson as unknown as ConnectorAuthOAuth2V2)?.type === 'oauth2'
+              ? (() => {
+                  const auth = tpl.authJson as unknown as ConnectorAuthOAuth2V2 & { authorizeUrl?: string };
+                  const authUrl = auth?.authorizationUrl ?? auth?.authorizeUrl;
+                  const tokenUrl = auth?.tokenUrl;
+                  return {
+                    oauthRequiredMetadataKeys: Array.from(
+                      new Set([...this.extractUrlTemplateVars(authUrl), ...this.extractUrlTemplateVars(tokenUrl)])
+                    ),
+                  };
+                })()
+              : {}),
+          };
+        })
+    );
 
     // Built-in reserved connector: "system" (not DB-backed).
     // It is configured via platform secrets and does not require per-starship installation.
@@ -317,6 +339,44 @@ export class ConnectorService {
     };
 
     return [...dbCatalog, systemCatalogItem];
+  }
+
+  /**
+   * Set instance-wide platform configuration for a code-driven connector (e.g. GitHub App
+   * credentials), persisting each declared field as a platform secret. Instance-admin only.
+   * Never returns secret values; reports whether the connector is now fully configured.
+   */
+  async configureConnector(
+    provider: ConnectorProvider,
+    values: Record<string, string>,
+    userId: string
+  ): Promise<{ configured: boolean }> {
+    const def = connectorRegistry.get(provider);
+    const fields = def?.auth.configFields;
+    if (!def || !fields || fields.length === 0) {
+      throw new AppError(`Connector ${provider} does not support configuration`, 'VALIDATION_ERROR', 400);
+    }
+
+    const allowed = new Set(fields.map((f) => f.key));
+    for (const f of fields) {
+      if (!f.required) continue;
+      const v = values[f.key];
+      if (typeof v !== 'string' || !v.trim()) {
+        throw new AppError(`Missing required config field: ${f.key}`, 'MISSING_REQUIRED_FIELD', 400, { details: { field: f.key } });
+      }
+    }
+
+    const repo = new PlatformSecretRepository();
+    for (const [key, value] of Object.entries(values)) {
+      if (!allowed.has(key)) continue;
+      if (typeof value !== 'string' || !value.trim()) continue;
+      await repo.upsertSecret({ key, value: value.trim(), description: `${def.name} connector configuration`, updatedBy: userId });
+    }
+
+    const configured = def.auth.isConfigured
+      ? await def.auth.isConfigured({ env: connectorEnv, secrets: makeSecretResolver({}) })
+      : true;
+    return { configured };
   }
 
   /**

@@ -425,6 +425,18 @@ export interface ConnectorListResponse {
   connectors: ConnectorListItem[];
 }
 
+/**
+ * A platform-level configuration field for a connector (e.g. GitHub App credentials).
+ * Collected from an instance admin and stored as platform secrets. Never carries values.
+ */
+export interface ConnectorConfigField {
+  key: string;
+  label: string;
+  type: 'string' | 'password' | 'textarea';
+  required: boolean;
+  description?: string;
+}
+
 export interface ConnectorCatalogItem {
   provider: ConnectorProvider;
   name: string;
@@ -445,6 +457,14 @@ export interface ConnectorCatalogItem {
    * Used by the UI to validate pre-OAuth metadata inputs.
    */
   metadataSchema?: JsonSchemaObject;
+  /**
+   * True when this connector needs instance-wide platform config (e.g. a GitHub App)
+   * before it can be connected. When true, `configured` reflects whether that setup is done.
+   */
+  configurable?: boolean;
+  configured?: boolean;
+  /** The platform-level fields an instance admin must provide (never includes values). */
+  configFields?: ConnectorConfigField[];
 }
 
 export interface ConnectorCatalogResponse {

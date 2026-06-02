@@ -79,6 +79,19 @@ export interface FieldSpec {
   description?: string;
 }
 
+/**
+ * A platform-level configuration field for a connector (e.g. GitHub App credentials).
+ * Stored as platform secrets by `key`. Distinct from per-starship connect inputs:
+ * these are instance-wide setup an admin provides once.
+ */
+export interface ConfigFieldSpec {
+  key: string;
+  label: string;
+  type: 'string' | 'password' | 'textarea';
+  required: boolean;
+  description?: string;
+}
+
 export type BeginResult =
   | { kind: 'redirect'; redirectUrl: string; metadata?: Record<string, unknown>; status?: ConnectorStatus }
   | { kind: 'form'; fields: FieldSpec[] }
@@ -143,6 +156,16 @@ export interface AuthStrategy {
 
   /** Optional credential refresh (e.g. OAuth2 refresh_token exchange). */
   refresh?(ctx: SessionCtx): Promise<{ secrets: Record<string, string> }>;
+
+  /**
+   * Platform-level config an instance admin must provide before the connector is usable
+   * (e.g. GitHub App id/slug/private key). Stored as platform secrets keyed by field.key.
+   * Absent for connectors that need no instance-wide setup.
+   */
+  readonly configFields?: ConfigFieldSpec[];
+
+  /** True when all required platform-level config is present. Only meaningful with configFields. */
+  isConfigured?(ctx: { env: ConnectorEnv; secrets: SecretResolver }): Promise<boolean>;
 
   /**
    * The auth value placed on the runtime template handed to the runner. The runner
@@ -221,4 +244,6 @@ export interface ConnectorCatalogEntry {
   demoVideoUrl?: string;
   oauthRequiredMetadataKeys?: string[];
   metadataSchema?: JsonSchemaObject;
+  /** Platform-level config fields an admin must set (e.g. GitHub App credentials). */
+  configFields?: ConfigFieldSpec[];
 }

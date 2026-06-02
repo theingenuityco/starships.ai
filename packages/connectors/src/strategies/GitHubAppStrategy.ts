@@ -22,6 +22,7 @@ import type {
   BeginResult,
   CompleteCtx,
   CompleteResult,
+  ConfigFieldSpec,
   ConnectorAuthKind,
   ConnectorCatalogAuthType,
   ConnectorEnv,
@@ -31,6 +32,9 @@ import type {
 
 /** Minimal context needed to resolve GitHub App configuration. */
 type ConfigCtx = { env: ConnectorEnv; secrets: SecretResolver };
+
+/** Platform-level config keys (stored as platform secrets, env fallback for local dev). */
+const CONFIG_KEYS = ['GITHUB_APP_ID', 'GITHUB_APP_SLUG', 'GITHUB_APP_PRIVATE_KEY'] as const;
 
 const GITHUB_API = 'https://api.github.com';
 /** Refresh the cached installation token this many ms before it actually expires. */
@@ -46,6 +50,25 @@ export class GitHubAppStrategy implements AuthStrategy {
   readonly catalogAuthType: ConnectorCatalogAuthType = 'github_app';
 
   private readonly tokenCache = new Map<string, CachedToken>();
+
+  readonly configFields: ConfigFieldSpec[] = [
+    { key: 'GITHUB_APP_ID', label: 'App ID', type: 'string', required: true, description: 'The numeric GitHub App ID.' },
+    { key: 'GITHUB_APP_SLUG', label: 'App slug', type: 'string', required: true, description: 'The App URL slug (github.com/apps/<slug>).' },
+    {
+      key: 'GITHUB_APP_PRIVATE_KEY',
+      label: 'Private key (base64 PEM)',
+      type: 'textarea',
+      required: true,
+      description: 'The App private key PEM, base64-encoded: `base64 -i key.pem | tr -d "\\n"`.',
+    },
+  ];
+
+  async isConfigured(ctx: ConfigCtx): Promise<boolean> {
+    for (const key of CONFIG_KEYS) {
+      if (!(await this.resolveConfig(ctx, key))) return false;
+    }
+    return true;
+  }
 
   async begin(ctx: BeginCtx): Promise<BeginResult> {
     const slug = await this.resolveConfig(ctx, 'GITHUB_APP_SLUG');

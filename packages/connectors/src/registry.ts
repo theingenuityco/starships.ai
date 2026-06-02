@@ -64,6 +64,7 @@ export class ConnectorRegistry {
         ...(def.demoVideoUrl ? { demoVideoUrl: def.demoVideoUrl } : {}),
         ...(def.oauthRequiredMetadataKeys ? { oauthRequiredMetadataKeys: def.oauthRequiredMetadataKeys } : {}),
         ...(def.metadataSchema ? { metadataSchema: def.metadataSchema } : {}),
+        ...(def.auth.configFields ? { configFields: def.auth.configFields } : {}),
       }));
   }
 }

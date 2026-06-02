@@ -16,7 +16,7 @@ export function Hero() {
     const video = videoRef.current;
     if (!video) return;
 
-    function onLoadedData() {
+    function onReady() {
       setVideoReady(true);
     }
 
@@ -24,13 +24,24 @@ export function Hero() {
       if (video!.duration) setProgress(video!.currentTime / video!.duration);
     }
 
-    video.addEventListener('loadeddata', onLoadedData);
+    // iOS Safari won't fetch media data (or fire `loadeddata`) before a user
+    // gesture, so we also treat `loadedmetadata`/`canplay` as ready. The poster
+    // gives an instant preview frame regardless, and a fallback timer makes sure
+    // the blurred placeholder never gets stuck if no media event ever fires.
+    video.addEventListener('loadedmetadata', onReady);
+    video.addEventListener('loadeddata', onReady);
+    video.addEventListener('canplay', onReady);
     video.addEventListener('timeupdate', onTimeUpdate);
-    if (video.readyState >= 2) setVideoReady(true);
+    if (video.readyState >= 1) setVideoReady(true);
+
+    const fallback = setTimeout(() => setVideoReady(true), 2500);
 
     return () => {
-      video.removeEventListener('loadeddata', onLoadedData);
+      video.removeEventListener('loadedmetadata', onReady);
+      video.removeEventListener('loadeddata', onReady);
+      video.removeEventListener('canplay', onReady);
       video.removeEventListener('timeupdate', onTimeUpdate);
+      clearTimeout(fallback);
     };
   }, []);
 
@@ -106,8 +117,9 @@ export function Hero() {
               ref={videoRef}
               className="absolute inset-0 h-full w-full object-cover"
               src="/hero.mp4"
+              poster="/hero-poster.jpg"
               playsInline
-              preload="auto"
+              preload="metadata"
               aria-label="Starships product walkthrough"
               onEnded={handleEnded}
             />
@@ -133,17 +145,17 @@ export function Hero() {
               />
               {!playing && (
                 <span className="mx-auto flex w-full max-w-5xl px-6">
-                  <span className={`flex items-center gap-4 h-24 pl-6 pr-10 rounded-full bg-white/10 backdrop-blur-sm text-white cursor-pointer transition-all duration-500 group-hover:scale-105 ${videoReady ? 'opacity-100' : 'opacity-0'}`}>
+                  <span className="flex items-center gap-3 sm:gap-4 h-14 pl-5 pr-7 sm:h-24 sm:pl-6 sm:pr-10 rounded-full bg-white/10 backdrop-blur-sm text-white cursor-pointer transition-all duration-500 group-hover:scale-105">
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
                       viewBox="0 0 24 24"
                       fill="currentColor"
-                      className="w-10 h-10 translate-x-0.5"
+                      className="w-6 h-6 sm:w-10 sm:h-10 translate-x-0.5"
                       aria-hidden
                     >
                       <path d="M8 5v14l11-7z" />
                     </svg>
-                    <span className="text-3xl font-medium tracking-wide">{progress > 0 ? 'Resume' : 'Play'}</span>
+                    <span className="text-xl sm:text-3xl font-medium tracking-wide">{progress > 0 ? 'Resume' : 'Play'}</span>
                   </span>
                 </span>
               )}

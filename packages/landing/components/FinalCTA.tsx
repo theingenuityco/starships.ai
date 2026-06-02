@@ -9,10 +9,10 @@ export function FinalCTA() {
           <FadeIn as="span" delay={0} className="block text-(--color-fg-muted)">
             Stop running a startup.
           </FadeIn>
-          <FadeIn as="span" delay={90} className="block text-6xl sm:text-7xl md:text-8xl">
+          <FadeIn as="span" delay={90} className="block text-5xl sm:text-7xl md:text-8xl">
             Start running a
           </FadeIn>
-          <FadeIn as="span" delay={180} className="block text-6xl sm:text-7xl md:text-8xl">
+          <FadeIn as="span" delay={180} className="block text-5xl sm:text-7xl md:text-8xl">
             Starship.
           </FadeIn>
         </h2>

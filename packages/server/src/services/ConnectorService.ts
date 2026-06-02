@@ -18,7 +18,7 @@ import {
   ConnectorTemplateEntity,
   ConnectorWebhookBindingRepository,
 } from '@starships/models';
-import { ConnectorTemplateRegistryClient } from './ConnectorTemplateRegistryClient';
+import { ConnectorRegistryClient } from './ConnectorRegistryClient';
 import { ConnectorSecretService } from './ConnectorSecretService';
 import { getEnvConfig } from '@starships/env';
 import axios from 'axios';
@@ -34,7 +34,7 @@ import { AppError } from '@starships/errors';
  */
 export class ConnectorService {
   private connectorRepository: ConnectorRepository;
-  private connectorTemplateRegistry: ConnectorTemplateRegistryClient;
+  private connectorTemplateRegistry: ConnectorRegistryClient;
   private connectorSecretRepository: ConnectorSecretRepository;
   private connectorSecretService: ConnectorSecretService;
   private starshipRepository: StarshipRepository;
@@ -43,7 +43,7 @@ export class ConnectorService {
 
   constructor() {
     this.connectorRepository = new ConnectorRepository();
-    this.connectorTemplateRegistry = new ConnectorTemplateRegistryClient();
+    this.connectorTemplateRegistry = new ConnectorRegistryClient();
     this.connectorSecretRepository = new ConnectorSecretRepository();
     this.connectorSecretService = new ConnectorSecretService();
     this.starshipRepository = new StarshipRepository();

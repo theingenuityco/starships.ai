@@ -9,7 +9,7 @@ import type {
 import { ConnectorRepository } from '@starships/models';
 import { ConnectorSecretService } from './ConnectorSecretService';
 import { PlatformSecretService } from './PlatformSecretService';
-import { ConnectorTemplateRegistryClient } from './ConnectorTemplateRegistryClient';
+import { ConnectorRegistryClient } from './ConnectorRegistryClient';
 import { generateJWT } from '@/utils/jwt';
 import { buildBasicAuthHeaderValue } from '@/utils/basicAuth';
 
@@ -22,7 +22,7 @@ export interface ConnectorActionSessionBundle {
 }
 
 export class ConnectorActionSessionService {
-  private templateRegistry = new ConnectorTemplateRegistryClient();
+  private templateRegistry = new ConnectorRegistryClient();
   private connectorRepo = new ConnectorRepository();
   private connectorSecrets = new ConnectorSecretService();
   private platformSecrets = new PlatformSecretService();

@@ -11,7 +11,6 @@
 import type { ConnectorProvider } from '@starships/protocol';
 import type { ConnectorCatalogEntry, ConnectorDefinition, ConnectorRuntimeTemplate } from './types';
 import { fromTemplate, type ConnectorTemplateContainer } from './adapter/fromTemplate';
-import { githubConnector } from './connectors/github';
 
 export class ConnectorRegistry {
   private readonly codeDefs = new Map<string, ConnectorDefinition>();
@@ -97,6 +96,10 @@ export function toRuntimeTemplate(def: ConnectorDefinition): ConnectorRuntimeTem
   };
 }
 
-/** The shared registry singleton, pre-loaded with code connectors. */
+/**
+ * The shared registry singleton. Empty until the host bootstraps it (registers
+ * declarative connectors from disk and any hand-written code connectors). This keeps
+ * the package decoupled from where connector data lives and lets the host control
+ * when a provider flips from declarative to code-driven.
+ */
 export const connectorRegistry = new ConnectorRegistry();
-connectorRegistry.registerCode(githubConnector);

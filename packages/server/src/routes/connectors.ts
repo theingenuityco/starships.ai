@@ -20,14 +20,14 @@ import { getEnvConfig } from '@starships/env';
 import { validateOAuthState } from '@/utils/jwt';
 import type { ConnectorProvider } from '@starships/protocol';
 import { PlatformSecretService } from '@/services/PlatformSecretService';
-import { ConnectorTemplateRegistryClient } from '@/services/ConnectorTemplateRegistryClient';
+import { ConnectorRegistryClient } from '@/services/ConnectorRegistryClient';
 import { parseExternalLaunchConfigFromAuthJson, verifyExternalLaunchQuery } from '@/utils/external-launch';
 
 const env = getEnvConfig();
 
 const router: Router = Router();
 
-const connectorTemplateRegistry = new ConnectorTemplateRegistryClient();
+const connectorTemplateRegistry = new ConnectorRegistryClient();
 
 
 

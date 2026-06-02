@@ -852,6 +852,9 @@ importers:
       '@starships/autopilot':
         specifier: workspace:*
         version: link:../autopilot
+      '@starships/connectors':
+        specifier: workspace:*
+        version: link:../connectors
       '@starships/env':
         specifier: workspace:*
         version: link:../env

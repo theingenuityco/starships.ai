@@ -72,9 +72,24 @@ export class GitHubAppStrategy implements AuthStrategy {
   }
 
   async begin(ctx: BeginCtx): Promise<BeginResult> {
+    // If the App is already installed, link the existing installation directly. Sending the
+    // user to the install page when the App is already installed is a dead end: GitHub shows
+    // "nothing to do" and never redirects back with an installation_id.
+    const installations = await this.listInstallations(ctx).catch(() => []);
+    if (installations.length === 1) {
+      const inst = installations[0];
+      return {
+        kind: 'connected',
+        status: 'connected',
+        metadata: { installationId: String(inst.id), ...(inst.account ? { account: inst.account } : {}) },
+      };
+    }
+
     const slug = await this.resolveConfig(ctx, 'GITHUB_APP_SLUG');
     if (!slug) throw new Error('GITHUB_APP_SLUG is not configured (set it as a platform secret or env var)');
     const state = await ctx.encodeState({});
+    // Zero installations -> fresh install (GitHub redirects back to the callback with
+    // installation_id). Multiple installations -> let the user choose on GitHub's page.
     const redirectUrl = `https://github.com/apps/${encodeURIComponent(slug)}/installations/new?state=${encodeURIComponent(state)}`;
     return { kind: 'redirect', redirectUrl };
   }
@@ -130,6 +145,24 @@ export class GitHubAppStrategy implements AuthStrategy {
     if (fromPlatform && fromPlatform.trim()) return fromPlatform.trim();
     const fromEnv = ctx.env.get(key);
     return fromEnv && fromEnv.trim() ? fromEnv.trim() : undefined;
+  }
+
+  /** List the App's installations (the orgs/users that installed it), via an App JWT. */
+  private async listInstallations(ctx: ConfigCtx): Promise<Array<{ id: number; account?: string }>> {
+    const appJwt = await this.signAppJwt(ctx);
+    const res = await fetch(`${GITHUB_API}/app/installations?per_page=100`, {
+      headers: {
+        Authorization: `Bearer ${appJwt}`,
+        Accept: 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28',
+      },
+    });
+    if (!res.ok) return [];
+    const body = (await res.json()) as Array<{ id?: number; account?: { login?: string } }>;
+    if (!Array.isArray(body)) return [];
+    return body
+      .filter((i): i is { id: number; account?: { login?: string } } => typeof i.id === 'number')
+      .map((i) => ({ id: i.id, ...(i.account?.login ? { account: i.account.login } : {}) }));
   }
 
   /** Mint (or reuse a cached) installation access token for the given installation. */

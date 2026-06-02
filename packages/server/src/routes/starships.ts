@@ -3307,6 +3307,167 @@ router.post('/starships/:id/ensure-leadgen-room', jwtAuthMiddleware, async (req:
 });
 
 /**
+ * Internal helper: ensure a catalog room bundle is applied for a starship and
+ * return the resulting room. Idempotent: reuses an existing room provisioned from
+ * the same bundle tag, otherwise imports the bundle (bundle service, falling back
+ * to disk). Generalizes the leadgen flow for any room bundle in the catalog.
+ */
+async function ensureBundleRoomInternal(opts: {
+  starshipId: string;
+  userId: string;
+  /** bundle-service id, disk dir name, and provisioned_by_bundle tag (all the same value). */
+  bundleId: string;
+  /** Room agents to (re)add as participants after import. Best-effort. */
+  agentSlugs: string[];
+  /** Human-readable label used in error messages and logs. */
+  label: string;
+}): Promise<{ room: Awaited<ReturnType<RoomRepository['findRoomByBundleTag']>> & {}; importSummary?: { imported: Record<string, number>; warnings?: string[] } }> {
+  const { starshipId, userId, bundleId, agentSlugs, label } = opts;
+  const roomRepo = new RoomRepository();
+
+  const addAgentParticipants = async (conversationId: string): Promise<void> => {
+    try {
+      const agentRepo = new AgentRepository();
+      const participantRepo = new ConversationParticipantRepository();
+      for (const slug of agentSlugs) {
+        const agent = await agentRepo.findBySlugAndStarship(slug, starshipId).catch(() => null);
+        if (!agent?.id) continue;
+        try {
+          await participantRepo.addAgentParticipant({ conversationId, agentId: agent.id, createdBy: userId });
+        } catch {
+          // Ignore if agent is already a participant or if a constraint is hit.
+        }
+      }
+    } catch {
+      // Best-effort only; room provisioning should still succeed if this step fails.
+    }
+  };
+
+  const openDiskReader = (): DirectoryBundleReader => {
+    const bundlesRoot = resolveBundlesRoot();
+    const bundleDir = path.join(bundlesRoot, 'rooms', bundleId);
+    if (!fs.existsSync(bundleDir) || !fs.statSync(bundleDir).isDirectory()) {
+      console.error(`[room-bundle] Bundle directory not found`, { bundlesRoot, bundleDir, bundleId });
+      throw Object.assign(new Error(`${label} room bundle is not available on the server`), { code: 'BUNDLE_NOT_FOUND' });
+    }
+    return new DirectoryBundleReader(bundleDir);
+  };
+
+  // Reuse existing room if one already exists for this bundle tag.
+  const existingRoom = await roomRepo.findRoomByBundleTag(starshipId, bundleId);
+  if (existingRoom) {
+    try {
+      const participantRepo = new ConversationParticipantRepository();
+      await participantRepo.addUserParticipant({ conversationId: existingRoom.conversationId, userId, role: 'admin', createdBy: userId });
+    } catch {
+      // Ignore if already a participant or if a constraint is hit.
+    }
+    await addAgentParticipants(existingRoom.conversationId);
+    console.debug('[room-bundle] Reusing existing room', { starshipId, bundleId, roomSlug: existingRoom.slug });
+    return { room: existingRoom };
+  }
+
+  // No existing room; apply the bundle. Prefer the bundle service when configured.
+  let reader: DirectoryBundleReader | RemoteBundleReader;
+  const bundleServiceUrl = getEnvConfig().BUNDLE_SERVICE_URL;
+  if (bundleServiceUrl) {
+    try {
+      reader = await RemoteBundleReader.create(bundleServiceUrl, bundleId);
+    } catch (err) {
+      console.error('[room-bundle] Failed to fetch bundle from bundle service, falling back to disk', {
+        bundleServiceUrl,
+        bundleId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      reader = openDiskReader();
+    }
+  } else {
+    reader = openDiskReader();
+  }
+
+  const manifestEntry = reader.getEntry('manifest.json');
+  if (!manifestEntry) {
+    throw Object.assign(new Error(`${label} room bundle is missing manifest.json`), { code: 'MANIFEST_MISSING' });
+  }
+
+  let manifestRaw: unknown;
+  try {
+    manifestRaw = JSON.parse(manifestEntry.getData().toString('utf8'));
+  } catch {
+    throw Object.assign(new Error(`${label} room bundle manifest.json is not valid JSON`), { code: 'MANIFEST_INVALID_JSON' });
+  }
+
+  const manifestParsed = ImportRoomBundleManifestSchemaV1.safeParse(manifestRaw);
+  if (!manifestParsed.success) {
+    console.error('[room-bundle] manifest.json shape is invalid', { bundleId, issues: manifestParsed.error.issues });
+    throw Object.assign(new Error(`${label} room bundle manifest.json has an unexpected shape`), { code: 'MANIFEST_INVALID_SHAPE' });
+  }
+
+  assertRoomBundleManifestPathsOrThrow(manifestParsed.data);
+
+  const emptyDecisions: RoomBundleDecisions = { rooms: {}, views: {}, datasets: {}, taskBoards: {}, tools: {}, agents: {} };
+
+  const importSummary = await applyRoomBundleToStarship({
+    starshipId,
+    userId,
+    reader,
+    manifest: manifestParsed.data,
+    decisions: emptyDecisions,
+    provisionedByBundleTag: bundleId,
+  });
+
+  const createdRoom = await roomRepo.findRoomByBundleTag(starshipId, bundleId);
+  if (!createdRoom) {
+    console.error('[room-bundle] Room not found after import', { starshipId, bundleId, imported: importSummary.imported });
+    throw Object.assign(new Error(`${label} room was not created from bundle`), { code: 'ROOM_MISSING_POST_IMPORT' });
+  }
+
+  await addAgentParticipants(createdRoom.conversationId);
+
+  console.debug('[room-bundle] Room created from bundle', {
+    starshipId,
+    bundleId,
+    roomSlug: createdRoom.slug,
+    conversationId: createdRoom.conversationId,
+    imported: importSummary.imported,
+  });
+
+  if (reader instanceof RemoteBundleReader) reader.cleanup();
+
+  return { room: createdRoom, importSummary };
+}
+
+/**
+ * POST /starships/:id/ensure-engineering-room
+ *
+ * Ensure that the engineering room bundle is applied for the given starship and return the room.
+ * Used by the room catalog ("Add room") to provision the backlog-execution workspace in one click.
+ *
+ * Starship owner / instance-admin only (same access model as generic bundle import).
+ */
+router.post('/starships/:id/ensure-engineering-room', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'starship parameter');
+    if (!paramValidation) return;
+
+    const user = requireAuthUser(req, res);
+    if (!user) return;
+    if (!(await verifyStarshipOwnerAccess(paramValidation.id, user.id, res))) return;
+
+    const { room, importSummary } = await ensureBundleRoomInternal({
+      starshipId: paramValidation.id,
+      userId: user.id,
+      bundleId: 'engineering',
+      agentSlugs: ['forge', 'sift', 'quill', 'anvil', 'lens'],
+      label: 'Engineering',
+    });
+    sendSuccess(res, importSummary ? { room, importSummary } : { room });
+  } catch (error) {
+    handleError(error, res, 'ensuring engineering room for starship');
+  }
+});
+
+/**
  * POST /starships/:id/automate/save-company-info
  *
  * Called by the /onboarding flow post-auth. Persists company name, website URL, and bio

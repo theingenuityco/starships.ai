@@ -20,6 +20,14 @@ export const ROOM_CATALOG: RoomCatalogEntry[] = [
     ensureEndpoint: 'ensure-leadgen-room',
   },
   {
+    bundleId: 'engineering',
+    name: 'Engineering',
+    description: 'Triage your backlog, build and test changes on a real checkout, and open reviewed pull requests.',
+    icon: '🛠️',
+    features: ['Repos dataset', 'GitHub PRs', '5 AI agents'],
+    ensureEndpoint: 'ensure-engineering-room',
+  },
+  {
     bundleId: 'outreach',
     name: 'Outreach',
     description: 'Run personalised email and LinkedIn sequences at scale with AI-written copy and automated follow-ups.',

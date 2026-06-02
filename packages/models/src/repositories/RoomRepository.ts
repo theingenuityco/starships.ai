@@ -131,4 +131,25 @@ export class RoomRepository extends BaseRepository {
       starshipId
     );
   }
+
+  /**
+   * Find the first room provisioned from a given bundle tag (the value stored in
+   * provisioned_by_bundle), e.g. 'engineering' or 'lead-generation'. Used to make
+   * room provisioning idempotent for any catalog bundle.
+   */
+  async findRoomByBundleTag(starshipId: string, bundleTag: string): Promise<RoomModel | null> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        const row = await connection.queryOne<Record<string, unknown>>(
+          'SELECT * FROM rooms WHERE starship_id = $1 AND provisioned_by_bundle = $2 ORDER BY created_at ASC LIMIT 1',
+          [starshipId, bundleTag]
+        );
+        return row ? fromDatabase(RoomEntity, row) : null;
+      },
+      'findRoomByBundleTag',
+      'Room',
+      starshipId
+    );
+  }
 }

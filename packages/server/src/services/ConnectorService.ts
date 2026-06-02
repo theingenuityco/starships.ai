@@ -527,22 +527,6 @@ export class ConnectorService {
     });
 
     if (result.kind === 'redirect') return result.redirectUrl;
-
-    // Already connectable without a redirect (e.g. the GitHub App is already installed and we
-    // resolved the existing installation): persist and bounce back to the connectors page.
-    if (result.kind === 'connected') {
-      const template = await this.loadTemplateOrThrow(provider);
-      const applied = await this.applyConnectOutput(starshipId, userId, provider, template, {
-        status: result.status ?? 'connected',
-        metadata: result.metadata,
-        envUpdates: result.secrets,
-      });
-      const base = applied.starshipSlug
-        ? `/ship/${encodeURIComponent(applied.starshipSlug)}/connectors`
-        : `/ship/${encodeURIComponent(starshipId)}/connectors`;
-      return `${base}?${new URLSearchParams({ connector: String(provider), status: 'success' }).toString()}`;
-    }
-
     throw new Error(`Connector ${provider} returned an unsupported start result (${result.kind})`);
   }
 

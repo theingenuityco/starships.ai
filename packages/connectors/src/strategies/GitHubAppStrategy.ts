@@ -72,30 +72,11 @@ export class GitHubAppStrategy implements AuthStrategy {
   }
 
   async begin(ctx: BeginCtx): Promise<BeginResult> {
-    // If the App is already installed, link the existing installation directly. Sending the
-    // user to the install page when the App is already installed is a dead end: GitHub shows
-    // "nothing to do" and never redirects back with an installation_id.
-    const installations = await this.listInstallations(ctx).catch((err) => {
-      console.error('[github-app] listInstallations failed; falling back to install redirect', {
-        error: err instanceof Error ? err.message : String(err),
-      });
-      return [];
-    });
-    console.log('[github-app] begin: resolved', installations.length, 'installation(s)');
-    if (installations.length >= 1) {
-      // Single-tenant model: link the first installation. (A chooser for multiple orgs is a follow-up.)
-      const inst = installations[0];
-      return {
-        kind: 'connected',
-        status: 'connected',
-        metadata: { installationId: String(inst.id), ...(inst.account ? { account: inst.account } : {}) },
-      };
-    }
-
     const slug = await this.resolveConfig(ctx, 'GITHUB_APP_SLUG');
     if (!slug) throw new Error('GITHUB_APP_SLUG is not configured (set it as a platform secret or env var)');
     const state = await ctx.encodeState({});
-    // No installations yet -> fresh install (GitHub redirects back to the callback with installation_id).
+    // Send the user to install the App; GitHub redirects back to the callback (Setup URL)
+    // with installation_id + setup_action, which complete() persists.
     const redirectUrl = `https://github.com/apps/${encodeURIComponent(slug)}/installations/new?state=${encodeURIComponent(state)}`;
     return { kind: 'redirect', redirectUrl };
   }
@@ -151,24 +132,6 @@ export class GitHubAppStrategy implements AuthStrategy {
     if (fromPlatform && fromPlatform.trim()) return fromPlatform.trim();
     const fromEnv = ctx.env.get(key);
     return fromEnv && fromEnv.trim() ? fromEnv.trim() : undefined;
-  }
-
-  /** List the App's installations (the orgs/users that installed it), via an App JWT. */
-  private async listInstallations(ctx: ConfigCtx): Promise<Array<{ id: number; account?: string }>> {
-    const appJwt = await this.signAppJwt(ctx);
-    const res = await fetch(`${GITHUB_API}/app/installations?per_page=100`, {
-      headers: {
-        Authorization: `Bearer ${appJwt}`,
-        Accept: 'application/vnd.github+json',
-        'X-GitHub-Api-Version': '2022-11-28',
-      },
-    });
-    if (!res.ok) return [];
-    const body = (await res.json()) as Array<{ id?: number; account?: { login?: string } }>;
-    if (!Array.isArray(body)) return [];
-    return body
-      .filter((i): i is { id: number; account?: { login?: string } } => typeof i.id === 'number')
-      .map((i) => ({ id: i.id, ...(i.account?.login ? { account: i.account.login } : {}) }));
   }
 
   /** Mint (or reuse a cached) installation access token for the given installation. */

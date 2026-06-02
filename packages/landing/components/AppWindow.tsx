@@ -41,7 +41,7 @@ export function AppWindow({ title, activeNav = 'Dashboard', rooms, activeRoom, w
           }}
         >
           <div
-            className="dashboard-window absolute inset-x-8 top-8 sm:inset-x-16 sm:top-12"
+            className="dashboard-window absolute inset-x-4 top-6 sm:inset-x-16 sm:top-12"
             style={{ '--delay': '400ms' } as React.CSSProperties}
           >
             <div className="rounded-(--radius-card) border border-(--color-border) bg-(--color-bg-elev) shadow-2xl shadow-black/70">

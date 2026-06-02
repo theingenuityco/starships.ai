@@ -84,7 +84,7 @@ export function FeedDashboard() {
           }}
         >
             {/* The Mac window, centered on the wallpaper, extending below — staggered after the desktop */}
-            <FadeIn delay={150} className="absolute inset-x-8 top-8 sm:inset-x-16 sm:top-12">
+            <FadeIn delay={150} className="absolute inset-x-4 top-6 sm:inset-x-16 sm:top-12">
               <div className="rounded-(--radius-card) border border-(--color-border) bg-(--color-bg-elev) shadow-2xl shadow-black/70">
                 {/* Window chrome */}
                 <div className="flex items-center gap-2 border-b border-(--color-border) px-4 py-3">

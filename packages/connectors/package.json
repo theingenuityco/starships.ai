@@ -1,0 +1,22 @@
+{
+  "name": "@starships/connectors",
+  "version": "0.0.0",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "rm -rf dist && rm -f tsconfig.tsbuildinfo && tsc -p tsconfig.json && tsc-alias -p tsconfig.json",
+    "type-check": "tsc --noEmit",
+    "lint": "eslint src --ext .ts",
+    "test": "echo 'No tests yet' && :"
+  },
+  "dependencies": {
+    "@starships/protocol": "workspace:*",
+    "jose": "^6.0.11"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.10",
+    "tsc-alias": "^1.8.16",
+    "typescript": "^5.8.3"
+  }
+}

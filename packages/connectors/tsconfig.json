@@ -1,0 +1,18 @@
+{
+  "extends": "../../tsconfig.nodejs.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  },
+  "include": ["src/**/*", "src/**/*.json"],
+  "exclude": ["dist"],
+  "references": [
+    {
+      "path": "../protocol"
+    }
+  ]
+}

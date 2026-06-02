@@ -75,8 +75,15 @@ export class GitHubAppStrategy implements AuthStrategy {
     // If the App is already installed, link the existing installation directly. Sending the
     // user to the install page when the App is already installed is a dead end: GitHub shows
     // "nothing to do" and never redirects back with an installation_id.
-    const installations = await this.listInstallations(ctx).catch(() => []);
-    if (installations.length === 1) {
+    const installations = await this.listInstallations(ctx).catch((err) => {
+      console.error('[github-app] listInstallations failed; falling back to install redirect', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return [];
+    });
+    console.log('[github-app] begin: resolved', installations.length, 'installation(s)');
+    if (installations.length >= 1) {
+      // Single-tenant model: link the first installation. (A chooser for multiple orgs is a follow-up.)
       const inst = installations[0];
       return {
         kind: 'connected',
@@ -88,8 +95,7 @@ export class GitHubAppStrategy implements AuthStrategy {
     const slug = await this.resolveConfig(ctx, 'GITHUB_APP_SLUG');
     if (!slug) throw new Error('GITHUB_APP_SLUG is not configured (set it as a platform secret or env var)');
     const state = await ctx.encodeState({});
-    // Zero installations -> fresh install (GitHub redirects back to the callback with
-    // installation_id). Multiple installations -> let the user choose on GitHub's page.
+    // No installations yet -> fresh install (GitHub redirects back to the callback with installation_id).
     const redirectUrl = `https://github.com/apps/${encodeURIComponent(slug)}/installations/new?state=${encodeURIComponent(state)}`;
     return { kind: 'redirect', redirectUrl };
   }

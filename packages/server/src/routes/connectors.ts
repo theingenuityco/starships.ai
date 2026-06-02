@@ -21,6 +21,7 @@ import { validateOAuthState } from '@/utils/jwt';
 import type { ConnectorProvider } from '@starships/protocol';
 import { PlatformSecretService } from '@/services/PlatformSecretService';
 import { ConnectorRegistryClient } from '@/services/ConnectorRegistryClient';
+import { isStrategyDispatchProvider } from '@/services/connectorStrategy';
 import { parseExternalLaunchConfigFromAuthJson, verifyExternalLaunchQuery } from '@/utils/external-launch';
 
 const env = getEnvConfig();
@@ -550,6 +551,28 @@ async function connectorCallbackHandler(req: Request, res: Response): Promise<vo
           : `/ship/${encodeURIComponent(starshipId)}/connectors`;
       return `${basePath}?${params.toString()}`;
     };
+
+    // Code-driven connectors (e.g. GitHub App) complete via their strategy. The callback
+    // carries provider-specific params (installation_id) rather than an OAuth code.
+    if (isStrategyDispatchProvider(provider)) {
+      try {
+        const result = await connectorService.completeCodeConnector(provider as ConnectorProvider, state, req.query as Record<string, unknown>);
+        const successParams = new URLSearchParams({ connector: provider, status: 'success' });
+        if (result.returnUrl && isValidRedirectUrl(result.returnUrl)) {
+          res.redirect(addQueryParamsToPath(result.returnUrl, { connector: provider, status: 'success' }));
+          return;
+        }
+        res.redirect(buildStarshipRedirect(result.starshipId, result.starshipSlug, successParams));
+        return;
+      } catch (codeErr) {
+        console.error('[CONNECTOR_CALLBACK] code connector completion failed', {
+          provider,
+          errorMessage: (codeErr as Error | undefined)?.message,
+        });
+        res.redirect(`/?${new URLSearchParams({ connector: provider, status: 'error' }).toString()}`);
+        return;
+      }
+    }
 
     // Custom connector completion is removed in v2 (no fallback).
 

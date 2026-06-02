@@ -116,6 +116,10 @@ export function getEnvConfig(): EnvironmentConfig {
     // GitHub OAuth App (used for user login)
     GH_OAUTH_CLIENT_ID: process.env.GH_OAUTH_CLIENT_ID,
     GH_OAUTH_CLIENT_SECRET: process.env.GH_OAUTH_CLIENT_SECRET,
+    // GitHub App (used for the GitHub connector)
+    GITHUB_APP_ID: process.env.GITHUB_APP_ID,
+    GITHUB_APP_PRIVATE_KEY: process.env.GITHUB_APP_PRIVATE_KEY,
+    GITHUB_APP_SLUG: process.env.GITHUB_APP_SLUG,
 
     // Environment Variables Encryption Key
     ENCRYPTION_KEY: process.env.ENCRYPTION_KEY,

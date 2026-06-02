@@ -237,7 +237,13 @@ export interface ConnectorSessionV2 {
  * Declarative auth configuration stored on connector_templates.auth_json.
  * Must never contain raw secret values; only SecretRefs.
  */
-export type ConnectorAuthTypeV2 = 'oauth2' | 'api_key' | 'basic' | 'platform_jwt' | 'none';
+/**
+ * Connector auth descriptor types. 'github_app' is a host-side connect kind (GitHub
+ * App installation, bot identity) surfaced to the catalog/UI; it is NOT a member of
+ * the declarative ConnectorAuthV2 union (its runtime auth degrades to { type: 'none' }
+ * with a host-minted installation token injected via the session headers).
+ */
+export type ConnectorAuthTypeV2 = 'oauth2' | 'api_key' | 'basic' | 'platform_jwt' | 'none' | 'github_app';
 
 export interface ConnectorAuthNoneV2 {
   type: 'none';

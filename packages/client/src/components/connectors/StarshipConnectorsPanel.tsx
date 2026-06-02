@@ -701,7 +701,8 @@ export function StarshipConnectorsPanel({
     const logoSrc = getConnectorLogoSrc(provider)
     const authType = catalogItem.auth?.type
     const canDisconnect = !hideDisconnect && isConnected && authType !== 'platform_jwt'
-    const isOauthConnectable = authType === 'oauth2'
+    // GitHub App installs use the same redirect-based connect flow as OAuth.
+    const isOauthConnectable = authType === 'oauth2' || authType === 'github_app'
     const isApiKeyConnectable = authType === 'api_key'
     const isBasicConnectable = authType === 'basic'
     const isManaged = authType === 'platform_jwt'
@@ -979,7 +980,8 @@ export function StarshipConnectorsPanel({
     const logoSrc = getConnectorLogoSrc(provider)
     const authType = catalogItem.auth?.type
     const canDisconnect = !hideDisconnect && isConnected && authType !== 'platform_jwt'
-    const isOauthConnectable = authType === 'oauth2'
+    // GitHub App installs use the same redirect-based connect flow as OAuth.
+    const isOauthConnectable = authType === 'oauth2' || authType === 'github_app'
     const isApiKeyConnectable = authType === 'api_key'
     const isBasicConnectable = authType === 'basic'
     const isManaged = authType === 'platform_jwt'

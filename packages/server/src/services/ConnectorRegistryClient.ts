@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import type { ConnectorProvider } from '@starships/protocol';
-import { connectorRegistry, loadTemplateContainersFromDir } from '@starships/connectors';
+import { connectorRegistry, githubConnector, loadTemplateContainersFromDir } from '@starships/connectors';
 import type { ConnectorTemplateEntityLike } from './ConnectorTemplateRegistryClient';
 
 /**
@@ -34,12 +34,17 @@ function resolveBundlesDir(): string {
   return path.resolve(process.cwd(), 'packages', 'bundle-service', 'bundles');
 }
 
-/** Register hand-written code connectors. Phase 3 enables the GitHub App connector here. */
+/** Register hand-written code connectors. These take precedence over declarative ones. */
 function registerCodeConnectors(): void {
-  // (Phase 3) connectorRegistry.registerCode(githubConnector);
+  connectorRegistry.registerCode(githubConnector);
 }
 
-function ensureRegistered(): void {
+/**
+ * Idempotently bootstrap the in-process connector registry: load declarative
+ * connectors from disk, then register hand-written code connectors. Safe to call
+ * from anywhere that needs the registry populated (clients, strategy dispatch).
+ */
+export function ensureConnectorRegistry(): void {
   if (registered) return;
   try {
     const containers = loadTemplateContainersFromDir(resolveBundlesDir());
@@ -58,17 +63,17 @@ function ensureRegistered(): void {
 
 export class ConnectorRegistryClient {
   async list(): Promise<ConnectorTemplateEntityLike[]> {
-    ensureRegistered();
+    ensureConnectorRegistry();
     return connectorRegistry.listRuntimeTemplates();
   }
 
   async findByProvider(provider: ConnectorProvider): Promise<ConnectorTemplateEntityLike | null> {
-    ensureRegistered();
+    ensureConnectorRegistry();
     return connectorRegistry.runtimeTemplate(provider) ?? null;
   }
 
   async findById(id: string): Promise<ConnectorTemplateEntityLike | null> {
-    ensureRegistered();
+    ensureConnectorRegistry();
     return connectorRegistry.listRuntimeTemplates().find((t) => t.id === id || t.provider === id) ?? null;
   }
 

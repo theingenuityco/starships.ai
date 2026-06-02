@@ -23,6 +23,8 @@ import { ConnectorSecretService } from './ConnectorSecretService';
 import { getEnvConfig } from '@starships/env';
 import axios from 'axios';
 import { generateOAuthState, validateOAuthState } from '@/utils/jwt';
+import { connectorRegistry } from '@starships/connectors';
+import { connectorEnv, makeSecretResolver, isStrategyDispatchProvider } from './connectorStrategy';
 import { PlatformSecretService } from './PlatformSecretService';
 import { AppError } from '@starships/errors';
 
@@ -270,7 +272,11 @@ export class ConnectorService {
     const dbCatalog = templates
       .filter((tpl) => tpl.isEnabled !== false)
       .map((tpl): ConnectorCatalogItem => {
-        const authType = ((tpl.authJson as unknown as { type?: string })?.type || 'none') as ConnectorCatalogItem['auth']['type'];
+        // Code connectors (e.g. GitHub App) surface their catalog auth kind so the UI can
+        // show the right CTA; declarative connectors fall back to their runtime auth type.
+        const codeDef = connectorRegistry.get(tpl.provider as ConnectorProvider);
+        const authType = (codeDef?.auth.catalogAuthType ??
+          ((tpl.authJson as unknown as { type?: string })?.type || 'none')) as ConnectorCatalogItem['auth']['type'];
         const metadataSchema =
           tpl.metadataSchemaJson && typeof tpl.metadataSchemaJson === 'object' && !Array.isArray(tpl.metadataSchemaJson)
             ? (tpl.metadataSchemaJson as ConnectorCatalogItem['metadataSchema'])
@@ -327,6 +333,11 @@ export class ConnectorService {
     provider: ConnectorProvider,
     opts?: { metadata?: Record<string, unknown>; returnUrl?: string }
   ): Promise<string> {
+    // Code-driven connectors (e.g. GitHub App) own their connect flow via the strategy.
+    if (isStrategyDispatchProvider(provider)) {
+      return this.startCodeConnector(starshipId, userId, provider, opts);
+    }
+
     const template = await this.loadTemplateOrThrow(provider);
     if (template.isEnabled === false) {
       throw new Error(`Connector ${provider} is disabled by the instance admin`);
@@ -418,6 +429,100 @@ export class ConnectorService {
 
     const resolvedAuthUrl = this.resolveUrlTemplate(auth.authorizationUrl, mergedMetadata, 'auth.authorizationUrl');
     return `${resolvedAuthUrl}?${params.toString()}`;
+  }
+
+  /**
+   * Start a connect flow for a code-driven connector (e.g. GitHub App) by delegating
+   * to its AuthStrategy.begin(). Returns the redirect URL (App installation page).
+   */
+  private async startCodeConnector(
+    starshipId: string,
+    userId: string,
+    provider: ConnectorProvider,
+    opts?: { metadata?: Record<string, unknown>; returnUrl?: string }
+  ): Promise<string> {
+    const def = connectorRegistry.get(provider);
+    if (!def) throw new Error(`Connector ${provider} is not registered`);
+    if (!def.isEnabled) throw new Error(`Connector ${provider} is disabled by the instance admin`);
+
+    const env = getEnvConfig();
+    const redirectUri = `${env.PUBLIC_URL}/api/v1/connectors/${encodeURIComponent(String(provider))}/callback`;
+
+    const result = await def.auth.begin({
+      starshipId,
+      authUserId: userId,
+      redirectUri,
+      ...(opts?.returnUrl ? { returnUrl: opts.returnUrl } : {}),
+      ...(opts?.metadata ? { requestedMetadata: opts.metadata } : {}),
+      env: connectorEnv,
+      secrets: makeSecretResolver({}),
+      encodeState: (payload) =>
+        generateOAuthState(true, userId, {
+          starshipId,
+          provider,
+          ...(opts?.returnUrl ? { returnUrl: opts.returnUrl } : {}),
+          ...payload,
+        }),
+    });
+
+    if (result.kind === 'redirect') return result.redirectUrl;
+    throw new Error(`Connector ${provider} returned an unsupported start result (${result.kind})`);
+  }
+
+  /**
+   * Complete a connect flow for a code-driven connector (e.g. GitHub App) from its
+   * callback query, delegating to AuthStrategy.complete() and persisting the result.
+   */
+  async completeCodeConnector(
+    provider: ConnectorProvider,
+    stateToken: string,
+    callbackQuery: Record<string, unknown> | undefined
+  ): Promise<{ starshipId: string; starshipSlug?: string; userId: string; returnUrl?: string }> {
+    const def = connectorRegistry.get(provider);
+    if (!def) throw new Error(`Connector ${provider} is not registered`);
+
+    const stateValidation = await validateOAuthState(stateToken);
+    if (!stateValidation.valid) throw new Error('Invalid or expired connector state');
+    const { userId, context } = stateValidation;
+    if (!userId) throw new Error('Connector state missing user information');
+
+    const starshipId = context?.starshipId as string | undefined;
+    const providerFromState = context?.provider as string | undefined;
+    const returnUrl = context?.returnUrl as string | undefined;
+    if (!starshipId || providerFromState !== provider) {
+      throw new Error('Connector state missing starship context');
+    }
+
+    const env = getEnvConfig();
+    const redirectUri = `${env.PUBLIC_URL}/api/v1/connectors/${encodeURIComponent(String(provider))}/callback`;
+
+    const input: Record<string, string | undefined> = {};
+    if (callbackQuery && typeof callbackQuery === 'object') {
+      for (const [k, v] of Object.entries(callbackQuery)) {
+        input[k] = v === undefined || v === null ? undefined : String(v);
+      }
+    }
+
+    const result = await def.auth.complete({
+      starshipId,
+      env: connectorEnv,
+      secrets: makeSecretResolver({}),
+      input,
+      redirectUri,
+      decodeState: async (token) => {
+        const v = await validateOAuthState(token);
+        return v.valid ? (v.context ?? {}) : null;
+      },
+    });
+
+    const template = await this.loadTemplateOrThrow(provider);
+    const applied = await this.applyConnectOutput(starshipId, userId, provider, template, {
+      status: result.status,
+      metadata: result.metadata,
+      envUpdates: result.secrets,
+    });
+
+    return { starshipId, starshipSlug: applied.starshipSlug, userId, ...(returnUrl ? { returnUrl } : {}) };
   }
 
   /**

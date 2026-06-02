@@ -236,6 +236,7 @@ export function StarshipConnectorsPanel({
   const [hiddenLogos, setHiddenLogos] = useState<Record<string, boolean>>({})
   const [configureItem, setConfigureItem] = useState<ConnectorCatalogItem | null>(null)
   const [configureValues, setConfigureValues] = useState<Record<string, string>>({})
+  const [configureFileNames, setConfigureFileNames] = useState<Record<string, string>>({})
   const [apiKeyDialogProvider, setApiKeyDialogProvider] = useState<string | null>(null)
   const [apiKeyValue, setApiKeyValue] = useState('')
   const [apiKeyExtraConfigText, setApiKeyExtraConfigText] = useState('')
@@ -359,6 +360,7 @@ export function StarshipConnectorsPanel({
     const init: Record<string, string> = {}
     for (const f of item.configFields ?? []) init[f.key] = ''
     setConfigureValues(init)
+    setConfigureFileNames({})
   }
 
   const submitConfigure = async () => {
@@ -1285,7 +1287,29 @@ export function StarshipConnectorsPanel({
                   {field.label}
                   {field.required ? <span className="text-destructive"> *</span> : null}
                 </label>
-                {field.type === 'textarea' ? (
+                {field.type === 'file' ? (
+                  <div className="flex flex-col gap-1">
+                    <Input
+                      type="file"
+                      accept={field.accept}
+                      className="cursor-pointer file:mr-3 file:rounded file:border-0 file:bg-muted file:px-2 file:py-1 file:text-xs"
+                      onChange={async e => {
+                        const file = e.target.files?.[0]
+                        if (!file) {
+                          setConfigureValues(v => ({ ...v, [field.key]: '' }))
+                          setConfigureFileNames(n => ({ ...n, [field.key]: '' }))
+                          return
+                        }
+                        const text = await file.text()
+                        setConfigureValues(v => ({ ...v, [field.key]: text }))
+                        setConfigureFileNames(n => ({ ...n, [field.key]: file.name }))
+                      }}
+                    />
+                    {configureFileNames[field.key] ? (
+                      <p className="text-xs text-emerald-600 dark:text-emerald-400">Loaded {configureFileNames[field.key]}</p>
+                    ) : null}
+                  </div>
+                ) : field.type === 'textarea' ? (
                   <Textarea
                     value={configureValues[field.key] ?? ''}
                     onChange={e => setConfigureValues(v => ({ ...v, [field.key]: e.target.value }))}

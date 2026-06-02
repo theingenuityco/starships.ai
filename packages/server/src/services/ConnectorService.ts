@@ -300,6 +300,7 @@ export class ConnectorService {
                 type: f.type,
                 required: f.required,
                 ...(f.description ? { description: f.description } : {}),
+                ...(f.accept ? { accept: f.accept } : {}),
               })),
             };
           }

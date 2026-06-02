@@ -87,9 +87,11 @@ export interface FieldSpec {
 export interface ConfigFieldSpec {
   key: string;
   label: string;
-  type: 'string' | 'password' | 'textarea';
+  type: 'string' | 'password' | 'textarea' | 'file';
   required: boolean;
   description?: string;
+  /** For type 'file': the accept attribute hint (e.g. '.pem,.txt'). */
+  accept?: string;
 }
 
 export type BeginResult =

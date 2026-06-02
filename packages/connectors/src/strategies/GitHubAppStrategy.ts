@@ -56,10 +56,11 @@ export class GitHubAppStrategy implements AuthStrategy {
     { key: 'GITHUB_APP_SLUG', label: 'App slug', type: 'string', required: true, description: 'The App URL slug (github.com/apps/<slug>).' },
     {
       key: 'GITHUB_APP_PRIVATE_KEY',
-      label: 'Private key (base64 PEM)',
-      type: 'textarea',
+      label: 'Private key',
+      type: 'file',
+      accept: '.pem,.txt',
       required: true,
-      description: 'The App private key PEM, base64-encoded: `base64 -i key.pem | tr -d "\\n"`.',
+      description: 'Upload the App private key .pem file generated in the GitHub App settings.',
     },
   ];
 
@@ -116,6 +117,13 @@ export class GitHubAppStrategy implements AuthStrategy {
     return null;
   }
 
+  /** Accept a PEM directly (from a .pem file upload) or a base64-encoded PEM (env/legacy). */
+  private normalizePem(value: string): string {
+    const trimmed = value.trim();
+    if (trimmed.includes('-----BEGIN')) return trimmed;
+    return Buffer.from(trimmed, 'base64').toString('utf-8');
+  }
+
   /** Resolve App config: platform secret first (encrypted), env var fallback for local dev. */
   private async resolveConfig(ctx: ConfigCtx, key: string): Promise<string | undefined> {
     const fromPlatform = await ctx.secrets.resolve({ type: 'platform_secret', key });
@@ -155,11 +163,11 @@ export class GitHubAppStrategy implements AuthStrategy {
   /** Sign a short-lived RS256 App JWT (iss = App ID), valid for <= 10 minutes. */
   private async signAppJwt(ctx: ConfigCtx): Promise<string> {
     const appId = await this.resolveConfig(ctx, 'GITHUB_APP_ID');
-    const privateKeyB64 = await this.resolveConfig(ctx, 'GITHUB_APP_PRIVATE_KEY');
+    const privateKeyRaw = await this.resolveConfig(ctx, 'GITHUB_APP_PRIVATE_KEY');
     if (!appId) throw new Error('GITHUB_APP_ID is not configured (set it as a platform secret or env var)');
-    if (!privateKeyB64) throw new Error('GITHUB_APP_PRIVATE_KEY is not configured (set it as a platform secret or env var)');
+    if (!privateKeyRaw) throw new Error('GITHUB_APP_PRIVATE_KEY is not configured (set it as a platform secret or env var)');
 
-    const pem = Buffer.from(privateKeyB64, 'base64').toString('utf-8');
+    const pem = this.normalizePem(privateKeyRaw);
     const key = await importPKCS8(pem, 'RS256');
 
     const nowSec = Math.floor(Date.now() / 1000);

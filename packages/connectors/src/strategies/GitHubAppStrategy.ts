@@ -9,7 +9,9 @@
  * Authorization header handed to the runner, and the same token works for git over
  * HTTPS as `x-access-token:<token>`. PRs are authored by the App's bot identity.
  *
- * Env: GITHUB_APP_ID, GITHUB_APP_PRIVATE_KEY (base64-encoded PEM), GITHUB_APP_SLUG.
+ * Configuration (GITHUB_APP_ID, GITHUB_APP_PRIVATE_KEY as base64-encoded PEM,
+ * GITHUB_APP_SLUG) is resolved as platform secrets first (encrypted, instance-admin
+ * managed) and falls back to env vars of the same name for local development.
  */
 
 import { SignJWT, importPKCS8 } from 'jose';
@@ -23,8 +25,12 @@ import type {
   ConnectorAuthKind,
   ConnectorCatalogAuthType,
   ConnectorEnv,
+  SecretResolver,
   SessionCtx,
 } from '../types';
+
+/** Minimal context needed to resolve GitHub App configuration. */
+type ConfigCtx = { env: ConnectorEnv; secrets: SecretResolver };
 
 const GITHUB_API = 'https://api.github.com';
 /** Refresh the cached installation token this many ms before it actually expires. */
@@ -42,8 +48,8 @@ export class GitHubAppStrategy implements AuthStrategy {
   private readonly tokenCache = new Map<string, CachedToken>();
 
   async begin(ctx: BeginCtx): Promise<BeginResult> {
-    const slug = ctx.env.get('GITHUB_APP_SLUG');
-    if (!slug) throw new Error('GITHUB_APP_SLUG is not configured');
+    const slug = await this.resolveConfig(ctx, 'GITHUB_APP_SLUG');
+    if (!slug) throw new Error('GITHUB_APP_SLUG is not configured (set it as a platform secret or env var)');
     const state = await ctx.encodeState({});
     const redirectUrl = `https://github.com/apps/${encodeURIComponent(slug)}/installations/new?state=${encodeURIComponent(state)}`;
     return { kind: 'redirect', redirectUrl };
@@ -68,7 +74,7 @@ export class GitHubAppStrategy implements AuthStrategy {
   async buildSession(ctx: SessionCtx): Promise<ConnectorSessionV2 | null> {
     const installationId = this.readInstallationId(ctx.metadata);
     if (!installationId) return null;
-    const token = await this.getInstallationToken(ctx.env, installationId);
+    const token = await this.getInstallationToken(ctx, installationId);
     if (!token) return null;
     return { headers: { Authorization: `Bearer ${token}` } };
   }
@@ -87,14 +93,22 @@ export class GitHubAppStrategy implements AuthStrategy {
     return null;
   }
 
+  /** Resolve App config: platform secret first (encrypted), env var fallback for local dev. */
+  private async resolveConfig(ctx: ConfigCtx, key: string): Promise<string | undefined> {
+    const fromPlatform = await ctx.secrets.resolve({ type: 'platform_secret', key });
+    if (fromPlatform && fromPlatform.trim()) return fromPlatform.trim();
+    const fromEnv = ctx.env.get(key);
+    return fromEnv && fromEnv.trim() ? fromEnv.trim() : undefined;
+  }
+
   /** Mint (or reuse a cached) installation access token for the given installation. */
-  private async getInstallationToken(env: ConnectorEnv, installationId: string): Promise<string | null> {
+  private async getInstallationToken(ctx: ConfigCtx, installationId: string): Promise<string | null> {
     const cached = this.tokenCache.get(installationId);
     if (cached && cached.expiresAtMs - TOKEN_SKEW_MS > Date.now()) {
       return cached.token;
     }
 
-    const appJwt = await this.signAppJwt(env);
+    const appJwt = await this.signAppJwt(ctx);
     const res = await fetch(`${GITHUB_API}/app/installations/${encodeURIComponent(installationId)}/access_tokens`, {
       method: 'POST',
       headers: {
@@ -116,11 +130,11 @@ export class GitHubAppStrategy implements AuthStrategy {
   }
 
   /** Sign a short-lived RS256 App JWT (iss = App ID), valid for <= 10 minutes. */
-  private async signAppJwt(env: ConnectorEnv): Promise<string> {
-    const appId = env.get('GITHUB_APP_ID');
-    const privateKeyB64 = env.get('GITHUB_APP_PRIVATE_KEY');
-    if (!appId) throw new Error('GITHUB_APP_ID is not configured');
-    if (!privateKeyB64) throw new Error('GITHUB_APP_PRIVATE_KEY is not configured');
+  private async signAppJwt(ctx: ConfigCtx): Promise<string> {
+    const appId = await this.resolveConfig(ctx, 'GITHUB_APP_ID');
+    const privateKeyB64 = await this.resolveConfig(ctx, 'GITHUB_APP_PRIVATE_KEY');
+    if (!appId) throw new Error('GITHUB_APP_ID is not configured (set it as a platform secret or env var)');
+    if (!privateKeyB64) throw new Error('GITHUB_APP_PRIVATE_KEY is not configured (set it as a platform secret or env var)');
 
     const pem = Buffer.from(privateKeyB64, 'base64').toString('utf-8');
     const key = await importPKCS8(pem, 'RS256');

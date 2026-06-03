@@ -67,7 +67,7 @@ Supported types and how they map to Postgres:
 | `enum` | `text` + `CHECK (col IN (...))` | single-select string |
 | `reference` | `text` | stores the soft key of the referenced row/card |
 
-> Note: the `formula` column type has been removed. Computed values are no longer part of the Table feature. Use the read-only [SQL surface](./sql.md) for derived/aggregated reads instead.
+> Note: there is no computed/formula column type. For derived or aggregated reads, use the read-only [SQL surface](./sql.md).
 
 ## Column formats (`column.format`)
 

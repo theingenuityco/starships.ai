@@ -11,9 +11,9 @@ Every starship has its own private **Database**: a starship-scoped namespace tha
 The feature is a two-level hierarchy:
 
 - **Database** (one per starship): the starship's private data namespace. Under the hood it is a dedicated Postgres schema, `db_<starshipId>`, provisioned automatically the first time you create a Table.
-- **Table**: a real, typed Postgres table of rows inside the Database. This is what was previously called a "dataset".
+- **Table**: a real, typed Postgres table of rows inside the Database.
 
-Because Tables are real Postgres tables (not JSON blobs), columns are strongly typed, constraints are enforced by the database, and agents can run read-only **SQL** directly against their Database.
+Because Tables are real Postgres tables, columns are strongly typed, constraints are enforced by the database, and agents can run read-only **SQL** directly against their Database.
 
 - **Schema**: a `columns` array stored on the Table (column name, type, constraints, enum/reference config).
 - **Rows**: plain JSON objects (`Record<string, unknown>`) at the API level, stored as typed columns in the physical table.
@@ -72,7 +72,7 @@ Your declared columns become real typed Postgres columns (see [schema](./databas
 ## Glossary
 
 - **Database**: the per-starship Postgres schema (`db_<starshipId>`) that contains a starship's Tables.
-- **Table**: a real, typed Postgres table of rows (formerly "dataset").
+- **Table**: a real, typed Postgres table of rows.
 - **tableIdOrSlug**: most endpoints accept either a Table **id** or its **slug**.
 - **rowKey / `__row_key`**: a stable row identifier derived from the Table `primaryKey` value.
 - **physicalTable**: the physical Postgres table name (within `db_<starshipId>`) that agents reference in SQL.

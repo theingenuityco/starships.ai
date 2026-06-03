@@ -23,7 +23,7 @@ import type {
   AgentExportPayloadV1,
   CreateAgentRequest,
   CreateToolRequest,
-  DatasetExportPayloadV1,
+  TableExportPayloadV1,
   ImportExportContainerV1,
   ImportExportKind,
   RoomExportPayloadV1,
@@ -101,8 +101,8 @@ export class ImportExportService {
     return typeof starship?.slug === 'string' && starship.slug.trim().length > 0 ? starship.slug : undefined;
   }
 
-  private async listAllDatasetRows(table: StarshipTableRecord): Promise<Array<{ rowKey?: string | null; data: Record<string, unknown> }>> {
-    const rows: Array<{ rowKey?: string | null; data: Record<string, unknown> }> = [];
+  private async listAllDatasetRows(table: StarshipTableRecord): Promise<Array<{ rowKey: string | null; data: Record<string, unknown> }>> {
+    const rows: Array<{ rowKey: string | null; data: Record<string, unknown> }> = [];
     let offset = 0;
     const ref: TableRef = {
       starshipId: table.starshipId,
@@ -115,10 +115,7 @@ export class ImportExportService {
       const page = await this.datasetRowRepo.listByDataset(ref, { limit: 200, offset, order: 'asc' });
       if (page.length === 0) break;
       for (const row of page) {
-        rows.push({
-          ...(row.rowKey !== undefined ? { rowKey: row.rowKey ?? null } : {}),
-          data: row.data,
-        });
+        rows.push({ rowKey: row.rowKey ?? null, data: row.data });
       }
       if (page.length < 200) break;
       offset += page.length;
@@ -395,7 +392,7 @@ export class ImportExportService {
       throw new Error('Dataset not found');
     }
 
-    const payload: DatasetExportPayloadV1 = {
+    const payload: TableExportPayloadV1 = {
       dataset: {
         name: dataset.name,
         description: dataset.description,

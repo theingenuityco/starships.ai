@@ -20,7 +20,7 @@ import {
   quoteSqlIdent,
 } from '@starships/models';
 import type { StarshipTableRecord, TableRef, TableRowFilter } from '@starships/models';
-import type { StarshipDatasetColumn } from '@starships/protocol';
+import type { StarshipTableColumn } from '@starships/protocol';
 
 const router: Router = Router();
 
@@ -66,7 +66,7 @@ function isProbablyUnsafeRegex(pattern: string): boolean {
   return false;
 }
 
-function wantsAutoincrement(col: StarshipDatasetColumn): boolean {
+function wantsAutoincrement(col: StarshipTableColumn): boolean {
   return Boolean(col?.constraints?.autoincrement);
 }
 
@@ -93,7 +93,7 @@ function referenceKeyFor(value: unknown): string | null {
 function coerceValidateRow(args: {
   index: number;
   row: Record<string, unknown>;
-  columns: StarshipDatasetColumn[];
+  columns: StarshipTableColumn[];
 }): { ok: true; data: Record<string, unknown> } | { ok: false; issues: RowIssue[] } {
   const { index, row, columns } = args;
   const issues: RowIssue[] = [];
@@ -228,7 +228,7 @@ function coerceValidateRow(args: {
 }
 
 /** Reconstruct stored soft-reference keys back into reference objects for the client. */
-function reconstructRow(columns: StarshipDatasetColumn[], data: Record<string, unknown>): Record<string, unknown> {
+function reconstructRow(columns: StarshipTableColumn[], data: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = { ...data };
   for (const col of columns) {
     if (col?.type !== 'reference' || !col.name) continue;
@@ -252,7 +252,7 @@ function tableRefOf(record: StarshipTableRecord): TableRef {
 // Schemas
 // ---------------------------------------------------------------------------
 
-const TableColumnSchema: z.ZodType<StarshipDatasetColumn> = z
+const TableColumnSchema: z.ZodType<StarshipTableColumn> = z
   .object({
     name: z
       .string()
@@ -295,9 +295,9 @@ const TableColumnSchema: z.ZodType<StarshipDatasetColumn> = z
       .strict()
       .optional(),
   })
-  .strict() as z.ZodType<StarshipDatasetColumn>;
+  .strict() as z.ZodType<StarshipTableColumn>;
 
-function validateColumnsConstraints(cols: StarshipDatasetColumn[], ctx: z.RefinementCtx) {
+function validateColumnsConstraints(cols: StarshipTableColumn[], ctx: z.RefinementCtx) {
   const seen = new Set<string>();
   for (const c of cols) {
     const n = String(c?.name || '').trim();
@@ -323,7 +323,7 @@ function validateColumnsConstraints(cols: StarshipDatasetColumn[], ctx: z.Refine
   }
 }
 
-function validatePkAndUnique(cols: StarshipDatasetColumn[], primaryKey: string | null | undefined, ctx: z.RefinementCtx) {
+function validatePkAndUnique(cols: StarshipTableColumn[], primaryKey: string | null | undefined, ctx: z.RefinementCtx) {
   const pk = typeof primaryKey === 'string' ? primaryKey.trim() : '';
   if (pk && !cols.some((c) => String(c?.name || '') === pk))
     ctx.addIssue({ code: 'custom', message: 'primaryKey must match an existing column name', path: ['primaryKey'] });

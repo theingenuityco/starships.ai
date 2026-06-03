@@ -16,7 +16,7 @@ import type {
   UpdateToolRequest,
   WidgetInstanceNodeInput,
   ViewRuntimeConfig,
-  StarshipDatasetColumn,
+  StarshipTableColumn,
 } from '@starships/protocol';
 import type { AuthUser, ImportExportContainerV1 } from '@starships/protocol';
 import type { NextFunction, Request, Response } from 'express';
@@ -806,7 +806,7 @@ async function applyRoomBundleToStarship(opts: {
         starshipId,
         name: String(datasetPayload?.name || 'Dataset'),
         description: typeof datasetPayload?.description === 'string' ? String(datasetPayload.description) : '',
-        columns: Array.isArray(datasetPayload?.columns) ? (datasetPayload.columns as StarshipDatasetColumn[]) : [],
+        columns: Array.isArray(datasetPayload?.columns) ? (datasetPayload.columns as StarshipTableColumn[]) : [],
         primaryKey:
           typeof datasetPayload?.primaryKey === 'string'
             ? String(datasetPayload.primaryKey)
@@ -4000,7 +4000,7 @@ router.post(
             starshipId,
             name: String(datasetPayload?.name || 'Dataset'),
             description: typeof datasetPayload?.description === 'string' ? String(datasetPayload.description) : '',
-            columns: Array.isArray(datasetPayload?.columns) ? (datasetPayload.columns as StarshipDatasetColumn[]) : [],
+            columns: Array.isArray(datasetPayload?.columns) ? (datasetPayload.columns as StarshipTableColumn[]) : [],
             primaryKey:
               typeof datasetPayload?.primaryKey === 'string'
                 ? String(datasetPayload.primaryKey)

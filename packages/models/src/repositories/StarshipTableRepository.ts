@@ -1,4 +1,4 @@
-import type { StarshipDatasetColumn } from '@starships/protocol';
+import type { StarshipTableColumn } from '@starships/protocol';
 import { BaseRepository } from './BaseRepository';
 import { NotFoundError, ValidationError } from '@starships/errors';
 import { nanoid } from 'nanoid';
@@ -17,7 +17,7 @@ export interface StarshipTableRecord {
   name: string;
   slug: string;
   description: string;
-  columns: StarshipDatasetColumn[];
+  columns: StarshipTableColumn[];
   primaryKey: string | null;
   schemaName: string;
   physicalTable: string;
@@ -30,14 +30,14 @@ export interface CreateStarshipTableInput {
   starshipId: string;
   name: string;
   description?: string;
-  columns: StarshipDatasetColumn[];
+  columns: StarshipTableColumn[];
   primaryKey?: string | null;
 }
 
 export interface UpdateStarshipTableInput {
   name?: string;
   description?: string;
-  columns?: StarshipDatasetColumn[];
+  columns?: StarshipTableColumn[];
   primaryKey?: string | null;
   archived?: boolean;
 }
@@ -52,8 +52,8 @@ function toIso(value: unknown): string {
   return typeof value === 'string' ? value : new Date(String(value)).toISOString();
 }
 
-function dropFormula(columns: StarshipDatasetColumn[] | undefined): StarshipDatasetColumn[] {
-  return (Array.isArray(columns) ? columns : []).filter((c) => c && c.name && c.type !== 'formula');
+function dropFormula(columns: StarshipTableColumn[] | undefined): StarshipTableColumn[] {
+  return (Array.isArray(columns) ? columns : []).filter((c) => c && c.name);
 }
 
 export class StarshipTableRepository extends BaseRepository {
@@ -63,10 +63,10 @@ export class StarshipTableRepository extends BaseRepository {
 
   private mapRow(row: DbRow): StarshipTableRecord {
     const rawCols = row['columns_meta'];
-    const columns: StarshipDatasetColumn[] = Array.isArray(rawCols)
-      ? (rawCols as StarshipDatasetColumn[])
+    const columns: StarshipTableColumn[] = Array.isArray(rawCols)
+      ? (rawCols as StarshipTableColumn[])
       : typeof rawCols === 'string'
-        ? (JSON.parse(rawCols) as StarshipDatasetColumn[])
+        ? (JSON.parse(rawCols) as StarshipTableColumn[])
         : [];
     return {
       id: String(row['id']),

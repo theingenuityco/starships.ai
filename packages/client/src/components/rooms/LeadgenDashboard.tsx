@@ -2,7 +2,7 @@
 
 import React, { useMemo, useState } from 'react'
 import type { RoomPinnedDataset, RoomPinnedTaskBoard } from '@starships/protocol'
-import { useStarshipDatasets, useDatasetRows } from '@/hooks/useDatasets'
+import { useStarshipTables, useDatasetRows } from '@/hooks/useDatasets'
 import type { DatasetRowFilter } from '@/hooks/useDatasets'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -489,7 +489,7 @@ function AccountsTable({ rows, allContactRows, loading, contactsLoading, primary
 
 export function LeadgenDashboard({ starshipId, starshipSlug, roomSlug, roomName, pinnedDatasets }: LeadgenDashboardProps) {
   const [icpFilter, setIcpFilter] = useState<string>('all')
-  const { data: allDatasets = [] } = useStarshipDatasets(starshipId)
+  const { data: allDatasets = [] } = useStarshipTables(starshipId)
 
   const { accountsDataset, contactsDatasetId, icpProfilesDatasetId } = useMemo(() => {
     const pinnedIds = new Set(pinnedDatasets.map((p) => p.datasetId))

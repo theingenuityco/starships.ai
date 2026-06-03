@@ -1,16 +1,16 @@
 import api from '@/lib/api'
 import type {
   ApiResponse,
-  CreateStarshipDatasetRequest,
-  StarshipDatasetDetailsResponse,
-  StarshipDatasetListResponse,
-  StarshipDatasetModel,
-  StarshipDatasetRowsPageResponse,
-  UpsertStarshipDatasetRowsRequest,
-  UpsertStarshipDatasetRowsResponse,
-  UpdateStarshipDatasetRequest,
+  CreateStarshipTableRequest,
+  StarshipTableDetailsResponse,
+  StarshipTableListResponse,
+  StarshipTableModel,
+  StarshipTableRowsPageResponse,
+  UpsertStarshipTableRowsRequest,
+  UpsertStarshipTableRowsResponse,
+  UpdateStarshipTableRequest,
 } from '@starships/protocol'
-import type { DatasetRowFilter } from '@starships/models'
+import type { TableRowFilter as DatasetRowFilter } from '@starships/models'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { FetchResponse } from '@/lib/types'
 
@@ -24,11 +24,11 @@ export const DATASET_QUERY_KEYS = {
     [...DATASET_QUERY_KEYS.byId(starshipId, datasetId), 'rows', { limit, offset, expand: expand ?? '', search: search ?? '', filters: filters ?? [] }] as const,
 } as const
 
-export function useStarshipDatasets(starshipId: string, enabled: boolean = true, opts?: { includeArchived?: boolean }) {
+export function useStarshipTables(starshipId: string, enabled: boolean = true, opts?: { includeArchived?: boolean }) {
   return useQuery({
     queryKey: [...DATASET_QUERY_KEYS.byStarship(starshipId), { includeArchived: Boolean(opts?.includeArchived) }] as const,
-    queryFn: async (): Promise<StarshipDatasetModel[]> => {
-      const response: FetchResponse<ApiResponse<StarshipDatasetListResponse>> = await api.get(`/api/v1/starships/${starshipId}/datasets`, {
+    queryFn: async (): Promise<StarshipTableModel[]> => {
+      const response: FetchResponse<ApiResponse<StarshipTableListResponse>> = await api.get(`/api/v1/starships/${starshipId}/datasets`, {
         params: opts,
       })
       return response.data.data.datasets
@@ -42,8 +42,8 @@ export function useStarshipDatasets(starshipId: string, enabled: boolean = true,
 export function useDataset(starshipId: string, datasetId: string, enabled: boolean = true) {
   return useQuery({
     queryKey: DATASET_QUERY_KEYS.byId(starshipId, datasetId),
-    queryFn: async (): Promise<StarshipDatasetModel> => {
-      const response: FetchResponse<ApiResponse<StarshipDatasetDetailsResponse>> = await api.get(
+    queryFn: async (): Promise<StarshipTableModel> => {
+      const response: FetchResponse<ApiResponse<StarshipTableDetailsResponse>> = await api.get(
         `/api/v1/starships/${starshipId}/datasets/${datasetId}`
       )
       return response.data.data.dataset
@@ -65,8 +65,8 @@ export function useDatasetRows(
 ) {
   return useQuery({
     queryKey: DATASET_QUERY_KEYS.rows(starshipId, datasetId, limit, offset, 'refs', search, filters),
-    queryFn: async (): Promise<StarshipDatasetRowsPageResponse> => {
-      const response: FetchResponse<ApiResponse<StarshipDatasetRowsPageResponse>> = await api.get(
+    queryFn: async (): Promise<StarshipTableRowsPageResponse> => {
+      const response: FetchResponse<ApiResponse<StarshipTableRowsPageResponse>> = await api.get(
         `/api/v1/starships/${starshipId}/datasets/${datasetId}/rows`,
         {
           params: {
@@ -89,8 +89,8 @@ export function useDatasetRows(
 export function useCreateDataset(starshipId: string) {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async (payload: Omit<CreateStarshipDatasetRequest, 'starshipId'>): Promise<StarshipDatasetModel> => {
-      const response: FetchResponse<ApiResponse<StarshipDatasetDetailsResponse>> = await api.post(
+    mutationFn: async (payload: Omit<CreateStarshipTableRequest, 'starshipId'>): Promise<StarshipTableModel> => {
+      const response: FetchResponse<ApiResponse<StarshipTableDetailsResponse>> = await api.post(
         `/api/v1/starships/${starshipId}/datasets`,
         payload
       )
@@ -105,8 +105,8 @@ export function useCreateDataset(starshipId: string) {
 export function useUpdateDataset(starshipId: string, datasetId: string) {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async (updates: UpdateStarshipDatasetRequest): Promise<StarshipDatasetModel> => {
-      const response: FetchResponse<ApiResponse<StarshipDatasetDetailsResponse>> = await api.patch(
+    mutationFn: async (updates: UpdateStarshipTableRequest): Promise<StarshipTableModel> => {
+      const response: FetchResponse<ApiResponse<StarshipTableDetailsResponse>> = await api.patch(
         `/api/v1/starships/${starshipId}/datasets/${datasetId}`,
         updates
       )
@@ -122,9 +122,9 @@ export function useUpdateDataset(starshipId: string, datasetId: string) {
 export function useArchiveDataset(starshipId: string) {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async (datasetIdOrSlug: string): Promise<StarshipDatasetModel> => {
+    mutationFn: async (datasetIdOrSlug: string): Promise<StarshipTableModel> => {
       const id = encodeURIComponent(String(datasetIdOrSlug || '').trim())
-      const response: FetchResponse<ApiResponse<StarshipDatasetDetailsResponse>> = await api.post(
+      const response: FetchResponse<ApiResponse<StarshipTableDetailsResponse>> = await api.post(
         `/api/v1/starships/${starshipId}/datasets/${id}/archive`,
         {}
       )
@@ -152,8 +152,8 @@ export function useHardDeleteDataset(starshipId: string) {
 export function useUpsertDatasetRows(starshipId: string, datasetId: string) {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async (payload: UpsertStarshipDatasetRowsRequest): Promise<UpsertStarshipDatasetRowsResponse> => {
-      const response: FetchResponse<ApiResponse<UpsertStarshipDatasetRowsResponse>> = await api.post(
+    mutationFn: async (payload: UpsertStarshipTableRowsRequest): Promise<UpsertStarshipTableRowsResponse> => {
+      const response: FetchResponse<ApiResponse<UpsertStarshipTableRowsResponse>> = await api.post(
         `/api/v1/starships/${starshipId}/datasets/${datasetId}/rows:upsert`,
         payload
       )

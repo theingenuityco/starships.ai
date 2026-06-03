@@ -4,7 +4,7 @@ import type { ToolModel, CreateToolRequest } from '../domains/tool';
 import type { CreateViewRequest } from '../domains/view';
 import type { CreateTaskBoardRequest, TaskCardModel, TaskColumnModel } from '../domains/task-board';
 import type { Room } from '../domains/room';
-import type { CreateStarshipDatasetRequest, StarshipDatasetRowModel } from '../domains/dataset';
+import type { CreateStarshipTableRequest, StarshipTableRowModel } from '../domains/dataset';
 
 export type ImportExportKind = 'agent' | 'tool' | 'connector_template' | 'room' | 'view' | 'dataset' | 'task_board';
 
@@ -39,7 +39,7 @@ export interface ImportExportContainerV1<K extends ImportExportKind = ImportExpo
         : K extends 'view'
           ? ViewExportPayloadV1
           : K extends 'dataset'
-            ? DatasetExportPayloadV1
+            ? TableExportPayloadV1
             : K extends 'task_board'
               ? TaskBoardExportPayloadV1
               : ConnectorTemplateExportPayloadV1;
@@ -88,11 +88,11 @@ export interface ViewExportPayloadV1 {
   };
 }
 
-export interface DatasetExportPayloadV1 {
-  dataset: Omit<CreateStarshipDatasetRequest, 'starshipId'> & {
+export interface TableExportPayloadV1 {
+  dataset: Omit<CreateStarshipTableRequest, 'starshipId'> & {
     name: string;
   };
-  rows?: Array<Pick<StarshipDatasetRowModel, 'rowKey' | 'data'>>;
+  rows?: Array<Pick<StarshipTableRowModel, 'rowKey' | 'data'>>;
 }
 
 export interface TaskBoardExportPayloadV1 {

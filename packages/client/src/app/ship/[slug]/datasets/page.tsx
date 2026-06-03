@@ -20,12 +20,12 @@ import { getSafeErrorMessage } from '@/lib/error-utils'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu'
 
 import { useStarshipBySlug } from '@/hooks/useStarships'
-import { useArchiveDataset, useCreateDataset, useHardDeleteDataset, useStarshipDatasets } from '@/hooks/useDatasets'
-import type { StarshipDatasetColumn, StarshipDatasetColumnFormat, StarshipDatasetColumnType } from '@starships/protocol'
+import { useArchiveDataset, useCreateDataset, useHardDeleteDataset, useStarshipTables } from '@/hooks/useDatasets'
+import type { StarshipTableColumn, StarshipTableColumnFormat, StarshipTableColumnType } from '@starships/protocol'
 import { useAuth } from '@/hooks/useAuth'
 import { useStarshipMembersAndInvites } from '@/hooks/useStarshipMembers'
 
-const COLUMN_TYPES: Array<{ value: StarshipDatasetColumnType; label: string }> = [
+const COLUMN_TYPES: Array<{ value: StarshipTableColumnType; label: string }> = [
   { value: 'string', label: 'String' },
   { value: 'number', label: 'Number' },
   { value: 'boolean', label: 'Boolean' },
@@ -33,11 +33,10 @@ const COLUMN_TYPES: Array<{ value: StarshipDatasetColumnType; label: string }> =
   { value: 'datetime', label: 'Datetime' },
   { value: 'enum', label: 'Enum (select)' },
   { value: 'reference', label: 'Reference' },
-  { value: 'formula', label: 'Formula' },
   { value: 'json', label: 'JSON' },
 ]
 
-const COLUMN_FORMATS: Array<{ value: StarshipDatasetColumnFormat; label: string }> = [
+const COLUMN_FORMATS: Array<{ value: StarshipTableColumnFormat; label: string }> = [
   { value: 'text', label: 'Text' },
   { value: 'number', label: 'Number' },
   { value: 'currency', label: 'Currency' },
@@ -74,7 +73,7 @@ export default function TablesIndexPage(): React.JSX.Element {
           membersAndInvites?.members?.some((m) => String(m.userId) === String(user.id) && (m.role === 'owner' || m.role === 'admin'))))
   )
 
-  const { data: datasets = [], isLoading: datasetsLoading } = useStarshipDatasets(starshipId, Boolean(starshipId))
+  const { data: datasets = [], isLoading: datasetsLoading } = useStarshipTables(starshipId, Boolean(starshipId))
 
   const sorted = useMemo(() => {
     const list = Array.isArray(datasets) ? datasets : []
@@ -115,7 +114,7 @@ export default function TablesIndexPage(): React.JSX.Element {
   const [description, setDescription] = useState('')
   const [primaryKey, setPrimaryKey] = useState<string>('')
   const [createTab, setCreateTab] = useState<'guided' | 'json'>('guided')
-  const [columnsDraft, setColumnsDraft] = useState<StarshipDatasetColumn[]>([
+  const [columnsDraft, setColumnsDraft] = useState<StarshipTableColumn[]>([
     { name: 'id', type: 'string' },
     { name: 'name', type: 'string' },
   ])
@@ -126,7 +125,7 @@ export default function TablesIndexPage(): React.JSX.Element {
     setDescription('')
     setPrimaryKey('')
     setCreateTab('guided')
-    const initial: StarshipDatasetColumn[] = [
+    const initial: StarshipTableColumn[] = [
       { name: 'id', type: 'string' },
       { name: 'name', type: 'string' },
     ]
@@ -136,7 +135,7 @@ export default function TablesIndexPage(): React.JSX.Element {
 
   async function onCreate() {
     if (!canCreate) return
-    let cols: StarshipDatasetColumn[] = []
+    let cols: StarshipTableColumn[] = []
     if (createTab === 'json') {
       let parsed: unknown
       try {
@@ -149,7 +148,7 @@ export default function TablesIndexPage(): React.JSX.Element {
         toast.error('Columns JSON must be an array')
         return
       }
-      cols = parsed.filter((c) => c && typeof c === 'object') as StarshipDatasetColumn[]
+      cols = parsed.filter((c) => c && typeof c === 'object') as StarshipTableColumn[]
     } else {
       cols = (Array.isArray(columnsDraft) ? columnsDraft : []).filter((c) => String(c?.name || '').trim().length > 0)
     }
@@ -458,12 +457,12 @@ export default function TablesIndexPage(): React.JSX.Element {
                     <div className="space-y-3">
                       {columnsDraft.map((col, idx) => {
                         const nameVal = String(col?.name || '')
-                        const typeVal = (col?.type ?? 'string') as StarshipDatasetColumnType
-                        const formatVal = col?.format as StarshipDatasetColumnFormat | undefined
+                        const typeVal = (col?.type ?? 'string') as StarshipTableColumnType
+                        const formatVal = col?.format as StarshipTableColumnFormat | undefined
                         const constraints = (col?.constraints ?? {}) as any
                         const isPk = primaryKey.trim() && primaryKey.trim() === nameVal.trim()
 
-                        const setCol = (patch: Partial<StarshipDatasetColumn>) => {
+                        const setCol = (patch: Partial<StarshipTableColumn>) => {
                           const next = columnsDraft.map((c, i) => (i === idx ? { ...(c as any), ...patch } : c))
                           setColumnsDraft(next)
                           setColumnsJsonText(JSON.stringify(next, null, 2))
@@ -648,48 +647,6 @@ export default function TablesIndexPage(): React.JSX.Element {
                               </div>
                             )}
 
-                            {typeVal === 'formula' && (
-                              <div className="space-y-2">
-                                <div className="text-[11px] text-muted-foreground">Expression</div>
-                                <Textarea
-                                  value={String((col as any)?.formula?.expr || '')}
-                                  onChange={(e) => setCol({ formula: { ...(col as any).formula, expr: e.target.value } } as any)}
-                                  rows={3}
-                                  placeholder='e.g. round(price * qty, 2)'
-                                />
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                  <div className="space-y-1">
-                                    <div className="text-[11px] text-muted-foreground">Result type (optional)</div>
-                                    <Select
-                                      value={String((col as any)?.formula?.resultType || '')}
-                                      onValueChange={(v) =>
-                                        setCol({
-                                          formula: { ...(col as any).formula, resultType: v === SELECT_INFER_VALUE ? undefined : v || undefined },
-                                        } as any)
-                                      }
-                                    >
-                                      <SelectTrigger>
-                                        <SelectValue placeholder="(infer)" />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        <SelectItem value={SELECT_INFER_VALUE}>(infer)</SelectItem>
-                                        {['string', 'number', 'boolean', 'date', 'datetime', 'json', 'enum'].map((t) => (
-                                          <SelectItem key={t} value={t}>
-                                            {t}
-                                          </SelectItem>
-                                        ))}
-                                      </SelectContent>
-                                    </Select>
-                                  </div>
-                                  <div className="space-y-1">
-                                    <div className="text-[11px] text-muted-foreground">Notes</div>
-                                    <div className="text-[11px] text-muted-foreground">
-                                      Formulas are computed on read; writes ignore this field.
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            )}
                           </div>
                         )
                       })}

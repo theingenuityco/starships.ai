@@ -1,4 +1,4 @@
-import type { StarshipDatasetColumn } from '@starships/protocol';
+import type { StarshipTableColumn } from '@starships/protocol';
 import { quoteIdent, constraintName } from '@/helpers/starship-tables/identifiers';
 
 /**
@@ -27,9 +27,8 @@ export class TableSchemaChangeError extends Error {
 
 export const HIDDEN_COLUMNS = ['__id', '__row_key', '__created_at', '__updated_at'] as const;
 
-type Col = StarshipDatasetColumn;
+type Col = StarshipTableColumn;
 
-const isFormula = (c: Col): boolean => c.type === 'formula';
 const isAutoincrement = (c: Col): boolean => Boolean(c.constraints?.autoincrement) && (c.type ?? 'string') === 'number';
 
 /** Logical column type → Postgres type. */
@@ -129,7 +128,7 @@ export interface CompileTableArgs {
 
 /** Statements to create a Table (CREATE TABLE + indexes). Run inside a transaction. */
 export function compileCreateTable(args: CompileTableArgs): string[] {
-  const userCols = (args.columns ?? []).filter((c) => c && c.name && !isFormula(c));
+  const userCols = (args.columns ?? []).filter((c) => c && c.name);
   const hasPk = typeof args.primaryKey === 'string' && args.primaryKey.length > 0;
 
   const lines: string[] = [
@@ -167,8 +166,8 @@ export interface CompileAlterArgs extends CompileTableArgs {
  * throws TableSchemaChangeError so the route can reject with a 400.
  */
 export function compileAlterTable(args: CompileAlterArgs): string[] {
-  const oldByName = new Map(args.oldColumns.filter((c) => c && c.name && !isFormula(c)).map((c) => [c.name, c]));
-  const newByName = new Map(args.columns.filter((c) => c && c.name && !isFormula(c)).map((c) => [c.name, c]));
+  const oldByName = new Map(args.oldColumns.filter((c) => c && c.name).map((c) => [c.name, c]));
+  const newByName = new Map(args.columns.filter((c) => c && c.name).map((c) => [c.name, c]));
   const stmts: string[] = [];
   const t = args.table;
 

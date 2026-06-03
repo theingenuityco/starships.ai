@@ -29,10 +29,10 @@ import { getSafeErrorMessage } from '@/lib/error-utils'
 import { adaptDataTable, downloadTableAsCsv, sanitizeFilename } from '@/lib/export'
 
 import { useStarshipBySlug } from '@/hooks/useStarships'
-import { useDataset, useDatasetRows, useDeleteDatasetRow, useStarshipDatasets, useUpdateDataset, useUpsertDatasetRows } from '@/hooks/useDatasets'
-import type { StarshipDatasetColumn, StarshipDatasetColumnFormat, StarshipDatasetColumnType } from '@starships/protocol'
+import { useDataset, useDatasetRows, useDeleteDatasetRow, useStarshipTables, useUpdateDataset, useUpsertDatasetRows } from '@/hooks/useDatasets'
+import type { StarshipTableColumn, StarshipTableColumnFormat, StarshipTableColumnType } from '@starships/protocol'
 
-const COLUMN_TYPES: Array<{ value: StarshipDatasetColumnType; label: string }> = [
+const COLUMN_TYPES: Array<{ value: StarshipTableColumnType; label: string }> = [
   { value: 'string', label: 'String' },
   { value: 'number', label: 'Number' },
   { value: 'boolean', label: 'Boolean' },
@@ -40,11 +40,10 @@ const COLUMN_TYPES: Array<{ value: StarshipDatasetColumnType; label: string }> =
   { value: 'datetime', label: 'Datetime' },
   { value: 'enum', label: 'Enum (select)' },
   { value: 'reference', label: 'Reference' },
-  { value: 'formula', label: 'Formula' },
   { value: 'json', label: 'JSON' },
 ]
 
-const COLUMN_FORMATS: Array<{ value: StarshipDatasetColumnFormat; label: string }> = [
+const COLUMN_FORMATS: Array<{ value: StarshipTableColumnFormat; label: string }> = [
   { value: 'text', label: 'Text' },
   { value: 'number', label: 'Number' },
   { value: 'currency', label: 'Currency' },
@@ -124,7 +123,7 @@ export default function DatasetViewerPage(): React.JSX.Element {
 
   const { data: dataset, isLoading: datasetLoading } = useDataset(starshipId, datasetId, Boolean(starshipId && datasetId))
   const updateDataset = useUpdateDataset(starshipId, datasetId)
-  const { data: datasets = [] } = useStarshipDatasets(starshipId, Boolean(starshipId))
+  const { data: datasets = [] } = useStarshipTables(starshipId, Boolean(starshipId))
   const upsertRows = useUpsertDatasetRows(starshipId, datasetId)
   const deleteRow = useDeleteDatasetRow(starshipId, datasetId)
 
@@ -156,7 +155,7 @@ export default function DatasetViewerPage(): React.JSX.Element {
   const [schemaOpen, setSchemaOpen] = useState(false)
   const [schemaTab, setSchemaTab] = useState<'guided' | 'json'>('guided')
   const [primaryKeyText, setPrimaryKeyText] = useState('')
-  const [columnsDraft, setColumnsDraft] = useState<StarshipDatasetColumn[]>([])
+  const [columnsDraft, setColumnsDraft] = useState<StarshipTableColumn[]>([])
   const [columnsJsonText, setColumnsJsonText] = useState('[]')
 
   const canSaveSchema = Boolean(starshipId && datasetId) && !updateDataset.isPending
@@ -164,7 +163,7 @@ export default function DatasetViewerPage(): React.JSX.Element {
   function openSchemaEditor() {
     const pk = dataset?.primaryKey ? String(dataset.primaryKey) : ''
     setPrimaryKeyText(pk)
-    const cols = (dataset?.columns ?? []) as StarshipDatasetColumn[]
+    const cols = (dataset?.columns ?? []) as StarshipTableColumn[]
     setColumnsDraft(Array.isArray(cols) ? cols : [])
     setColumnsJsonText(JSON.stringify(cols ?? [], null, 2))
     setSchemaTab('guided')
@@ -173,7 +172,7 @@ export default function DatasetViewerPage(): React.JSX.Element {
 
   async function onSaveSchema() {
     if (!canSaveSchema) return
-    let cols: StarshipDatasetColumn[] = []
+    let cols: StarshipTableColumn[] = []
     if (schemaTab === 'json') {
       let parsed: unknown
       try {
@@ -186,7 +185,7 @@ export default function DatasetViewerPage(): React.JSX.Element {
         toast.error('Columns JSON must be an array')
         return
       }
-      cols = parsed.filter((c) => c && typeof c === 'object') as StarshipDatasetColumn[]
+      cols = parsed.filter((c) => c && typeof c === 'object') as StarshipTableColumn[]
     } else {
       cols = (Array.isArray(columnsDraft) ? columnsDraft : []).filter((c) => String(c?.name || '').trim().length > 0)
     }
@@ -552,12 +551,12 @@ export default function DatasetViewerPage(): React.JSX.Element {
                   <div className="space-y-3">
                     {columnsDraft.map((col, idx) => {
                       const nameVal = String(col?.name || '')
-                      const typeVal = (col?.type ?? 'string') as StarshipDatasetColumnType
-                      const formatVal = col?.format as StarshipDatasetColumnFormat | undefined
+                      const typeVal = (col?.type ?? 'string') as StarshipTableColumnType
+                      const formatVal = col?.format as StarshipTableColumnFormat | undefined
                       const constraints = (col?.constraints ?? {}) as any
                       const isPk = primaryKeyText.trim() && primaryKeyText.trim() === nameVal.trim()
 
-                      const setCol = (patch: Partial<StarshipDatasetColumn>) => {
+                      const setCol = (patch: Partial<StarshipTableColumn>) => {
                         const next = columnsDraft.map((c, i) => (i === idx ? { ...(c as any), ...patch } : c))
                         setColumnsDraft(next)
                         setColumnsJsonText(JSON.stringify(next, null, 2))
@@ -727,40 +726,6 @@ export default function DatasetViewerPage(): React.JSX.Element {
                             </div>
                           )}
 
-                          {typeVal === 'formula' && (
-                            <div className="space-y-2">
-                              <div className="text-[11px] text-muted-foreground">Expression</div>
-                              <Textarea
-                                value={String((col as any)?.formula?.expr || '')}
-                                onChange={(e) => setCol({ formula: { ...(col as any).formula, expr: e.target.value } } as any)}
-                                rows={3}
-                                placeholder='e.g. round(price * qty, 2)'
-                              />
-                              <div className="space-y-1">
-                                <div className="text-[11px] text-muted-foreground">Result type (optional)</div>
-                                <Select
-                                  value={String((col as any)?.formula?.resultType || '')}
-                                  onValueChange={(v) =>
-                                    setCol({
-                                      formula: { ...(col as any).formula, resultType: v === SELECT_INFER_VALUE ? undefined : v || undefined },
-                                    } as any)
-                                  }
-                                >
-                                  <SelectTrigger>
-                                    <SelectValue placeholder="(infer)" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value={SELECT_INFER_VALUE}>(infer)</SelectItem>
-                                    {['string', 'number', 'boolean', 'date', 'datetime', 'json', 'enum'].map((t) => (
-                                      <SelectItem key={t} value={t}>
-                                        {t}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                            </div>
-                          )}
                         </div>
                       )
                     })}
@@ -776,7 +741,7 @@ export default function DatasetViewerPage(): React.JSX.Element {
                     // Best-effort sync draft for pk dropdown when JSON is valid.
                     try {
                       const parsed = JSON.parse(e.target.value)
-                      if (Array.isArray(parsed)) setColumnsDraft(parsed.filter((c) => c && typeof c === 'object') as StarshipDatasetColumn[])
+                      if (Array.isArray(parsed)) setColumnsDraft(parsed.filter((c) => c && typeof c === 'object') as StarshipTableColumn[])
                     } catch {
                       // ignore while typing
                     }

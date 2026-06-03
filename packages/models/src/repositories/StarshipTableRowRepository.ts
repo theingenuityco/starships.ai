@@ -1,4 +1,4 @@
-import type { StarshipDatasetColumn } from '@starships/protocol';
+import type { StarshipTableColumn } from '@starships/protocol';
 import { BaseRepository } from './BaseRepository';
 import { nanoid } from 'nanoid';
 import type { PostgresConnection } from '@/helpers/database';
@@ -10,7 +10,7 @@ type DbRow = Record<string, unknown>;
 export interface TableRef {
   starshipId: string;
   physicalTable: string;
-  columns: StarshipDatasetColumn[];
+  columns: StarshipTableColumn[];
   primaryKey: string | null;
 }
 
@@ -55,7 +55,7 @@ function toIso(value: unknown): string {
 }
 
 /** Cast suffix for a typed comparison based on a column's logical type. */
-function comparisonCast(type: StarshipDatasetColumn['type']): string {
+function comparisonCast(type: StarshipTableColumn['type']): string {
   switch (type) {
     case 'number':
       return '::double precision';
@@ -85,7 +85,7 @@ export class StarshipTableRowRepository extends BaseRepository {
     let i = 1;
 
     // Resolve a requested filter column to a quoted SQL column + its logical type.
-    const resolve = (column: string): { sql: string; type: StarshipDatasetColumn['type'] } | null => {
+    const resolve = (column: string): { sql: string; type: StarshipTableColumn['type'] } | null => {
       if (ROW_KEY_ALIASES.has(column)) return { sql: quoteIdent('__row_key'), type: 'string' };
       const col = byName.get(column);
       if (!col) return null;

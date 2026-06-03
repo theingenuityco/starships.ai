@@ -34,7 +34,7 @@ import {
   useUnassignRoomTool,
 } from '@/hooks/useRooms'
 import { useStarshipViews } from '@/hooks/useViews'
-import { useStarshipDatasets } from '@/hooks/useDatasets'
+import { useStarshipTables } from '@/hooks/useDatasets'
 import { useStarshipDocs } from '@/hooks/useDocs'
 import { cn } from '@/lib/utils'
 import type { AgentModel, MessageModel, RoomModel } from '@starships/protocol'
@@ -529,7 +529,7 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
   const { data: pinsData } = useRoomPins(activeConversationId || '', Boolean(activeConversationId && isRoomParticipant))
   const { data: roomToolsData } = useRoomTools(activeConversationId || '', Boolean(activeConversationId && isRoomParticipant))
   const { data: starshipViews = [] } = useStarshipViews(starshipData?.id ?? '', Boolean(starshipData?.id))
-  const { data: datasets = [] } = useStarshipDatasets(starshipData?.id ?? '', Boolean(starshipData?.id))
+  const { data: datasets = [] } = useStarshipTables(starshipData?.id ?? '', Boolean(starshipData?.id))
   const { data: taskBoards = [] } = useStarshipTaskBoards(starshipData?.id ?? '', Boolean(starshipData?.id))
   const { data: docs = [] } = useStarshipDocs(starshipData?.id ?? '', Boolean(starshipData?.id))
   const { data: tools = [] } = useStarshipTools(starshipData?.id ?? '', Boolean(starshipData?.id))

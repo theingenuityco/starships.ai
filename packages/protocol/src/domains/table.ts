@@ -8,8 +8,8 @@
  * - Rows are returned to the UI in `data` form (array of row objects) to feed `DataTable`.
  */
 
-export type StarshipDatasetColumnFormat = 'text' | 'number' | 'currency' | 'date' | 'datetime' | 'percentage';
-export type StarshipDatasetColumnType =
+export type StarshipTableColumnFormat = 'text' | 'number' | 'currency' | 'date' | 'datetime' | 'percentage';
+export type StarshipTableColumnType =
   | 'string'
   | 'number'
   | 'boolean'
@@ -17,10 +17,9 @@ export type StarshipDatasetColumnType =
   | 'datetime'
   | 'json'
   | 'enum'
-  | 'reference'
-  | 'formula';
+  | 'reference';
 
-export type StarshipDatasetColumnConstraints = {
+export type StarshipTableColumnConstraints = {
   /**
    * When true, the value must be present (not null/undefined/empty-string) on writes.
    */
@@ -65,32 +64,27 @@ export type StarshipDatasetColumnConstraints = {
   pattern?: string;
 };
 
-export type StarshipDatasetEnumConfig = {
+export type StarshipTableEnumConfig = {
   options: string[];
 };
 
-export type StarshipDatasetReferenceTarget =
+export type StarshipTableReferenceTarget =
   | { kind: 'dataset_row'; datasetIdOrSlug: string }
   | { kind: 'task_card' };
 
-export type StarshipDatasetReferenceConfig = {
-  target: StarshipDatasetReferenceTarget;
+export type StarshipTableReferenceConfig = {
+  target: StarshipTableReferenceTarget;
   /**
    * Optional column name to use as a human label when hydrating references.
    */
   labelColumn?: string;
 };
 
-export type StarshipDatasetFormulaConfig = {
-  expr: string;
-  resultType?: Exclude<StarshipDatasetColumnType, 'formula' | 'reference' | 'enum'> | 'enum';
-};
-
-export type StarshipDatasetReferenceValue =
+export type StarshipTableReferenceValue =
   | { kind: 'dataset_row'; datasetIdOrSlug: string; key: string; label?: string; url?: string }
   | { kind: 'task_card'; cardId: string; label?: string; url?: string };
 
-export interface StarshipDatasetColumn {
+export interface StarshipTableColumn {
   /**
    * Stable key used in row objects and shown in tables.
    */
@@ -99,31 +93,35 @@ export interface StarshipDatasetColumn {
    * Optional human-readable help text for this column.
    */
   description?: string;
-  format?: StarshipDatasetColumnFormat;
-  type?: StarshipDatasetColumnType;
-  constraints?: StarshipDatasetColumnConstraints;
-  enum?: StarshipDatasetEnumConfig;
-  reference?: StarshipDatasetReferenceConfig;
-  formula?: StarshipDatasetFormulaConfig;
+  format?: StarshipTableColumnFormat;
+  type?: StarshipTableColumnType;
+  constraints?: StarshipTableColumnConstraints;
+  enum?: StarshipTableEnumConfig;
+  reference?: StarshipTableReferenceConfig;
 }
 
-export interface StarshipDatasetModel {
+export interface StarshipTableModel {
   id: string;
   starshipId: string;
   name: string;
   slug: string;
   description: string;
-  columns: StarshipDatasetColumn[];
+  columns: StarshipTableColumn[];
   /**
    * Optional column name that acts as a primary key for upsert semantics.
    */
   primaryKey?: string | null;
+  /**
+   * Physical Postgres table name backing this Table (within the starship's
+   * Database schema). Surfaced so agents can write SQL against it.
+   */
+  physicalTable?: string;
   archived: boolean;
   createdAt: string;
   updatedAt: string;
 }
 
-export interface StarshipDatasetRowModel {
+export interface StarshipTableRowModel {
   id: string;
   datasetId: string;
   rowKey?: string | null;
@@ -136,42 +134,42 @@ export interface StarshipDatasetRowModel {
 // Requests / responses
 // ----------------------------------------------------------------------------
 
-export type CreateStarshipDatasetRequest = {
+export type CreateStarshipTableRequest = {
   starshipId: string;
   name: string;
   description?: string;
-  columns: StarshipDatasetColumn[];
+  columns: StarshipTableColumn[];
   primaryKey?: string | null;
 };
 
-export type UpdateStarshipDatasetRequest = {
+export type UpdateStarshipTableRequest = {
   name?: string;
   description?: string;
-  columns?: StarshipDatasetColumn[];
+  columns?: StarshipTableColumn[];
   primaryKey?: string | null;
   archived?: boolean;
 };
 
-export type StarshipDatasetListResponse = {
-  datasets: StarshipDatasetModel[];
+export type StarshipTableListResponse = {
+  datasets: StarshipTableModel[];
 };
 
-export type StarshipDatasetDetailsResponse = {
-  dataset: StarshipDatasetModel;
+export type StarshipTableDetailsResponse = {
+  dataset: StarshipTableModel;
 };
 
-export type StarshipDatasetRowsPageResponse = {
-  columns: StarshipDatasetColumn[];
+export type StarshipTableRowsPageResponse = {
+  columns: StarshipTableColumn[];
   data: Array<Record<string, unknown>>;
   pagination: { limit: number; offset: number; total: number };
 };
 
-export type UpsertStarshipDatasetRowsRequest = {
+export type UpsertStarshipTableRowsRequest = {
   rows: Array<Record<string, unknown>>;
   mode?: 'append' | 'upsert';
 };
 
-export type UpsertStarshipDatasetRowsResponse = {
+export type UpsertStarshipTableRowsResponse = {
   inserted: number;
   updated: number;
   /**

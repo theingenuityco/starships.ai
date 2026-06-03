@@ -1,4 +1,4 @@
-import type { StarshipDatasetColumn } from '@starships/protocol';
+import type { StarshipTableColumn } from '@starships/protocol';
 
 /**
  * Catalog introspection for Tables.
@@ -51,10 +51,10 @@ export function physicalUserColumns(introspected: IntrospectedColumn[]): Introsp
  * present. Formula columns (a removed feature) are filtered out.
  */
 export function reassembleColumns(
-  authored: StarshipDatasetColumn[],
+  authored: StarshipTableColumn[],
   introspected?: IntrospectedColumn[]
-): StarshipDatasetColumn[] {
-  const cols = (authored ?? []).filter((c) => c && c.name && c.type !== 'formula');
+): StarshipTableColumn[] {
+  const cols = (authored ?? []).filter((c) => c && c.name);
   if (!introspected || introspected.length === 0) return cols;
 
   const byName = new Map(physicalUserColumns(introspected).map((c) => [c.column, c]));

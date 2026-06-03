@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1",
-  "kind": "dataset",
+  "kind": "table",
   "exportedAt": "2026-03-10T19:02:15.317Z",
   "metadata": {
     "fromSlug": "icp-profiles",
@@ -11,7 +11,7 @@
     "version": "0.0.0"
   },
   "payload": {
-    "dataset": {
+    "table": {
       "name": "ICP Profiles",
       "description": "Ideal Customer Profile definitions (segments) used to tag/qualify accounts and contacts.",
       "columns": [

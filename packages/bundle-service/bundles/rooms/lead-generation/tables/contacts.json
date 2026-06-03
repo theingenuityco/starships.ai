@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1",
-  "kind": "dataset",
+  "kind": "table",
   "exportedAt": "2026-03-10T19:02:15.317Z",
   "metadata": {
     "fromSlug": "contacts",
@@ -11,7 +11,7 @@
     "version": "0.0.0"
   },
   "payload": {
-    "dataset": {
+    "table": {
       "name": "Contacts",
       "description": "People/contacts associated with accounts. References Accounts.",
       "columns": [
@@ -29,8 +29,8 @@
           "type": "reference",
           "reference": {
             "target": {
-              "kind": "dataset_row",
-              "datasetIdOrSlug": "accounts"
+              "kind": "table_row",
+              "tableIdOrSlug": "accounts"
             },
             "labelColumn": "account_name"
           },

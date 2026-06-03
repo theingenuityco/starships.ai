@@ -178,7 +178,7 @@ export class StarshipTableRowRepository extends BaseRepository {
     };
   }
 
-  async countByDataset(ref: TableRef, opts?: { search?: string | null; filters?: TableRowFilter[] | null }): Promise<number> {
+  async countByTable(ref: TableRef, opts?: { search?: string | null; filters?: TableRowFilter[] | null }): Promise<number> {
     return this.executeWithErrorHandling(
       async () => {
         const { whereSql, params } = this.buildWhere(ref, opts);
@@ -186,13 +186,13 @@ export class StarshipTableRowRepository extends BaseRepository {
         const row = await this.getConnection().queryOne<{ count: string }>(`SELECT COUNT(*)::text AS count FROM ${table} ${whereSql}`, params);
         return toFiniteInt(row?.count, 0);
       },
-      'countByDataset',
+      'countByTable',
       'StarshipTableRow',
       ref.physicalTable
     );
   }
 
-  async listByDataset(
+  async listByTable(
     ref: TableRef,
     opts?: { limit?: number; offset?: number; order?: 'asc' | 'desc'; search?: string | null; filters?: TableRowFilter[] | null }
   ): Promise<TableRowModel[]> {
@@ -212,7 +212,7 @@ export class StarshipTableRowRepository extends BaseRepository {
         );
         return rows.map((r) => this.mapRow(ref, r));
       },
-      'listByDataset',
+      'listByTable',
       'StarshipTableRow',
       ref.physicalTable
     );

@@ -1,10 +1,10 @@
 /**
- * Starship Dataset (Tabular Data) Domain Types
+ * Starship Table (Tabular Data) Domain Types
  *
- * Starship-scoped tabular datasets used by humans and agents.
+ * Starship-scoped Tables used by humans and agents.
  *
  * Notes:
- * - Datasets store a schema-like `columns` array and JSON row objects.
+ * - Tables store a schema-like `columns` array and JSON row objects.
  * - Rows are returned to the UI in `data` form (array of row objects) to feed `DataTable`.
  */
 
@@ -30,7 +30,7 @@ export type StarshipTableColumnConstraints = {
    *
    * Recommended usage:
    * - Use only on a `number` column
-   * - Use only on the dataset `primaryKey` column
+   * - Use only on the Table `primaryKey` column
    */
   autoincrement?: boolean;
   /**
@@ -41,7 +41,7 @@ export type StarshipTableColumnConstraints = {
    * When true, values should be unique across rows.
    *
    * Note: enforcement semantics are implementation-defined. Some deployments may only
-   * support uniqueness for the dataset primaryKey column.
+   * support uniqueness for the Table primaryKey column.
    */
   unique?: boolean;
   /**
@@ -69,7 +69,7 @@ export type StarshipTableEnumConfig = {
 };
 
 export type StarshipTableReferenceTarget =
-  | { kind: 'dataset_row'; datasetIdOrSlug: string }
+  | { kind: 'table_row'; tableIdOrSlug: string }
   | { kind: 'task_card' };
 
 export type StarshipTableReferenceConfig = {
@@ -81,7 +81,7 @@ export type StarshipTableReferenceConfig = {
 };
 
 export type StarshipTableReferenceValue =
-  | { kind: 'dataset_row'; datasetIdOrSlug: string; key: string; label?: string; url?: string }
+  | { kind: 'table_row'; tableIdOrSlug: string; key: string; label?: string; url?: string }
   | { kind: 'task_card'; cardId: string; label?: string; url?: string };
 
 export interface StarshipTableColumn {
@@ -123,7 +123,7 @@ export interface StarshipTableModel {
 
 export interface StarshipTableRowModel {
   id: string;
-  datasetId: string;
+  tableId: string;
   rowKey?: string | null;
   data: Record<string, unknown>;
   createdAt: string;
@@ -151,11 +151,11 @@ export type UpdateStarshipTableRequest = {
 };
 
 export type StarshipTableListResponse = {
-  datasets: StarshipTableModel[];
+  tables: StarshipTableModel[];
 };
 
 export type StarshipTableDetailsResponse = {
-  dataset: StarshipTableModel;
+  table: StarshipTableModel;
 };
 
 export type StarshipTableRowsPageResponse = {

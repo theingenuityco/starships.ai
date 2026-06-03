@@ -8,7 +8,7 @@ export const queryDatabaseSqlTool: ToolParams = {
   name: 'Query Database (SQL)',
   slug: 'query-database-sql',
   description:
-    'Run a single read-only SQL SELECT over this starship\'s Database (a schema of Tables). Call list-datasets first to learn each Table\'s physical_table name and columns. Tables are in your Database schema (search_path is preset, reference them unqualified). SELECT only — writes are rejected.',
+    'Run a single read-only SQL SELECT over this starship\'s Database (a schema of Tables). Call list-tables first to learn each Table\'s physical_table name and columns. Tables are in your Database schema (search_path is preset, reference them unqualified). SELECT only — writes are rejected.',
   parameters: {
     type: 'object',
     properties: {

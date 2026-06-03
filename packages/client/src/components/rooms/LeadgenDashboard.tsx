@@ -1,9 +1,9 @@
 'use client'
 
 import React, { useMemo, useState } from 'react'
-import type { RoomPinnedDataset, RoomPinnedTaskBoard } from '@starships/protocol'
-import { useStarshipTables, useDatasetRows } from '@/hooks/useDatasets'
-import type { DatasetRowFilter } from '@/hooks/useDatasets'
+import type { RoomPinnedTable, RoomPinnedTaskBoard } from '@starships/protocol'
+import { useStarshipTables, useTableRows } from '@/hooks/useTables'
+import type { TableRowFilter } from '@/hooks/useTables'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -18,7 +18,7 @@ interface LeadgenDashboardProps {
   starshipSlug: string
   roomSlug: string
   roomName: string | null | undefined
-  pinnedDatasets: RoomPinnedDataset[]
+  pinnedTables: RoomPinnedTable[]
   pinnedTaskBoards: RoomPinnedTaskBoard[]
 }
 
@@ -214,13 +214,13 @@ interface AccountsTableProps {
   loading: boolean
   contactsLoading: boolean
   primaryKey: string | null | undefined
-  datasetName?: string
+  tableName?: string
   icpProfiles: IcpProfile[]
   icpFilter: string
   onIcpFilterChange: (value: string) => void
 }
 
-function AccountsTable({ rows, allContactRows, loading, contactsLoading, primaryKey, datasetName, icpProfiles, icpFilter, onIcpFilterChange }: AccountsTableProps) {
+function AccountsTable({ rows, allContactRows, loading, contactsLoading, primaryKey, tableName, icpProfiles, icpFilter, onIcpFilterChange }: AccountsTableProps) {
   const [query, setQuery] = useState('')
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set())
   const [page, setPage] = useState(1)
@@ -273,7 +273,7 @@ function AccountsTable({ rows, allContactRows, loading, contactsLoading, primary
       employees: getStr(r, 'employee_count', 'employee_range', 'employees', 'company_size'),
       website: getStr(r, 'website', 'website_url'),
     }))
-    downloadTableAsCsv(adaptDataTable(cols, data), `${sanitizeFilename(datasetName ?? 'accounts')}-${Date.now()}.csv`)
+    downloadTableAsCsv(adaptDataTable(cols, data), `${sanitizeFilename(tableName ?? 'accounts')}-${Date.now()}.csv`)
   }
 
   return (
@@ -487,27 +487,27 @@ function AccountsTable({ rows, allContactRows, loading, contactsLoading, primary
 
 // --- LeadgenDashboard ---
 
-export function LeadgenDashboard({ starshipId, starshipSlug, roomSlug, roomName, pinnedDatasets }: LeadgenDashboardProps) {
+export function LeadgenDashboard({ starshipId, starshipSlug, roomSlug, roomName, pinnedTables }: LeadgenDashboardProps) {
   const [icpFilter, setIcpFilter] = useState<string>('all')
-  const { data: allDatasets = [] } = useStarshipTables(starshipId)
+  const { data: allTables = [] } = useStarshipTables(starshipId)
 
-  const { accountsDataset, contactsDatasetId, icpProfilesDatasetId } = useMemo(() => {
-    const pinnedIds = new Set(pinnedDatasets.map((p) => p.datasetId))
-    const pinned = allDatasets.filter((d) => pinnedIds.has(d.id))
+  const { accountsTable, contactsTableId, icpProfilesTableId } = useMemo(() => {
+    const pinnedIds = new Set(pinnedTables.map((p) => p.tableId))
+    const pinned = allTables.filter((d) => pinnedIds.has(d.id))
     return {
-      accountsDataset: pinned.find((d) => d.slug.includes('accounts')) ?? null,
-      contactsDatasetId: pinned.find((d) => d.slug.includes('contacts'))?.id ?? null,
-      icpProfilesDatasetId: pinned.find((d) => d.slug === 'icp-profiles')?.id ?? null,
+      accountsTable: pinned.find((d) => d.slug.includes('accounts')) ?? null,
+      contactsTableId: pinned.find((d) => d.slug.includes('contacts'))?.id ?? null,
+      icpProfilesTableId: pinned.find((d) => d.slug === 'icp-profiles')?.id ?? null,
     }
-  }, [allDatasets, pinnedDatasets])
+  }, [allTables, pinnedTables])
 
-  const { data: icpProfilesPage } = useDatasetRows(
+  const { data: icpProfilesPage } = useTableRows(
     starshipId,
-    icpProfilesDatasetId ?? '',
+    icpProfilesTableId ?? '',
     100,
     0,
     undefined,
-    Boolean(icpProfilesDatasetId),
+    Boolean(icpProfilesTableId),
   )
 
   const icpProfiles = useMemo<IcpProfile[]>(() => {
@@ -523,7 +523,7 @@ export function LeadgenDashboard({ starshipId, starshipSlug, roomSlug, roomName,
     })
   }, [icpProfilesPage?.data])
 
-  const accountFilters = useMemo<DatasetRowFilter[]>(() => {
+  const accountFilters = useMemo<TableRowFilter[]>(() => {
     if (icpFilter === 'all') return []
     const icp = icpProfiles.find((p) => p.id === icpFilter)
     if (!icp) return []
@@ -531,10 +531,10 @@ export function LeadgenDashboard({ starshipId, starshipSlug, roomSlug, roomName,
     if (icp.icpId !== null) {
       // Rows created via the upsert API have icp_id in data_json and a valid row_key.
       // Accounts reference ICPs via the icp_profile column as a JSON object
-      // { "kind": "dataset_row", "datasetIdOrSlug": "icp-profiles", "key": <icp_id> }.
+      // { "kind": "table_row", "tableIdOrSlug": "icp-profiles", "key": <icp_id> }.
       // PostgreSQL jsonb serialises keys alphabetically with a space after the colon, so the
       // text representation is:
-      //   {"datasetIdOrSlug": "icp-profiles", "key": <id>, "kind": "dataset_row"}
+      //   {"tableIdOrSlug": "icp-profiles", "key": <id>, "kind": "table_row"}
       // Using contains on `"key": <id>,` uniquely identifies this ICP without false positives.
       return [{ column: 'icp_profile', op: 'contains', value: `"key": ${icp.icpId},` }]
     }
@@ -551,23 +551,23 @@ export function LeadgenDashboard({ starshipId, starshipSlug, roomSlug, roomName,
     return []
   }, [icpFilter, icpProfiles])
 
-  const { data: accountsPage, isLoading: accountsLoading } = useDatasetRows(
+  const { data: accountsPage, isLoading: accountsLoading } = useTableRows(
     starshipId,
-    accountsDataset?.id ?? '',
+    accountsTable?.id ?? '',
     200,
     0,
     undefined,
-    Boolean(accountsDataset?.id),
+    Boolean(accountsTable?.id),
     accountFilters,
   )
 
-  const { data: contactsPage, isLoading: contactsLoading } = useDatasetRows(
+  const { data: contactsPage, isLoading: contactsLoading } = useTableRows(
     starshipId,
-    contactsDatasetId ?? '',
+    contactsTableId ?? '',
     500,
     0,
     undefined,
-    Boolean(contactsDatasetId),
+    Boolean(contactsTableId),
   )
 
   const accountRows = useMemo(
@@ -601,8 +601,8 @@ export function LeadgenDashboard({ starshipId, starshipSlug, roomSlug, roomName,
             allContactRows={contactsPage?.data ?? []}
             loading={accountsLoading}
             contactsLoading={contactsLoading}
-            primaryKey={accountsDataset?.primaryKey}
-            datasetName={accountsDataset?.name}
+            primaryKey={accountsTable?.primaryKey}
+            tableName={accountsTable?.name}
             icpProfiles={icpProfiles}
             icpFilter={icpFilter}
             onIcpFilterChange={setIcpFilter}

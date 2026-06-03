@@ -3,7 +3,7 @@ import {
   AgentRepository,
   ConversationParticipantRepository,
   PostgresConnection,
-  RoomDatasetsRepository,
+  RoomTablesRepository,
   RoomRepository,
   RoomTaskBoardsRepository,
   RoomToolsRepository,
@@ -40,13 +40,13 @@ export class ImportExportService {
   private agentService: AgentService;
   private roomRepo: RoomRepository;
   private roomViewsRepo: RoomViewsRepository;
-  private roomDatasetsRepo: RoomDatasetsRepository;
+  private roomTablesRepo: RoomTablesRepository;
   private roomTaskBoardsRepo: RoomTaskBoardsRepository;
   private roomToolsRepo: RoomToolsRepository;
   private participantRepo: ConversationParticipantRepository;
   private viewRepo: ViewRepository;
-  private datasetRepo: StarshipTableRepository;
-  private datasetRowRepo: StarshipTableRowRepository;
+  private tableRepo: StarshipTableRepository;
+  private tableRowRepo: StarshipTableRowRepository;
   private taskBoardRepo: TaskBoardRepository;
   private taskColumnRepo: TaskColumnRepository;
   private taskCardRepo: TaskCardRepository;
@@ -58,13 +58,13 @@ export class ImportExportService {
     this.agentService = new AgentService(connection);
     this.roomRepo = new RoomRepository();
     this.roomViewsRepo = new RoomViewsRepository();
-    this.roomDatasetsRepo = new RoomDatasetsRepository();
+    this.roomTablesRepo = new RoomTablesRepository();
     this.roomTaskBoardsRepo = new RoomTaskBoardsRepository();
     this.roomToolsRepo = new RoomToolsRepository();
     this.participantRepo = new ConversationParticipantRepository();
     this.viewRepo = new ViewRepository();
-    this.datasetRepo = new StarshipTableRepository();
-    this.datasetRowRepo = new StarshipTableRowRepository();
+    this.tableRepo = new StarshipTableRepository();
+    this.tableRowRepo = new StarshipTableRowRepository();
     this.taskBoardRepo = new TaskBoardRepository();
     this.taskColumnRepo = new TaskColumnRepository();
     this.taskCardRepo = new TaskCardRepository();
@@ -101,7 +101,7 @@ export class ImportExportService {
     return typeof starship?.slug === 'string' && starship.slug.trim().length > 0 ? starship.slug : undefined;
   }
 
-  private async listAllDatasetRows(table: StarshipTableRecord): Promise<Array<{ rowKey: string | null; data: Record<string, unknown> }>> {
+  private async listAllTableRows(table: StarshipTableRecord): Promise<Array<{ rowKey: string | null; data: Record<string, unknown> }>> {
     const rows: Array<{ rowKey: string | null; data: Record<string, unknown> }> = [];
     let offset = 0;
     const ref: TableRef = {
@@ -112,7 +112,7 @@ export class ImportExportService {
     };
 
     while (true) {
-      const page = await this.datasetRowRepo.listByDataset(ref, { limit: 200, offset, order: 'asc' });
+      const page = await this.tableRowRepo.listByTable(ref, { limit: 200, offset, order: 'asc' });
       if (page.length === 0) break;
       for (const row of page) {
         rows.push({ rowKey: row.rowKey ?? null, data: row.data });
@@ -221,7 +221,7 @@ export class ImportExportService {
     room: ImportExportContainerV1<'room'>;
     agents: Array<ImportExportContainerV1<'agent'>>;
     views: Array<ImportExportContainerV1<'view'>>;
-    datasets: Array<ImportExportContainerV1<'dataset'>>;
+    tables: Array<ImportExportContainerV1<'table'>>;
     taskBoards: Array<ImportExportContainerV1<'task_board'>>;
     tools: Array<ImportExportContainerV1<'tool'>>;
   }> {
@@ -230,25 +230,25 @@ export class ImportExportService {
       throw new Error('Room not found');
     }
 
-    const [viewPins, datasetPins, taskBoardPins, toolAssignments, participants] = await Promise.all([
+    const [viewPins, tablePins, taskBoardPins, toolAssignments, participants] = await Promise.all([
       this.roomViewsRepo.list(roomConversationId),
-      this.roomDatasetsRepo.list(roomConversationId),
+      this.roomTablesRepo.list(roomConversationId),
       this.roomTaskBoardsRepo.list(roomConversationId),
       this.roomToolsRepo.list(roomConversationId),
       this.participantRepo.listByConversation(roomConversationId),
     ]);
 
     const viewIds = Array.from(new Set(viewPins.map((pin) => String(pin.viewId || '')).filter(Boolean)));
-    const datasetIds = Array.from(new Set(datasetPins.map((pin) => String(pin.datasetId || '')).filter(Boolean)));
+    const tableIds = Array.from(new Set(tablePins.map((pin) => String(pin.tableId || '')).filter(Boolean)));
     const taskBoardIds = Array.from(new Set(taskBoardPins.map((pin) => String(pin.boardId || '')).filter(Boolean)));
     const roomToolIds = Array.from(new Set(toolAssignments.map((assignment) => String(assignment.toolId || '')).filter(Boolean)));
     const agentParticipantIds = Array.from(
       new Set(participants.map((participant) => String(participant.agentId || '')).filter(Boolean))
     );
 
-    const [views, datasets, taskBoards, roomTools, agentBundle, fromStarshipSlug] = await Promise.all([
+    const [views, tables, taskBoards, roomTools, agentBundle, fromStarshipSlug] = await Promise.all([
       Promise.all(viewIds.map((id) => this.viewRepo.findById(id))),
-      Promise.all(datasetIds.map((id) => this.datasetRepo.findById(id))),
+      Promise.all(tableIds.map((id) => this.tableRepo.findById(id))),
       Promise.all(taskBoardIds.map((id) => this.taskBoardRepo.findById(id))),
       Promise.all(roomToolIds.map((id) => this.toolRepo.findById(id))),
       this.exportAgentsBundle(agentParticipantIds),
@@ -256,12 +256,12 @@ export class ImportExportService {
     ]);
 
     const viewsById = new Map(views.filter(Boolean).map((view) => [String(view!.id), view!]));
-    const datasetsById = new Map(datasets.filter(Boolean).map((dataset) => [String(dataset!.id), dataset!]));
+    const tablesById = new Map(tables.filter(Boolean).map((table) => [String(table!.id), table!]));
     const taskBoardsById = new Map(taskBoards.filter(Boolean).map((taskBoard) => [String(taskBoard!.id), taskBoard!]));
     const toolsById = new Map(roomTools.filter(Boolean).map((tool) => [String(tool!.id), tool!]));
 
     const exportedViews = await Promise.all(Array.from(viewsById.keys()).map((id) => this.exportView(id)));
-    const exportedDatasets = await Promise.all(Array.from(datasetsById.keys()).map((id) => this.exportDataset(id)));
+    const exportedTables = await Promise.all(Array.from(tablesById.keys()).map((id) => this.exportTable(id)));
     const exportedTaskBoards = await Promise.all(Array.from(taskBoardsById.keys()).map((id) => this.exportTaskBoard(id)));
 
     const toolContainerBySlug = new Map<string, ImportExportContainerV1<'tool'>>();
@@ -289,13 +289,13 @@ export class ImportExportService {
           return { viewSlug: view.slug, position: pin.position };
         })
         .filter(Boolean) as RoomExportPayloadV1['viewPins'],
-      datasetPins: datasetPins
+      tablePins: tablePins
         .map((pin) => {
-          const dataset = datasetsById.get(String(pin.datasetId || ''));
-          if (!dataset?.slug) return null;
-          return { datasetSlug: dataset.slug, position: pin.position };
+          const table = tablesById.get(String(pin.tableId || ''));
+          if (!table?.slug) return null;
+          return { tableSlug: table.slug, position: pin.position };
         })
-        .filter(Boolean) as RoomExportPayloadV1['datasetPins'],
+        .filter(Boolean) as RoomExportPayloadV1['tablePins'],
       taskBoardPins: taskBoardPins
         .map((pin) => {
           const taskBoard = taskBoardsById.get(String(pin.boardId || ''));
@@ -323,7 +323,7 @@ export class ImportExportService {
       }),
       agents: agentBundle.agents,
       views: exportedViews,
-      datasets: exportedDatasets,
+      tables: exportedTables,
       taskBoards: exportedTaskBoards,
       tools: Array.from(toolContainerBySlug.values()),
     };
@@ -386,25 +386,25 @@ export class ImportExportService {
     });
   }
 
-  async exportDataset(datasetId: string): Promise<ImportExportContainerV1<'dataset'>> {
-    const dataset = await this.datasetRepo.findById(datasetId);
-    if (!dataset) {
-      throw new Error('Dataset not found');
+  async exportTable(tableId: string): Promise<ImportExportContainerV1<'table'>> {
+    const table = await this.tableRepo.findById(tableId);
+    if (!table) {
+      throw new Error('Table not found');
     }
 
     const payload: TableExportPayloadV1 = {
-      dataset: {
-        name: dataset.name,
-        description: dataset.description,
-        columns: dataset.columns,
-        ...(dataset.primaryKey !== undefined ? { primaryKey: dataset.primaryKey ?? null } : {}),
+      table: {
+        name: table.name,
+        description: table.description,
+        columns: table.columns,
+        ...(table.primaryKey !== undefined ? { primaryKey: table.primaryKey ?? null } : {}),
       },
-      rows: await this.listAllDatasetRows(dataset),
+      rows: await this.listAllTableRows(table),
     };
 
-    return this.buildContainer('dataset', {
-      fromSlug: dataset.slug,
-      fromStarshipSlug: await this.getStarshipSlug(dataset.starshipId),
+    return this.buildContainer('table', {
+      fromSlug: table.slug,
+      fromStarshipSlug: await this.getStarshipSlug(table.starshipId),
       payload,
     });
   }

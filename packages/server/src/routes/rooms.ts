@@ -15,7 +15,7 @@ import {
   ConversationParticipantRepository,
   ConversationRepository,
   NotificationRepository,
-  RoomDatasetsRepository,
+  RoomTablesRepository,
   RoomDocsRepository,
   RoomTaskBoardsRepository,
   RoomToolsRepository,
@@ -1194,7 +1194,7 @@ router.get('/rooms/:roomId/export-bundle', jwtAuthMiddleware, async (req: Reques
     const roomEntries = appendContainers([bundle.room], 'rooms', 'room', 'room');
     const agentEntries = appendContainers(bundle.agents, 'agents', 'agent', 'agent');
     const viewEntries = appendContainers(bundle.views, 'views', 'view', 'view');
-    const datasetEntries = appendContainers(bundle.datasets, 'datasets', 'dataset', 'dataset');
+    const tableEntries = appendContainers(bundle.tables, 'tables', 'table', 'table');
     const taskBoardEntries = appendContainers(bundle.taskBoards, 'task-boards', 'task-board', 'task_board');
     const toolEntries = appendContainers(bundle.tools, 'tools', 'tool', 'tool');
 
@@ -1206,7 +1206,7 @@ router.get('/rooms/:roomId/export-bundle', jwtAuthMiddleware, async (req: Reques
         rooms: roomEntries,
         agents: agentEntries,
         views: viewEntries,
-        datasets: datasetEntries,
+        tables: tableEntries,
         taskBoards: taskBoardEntries,
         tools: toolEntries,
       },
@@ -1645,18 +1645,18 @@ router.get('/rooms/:roomId/pins', jwtAuthMiddleware, async (req: Request, res: R
     if (!access) return;
 
     const viewsRepo = new RoomViewsRepository();
-    const datasetsRepo = new RoomDatasetsRepository();
+    const tablesRepo = new RoomTablesRepository();
     const boardsRepo = new RoomTaskBoardsRepository();
     const docsRepo = new RoomDocsRepository();
 
-    const [views, datasets, taskBoards, docs] = await Promise.all([
+    const [views, tables, taskBoards, docs] = await Promise.all([
       viewsRepo.list(access.room.conversationId),
-      datasetsRepo.list(access.room.conversationId),
+      tablesRepo.list(access.room.conversationId),
       boardsRepo.list(access.room.conversationId),
       docsRepo.list(access.room.conversationId),
     ]);
 
-    sendSuccess(res, { views, datasets, taskBoards, docs }, 200);
+    sendSuccess(res, { views, tables, taskBoards, docs }, 200);
   } catch (error) {
     handleError(error, res, 'listing room pins');
   }
@@ -1703,23 +1703,23 @@ router.get('/rooms/:roomId/resources', jwtAuthMiddleware, async (req: Request, r
     const requestedKindsList =
       rawKinds == null ? null : Array.isArray(rawKinds) ? rawKinds.flatMap((v) => String(v).split(',')) : String(rawKinds).split(',');
 
-    const normalizeKind = (input: string): 'views' | 'datasets' | 'taskBoards' | 'tools' | null | 'INVALID' => {
+    const normalizeKind = (input: string): 'views' | 'tables' | 'taskBoards' | 'tools' | null | 'INVALID' => {
       const k = String(input || '')
         .trim()
         .toLowerCase();
       if (!k) return null;
       if (k === 'all' || k === '*') return null;
       if (k === 'views' || k === 'view') return 'views';
-      if (k === 'datasets' || k === 'dataset') return 'datasets';
+      if (k === 'tables' || k === 'table') return 'tables';
       if (k === 'taskboards' || k === 'task-boards' || k === 'boards' || k === 'board' || k === 'tasks') return 'taskBoards';
       if (k === 'tools' || k === 'tool') return 'tools';
       return 'INVALID';
     };
 
-    const allKinds: Array<'views' | 'datasets' | 'taskBoards' | 'tools'> = ['views', 'datasets', 'taskBoards', 'tools'];
-    const kindSet = new Set<'views' | 'datasets' | 'taskBoards' | 'tools'>(allKinds);
+    const allKinds: Array<'views' | 'tables' | 'taskBoards' | 'tools'> = ['views', 'tables', 'taskBoards', 'tools'];
+    const kindSet = new Set<'views' | 'tables' | 'taskBoards' | 'tools'>(allKinds);
     if (requestedKindsList && requestedKindsList.length > 0) {
-      const next = new Set<'views' | 'datasets' | 'taskBoards' | 'tools'>();
+      const next = new Set<'views' | 'tables' | 'taskBoards' | 'tools'>();
       for (const kRaw of requestedKindsList) {
         const nk = normalizeKind(kRaw);
         if (nk === null) {
@@ -1744,13 +1744,13 @@ router.get('/rooms/:roomId/resources', jwtAuthMiddleware, async (req: Request, r
     }
 
     const viewsRepo = new RoomViewsRepository();
-    const datasetsRepo = new RoomDatasetsRepository();
+    const tablesRepo = new RoomTablesRepository();
     const boardsRepo = new RoomTaskBoardsRepository();
     const toolsRepo = new RoomToolsRepository();
 
-    const [viewPins, datasetPins, boardPins, toolPins] = await Promise.all([
+    const [viewPins, tablePins, boardPins, toolPins] = await Promise.all([
       kindSet.has('views') ? viewsRepo.list(access.room.conversationId) : Promise.resolve([]),
-      kindSet.has('datasets') ? datasetsRepo.list(access.room.conversationId) : Promise.resolve([]),
+      kindSet.has('tables') ? tablesRepo.list(access.room.conversationId) : Promise.resolve([]),
       kindSet.has('taskBoards') ? boardsRepo.list(access.room.conversationId) : Promise.resolve([]),
       kindSet.has('tools') ? toolsRepo.list(access.room.conversationId) : Promise.resolve([]),
     ]);
@@ -1822,11 +1822,11 @@ router.get('/rooms/:roomId/resources', jwtAuthMiddleware, async (req: Request, r
     };
 
     const viewIds = viewPins.map((p) => String(p.viewId)).filter(Boolean);
-    const datasetIds = datasetPins.map((p) => String(p.datasetId)).filter(Boolean);
+    const tableIds = tablePins.map((p) => String(p.tableId)).filter(Boolean);
     const boardIds = boardPins.map((p) => String(p.boardId)).filter(Boolean);
     const toolIds = toolPins.map((p) => String(p.toolId)).filter(Boolean);
 
-    const [viewsRows, datasetRows, boardRows, toolRows] = await Promise.all([
+    const [viewsRows, tableRows, boardRows, toolRows] = await Promise.all([
       viewIds.length
         ? conn.query<{
             id: string;
@@ -1852,7 +1852,7 @@ router.get('/rooms/:roomId/resources', jwtAuthMiddleware, async (req: Request, r
             hasQ ? [viewIds, access.conversationStarshipId, qLike] : [viewIds, access.conversationStarshipId]
           )
         : Promise.resolve([]),
-      datasetIds.length
+      tableIds.length
         ? conn.query<{
             id: string;
             name: string;
@@ -1863,7 +1863,7 @@ router.get('/rooms/:roomId/resources', jwtAuthMiddleware, async (req: Request, r
             updated_at: string;
           }>(
             `SELECT id, name, slug, description, archived, created_at, updated_at
-               FROM starship_datasets
+               FROM starship_tables
               WHERE id = ANY($1::text[])
                 AND starship_id = $2
                 ${includeArchived ? '' : `AND archived = FALSE`}
@@ -1876,7 +1876,7 @@ router.get('/rooms/:roomId/resources', jwtAuthMiddleware, async (req: Request, r
                     )`
                     : ''
                 }`,
-            hasQ ? [datasetIds, access.conversationStarshipId, qLike] : [datasetIds, access.conversationStarshipId]
+            hasQ ? [tableIds, access.conversationStarshipId, qLike] : [tableIds, access.conversationStarshipId]
           )
         : Promise.resolve([]),
       boardIds.length
@@ -1935,7 +1935,7 @@ router.get('/rooms/:roomId/resources', jwtAuthMiddleware, async (req: Request, r
     ]);
 
     const viewsById = new Map(viewsRows.map((r) => [String(r.id), r]));
-    const datasetsById = new Map(datasetRows.map((r) => [String(r.id), r]));
+    const tablesById = new Map(tableRows.map((r) => [String(r.id), r]));
     const boardsById = new Map(boardRows.map((r) => [String(r.id), r]));
     const toolsById = new Map(toolRows.map((r) => [String(r.id), r]));
 
@@ -1957,13 +1957,13 @@ router.get('/rooms/:roomId/resources', jwtAuthMiddleware, async (req: Request, r
       })
       .filter(Boolean);
 
-    let datasets = datasetPins
+    let tables = tablePins
       .map((pin) => {
-        const r = datasetsById.get(String(pin.datasetId));
+        const r = tablesById.get(String(pin.tableId));
         if (!r) return null;
         return {
           pin,
-          dataset: {
+          table: {
             id: String(r.id),
             name: String(r.name),
             slug: String(r.slug),
@@ -2017,18 +2017,18 @@ router.get('/rooms/:roomId/resources', jwtAuthMiddleware, async (req: Request, r
     if (limitPerKind != null) {
       if (limitPerKind === 0) {
         views = [];
-        datasets = [];
+        tables = [];
         taskBoards = [];
         tools = [];
       } else {
         views = views.slice(0, limitPerKind);
-        datasets = datasets.slice(0, limitPerKind);
+        tables = tables.slice(0, limitPerKind);
         taskBoards = taskBoards.slice(0, limitPerKind);
         tools = tools.slice(0, limitPerKind);
       }
     }
 
-    sendSuccess(res, { views, datasets, taskBoards, tools, participants }, 200);
+    sendSuccess(res, { views, tables, taskBoards, tools, participants }, 200);
   } catch (error) {
     handleError(error, res, 'listing room resources');
   }
@@ -2091,7 +2091,7 @@ router.get('/rooms/:roomId/pins/views', jwtAuthMiddleware, async (req: Request, 
   }
 });
 
-router.get('/rooms/:roomId/pins/datasets', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.get('/rooms/:roomId/pins/tables', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const params = validateData(z.object({ roomId: IdSchema }), req.params, res, 'room parameter');
     if (!params) return;
@@ -2099,9 +2099,9 @@ router.get('/rooms/:roomId/pins/datasets', jwtAuthMiddleware, async (req: Reques
     const access = await requireRoomReadAccess({ roomId: params.roomId, req, res });
     if (!access) return;
 
-    const datasetsRepo = new RoomDatasetsRepository();
-    const pins = await datasetsRepo.list(access.room.conversationId);
-    const ids = pins.map((p) => String(p.datasetId)).filter(Boolean);
+    const tablesRepo = new RoomTablesRepository();
+    const pins = await tablesRepo.list(access.room.conversationId);
+    const ids = pins.map((p) => String(p.tableId)).filter(Boolean);
 
     if (ids.length === 0) {
       sendSuccess(res, { items: [] }, 200);
@@ -2119,7 +2119,7 @@ router.get('/rooms/:roomId/pins/datasets', jwtAuthMiddleware, async (req: Reques
       updated_at: string;
     }>(
       `SELECT id, name, slug, description, archived, created_at, updated_at
-         FROM starship_datasets
+         FROM starship_tables
         WHERE id = ANY($1::text[])
           AND starship_id = $2`,
       [ids, access.conversationStarshipId]
@@ -2127,11 +2127,11 @@ router.get('/rooms/:roomId/pins/datasets', jwtAuthMiddleware, async (req: Reques
     const byId = new Map(rows.map((r) => [String(r.id), r]));
     const items = pins
       .map((pin) => {
-        const r = byId.get(String(pin.datasetId));
+        const r = byId.get(String(pin.tableId));
         if (!r) return null;
         return {
           pin,
-          dataset: {
+          table: {
             id: String(r.id),
             name: String(r.name),
             slug: String(r.slug),
@@ -2146,7 +2146,7 @@ router.get('/rooms/:roomId/pins/datasets', jwtAuthMiddleware, async (req: Reques
 
     sendSuccess(res, { items }, 200);
   } catch (error) {
-    handleError(error, res, 'listing pinned datasets');
+    handleError(error, res, 'listing pinned tables');
   }
 });
 
@@ -2421,7 +2421,7 @@ router.delete('/rooms/:roomId/pins/views/:viewId', jwtAuthMiddleware, async (req
   }
 });
 
-router.post('/rooms/:roomId/pins/datasets', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.post('/rooms/:roomId/pins/tables', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const params = validateData(z.object({ roomId: IdSchema }), req.params, res, 'room parameter');
     if (!params) return;
@@ -2431,10 +2431,10 @@ router.post('/rooms/:roomId/pins/datasets', jwtAuthMiddleware, async (req: Reque
       return;
     }
     const body = validateData(
-      z.object({ datasetId: IdSchema, position: z.number().int().min(0).optional() }),
+      z.object({ tableId: IdSchema, position: z.number().int().min(0).optional() }),
       req.body,
       res,
-      'pin dataset'
+      'pin table'
     );
     if (!body) return;
 
@@ -2446,37 +2446,37 @@ router.post('/rooms/:roomId/pins/datasets', jwtAuthMiddleware, async (req: Reque
     }
     if (!(await verifyStarshipOwnerAccess(room.starshipId, authUserId, res))) return;
 
-    const datasetRepo = new StarshipTableRepository();
-    const dataset = await datasetRepo.findById(body.datasetId);
-    if (!dataset) {
-      sendError(res, 'VALIDATION_ERROR', 'Dataset not found', 400, { datasetId: body.datasetId });
+    const tableRepo = new StarshipTableRepository();
+    const table = await tableRepo.findById(body.tableId);
+    if (!table) {
+      sendError(res, 'VALIDATION_ERROR', 'Table not found', 400, { tableId: body.tableId });
       return;
     }
-    if (String(dataset.starshipId) !== String(room.starshipId)) {
-      sendError(res, 'VALIDATION_ERROR', 'Pinned dataset must belong to the same starship as the room', 400, {
-        datasetId: body.datasetId,
+    if (String(table.starshipId) !== String(room.starshipId)) {
+      sendError(res, 'VALIDATION_ERROR', 'Pinned table must belong to the same starship as the room', 400, {
+        tableId: body.tableId,
         roomStarshipId: room.starshipId,
-        datasetStarshipId: dataset.starshipId,
+        tableStarshipId: table.starshipId,
       });
       return;
     }
 
-    const pinnedRepo = new RoomDatasetsRepository();
+    const pinnedRepo = new RoomTablesRepository();
     const pin = await pinnedRepo.upsert({
       roomConversationId: room.conversationId,
-      datasetId: body.datasetId,
+      tableId: body.tableId,
       position: body.position ?? null,
       createdBy: authUserId,
     });
     sendSuccess(res, { pin }, 200);
   } catch (error) {
-    handleError(error, res, 'pinning dataset');
+    handleError(error, res, 'pinning table');
   }
 });
 
-router.delete('/rooms/:roomId/pins/datasets/:datasetId', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.delete('/rooms/:roomId/pins/tables/:tableId', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
-    const params = validateData(z.object({ roomId: IdSchema, datasetId: IdSchema }), req.params, res, 'pin parameter');
+    const params = validateData(z.object({ roomId: IdSchema, tableId: IdSchema }), req.params, res, 'pin parameter');
     if (!params) return;
     const authUserId = req.user?.id as string | undefined;
     if (!authUserId) {
@@ -2491,11 +2491,11 @@ router.delete('/rooms/:roomId/pins/datasets/:datasetId', jwtAuthMiddleware, asyn
     }
     if (!(await verifyStarshipOwnerAccess(room.starshipId, authUserId, res))) return;
 
-    const pinnedRepo = new RoomDatasetsRepository();
-    const removed = await pinnedRepo.remove(room.conversationId, params.datasetId);
+    const pinnedRepo = new RoomTablesRepository();
+    const removed = await pinnedRepo.remove(room.conversationId, params.tableId);
     sendSuccess(res, { removed }, 200);
   } catch (error) {
-    handleError(error, res, 'unpinning dataset');
+    handleError(error, res, 'unpinning table');
   }
 });
 
@@ -2651,7 +2651,7 @@ router.post('/rooms/:roomId/pins/views/reorder', jwtAuthMiddleware, async (req: 
   }
 });
 
-router.post('/rooms/:roomId/pins/datasets/reorder', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.post('/rooms/:roomId/pins/tables/reorder', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const params = validateData(z.object({ roomId: IdSchema }), req.params, res, 'room parameter');
     if (!params) return;
@@ -2660,7 +2660,7 @@ router.post('/rooms/:roomId/pins/datasets/reorder', jwtAuthMiddleware, async (re
       sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
       return;
     }
-    const body = validateData(z.object({ datasetIds: z.array(IdSchema) }), req.body, res, 'reorder pinned datasets');
+    const body = validateData(z.object({ tableIds: z.array(IdSchema) }), req.body, res, 'reorder pinned tables');
     if (!body) return;
 
     const roomRepo = new RoomRepository();
@@ -2671,18 +2671,18 @@ router.post('/rooms/:roomId/pins/datasets/reorder', jwtAuthMiddleware, async (re
     }
     if (!(await verifyStarshipOwnerAccess(room.starshipId, authUserId, res))) return;
 
-    const pinnedRepo = new RoomDatasetsRepository();
+    const pinnedRepo = new RoomTablesRepository();
     const existing = await pinnedRepo.list(room.conversationId);
-    const existingIds = existing.map((p: { datasetId: string }) => String(p.datasetId));
-    const nextIds = body.datasetIds.map((x) => String(x));
+    const existingIds = existing.map((p: { tableId: string }) => String(p.tableId));
+    const nextIds = body.tableIds.map((x) => String(x));
 
     const uniq = new Set(nextIds);
     if (uniq.size !== nextIds.length) {
-      sendError(res, 'VALIDATION_ERROR', 'Duplicate datasetIds in reorder list', 400);
+      sendError(res, 'VALIDATION_ERROR', 'Duplicate tableIds in reorder list', 400);
       return;
     }
     if (existingIds.length !== nextIds.length || existingIds.some((id: string) => !uniq.has(id))) {
-      sendError(res, 'VALIDATION_ERROR', 'Reorder list must include exactly the currently pinned datasets', 400, {
+      sendError(res, 'VALIDATION_ERROR', 'Reorder list must include exactly the currently pinned tables', 400, {
         pinnedCount: existingIds.length,
         providedCount: nextIds.length,
       });
@@ -2697,19 +2697,19 @@ router.post('/rooms/:roomId/pins/datasets/reorder', jwtAuthMiddleware, async (re
 
     await conn.query('BEGIN');
     try {
-      await conn.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`room_datasets:${room.conversationId}`]);
+      await conn.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`room_tables:${room.conversationId}`]);
       await conn.query(
-        `UPDATE room_datasets
-            SET position = CASE dataset_id ${caseTemp} ELSE position END
+        `UPDATE room_tables
+            SET position = CASE table_id ${caseTemp} ELSE position END
           WHERE room_conversation_id = $1
-            AND dataset_id IN (${inList})`,
+            AND table_id IN (${inList})`,
         args
       );
       await conn.query(
-        `UPDATE room_datasets
-            SET position = CASE dataset_id ${caseFinal} ELSE position END
+        `UPDATE room_tables
+            SET position = CASE table_id ${caseFinal} ELSE position END
           WHERE room_conversation_id = $1
-            AND dataset_id IN (${inList})`,
+            AND table_id IN (${inList})`,
         args
       );
       await conn.query('COMMIT');
@@ -2718,10 +2718,10 @@ router.post('/rooms/:roomId/pins/datasets/reorder', jwtAuthMiddleware, async (re
       throw e;
     }
 
-    const datasets = await pinnedRepo.list(room.conversationId);
-    sendSuccess(res, { datasets }, 200);
+    const tables = await pinnedRepo.list(room.conversationId);
+    sendSuccess(res, { tables }, 200);
   } catch (error) {
-    handleError(error, res, 'reordering pinned datasets');
+    handleError(error, res, 'reordering pinned tables');
   }
 });
 

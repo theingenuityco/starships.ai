@@ -58,7 +58,7 @@ export { ConnectorWebhookBindingRepository } from './repositories/ConnectorWebho
 export { ChannelRepository } from './repositories/ChannelRepository';
 export { RoomRepository } from './repositories/RoomRepository';
 export { RoomViewsRepository } from './repositories/RoomViewsRepository';
-export { RoomDatasetsRepository } from './repositories/RoomDatasetsRepository';
+export { RoomTablesRepository } from './repositories/RoomTablesRepository';
 export { RoomDocsRepository } from './repositories/RoomDocsRepository';
 export { RoomTaskBoardsRepository } from './repositories/RoomTaskBoardsRepository';
 export { RoomToolsRepository } from './repositories/RoomToolsRepository';
@@ -89,7 +89,7 @@ export { TaskBoardRepository } from './repositories/TaskBoardRepository';
 export { TaskColumnRepository } from './repositories/TaskColumnRepository';
 export { TaskCardRepository } from './repositories/TaskCardRepository';
 export { StarshipDocRepository } from './repositories/StarshipDocRepository';
-// Per-starship Database of Tables (replaces the removed JSONB dataset repos).
+// Per-starship Database of Tables (replaces the removed JSONB Table repos).
 export { StarshipTableRepository } from './repositories/StarshipTableRepository';
 export type { StarshipTableRecord, CreateStarshipTableInput, UpdateStarshipTableInput } from './repositories/StarshipTableRepository';
 export { StarshipTableRowRepository } from './repositories/StarshipTableRowRepository';

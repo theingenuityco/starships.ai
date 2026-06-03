@@ -26,7 +26,7 @@ export interface BundleManifest {
     tools?: BundleManifestEntity[];
     rooms?: BundleManifestEntity[];
     views?: BundleManifestEntity[];
-    datasets?: BundleManifestEntity[];
+    tables?: BundleManifestEntity[];
     taskBoards?: BundleManifestEntity[];
     connectorTemplates?: BundleManifestEntity[];
   };

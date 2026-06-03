@@ -25,7 +25,7 @@ export type DataCellValue = string | number | boolean | null | undefined
 export type DataColumnDataType = 'string' | 'number' | 'boolean' | 'date' | 'datetime' | 'json' | 'enum' | 'reference' | 'formula'
 
 export type DataColumnReferenceTarget =
-  | { kind: 'dataset_row'; datasetIdOrSlug: string }
+  | { kind: 'table_row'; tableIdOrSlug: string }
   | { kind: 'task_card' }
 
 export interface DataColumn {
@@ -76,7 +76,7 @@ export interface DataTableProps {
 type SortState = { key: string; dir: 'asc' | 'desc' } | null
 
 type RefValue =
-  | { kind: 'dataset_row'; datasetIdOrSlug: string; key: string; label?: string; url?: string }
+  | { kind: 'table_row'; tableIdOrSlug: string; key: string; label?: string; url?: string }
   | { kind: 'task_card'; cardId: string; label?: string; url?: string }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -89,7 +89,7 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 function isRefValue(value: unknown): value is RefValue {
   if (!isPlainObject(value)) return false
   const kind = String((value as any).kind || '').trim()
-  if (kind === 'dataset_row') return typeof (value as any).datasetIdOrSlug === 'string' && typeof (value as any).key === 'string'
+  if (kind === 'table_row') return typeof (value as any).tableIdOrSlug === 'string' && typeof (value as any).key === 'string'
   if (kind === 'task_card') return typeof (value as any).cardId === 'string'
   return false
 }
@@ -381,7 +381,7 @@ export function DataTable({
       if (!key) return undefined
       if (!target) return s
       if (target.kind === 'task_card') return { kind: 'task_card', cardId: key }
-      return { kind: 'dataset_row', datasetIdOrSlug: target.datasetIdOrSlug, key }
+      return { kind: 'table_row', tableIdOrSlug: target.tableIdOrSlug, key }
     }
     if (t === 'formula') return undefined
     if (t === 'date' || t === 'datetime') return s
@@ -425,7 +425,7 @@ export function DataTable({
     if (!pk) return
     const pkVal = (row as any)?.[pk]
     if (pkVal === null || pkVal === undefined || String(pkVal).trim().length === 0) {
-      toast.error('This dataset requires a primary key to edit rows')
+      toast.error('This table requires a primary key to edit rows')
       return
     }
 

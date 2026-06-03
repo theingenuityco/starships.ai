@@ -80,7 +80,7 @@ function referenceKeyFor(value: unknown): string | null {
     const cardId = String(rec['cardId'] || '').trim();
     return cardId || null;
   }
-  // dataset_row or unspecified: use `key`.
+  // table_row or unspecified: use `key`.
   const key = String(rec['key'] || '').trim();
   return key || null;
 }
@@ -237,8 +237,8 @@ function reconstructRow(columns: StarshipTableColumn[], data: Record<string, unk
     const target = col.reference?.target;
     if (target?.kind === 'task_card') {
       out[col.name] = { kind: 'task_card', cardId: String(stored) };
-    } else if (target?.kind === 'dataset_row') {
-      out[col.name] = { kind: 'dataset_row', datasetIdOrSlug: target.datasetIdOrSlug, key: String(stored) };
+    } else if (target?.kind === 'table_row') {
+      out[col.name] = { kind: 'table_row', tableIdOrSlug: target.tableIdOrSlug, key: String(stored) };
     }
   }
   return out;
@@ -287,7 +287,7 @@ const TableColumnSchema: z.ZodType<StarshipTableColumn> = z
     reference: z
       .object({
         target: z.union([
-          z.object({ kind: z.literal('dataset_row'), datasetIdOrSlug: z.string().trim().min(1).max(255) }).strict(),
+          z.object({ kind: z.literal('table_row'), tableIdOrSlug: z.string().trim().min(1).max(255) }).strict(),
           z.object({ kind: z.literal('task_card') }).strict(),
         ]),
         labelColumn: z.string().trim().min(1).max(100).optional(),
@@ -421,10 +421,10 @@ async function requireTableInStarship(args: {
 }
 
 // ---------------------------------------------------------------------------
-// Routes (served on /datasets paths during the transition; renamed in a later step)
+// Routes (served on /tables paths)
 // ---------------------------------------------------------------------------
 
-router.get('/starships/:starshipId/datasets', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.get('/starships/:starshipId/tables', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = requireAuthUserId(req, res);
     if (!userId) return;
@@ -435,13 +435,13 @@ router.get('/starships/:starshipId/datasets', jwtAuthMiddleware, async (req: Req
     const q = validateData(ListTablesQuerySchema, req.query, res, 'tables query') || {};
     const tableRepo = new StarshipTableRepository();
     const tables = await tableRepo.listByStarship(params.starshipId, { includeArchived: Boolean((q as { includeArchived?: boolean }).includeArchived) });
-    sendSuccess(res, { datasets: tables });
+    sendSuccess(res, { tables });
   } catch (error) {
     handleError(error, res, 'list tables');
   }
 });
 
-router.post('/starships/:starshipId/datasets', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.post('/starships/:starshipId/tables', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   const userId = requireAuthUserId(req, res);
   if (!userId) return;
   const params = validateData(z.object({ starshipId: IdSchema }), req.params, res, 'tables params');
@@ -459,33 +459,33 @@ router.post('/starships/:starshipId/datasets', jwtAuthMiddleware, async (req: Re
       columns: body.columns ?? [],
       ...(body.primaryKey !== undefined ? { primaryKey: body.primaryKey } : null),
     });
-    sendSuccess(res, { dataset: created }, 201);
+    sendSuccess(res, { table: created }, 201);
   } catch (error) {
     handleError(error, res, 'create table');
   }
 });
 
-router.get('/starships/:starshipId/datasets/:datasetIdOrSlug', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.get('/starships/:starshipId/tables/:tableIdOrSlug', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = requireAuthUserId(req, res);
     if (!userId) return;
-    const params = validateData(z.object({ starshipId: IdSchema, datasetIdOrSlug: TableIdOrSlugSchema }), req.params, res, 'table params');
+    const params = validateData(z.object({ starshipId: IdSchema, tableIdOrSlug: TableIdOrSlugSchema }), req.params, res, 'table params');
     if (!params) return;
     if (!(await verifyStarshipAccess(params.starshipId, userId, res))) return;
 
     const tableRepo = new StarshipTableRepository();
-    const required = await requireTableInStarship({ tableIdOrSlug: params.datasetIdOrSlug, starshipId: params.starshipId, tableRepo, res });
+    const required = await requireTableInStarship({ tableIdOrSlug: params.tableIdOrSlug, starshipId: params.starshipId, tableRepo, res });
     if (!required) return;
-    sendSuccess(res, { dataset: required.table });
+    sendSuccess(res, { table: required.table });
   } catch (error) {
     handleError(error, res, 'get table');
   }
 });
 
-router.patch('/starships/:starshipId/datasets/:datasetIdOrSlug', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.patch('/starships/:starshipId/tables/:tableIdOrSlug', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   const userId = requireAuthUserId(req, res);
   if (!userId) return;
-  const params = validateData(z.object({ starshipId: IdSchema, datasetIdOrSlug: TableIdOrSlugSchema }), req.params, res, 'table params');
+  const params = validateData(z.object({ starshipId: IdSchema, tableIdOrSlug: TableIdOrSlugSchema }), req.params, res, 'table params');
   if (!params) return;
   if (!(await verifyStarshipAccess(params.starshipId, userId, res))) return;
   const body = validateData(UpdateTableSchema, req.body, res, 'update table body');
@@ -493,53 +493,53 @@ router.patch('/starships/:starshipId/datasets/:datasetIdOrSlug', jwtAuthMiddlewa
 
   try {
     const tableRepo = new StarshipTableRepository();
-    const required = await requireTableInStarship({ tableIdOrSlug: params.datasetIdOrSlug, starshipId: params.starshipId, tableRepo, res });
+    const required = await requireTableInStarship({ tableIdOrSlug: params.tableIdOrSlug, starshipId: params.starshipId, tableRepo, res });
     if (!required) return;
 
     const updated = await tableRepo.update(required.table.id, body);
     if (!updated) {
-      sendError(res, 'RESOURCE_NOT_FOUND', 'Table not found', 404, { datasetIdOrSlug: params.datasetIdOrSlug });
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Table not found', 404, { tableIdOrSlug: params.tableIdOrSlug });
       return;
     }
-    sendSuccess(res, { dataset: updated });
+    sendSuccess(res, { table: updated });
   } catch (error) {
     handleError(error, res, 'update table');
   }
 });
 
-router.post('/starships/:starshipId/datasets/:datasetIdOrSlug/archive', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.post('/starships/:starshipId/tables/:tableIdOrSlug/archive', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = requireAuthUserId(req, res);
     if (!userId) return;
-    const params = validateData(z.object({ starshipId: IdSchema, datasetIdOrSlug: TableIdOrSlugSchema }), req.params, res, 'table archive params');
+    const params = validateData(z.object({ starshipId: IdSchema, tableIdOrSlug: TableIdOrSlugSchema }), req.params, res, 'table archive params');
     if (!params) return;
     if (!(await verifyStarshipAccess(params.starshipId, userId, res))) return;
 
     const tableRepo = new StarshipTableRepository();
-    const required = await requireTableInStarship({ tableIdOrSlug: params.datasetIdOrSlug, starshipId: params.starshipId, tableRepo, res });
+    const required = await requireTableInStarship({ tableIdOrSlug: params.tableIdOrSlug, starshipId: params.starshipId, tableRepo, res });
     if (!required) return;
     const updated = await tableRepo.update(required.table.id, { archived: true });
-    sendSuccess(res, { dataset: updated });
+    sendSuccess(res, { table: updated });
   } catch (error) {
     handleError(error, res, 'archive table');
   }
 });
 
-router.delete('/starships/:starshipId/datasets/:datasetIdOrSlug', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.delete('/starships/:starshipId/tables/:tableIdOrSlug', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = requireAuthUserId(req, res);
     if (!userId) return;
-    const params = validateData(z.object({ starshipId: IdSchema, datasetIdOrSlug: TableIdOrSlugSchema }), req.params, res, 'table delete params');
+    const params = validateData(z.object({ starshipId: IdSchema, tableIdOrSlug: TableIdOrSlugSchema }), req.params, res, 'table delete params');
     if (!params) return;
     if (!(await verifyStarshipAdminAccess(params.starshipId, userId, res))) return;
 
     const tableRepo = new StarshipTableRepository();
-    const required = await requireTableInStarship({ tableIdOrSlug: params.datasetIdOrSlug, starshipId: params.starshipId, tableRepo, res });
+    const required = await requireTableInStarship({ tableIdOrSlug: params.tableIdOrSlug, starshipId: params.starshipId, tableRepo, res });
     if (!required) return;
 
     const ok = await tableRepo.delete(required.table.id);
     if (!ok) {
-      sendError(res, 'RESOURCE_NOT_FOUND', 'Table not found', 404, { datasetIdOrSlug: params.datasetIdOrSlug });
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Table not found', 404, { tableIdOrSlug: params.tableIdOrSlug });
       return;
     }
     res.status(204).send();
@@ -548,11 +548,11 @@ router.delete('/starships/:starshipId/datasets/:datasetIdOrSlug', jwtAuthMiddlew
   }
 });
 
-router.get('/starships/:starshipId/datasets/:datasetIdOrSlug/rows', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.get('/starships/:starshipId/tables/:tableIdOrSlug/rows', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = requireAuthUserId(req, res);
     if (!userId) return;
-    const params = validateData(z.object({ starshipId: IdSchema, datasetIdOrSlug: TableIdOrSlugSchema }), req.params, res, 'table rows params');
+    const params = validateData(z.object({ starshipId: IdSchema, tableIdOrSlug: TableIdOrSlugSchema }), req.params, res, 'table rows params');
     if (!params) return;
     if (!(await verifyStarshipAccess(params.starshipId, userId, res))) return;
 
@@ -566,7 +566,7 @@ router.get('/starships/:starshipId/datasets/:datasetIdOrSlug/rows', jwtAuthMiddl
 
     const tableRepo = new StarshipTableRepository();
     const rowRepo = new StarshipTableRowRepository();
-    const required = await requireTableInStarship({ tableIdOrSlug: params.datasetIdOrSlug, starshipId: params.starshipId, tableRepo, res });
+    const required = await requireTableInStarship({ tableIdOrSlug: params.tableIdOrSlug, starshipId: params.starshipId, tableRepo, res });
     if (!required) return;
     const ref = tableRefOf(required.table);
 
@@ -605,8 +605,8 @@ router.get('/starships/:starshipId/datasets/:datasetIdOrSlug/rows', jwtAuthMiddl
       }
     }
 
-    const total = await rowRepo.countByDataset(ref, { search, filters });
-    const rows = await rowRepo.listByDataset(ref, { limit, offset, order: 'desc', search, filters });
+    const total = await rowRepo.countByTable(ref, { search, filters });
+    const rows = await rowRepo.listByTable(ref, { limit, offset, order: 'desc', search, filters });
     const data = rows.map((r) => reconstructRow(required.table.columns, isPlainObject(r.data) ? r.data : {}));
 
     sendSuccess(res, { columns: required.table.columns ?? [], data, pagination: { limit, offset, total } });
@@ -615,12 +615,12 @@ router.get('/starships/:starshipId/datasets/:datasetIdOrSlug/rows', jwtAuthMiddl
   }
 });
 
-router.delete('/starships/:starshipId/datasets/:datasetIdOrSlug/rows/:rowKey', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.delete('/starships/:starshipId/tables/:tableIdOrSlug/rows/:rowKey', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = requireAuthUserId(req, res);
     if (!userId) return;
     const params = validateData(
-      z.object({ starshipId: IdSchema, datasetIdOrSlug: TableIdOrSlugSchema, rowKey: RowKeySchema }),
+      z.object({ starshipId: IdSchema, tableIdOrSlug: TableIdOrSlugSchema, rowKey: RowKeySchema }),
       req.params,
       res,
       'table row delete params'
@@ -630,7 +630,7 @@ router.delete('/starships/:starshipId/datasets/:datasetIdOrSlug/rows/:rowKey', j
 
     const tableRepo = new StarshipTableRepository();
     const rowRepo = new StarshipTableRowRepository();
-    const required = await requireTableInStarship({ tableIdOrSlug: params.datasetIdOrSlug, starshipId: params.starshipId, tableRepo, res });
+    const required = await requireTableInStarship({ tableIdOrSlug: params.tableIdOrSlug, starshipId: params.starshipId, tableRepo, res });
     if (!required) return;
 
     const result = await rowRepo.deleteByRowKey(tableRefOf(required.table), params.rowKey);
@@ -644,10 +644,10 @@ router.delete('/starships/:starshipId/datasets/:datasetIdOrSlug/rows/:rowKey', j
   }
 });
 
-router.post('/starships/:starshipId/datasets/:datasetIdOrSlug/rows:upsert', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.post('/starships/:starshipId/tables/:tableIdOrSlug/rows:upsert', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   const userId = requireAuthUserId(req, res);
   if (!userId) return;
-  const params = validateData(z.object({ starshipId: IdSchema, datasetIdOrSlug: TableIdOrSlugSchema }), req.params, res, 'table rows params');
+  const params = validateData(z.object({ starshipId: IdSchema, tableIdOrSlug: TableIdOrSlugSchema }), req.params, res, 'table rows params');
   if (!params) return;
   if (!(await verifyStarshipAccess(params.starshipId, userId, res))) return;
   const body = validateData(UpsertRowsSchema, req.body, res, 'upsert table rows body');
@@ -656,7 +656,7 @@ router.post('/starships/:starshipId/datasets/:datasetIdOrSlug/rows:upsert', jwtA
   try {
     const tableRepo = new StarshipTableRepository();
     const rowRepo = new StarshipTableRowRepository();
-    const required = await requireTableInStarship({ tableIdOrSlug: params.datasetIdOrSlug, starshipId: params.starshipId, tableRepo, res });
+    const required = await requireTableInStarship({ tableIdOrSlug: params.tableIdOrSlug, starshipId: params.starshipId, tableRepo, res });
     if (!required) return;
     const ref = tableRefOf(required.table);
 
@@ -722,7 +722,7 @@ router.post('/starships/:starshipId/datasets/:datasetIdOrSlug/rows:upsert', jwtA
   }
 });
 
-router.post('/starships/:starshipId/datasets/refs:resolve', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.post('/starships/:starshipId/tables/refs:resolve', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = requireAuthUserId(req, res);
     if (!userId) return;
@@ -732,8 +732,8 @@ router.post('/starships/:starshipId/datasets/refs:resolve', jwtAuthMiddleware, a
 
     const BodySchema = z
       .object({
-        datasetRowRefs: z
-          .array(z.object({ datasetIdOrSlug: z.string().trim().min(1).max(255), key: z.string().trim().min(1).max(500), labelColumn: z.string().trim().min(1).max(100).optional() }).strict())
+        tableRowRefs: z
+          .array(z.object({ tableIdOrSlug: z.string().trim().min(1).max(255), key: z.string().trim().min(1).max(500), labelColumn: z.string().trim().min(1).max(100).optional() }).strict())
           .max(500)
           .optional()
           .default([]),
@@ -762,13 +762,13 @@ router.post('/starships/:starshipId/datasets/refs:resolve', jwtAuthMiddleware, a
       }
     }
 
-    if (body.datasetRowRefs.length > 0) {
+    if (body.tableRowRefs.length > 0) {
       const tableRepo = new StarshipTableRepository();
       const rowRepo = new StarshipTableRowRepository();
       // Group by target table.
       const groups = new Map<string, { dsKey: string; table: StarshipTableRecord; refs: Array<{ key: string; labelColumn?: string }> }>();
-      for (const ref of body.datasetRowRefs) {
-        const dsKey = String(ref.datasetIdOrSlug || '').trim();
+      for (const ref of body.tableRowRefs) {
+        const dsKey = String(ref.tableIdOrSlug || '').trim();
         const rowKey = String(ref.key || '').trim();
         if (!dsKey || !rowKey) continue;
         const table = IdSchema.safeParse(dsKey).success ? await tableRepo.findById(dsKey) : await tableRepo.findBySlug(dsKey, params.starshipId);
@@ -781,14 +781,14 @@ router.post('/starships/:starshipId/datasets/refs:resolve', jwtAuthMiddleware, a
       for (const g of groups.values()) {
         const keys = Array.from(new Set(g.refs.map((r) => r.key)));
         if (keys.length === 0) continue;
-        const found = await rowRepo.listByDataset(tableRefOf(g.table), { limit: 200, filters: [{ column: 'rowKey', op: 'in', value: keys }] });
+        const found = await rowRepo.listByTable(tableRefOf(g.table), { limit: 200, filters: [{ column: 'rowKey', op: 'in', value: keys }] });
         const byKey = new Map(found.map((row) => [String(row.rowKey), row.data]));
         for (const r of g.refs) {
           const data = byKey.get(r.key);
           if (!data) continue;
           const labelCol = String(r.labelColumn || '').trim();
           const label = labelCol && data[labelCol] != null ? String(data[labelCol]) : r.key;
-          resolved[`dataset_row:${g.dsKey}:${r.key}`] = { label, data };
+          resolved[`table_row:${g.dsKey}:${r.key}`] = { label, data };
         }
       }
     }

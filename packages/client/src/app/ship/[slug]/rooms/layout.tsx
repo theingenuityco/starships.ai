@@ -15,7 +15,7 @@ import { Button } from '@/components/ui/button'
 import { useStarshipBySlug } from '@/hooks/useStarships'
 import { useMarkConversationRead } from '@/hooks/useNotifications'
 import {
-  usePinRoomDataset,
+  usePinRoomTable,
   usePinRoomDoc,
   usePinRoomTaskBoard,
   usePinRoomView,
@@ -26,7 +26,7 @@ import {
   useRoomParticipation,
   useStarshipRooms,
   useStarshipTaskBoards,
-  useUnpinRoomDataset,
+  useUnpinRoomTable,
   useUnpinRoomDoc,
   useUnpinRoomTaskBoard,
   useUnpinRoomView,
@@ -34,7 +34,7 @@ import {
   useUnassignRoomTool,
 } from '@/hooks/useRooms'
 import { useStarshipViews } from '@/hooks/useViews'
-import { useStarshipTables } from '@/hooks/useDatasets'
+import { useStarshipTables } from '@/hooks/useTables'
 import { useStarshipDocs } from '@/hooks/useDocs'
 import { cn } from '@/lib/utils'
 import type { AgentModel, MessageModel, RoomModel } from '@starships/protocol'
@@ -529,7 +529,7 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
   const { data: pinsData } = useRoomPins(activeConversationId || '', Boolean(activeConversationId && isRoomParticipant))
   const { data: roomToolsData } = useRoomTools(activeConversationId || '', Boolean(activeConversationId && isRoomParticipant))
   const { data: starshipViews = [] } = useStarshipViews(starshipData?.id ?? '', Boolean(starshipData?.id))
-  const { data: datasets = [] } = useStarshipTables(starshipData?.id ?? '', Boolean(starshipData?.id))
+  const { data: tables = [] } = useStarshipTables(starshipData?.id ?? '', Boolean(starshipData?.id))
   const { data: taskBoards = [] } = useStarshipTaskBoards(starshipData?.id ?? '', Boolean(starshipData?.id))
   const { data: docs = [] } = useStarshipDocs(starshipData?.id ?? '', Boolean(starshipData?.id))
   const { data: tools = [] } = useStarshipTools(starshipData?.id ?? '', Boolean(starshipData?.id))
@@ -548,17 +548,17 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
 
   const hasAnyResources = useMemo(() => {
     const v = pinsData?.views?.length ?? 0
-    const d = pinsData?.datasets?.length ?? 0
+    const d = pinsData?.tables?.length ?? 0
     const b = pinsData?.taskBoards?.length ?? 0
     const doc = pinsData?.docs?.length ?? 0
     const t = roomToolsData?.items?.length ?? 0
     return v + d + b + doc + t > 0
-  }, [pinsData?.datasets?.length, pinsData?.docs?.length, pinsData?.taskBoards?.length, pinsData?.views?.length, roomToolsData?.items?.length])
+  }, [pinsData?.tables?.length, pinsData?.docs?.length, pinsData?.taskBoards?.length, pinsData?.views?.length, roomToolsData?.items?.length])
 
   const pinView = usePinRoomView(activeConversationId || '', starshipData?.id ?? '')
   const unpinView = useUnpinRoomView(activeConversationId || '')
-  const pinDataset = usePinRoomDataset(activeConversationId || '')
-  const unpinDataset = useUnpinRoomDataset(activeConversationId || '')
+  const pinTable = usePinRoomTable(activeConversationId || '')
+  const unpinTable = useUnpinRoomTable(activeConversationId || '')
   const pinBoard = usePinRoomTaskBoard(activeConversationId || '')
   const unpinBoard = useUnpinRoomTaskBoard(activeConversationId || '')
   const pinDoc = usePinRoomDoc(activeConversationId || '')
@@ -577,16 +577,16 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
     return m
   }, [starshipViews])
 
-  const datasetLabelById = useMemo(() => {
+  const tableLabelById = useMemo(() => {
     const m = new Map<string, string>()
-    for (const d of Array.isArray(datasets) ? datasets : []) {
+    for (const d of Array.isArray(tables) ? tables : []) {
       const id = typeof (d as any)?.id === 'string' ? String((d as any).id).trim() : ''
       if (!id) continue
-      const name = String((d as any)?.name || (d as any)?.slug || 'Dataset').trim()
+      const name = String((d as any)?.name || (d as any)?.slug || 'Table').trim()
       m.set(id, name)
     }
     return m
-  }, [datasets])
+  }, [tables])
 
   const taskBoardLabelById = useMemo(() => {
     const m = new Map<string, string>()
@@ -630,13 +630,13 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
       .sort((a, b) => a.name.localeCompare(b.name))
   }, [starshipViews])
 
-  const availableDatasets = useMemo(() => {
-    const list = Array.isArray(datasets) ? datasets : []
+  const availableTables = useMemo(() => {
+    const list = Array.isArray(tables) ? tables : []
     return list
-      .map((d: any) => ({ id: String(d?.id || '').trim(), name: String(d?.name || d?.slug || 'Dataset').trim() }))
+      .map((d: any) => ({ id: String(d?.id || '').trim(), name: String(d?.name || d?.slug || 'Table').trim() }))
       .filter(d => Boolean(d.id))
       .sort((a, b) => a.name.localeCompare(b.name))
-  }, [datasets])
+  }, [tables])
 
   const availableTaskBoards = useMemo(() => {
     const list = Array.isArray(taskBoards) ? taskBoards : []
@@ -903,7 +903,7 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
             starshipSlug={routeParams.slug}
             roomSlug={activeRoom?.slug ?? normalizedRoomSlug}
             roomName={activeRoom?.name}
-            pinnedDatasets={pinsData?.datasets ?? []}
+            pinnedTables={pinsData?.tables ?? []}
             pinnedTaskBoards={pinsData?.taskBoards ?? []}
           />
         ) : activeConversationId ? (
@@ -921,12 +921,12 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
             allowedMentionAgentIds={roomParticipants.data?.agentIds ?? []}
             // Do not hard-block agent selection to room participants; server will create invite approvals as needed.
             pinnedViews={pinsData?.views ?? null}
-            pinnedDatasets={pinsData?.datasets ?? null}
+            pinnedTables={pinsData?.tables ?? null}
             pinnedTaskBoards={pinsData?.taskBoards ?? null}
             pinnedDocs={pinsData?.docs ?? null}
             assignedTools={(roomToolsData?.items || []).map(i => i.assignment)}
             viewLabelById={viewLabelById}
-            datasetLabelById={datasetLabelById}
+            tableLabelById={tableLabelById}
             taskBoardLabelById={taskBoardLabelById}
             docLabelById={docLabelById}
             toolLabelById={toolLabelById}
@@ -937,14 +937,14 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
             onOpenResourcesPane={() => setRoomPaneInUrl('resources')}
             onOpenParticipantsPane={() => setRoomPaneInUrl('participants')}
             availableViews={availableViews}
-            availableDatasets={availableDatasets}
+            availableTables={availableTables}
             availableTaskBoards={availableTaskBoards}
             availableDocs={availableDocs}
             availableTools={availableTools}
             onPinView={viewId => pinView.mutate({ viewId })}
             onUnpinView={viewId => unpinView.mutate(viewId)}
-            onPinDataset={datasetId => pinDataset.mutate({ datasetId })}
-            onUnpinDataset={datasetId => unpinDataset.mutate(datasetId)}
+            onPinTable={tableId => pinTable.mutate({ tableId })}
+            onUnpinTable={tableId => unpinTable.mutate(tableId)}
             onPinTaskBoard={boardId => pinBoard.mutate({ boardId })}
             onUnpinTaskBoard={boardId => unpinBoard.mutate(boardId)}
             onPinDoc={docId => pinDoc.mutate({ docId })}
@@ -1026,12 +1026,12 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
                   roomSlug={activeRoom?.slug ?? null}
                   roomName={activeRoom?.name ?? null}
                   pinnedViews={pinsData?.views ?? null}
-                  pinnedDatasets={pinsData?.datasets ?? null}
+                  pinnedTables={pinsData?.tables ?? null}
                   pinnedTaskBoards={pinsData?.taskBoards ?? null}
                   pinnedDocs={pinsData?.docs ?? null}
                   assignedTools={(roomToolsData?.items || []).map(i => i.assignment)}
                   viewLabelById={viewLabelById}
-                  datasetLabelById={datasetLabelById}
+                  tableLabelById={tableLabelById}
                   taskBoardLabelById={taskBoardLabelById}
                   docLabelById={docLabelById}
                   toolLabelById={toolLabelById}
@@ -1039,14 +1039,14 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
                   onOpenPinnedView={onOpenPinnedView}
                   canManagePins={canManagePins}
                   availableViews={availableViews}
-                  availableDatasets={availableDatasets}
+                  availableTables={availableTables}
                   availableTaskBoards={availableTaskBoards}
                   availableDocs={availableDocs}
                   availableTools={availableTools}
                   onPinView={viewId => pinView.mutate({ viewId })}
                   onUnpinView={viewId => unpinView.mutate(viewId)}
-                  onPinDataset={datasetId => pinDataset.mutate({ datasetId })}
-                  onUnpinDataset={datasetId => unpinDataset.mutate(datasetId)}
+                  onPinTable={tableId => pinTable.mutate({ tableId })}
+                  onUnpinTable={tableId => unpinTable.mutate(tableId)}
                   onPinTaskBoard={boardId => pinBoard.mutate({ boardId })}
                   onUnpinTaskBoard={boardId => unpinBoard.mutate(boardId)}
                   onPinDoc={docId => pinDoc.mutate({ docId })}
@@ -1155,12 +1155,12 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
               roomSlug={activeRoom?.slug ?? null}
               roomName={activeRoom?.name ?? null}
               pinnedViews={pinsData?.views ?? null}
-              pinnedDatasets={pinsData?.datasets ?? null}
+              pinnedTables={pinsData?.tables ?? null}
               pinnedTaskBoards={pinsData?.taskBoards ?? null}
               pinnedDocs={pinsData?.docs ?? null}
               assignedTools={(roomToolsData?.items || []).map(i => i.assignment)}
               viewLabelById={viewLabelById}
-              datasetLabelById={datasetLabelById}
+              tableLabelById={tableLabelById}
               taskBoardLabelById={taskBoardLabelById}
               docLabelById={docLabelById}
               toolLabelById={toolLabelById}
@@ -1168,14 +1168,14 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
               onOpenPinnedView={onOpenPinnedView}
               canManagePins={canManagePins}
               availableViews={availableViews}
-              availableDatasets={availableDatasets}
+              availableTables={availableTables}
               availableTaskBoards={availableTaskBoards}
               availableDocs={availableDocs}
               availableTools={availableTools}
               onPinView={viewId => pinView.mutate({ viewId })}
               onUnpinView={viewId => unpinView.mutate(viewId)}
-              onPinDataset={datasetId => pinDataset.mutate({ datasetId })}
-              onUnpinDataset={datasetId => unpinDataset.mutate(datasetId)}
+              onPinTable={tableId => pinTable.mutate({ tableId })}
+              onUnpinTable={tableId => unpinTable.mutate(tableId)}
               onPinTaskBoard={boardId => pinBoard.mutate({ boardId })}
               onUnpinTaskBoard={boardId => unpinBoard.mutate(boardId)}
               onPinDoc={docId => pinDoc.mutate({ docId })}

@@ -46,7 +46,7 @@ If you start only the client (`pnpm --filter @starships/client dev`), you must s
   - `/ship/[slug]/connectors`
   - `/ship/[slug]/schedules`
   - `/ship/[slug]/automations`
-  - `/ship/[slug]/datasets`, `/ship/[slug]/datasets/[datasetId]`
+  - `/ship/[slug]/tables`, `/ship/[slug]/tables/[tableId]`
   - `/ship/[slug]/views`, `/ship/[slug]/views/[viewId]`, `/ship/[slug]/views/[viewId]/edit`
   - `/ship/[slug]/tasks`
   - `/ship/[slug]/members`

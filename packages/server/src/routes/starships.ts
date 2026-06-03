@@ -29,7 +29,7 @@ import {
   ConversationRepository,
   ConversationParticipantRepository,
   PostgresConnection,
-  RoomDatasetsRepository,
+  RoomTablesRepository,
   RoomRepository,
   RoomTaskBoardsRepository,
   RoomToolsRepository,
@@ -147,7 +147,7 @@ function assertBundleManifestPathsOrThrow(manifest: z.infer<typeof ImportBundleM
 
 const ImportExportContainerSchemaV1RoomBundle = z.object({
   schemaVersion: z.literal('1'),
-  kind: z.enum(['agent', 'tool', 'room', 'view', 'dataset', 'task_board']),
+  kind: z.enum(['agent', 'tool', 'room', 'view', 'table', 'task_board']),
   exportedAt: z.string().min(1),
   metadata: z
     .object({
@@ -190,10 +190,10 @@ const ImportRoomBundleManifestSchemaV1 = z.object({
         })
       )
       .default([]),
-    datasets: z
+    tables: z
       .array(
         z.object({
-          kind: z.literal('dataset'),
+          kind: z.literal('table'),
           file: z.string().min(1),
           fromSlug: z.unknown().optional(),
           fromStarshipSlug: z.unknown().optional(),
@@ -215,7 +215,7 @@ const ImportRoomBundleManifestSchemaV1 = z.object({
   }),
 });
 
-const ROOM_BUNDLE_ENTRY_PATH_ALLOWLIST = /^(agents|tools|rooms|views|datasets|task-boards)\/[\w.-]+\.json$/;
+const ROOM_BUNDLE_ENTRY_PATH_ALLOWLIST = /^(agents|tools|rooms|views|tables|task-boards)\/[\w.-]+\.json$/;
 function isAllowedRoomBundlePath(file: unknown): file is string {
   return typeof file === 'string' && ROOM_BUNDLE_ENTRY_PATH_ALLOWLIST.test(file);
 }
@@ -237,9 +237,9 @@ function assertRoomBundleManifestPathsOrThrow(manifest: z.infer<typeof ImportRoo
     if (!isAllowedRoomBundlePath(v.file) || !v.file.startsWith('views/'))
       throw new Error(`Invalid manifest path for view entry: ${String(v.file)}`);
   }
-  for (const d of manifest.entities.datasets) {
-    if (!isAllowedRoomBundlePath(d.file) || !d.file.startsWith('datasets/'))
-      throw new Error(`Invalid manifest path for dataset entry: ${String(d.file)}`);
+  for (const d of manifest.entities.tables) {
+    if (!isAllowedRoomBundlePath(d.file) || !d.file.startsWith('tables/'))
+      throw new Error(`Invalid manifest path for table entry: ${String(d.file)}`);
   }
   for (const b of manifest.entities.taskBoards) {
     if (!isAllowedRoomBundlePath(b.file) || !b.file.startsWith('task-boards/'))
@@ -276,7 +276,7 @@ const RoomBundleDecisionSchema = z.object({
 const RoomBundleDecisionsSchema = z.object({
   rooms: z.record(z.string().min(1), RoomBundleDecisionSchema).default({}),
   views: z.record(z.string().min(1), RoomBundleDecisionSchema).default({}),
-  datasets: z.record(z.string().min(1), RoomBundleDecisionSchema).default({}),
+  tables: z.record(z.string().min(1), RoomBundleDecisionSchema).default({}),
   taskBoards: z.record(z.string().min(1), RoomBundleDecisionSchema).default({}),
   tools: z.record(z.string().min(1), RoomBundleDecisionSchema).default({}),
   agents: z.record(z.string().min(1), RoomBundleDecisionSchema).default({}),
@@ -375,26 +375,26 @@ async function applyRoomBundleToStarship(opts: {
     const viewRepo = new ViewRepository(txConn);
     // New Table repos manage their own (DDL) transactions, so they cannot use
     // the outer txConn (its .transaction() throws). They run independently.
-    const datasetRepo = new StarshipTableRepository();
-    const datasetRowRepo = new StarshipTableRowRepository();
+    const tableRepo = new StarshipTableRepository();
+    const tableRowRepo = new StarshipTableRowRepository();
     const taskBoardRepo = new TaskBoardRepository(txConn);
     const taskColumnRepo = new TaskColumnRepository(txConn);
     const taskCardRepo = new TaskCardRepository(txConn);
     const roomRepo = new RoomRepository(txConn);
     const roomViewsRepo = new RoomViewsRepository(txConn);
-    const roomDatasetsRepo = new RoomDatasetsRepository(txConn);
+    const roomTablesRepo = new RoomTablesRepository(txConn);
     const roomTaskBoardsRepo = new RoomTaskBoardsRepository(txConn);
     const roomToolsRepo = new RoomToolsRepository(txConn);
     const participantRepo = new ConversationParticipantRepository(txConn);
     const conversationRepo = new ConversationRepository(txConn);
 
     const warnings: string[] = [];
-    const imported: Record<string, number> = { rooms: 0, views: 0, datasets: 0, taskBoards: 0, agents: 0, tools: 0 };
+    const imported: Record<string, number> = { rooms: 0, views: 0, tables: 0, taskBoards: 0, agents: 0, tools: 0 };
 
     const toolSlugMap = new Map<string, string>();
     const agentIdMap = new Map<string, string>(); // source slug -> created agent id
     const viewSlugMap = new Map<string, string>(); // source slug -> created slug
-    const datasetSlugMap = new Map<string, string>();
+    const tableSlugMap = new Map<string, string>();
     const taskBoardSlugMap = new Map<string, string>();
 
     // Index existing tools for overwrite/skip mapping.
@@ -735,43 +735,43 @@ async function applyRoomBundleToStarship(opts: {
       if (sourceSlug) viewSlugMap.set(sourceSlug, created.slug);
     }
 
-    // Datasets (include rows best-effort; overwrite clears rows).
-    const existingDatasets = await datasetRepo.listByStarship(starshipId, { includeArchived: true });
-    const datasetsByHash = new Map<string, (typeof existingDatasets)[number]>();
-    const datasetsByName = new Map<string, (typeof existingDatasets)[number]>();
-    for (const d of existingDatasets) {
+    // Tables (include rows best-effort; overwrite clears rows).
+    const existingTables = await tableRepo.listByStarship(starshipId, { includeArchived: true });
+    const tablesByHash = new Map<string, (typeof existingTables)[number]>();
+    const tablesByName = new Map<string, (typeof existingTables)[number]>();
+    for (const d of existingTables) {
       const nameKey = String(d.name || '')
         .trim()
         .toLowerCase();
-      if (nameKey) datasetsByName.set(nameKey, d);
-      datasetsByHash.set(
+      if (nameKey) tablesByName.set(nameKey, d);
+      tablesByHash.set(
         computeBundleHash({ name: d.name, description: d.description, columns: d.columns, primaryKey: d.primaryKey ?? null }),
         d
       );
     }
 
-    for (const d of manifest.entities.datasets) {
+    for (const d of manifest.entities.tables) {
       const entry = getBundleEntry(reader, d.file);
       if (!entry) {
-        warnings.push(`Bundle is missing dataset file: ${d.file}`);
+        warnings.push(`Bundle is missing table file: ${d.file}`);
         continue;
       }
       let containerRaw: unknown;
       try {
         containerRaw = JSON.parse(entry.getData().toString('utf8'));
       } catch {
-        warnings.push(`Dataset file is not valid JSON: ${d.file}`);
+        warnings.push(`Table file is not valid JSON: ${d.file}`);
         continue;
       }
       const containerParsed = ContainerSchema.safeParse(containerRaw);
-      if (!containerParsed.success || containerParsed.data.kind !== 'dataset') {
-        warnings.push(`Dataset file is not a valid dataset container: ${d.file}`);
+      if (!containerParsed.success || containerParsed.data.kind !== 'table') {
+        warnings.push(`Table file is not a valid table container: ${d.file}`);
         continue;
       }
       const fromSlug = containerParsed.data.metadata?.fromSlug;
       const sourceSlug = typeof fromSlug === 'string' ? fromSlug.trim() : '';
-      const payload = containerParsed.data.payload as unknown as { dataset?: Record<string, unknown>; rows?: unknown };
-      const datasetPayload = payload?.dataset ?? {};
+      const payload = containerParsed.data.payload as unknown as { table?: Record<string, unknown>; rows?: unknown };
+      const tablePayload = payload?.table ?? {};
       const rowsRaw = Array.isArray(payload?.rows) ? (payload.rows as unknown[]) : [];
       const rows = rowsRaw
         .map((r: unknown) => {
@@ -784,33 +784,33 @@ async function applyRoomBundleToStarship(opts: {
         .filter((r) => isPlainObject(r?.data));
 
       const bundleHash = computeBundleHash({
-        name: datasetPayload?.name,
-        description: datasetPayload?.description,
-        columns: datasetPayload?.columns,
-        primaryKey: datasetPayload?.primaryKey ?? null,
+        name: tablePayload?.name,
+        description: tablePayload?.description,
+        columns: tablePayload?.columns,
+        primaryKey: tablePayload?.primaryKey ?? null,
       });
-      const decision = decisions.datasets[bundleHash] ?? { action: 'copy' as const };
-      const datasetNameKey = String(datasetPayload?.name || '')
+      const decision = decisions.tables[bundleHash] ?? { action: 'copy' as const };
+      const tableNameKey = String(tablePayload?.name || '')
         .trim()
         .toLowerCase();
-      const existingByHash = datasetsByHash.get(bundleHash);
-      const existingByName = datasetNameKey ? datasetsByName.get(datasetNameKey) : undefined;
+      const existingByHash = tablesByHash.get(bundleHash);
+      const existingByName = tableNameKey ? tablesByName.get(tableNameKey) : undefined;
       const target = existingByHash ?? existingByName ?? null;
 
       if (decision.action === 'skip') {
-        if (sourceSlug && target?.slug) datasetSlugMap.set(sourceSlug, target.slug);
+        if (sourceSlug && target?.slug) tableSlugMap.set(sourceSlug, target.slug);
         continue;
       }
 
       const normalizedCreate = {
         starshipId,
-        name: String(datasetPayload?.name || 'Dataset'),
-        description: typeof datasetPayload?.description === 'string' ? String(datasetPayload.description) : '',
-        columns: Array.isArray(datasetPayload?.columns) ? (datasetPayload.columns as StarshipTableColumn[]) : [],
+        name: String(tablePayload?.name || 'Table'),
+        description: typeof tablePayload?.description === 'string' ? String(tablePayload.description) : '',
+        columns: Array.isArray(tablePayload?.columns) ? (tablePayload.columns as StarshipTableColumn[]) : [],
         primaryKey:
-          typeof datasetPayload?.primaryKey === 'string'
-            ? String(datasetPayload.primaryKey)
-            : datasetPayload?.primaryKey === null
+          typeof tablePayload?.primaryKey === 'string'
+            ? String(tablePayload.primaryKey)
+            : tablePayload?.primaryKey === null
               ? null
               : undefined,
       };
@@ -818,10 +818,10 @@ async function applyRoomBundleToStarship(opts: {
       if (decision.action === 'overwrite') {
         const targetId = decision.targetId || target?.id;
         if (!targetId) {
-          warnings.push(`No overwrite target found for dataset: ${String(datasetPayload?.name || d.file)}`);
+          warnings.push(`No overwrite target found for table: ${String(tablePayload?.name || d.file)}`);
           continue;
         }
-        const updated = await datasetRepo.update(targetId, {
+        const updated = await tableRepo.update(targetId, {
           name: normalizedCreate.name,
           description: normalizedCreate.description,
           columns: normalizedCreate.columns,
@@ -829,22 +829,22 @@ async function applyRoomBundleToStarship(opts: {
           archived: false,
         });
         if (updated) {
-          await datasetRowRepo.truncate(tableRefOf(updated));
+          await tableRowRepo.truncate(tableRefOf(updated));
           if (rows.length > 0) {
-            await datasetRowRepo.appendMany(tableRefOf(updated), rows);
+            await tableRowRepo.appendMany(tableRefOf(updated), rows);
           }
-          imported.datasets += 1;
-          if (sourceSlug) datasetSlugMap.set(sourceSlug, updated.slug);
+          imported.tables += 1;
+          if (sourceSlug) tableSlugMap.set(sourceSlug, updated.slug);
         }
         continue;
       }
 
-      const created = await datasetRepo.create(normalizedCreate);
+      const created = await tableRepo.create(normalizedCreate);
       if (rows.length > 0) {
-        await datasetRowRepo.appendMany(tableRefOf(created), rows);
+        await tableRowRepo.appendMany(tableRefOf(created), rows);
       }
-      imported.datasets += 1;
-      if (sourceSlug) datasetSlugMap.set(sourceSlug, created.slug);
+      imported.tables += 1;
+      if (sourceSlug) tableSlugMap.set(sourceSlug, created.slug);
     }
 
     // Task boards (copy/skip; overwrite treated as copy)
@@ -1023,7 +1023,7 @@ async function applyRoomBundleToStarship(opts: {
         }
       }
 
-      // Pins (views/datasets/task boards)
+      // Pins (views/tables/task boards)
       const viewPins = Array.isArray(payload?.viewPins) ? (payload.viewPins as Record<string, unknown>[]) : [];
       for (const p of viewPins) {
         const sourceViewSlug = typeof p?.viewSlug === 'string' ? p.viewSlug.trim() : '';
@@ -1042,19 +1042,19 @@ async function applyRoomBundleToStarship(opts: {
         });
       }
 
-      const datasetPins = Array.isArray(payload?.datasetPins) ? (payload.datasetPins as Record<string, unknown>[]) : [];
-      for (const p of datasetPins) {
-        const sourceDatasetSlug = typeof p?.datasetSlug === 'string' ? p.datasetSlug.trim() : '';
-        if (!sourceDatasetSlug) continue;
-        const destSlug = datasetSlugMap.get(sourceDatasetSlug) ?? sourceDatasetSlug;
-        const dataset = await datasetRepo.findBySlug(destSlug, starshipId);
-        if (!dataset) {
-          warnings.push(`Skipped missing pinned dataset: ${destSlug}`);
+      const tablePins = Array.isArray(payload?.tablePins) ? (payload.tablePins as Record<string, unknown>[]) : [];
+      for (const p of tablePins) {
+        const sourceTableSlug = typeof p?.tableSlug === 'string' ? p.tableSlug.trim() : '';
+        if (!sourceTableSlug) continue;
+        const destSlug = tableSlugMap.get(sourceTableSlug) ?? sourceTableSlug;
+        const table = await tableRepo.findBySlug(destSlug, starshipId);
+        if (!table) {
+          warnings.push(`Skipped missing pinned table: ${destSlug}`);
           continue;
         }
-        await roomDatasetsRepo.upsert({
+        await roomTablesRepo.upsert({
           roomConversationId: createdRoom.conversationId,
-          datasetId: dataset.id,
+          tableId: table.id,
           position: typeof p?.position === 'number' ? p.position : undefined,
           createdBy: userId,
         });
@@ -2714,9 +2714,9 @@ router.post(
         existingAgentsByHash.set(computed, a);
       }
 
-      // Existing views/datasets/task boards/rooms (conflicts by hash + name where feasible).
+      // Existing views/tables/task boards/rooms (conflicts by hash + name where feasible).
       const viewRepo = new ViewRepository();
-      const datasetRepo = new StarshipTableRepository();
+      const tableRepo = new StarshipTableRepository();
       const taskBoardRepo = new TaskBoardRepository();
       const roomRepo = new RoomRepository();
 
@@ -2732,21 +2732,21 @@ router.post(
         existingViewsByHash.set(h, v);
       }
 
-      const existingDatasets = await datasetRepo.listByStarship(starshipId, { includeArchived: true });
-      const existingDatasetsByHash = new Map<string, (typeof existingDatasets)[number]>();
-      const existingDatasetsByName = new Map<string, (typeof existingDatasets)[number]>();
-      for (const d of existingDatasets) {
+      const existingTables = await tableRepo.listByStarship(starshipId, { includeArchived: true });
+      const existingTablesByHash = new Map<string, (typeof existingTables)[number]>();
+      const existingTablesByName = new Map<string, (typeof existingTables)[number]>();
+      for (const d of existingTables) {
         const nameKey = String(d.name || '')
           .trim()
           .toLowerCase();
-        if (nameKey) existingDatasetsByName.set(nameKey, d);
+        if (nameKey) existingTablesByName.set(nameKey, d);
         const h = computeBundleHash({
           name: d.name,
           description: d.description,
           columns: d.columns,
           primaryKey: d.primaryKey ?? null,
         });
-        existingDatasetsByHash.set(h, d);
+        existingTablesByHash.set(h, d);
       }
 
       const existingBoards = await taskBoardRepo.listByStarship(starshipId, { includeArchived: true });
@@ -2929,15 +2929,15 @@ router.post(
         });
       }
 
-      const datasetsAnalysis: Array<{
-        kind: 'dataset';
+      const tablesAnalysis: Array<{
+        kind: 'table';
         file: string;
         name: string;
         bundleHash: string;
         status: 'new' | 'same' | 'conflict';
         existing?: { id: string; name: string; slug: string };
       }> = [];
-      for (const d of manifestParsed.data.entities.datasets) {
+      for (const d of manifestParsed.data.entities.tables) {
         const entry = zip.getEntry(d.file);
         if (!entry) continue;
         let containerRaw: unknown;
@@ -2947,24 +2947,24 @@ router.post(
           continue;
         }
         const containerParsed = ContainerSchema.safeParse(containerRaw);
-        if (!containerParsed.success || containerParsed.data.kind !== 'dataset') continue;
-        const payload = containerParsed.data.payload as unknown as { dataset?: Record<string, unknown> };
-        const datasetPayload = payload?.dataset ?? {};
-        const name = String(datasetPayload?.name || '').trim();
+        if (!containerParsed.success || containerParsed.data.kind !== 'table') continue;
+        const payload = containerParsed.data.payload as unknown as { table?: Record<string, unknown> };
+        const tablePayload = payload?.table ?? {};
+        const name = String(tablePayload?.name || '').trim();
         const bundleHash = computeBundleHash({
-          name: datasetPayload?.name,
-          description: datasetPayload?.description,
-          columns: datasetPayload?.columns,
-          primaryKey: datasetPayload?.primaryKey ?? null,
+          name: tablePayload?.name,
+          description: tablePayload?.description,
+          columns: tablePayload?.columns,
+          primaryKey: tablePayload?.primaryKey ?? null,
         });
-        const existingByHash = existingDatasetsByHash.get(bundleHash);
-        const existingByName = name ? existingDatasetsByName.get(name.toLowerCase()) : undefined;
+        const existingByHash = existingTablesByHash.get(bundleHash);
+        const existingByName = name ? existingTablesByName.get(name.toLowerCase()) : undefined;
         const status: 'new' | 'same' | 'conflict' = existingByHash ? 'same' : existingByName ? 'conflict' : 'new';
         const existing = existingByHash ?? existingByName;
-        datasetsAnalysis.push({
-          kind: 'dataset',
+        tablesAnalysis.push({
+          kind: 'table',
           file: d.file,
-          name: name || '(unnamed dataset)',
+          name: name || '(unnamed table)',
           bundleHash,
           status,
           existing: existing ? { id: existing.id, name: existing.name, slug: existing.slug } : undefined,
@@ -3052,7 +3052,7 @@ router.post(
       sendSuccess(res, {
         rooms: roomsAnalysis,
         views: viewsAnalysis,
-        datasets: datasetsAnalysis,
+        tables: tablesAnalysis,
         taskBoards: taskBoardsAnalysis,
         tools: toolsAnalysis,
         agents: agentsAnalysis,
@@ -3065,7 +3065,7 @@ router.post(
 
 /**
  * Internal helper: map a human-readable employee size string from the /automate preview
- * to the `employee_range` enum used by the Accounts dataset in the leadgen room bundle.
+ * to the `employee_range` enum used by the Accounts table in the leadgen room bundle.
  */
 function mapSizeToEmployeeRange(size: string): string | null {
   const s = (size ?? '').replace(/\s/g, '');
@@ -3112,7 +3112,7 @@ async function ensureDefaultBundleForStarship(opts: { starshipId: string; userId
 
   assertRoomBundleManifestPathsOrThrow(manifestParsed.data);
 
-  const emptyDecisions: RoomBundleDecisions = { rooms: {}, views: {}, datasets: {}, taskBoards: {}, tools: {}, agents: {} };
+  const emptyDecisions: RoomBundleDecisions = { rooms: {}, views: {}, tables: {}, taskBoards: {}, tools: {}, agents: {} };
 
   await applyRoomBundleToStarship({
     starshipId,
@@ -3240,7 +3240,7 @@ async function ensureLeadGenRoomInternal(opts: {
     throw err;
   }
 
-  const emptyDecisions: RoomBundleDecisions = { rooms: {}, views: {}, datasets: {}, taskBoards: {}, tools: {}, agents: {} };
+  const emptyDecisions: RoomBundleDecisions = { rooms: {}, views: {}, tables: {}, taskBoards: {}, tools: {}, agents: {} };
 
   const importSummary = await applyRoomBundleToStarship({
     starshipId,
@@ -3413,7 +3413,7 @@ async function ensureBundleRoomInternal(opts: {
 
   assertRoomBundleManifestPathsOrThrow(manifestParsed.data);
 
-  const emptyDecisions: RoomBundleDecisions = { rooms: {}, views: {}, datasets: {}, taskBoards: {}, tools: {}, agents: {} };
+  const emptyDecisions: RoomBundleDecisions = { rooms: {}, views: {}, tables: {}, taskBoards: {}, tools: {}, agents: {} };
 
   const importSummary = await applyRoomBundleToStarship({
     starshipId,
@@ -3606,26 +3606,26 @@ router.post(
         const agentService = new AgentService(txConn);
         const svc = new ImportExportService(txConn);
         const viewRepo = new ViewRepository(txConn);
-        const datasetRepo = new StarshipTableRepository();
-        const datasetRowRepo = new StarshipTableRowRepository();
+        const tableRepo = new StarshipTableRepository();
+        const tableRowRepo = new StarshipTableRowRepository();
         const taskBoardRepo = new TaskBoardRepository(txConn);
         const taskColumnRepo = new TaskColumnRepository(txConn);
         const taskCardRepo = new TaskCardRepository(txConn);
         const roomRepo = new RoomRepository(txConn);
         const roomViewsRepo = new RoomViewsRepository(txConn);
-        const roomDatasetsRepo = new RoomDatasetsRepository(txConn);
+        const roomTablesRepo = new RoomTablesRepository(txConn);
         const roomTaskBoardsRepo = new RoomTaskBoardsRepository(txConn);
         const roomToolsRepo = new RoomToolsRepository(txConn);
         const participantRepo = new ConversationParticipantRepository(txConn);
         const conversationRepo = new ConversationRepository(txConn);
 
         const warnings: string[] = [];
-        const imported: Record<string, number> = { rooms: 0, views: 0, datasets: 0, taskBoards: 0, agents: 0, tools: 0 };
+        const imported: Record<string, number> = { rooms: 0, views: 0, tables: 0, taskBoards: 0, agents: 0, tools: 0 };
 
         const toolSlugMap = new Map<string, string>();
         const agentIdMap = new Map<string, string>(); // source slug -> created agent id
         const viewSlugMap = new Map<string, string>(); // source slug -> created slug
-        const datasetSlugMap = new Map<string, string>();
+        const tableSlugMap = new Map<string, string>();
         const taskBoardSlugMap = new Map<string, string>();
 
         // Index existing tools for overwrite/skip mapping.
@@ -3929,43 +3929,43 @@ router.post(
           if (sourceSlug) viewSlugMap.set(sourceSlug, created.slug);
         }
 
-        // Datasets (include rows best-effort; overwrite clears rows).
-        const existingDatasets = await datasetRepo.listByStarship(starshipId, { includeArchived: true });
-        const datasetsByHash = new Map<string, (typeof existingDatasets)[number]>();
-        const datasetsByName = new Map<string, (typeof existingDatasets)[number]>();
-        for (const d of existingDatasets) {
+        // Tables (include rows best-effort; overwrite clears rows).
+        const existingTables = await tableRepo.listByStarship(starshipId, { includeArchived: true });
+        const tablesByHash = new Map<string, (typeof existingTables)[number]>();
+        const tablesByName = new Map<string, (typeof existingTables)[number]>();
+        for (const d of existingTables) {
           const nameKey = String(d.name || '')
             .trim()
             .toLowerCase();
-          if (nameKey) datasetsByName.set(nameKey, d);
-          datasetsByHash.set(
+          if (nameKey) tablesByName.set(nameKey, d);
+          tablesByHash.set(
             computeBundleHash({ name: d.name, description: d.description, columns: d.columns, primaryKey: d.primaryKey ?? null }),
             d
           );
         }
 
-        for (const d of manifestParsed.data.entities.datasets) {
+        for (const d of manifestParsed.data.entities.tables) {
           const entry = zip.getEntry(d.file);
           if (!entry) {
-            warnings.push(`Bundle is missing dataset file: ${d.file}`);
+            warnings.push(`Bundle is missing table file: ${d.file}`);
             continue;
           }
           let containerRaw: unknown;
           try {
             containerRaw = JSON.parse(entry.getData().toString('utf8'));
           } catch {
-            warnings.push(`Dataset file is not valid JSON: ${d.file}`);
+            warnings.push(`Table file is not valid JSON: ${d.file}`);
             continue;
           }
           const containerParsed = ContainerSchema.safeParse(containerRaw);
-          if (!containerParsed.success || containerParsed.data.kind !== 'dataset') {
-            warnings.push(`Dataset file is not a valid dataset container: ${d.file}`);
+          if (!containerParsed.success || containerParsed.data.kind !== 'table') {
+            warnings.push(`Table file is not a valid table container: ${d.file}`);
             continue;
           }
           const fromSlug = containerParsed.data.metadata?.fromSlug;
           const sourceSlug = typeof fromSlug === 'string' ? fromSlug.trim() : '';
-          const payload = containerParsed.data.payload as unknown as { dataset?: Record<string, unknown>; rows?: unknown };
-          const datasetPayload = payload?.dataset ?? {};
+          const payload = containerParsed.data.payload as unknown as { table?: Record<string, unknown>; rows?: unknown };
+          const tablePayload = payload?.table ?? {};
           const rowsRaw = Array.isArray(payload?.rows) ? (payload.rows as unknown[]) : [];
           const rows = rowsRaw
             .map((r: unknown) => {
@@ -3978,33 +3978,33 @@ router.post(
             .filter((r) => isPlainObject(r?.data));
 
           const bundleHash = computeBundleHash({
-            name: datasetPayload?.name,
-            description: datasetPayload?.description,
-            columns: datasetPayload?.columns,
-            primaryKey: datasetPayload?.primaryKey ?? null,
+            name: tablePayload?.name,
+            description: tablePayload?.description,
+            columns: tablePayload?.columns,
+            primaryKey: tablePayload?.primaryKey ?? null,
           });
-          const decision = decisionsParsed.data.datasets[bundleHash] ?? { action: 'copy' as const };
-          const datasetNameKey = String(datasetPayload?.name || '')
+          const decision = decisionsParsed.data.tables[bundleHash] ?? { action: 'copy' as const };
+          const tableNameKey = String(tablePayload?.name || '')
             .trim()
             .toLowerCase();
-          const existingByHash = datasetsByHash.get(bundleHash);
-          const existingByName = datasetNameKey ? datasetsByName.get(datasetNameKey) : undefined;
+          const existingByHash = tablesByHash.get(bundleHash);
+          const existingByName = tableNameKey ? tablesByName.get(tableNameKey) : undefined;
           const target = existingByHash ?? existingByName ?? null;
 
           if (decision.action === 'skip') {
-            if (sourceSlug && target?.slug) datasetSlugMap.set(sourceSlug, target.slug);
+            if (sourceSlug && target?.slug) tableSlugMap.set(sourceSlug, target.slug);
             continue;
           }
 
           const normalizedCreate = {
             starshipId,
-            name: String(datasetPayload?.name || 'Dataset'),
-            description: typeof datasetPayload?.description === 'string' ? String(datasetPayload.description) : '',
-            columns: Array.isArray(datasetPayload?.columns) ? (datasetPayload.columns as StarshipTableColumn[]) : [],
+            name: String(tablePayload?.name || 'Table'),
+            description: typeof tablePayload?.description === 'string' ? String(tablePayload.description) : '',
+            columns: Array.isArray(tablePayload?.columns) ? (tablePayload.columns as StarshipTableColumn[]) : [],
             primaryKey:
-              typeof datasetPayload?.primaryKey === 'string'
-                ? String(datasetPayload.primaryKey)
-                : datasetPayload?.primaryKey === null
+              typeof tablePayload?.primaryKey === 'string'
+                ? String(tablePayload.primaryKey)
+                : tablePayload?.primaryKey === null
                   ? null
                   : undefined,
           };
@@ -4012,10 +4012,10 @@ router.post(
           if (decision.action === 'overwrite') {
             const targetId = decision.targetId || target?.id;
             if (!targetId) {
-              warnings.push(`No overwrite target found for dataset: ${String(datasetPayload?.name || d.file)}`);
+              warnings.push(`No overwrite target found for table: ${String(tablePayload?.name || d.file)}`);
               continue;
             }
-            const updated = await datasetRepo.update(targetId, {
+            const updated = await tableRepo.update(targetId, {
               name: normalizedCreate.name,
               description: normalizedCreate.description,
               columns: normalizedCreate.columns,
@@ -4023,22 +4023,22 @@ router.post(
               archived: false,
             });
             if (updated) {
-              await datasetRowRepo.truncate(tableRefOf(updated));
+              await tableRowRepo.truncate(tableRefOf(updated));
               if (rows.length > 0) {
-                await datasetRowRepo.appendMany(tableRefOf(updated), rows);
+                await tableRowRepo.appendMany(tableRefOf(updated), rows);
               }
-              imported.datasets += 1;
-              if (sourceSlug) datasetSlugMap.set(sourceSlug, updated.slug);
+              imported.tables += 1;
+              if (sourceSlug) tableSlugMap.set(sourceSlug, updated.slug);
             }
             continue;
           }
 
-          const created = await datasetRepo.create(normalizedCreate);
+          const created = await tableRepo.create(normalizedCreate);
           if (rows.length > 0) {
-            await datasetRowRepo.appendMany(tableRefOf(created), rows);
+            await tableRowRepo.appendMany(tableRefOf(created), rows);
           }
-          imported.datasets += 1;
-          if (sourceSlug) datasetSlugMap.set(sourceSlug, created.slug);
+          imported.tables += 1;
+          if (sourceSlug) tableSlugMap.set(sourceSlug, created.slug);
         }
 
         // Task boards (copy/skip; overwrite treated as copy)
@@ -4216,7 +4216,7 @@ router.post(
             }
           }
 
-          // Pins (views/datasets/task boards)
+          // Pins (views/tables/task boards)
           const viewPins = Array.isArray(payload?.viewPins) ? (payload.viewPins as Record<string, unknown>[]) : [];
           for (const p of viewPins) {
             const sourceViewSlug = typeof p?.viewSlug === 'string' ? p.viewSlug.trim() : '';
@@ -4235,19 +4235,19 @@ router.post(
             });
           }
 
-          const datasetPins = Array.isArray(payload?.datasetPins) ? (payload.datasetPins as Record<string, unknown>[]) : [];
-          for (const p of datasetPins) {
-            const sourceDatasetSlug = typeof p?.datasetSlug === 'string' ? p.datasetSlug.trim() : '';
-            if (!sourceDatasetSlug) continue;
-            const destSlug = datasetSlugMap.get(sourceDatasetSlug) ?? sourceDatasetSlug;
-            const dataset = await datasetRepo.findBySlug(destSlug, starshipId);
-            if (!dataset) {
-              warnings.push(`Skipped missing pinned dataset: ${destSlug}`);
+          const tablePins = Array.isArray(payload?.tablePins) ? (payload.tablePins as Record<string, unknown>[]) : [];
+          for (const p of tablePins) {
+            const sourceTableSlug = typeof p?.tableSlug === 'string' ? p.tableSlug.trim() : '';
+            if (!sourceTableSlug) continue;
+            const destSlug = tableSlugMap.get(sourceTableSlug) ?? sourceTableSlug;
+            const table = await tableRepo.findBySlug(destSlug, starshipId);
+            if (!table) {
+              warnings.push(`Skipped missing pinned table: ${destSlug}`);
               continue;
             }
-            await roomDatasetsRepo.upsert({
+            await roomTablesRepo.upsert({
               roomConversationId: createdRoom.conversationId,
-              datasetId: dataset.id,
+              tableId: table.id,
               position: typeof p?.position === 'number' ? p.position : undefined,
               createdBy: user.id,
             });
@@ -4383,7 +4383,7 @@ router.post('/starships/:id/bundle-service/:bundleId/install', jwtAuthMiddleware
       return;
     }
 
-    const emptyDecisions: RoomBundleDecisions = { rooms: {}, views: {}, datasets: {}, taskBoards: {}, tools: {}, agents: {} };
+    const emptyDecisions: RoomBundleDecisions = { rooms: {}, views: {}, tables: {}, taskBoards: {}, tools: {}, agents: {} };
 
     const importSummary = await applyRoomBundleToStarship({
       starshipId: paramValidation.id,

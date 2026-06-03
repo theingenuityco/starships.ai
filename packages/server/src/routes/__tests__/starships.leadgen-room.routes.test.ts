@@ -32,7 +32,7 @@ jest.mock('@starships/models', () => ({
   ConversationRepository: jest.fn(),
   ConversationParticipantRepository: jest.fn(),
   PostgresConnection: jest.fn(),
-  RoomDatasetsRepository: jest.fn(),
+  RoomTablesRepository: jest.fn(),
   RoomRepository: jest.fn(),
   RoomTaskBoardsRepository: jest.fn(),
   RoomToolsRepository: jest.fn(),

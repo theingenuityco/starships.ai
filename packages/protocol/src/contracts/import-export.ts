@@ -4,9 +4,9 @@ import type { ToolModel, CreateToolRequest } from '../domains/tool';
 import type { CreateViewRequest } from '../domains/view';
 import type { CreateTaskBoardRequest, TaskCardModel, TaskColumnModel } from '../domains/task-board';
 import type { Room } from '../domains/room';
-import type { CreateStarshipTableRequest, StarshipTableRowModel } from '../domains/dataset';
+import type { CreateStarshipTableRequest, StarshipTableRowModel } from '../domains/table';
 
-export type ImportExportKind = 'agent' | 'tool' | 'connector_template' | 'room' | 'view' | 'dataset' | 'task_board';
+export type ImportExportKind = 'agent' | 'tool' | 'connector_template' | 'room' | 'view' | 'table' | 'task_board';
 
 /**
  * Shared container/envelope for importing/exporting resources as JSON.
@@ -38,7 +38,7 @@ export interface ImportExportContainerV1<K extends ImportExportKind = ImportExpo
         ? RoomExportPayloadV1
         : K extends 'view'
           ? ViewExportPayloadV1
-          : K extends 'dataset'
+          : K extends 'table'
             ? TableExportPayloadV1
             : K extends 'task_board'
               ? TaskBoardExportPayloadV1
@@ -76,7 +76,7 @@ export interface ToolExportPayloadV1 {
 export interface RoomExportPayloadV1 {
   room: Omit<Room, 'slug'>;
   viewPins?: Array<{ viewSlug: string; position: number }>;
-  datasetPins?: Array<{ datasetSlug: string; position: number }>;
+  tablePins?: Array<{ tableSlug: string; position: number }>;
   taskBoardPins?: Array<{ taskBoardSlug: string; position: number }>;
   toolAssignments?: Array<{ toolSlug: string; permission: AgentToolPermission }>;
   agentParticipantSlugs?: string[];
@@ -89,7 +89,7 @@ export interface ViewExportPayloadV1 {
 }
 
 export interface TableExportPayloadV1 {
-  dataset: Omit<CreateStarshipTableRequest, 'starshipId'> & {
+  table: Omit<CreateStarshipTableRequest, 'starshipId'> & {
     name: string;
   };
   rows?: Array<Pick<StarshipTableRowModel, 'rowKey' | 'data'>>;

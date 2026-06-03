@@ -1,39 +1,38 @@
 import { BaseRepository } from './BaseRepository';
-import type { RoomPinnedDataset } from '@starships/protocol';
+import type { RoomPinnedTable } from '@starships/protocol';
 import type { PostgresConnection } from '@/helpers/database';
 
 // Backed by the `room_tables` join table (table_id), surfaced through the
-// existing RoomPinnedDataset shape (datasetId) via a SELECT alias so callers
-// are unaffected by the datasets -> Tables migration.
+// RoomPinnedTable shape (tableId).
 type DbRow = {
   room_conversation_id: string;
-  dataset_id: string;
+  table_id: string;
   position: number;
   created_at: string;
   created_by: string | null;
 };
 
-function fromDb(r: DbRow): RoomPinnedDataset {
+function fromDb(r: DbRow): RoomPinnedTable {
   return {
-    kind: 'dataset',
+    kind: 'table',
     roomConversationId: String(r.room_conversation_id),
-    datasetId: String(r.dataset_id),
+    tableId: String(r.table_id),
     position: Number(r.position) || 0,
     createdAt: String(r.created_at),
     createdBy: r.created_by ?? null,
   };
 }
 
-export class RoomDatasetsRepository extends BaseRepository {
+export class RoomTablesRepository extends BaseRepository {
   constructor(connection?: PostgresConnection) {
-    super('RoomDatasetsRepository', connection);
+    super('RoomTablesRepository', connection);
   }
 
-  async list(roomConversationId: string): Promise<RoomPinnedDataset[]> {
+  async list(roomConversationId: string): Promise<RoomPinnedTable[]> {
     return this.executeWithErrorHandling(async () => {
       const conn = this.getConnection();
       const rows = await conn.query<DbRow>(
-        `SELECT room_conversation_id, table_id AS dataset_id, position, created_at, created_by
+        `SELECT room_conversation_id, table_id, position, created_at, created_by
            FROM room_tables
           WHERE room_conversation_id = $1
           ORDER BY position ASC, created_at ASC`,
@@ -43,11 +42,11 @@ export class RoomDatasetsRepository extends BaseRepository {
     }, 'list', 'room_tables', roomConversationId);
   }
 
-  async upsert(args: { roomConversationId: string; datasetId: string; position?: number | null; createdBy?: string | null }): Promise<RoomPinnedDataset> {
+  async upsert(args: { roomConversationId: string; tableId: string; position?: number | null; createdBy?: string | null }): Promise<RoomPinnedTable> {
     return this.executeWithErrorHandling(async () => {
       const conn = this.getConnection();
       const roomConversationId = String(args.roomConversationId || '').trim();
-      const tableId = String(args.datasetId || '').trim();
+      const tableId = String(args.tableId || '').trim();
       const createdBy = args.createdBy ?? null;
       const requestedPosition = typeof args.position === 'number' ? Math.max(0, Math.trunc(args.position)) : null;
 
@@ -62,7 +61,7 @@ export class RoomDatasetsRepository extends BaseRepository {
 
         if (existing && requestedPosition == null) {
           const row = await conn.queryOne<DbRow>(
-            `SELECT room_conversation_id, table_id AS dataset_id, position, created_at, created_by
+            `SELECT room_conversation_id, table_id, position, created_at, created_by
                FROM room_tables
               WHERE room_conversation_id = $1 AND table_id = $2`,
             [roomConversationId, tableId]
@@ -98,7 +97,7 @@ export class RoomDatasetsRepository extends BaseRepository {
           const inserted = await conn.queryOne<DbRow>(
             `INSERT INTO room_tables (room_conversation_id, table_id, position, created_by)
              VALUES ($1, $2, $3, $4)
-             RETURNING room_conversation_id, table_id AS dataset_id, position, created_at, created_by`,
+             RETURNING room_conversation_id, table_id, position, created_at, created_by`,
             [roomConversationId, tableId, desired, createdBy]
           );
           if (!inserted) throw new Error('Failed to upsert room table');
@@ -151,7 +150,7 @@ export class RoomDatasetsRepository extends BaseRepository {
         }
 
         const row = await conn.queryOne<DbRow>(
-          `SELECT room_conversation_id, table_id AS dataset_id, position, created_at, created_by
+          `SELECT room_conversation_id, table_id, position, created_at, created_by
              FROM room_tables
             WHERE room_conversation_id = $1 AND table_id = $2`,
           [roomConversationId, tableId]
@@ -166,12 +165,12 @@ export class RoomDatasetsRepository extends BaseRepository {
     }, 'upsert', 'room_tables');
   }
 
-  async remove(roomConversationId: string, datasetId: string): Promise<boolean> {
+  async remove(roomConversationId: string, tableId: string): Promise<boolean> {
     return this.executeWithErrorHandling(async () => {
       const conn = this.getConnection();
       const result = await conn.queryWithResult(`DELETE FROM room_tables WHERE room_conversation_id = $1 AND table_id = $2`, [
         roomConversationId,
-        datasetId,
+        tableId,
       ]);
       return (result.rowCount ?? 0) > 0;
     }, 'remove', 'room_tables');

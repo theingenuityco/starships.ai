@@ -44,24 +44,24 @@
       }
     ],
     "views": [],
-    "datasets": [
+    "tables": [
       {
-        "kind": "dataset",
+        "kind": "table",
         "fromSlug": "accounts",
         "fromStarshipSlug": "starborn-dvlif0",
-        "file": "datasets/accounts.json"
+        "file": "tables/accounts.json"
       },
       {
-        "kind": "dataset",
+        "kind": "table",
         "fromSlug": "icp-profiles",
         "fromStarshipSlug": "starborn-dvlif0",
-        "file": "datasets/icp-profiles.json"
+        "file": "tables/icp-profiles.json"
       },
       {
-        "kind": "dataset",
+        "kind": "table",
         "fromSlug": "contacts",
         "fromStarshipSlug": "starborn-dvlif0",
-        "file": "datasets/contacts.json"
+        "file": "tables/contacts.json"
       }
     ],
     "taskBoards": [

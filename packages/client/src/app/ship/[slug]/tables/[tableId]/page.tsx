@@ -29,7 +29,7 @@ import { getSafeErrorMessage } from '@/lib/error-utils'
 import { adaptDataTable, downloadTableAsCsv, sanitizeFilename } from '@/lib/export'
 
 import { useStarshipBySlug } from '@/hooks/useStarships'
-import { useDataset, useDatasetRows, useDeleteDatasetRow, useStarshipTables, useUpdateDataset, useUpsertDatasetRows } from '@/hooks/useDatasets'
+import { useTable, useTableRows, useDeleteTableRow, useStarshipTables, useUpdateTable, useUpsertTableRows } from '@/hooks/useTables'
 import type { StarshipTableColumn, StarshipTableColumnFormat, StarshipTableColumnType } from '@starships/protocol'
 
 const COLUMN_TYPES: Array<{ value: StarshipTableColumnType; label: string }> = [
@@ -112,20 +112,20 @@ function toDataTableColumns(cols: unknown): Array<{
   return out
 }
 
-export default function DatasetViewerPage(): React.JSX.Element {
+export default function TableViewerPage(): React.JSX.Element {
   const router = useRouter()
-  const params = useParams<{ slug: string; datasetId: string }>()
+  const params = useParams<{ slug: string; tableId: string }>()
   const slug = typeof params.slug === 'string' ? params.slug : ''
-  const datasetId = typeof params.datasetId === 'string' ? params.datasetId : ''
+  const tableId = typeof params.tableId === 'string' ? params.tableId : ''
 
   const { data: starship, isLoading: starshipLoading, isError: starshipError } = useStarshipBySlug(slug, Boolean(slug))
   const starshipId = starship?.id ? String(starship.id) : ''
 
-  const { data: dataset, isLoading: datasetLoading } = useDataset(starshipId, datasetId, Boolean(starshipId && datasetId))
-  const updateDataset = useUpdateDataset(starshipId, datasetId)
-  const { data: datasets = [] } = useStarshipTables(starshipId, Boolean(starshipId))
-  const upsertRows = useUpsertDatasetRows(starshipId, datasetId)
-  const deleteRow = useDeleteDatasetRow(starshipId, datasetId)
+  const { data: table, isLoading: tableLoading } = useTable(starshipId, tableId, Boolean(starshipId && tableId))
+  const updateTable = useUpdateTable(starshipId, tableId)
+  const { data: tables = [] } = useStarshipTables(starshipId, Boolean(starshipId))
+  const upsertRows = useUpsertTableRows(starshipId, tableId)
+  const deleteRow = useDeleteTableRow(starshipId, tableId)
 
   const [limit, setLimit] = useState(100)
   const [offset, setOffset] = useState(0)
@@ -143,13 +143,13 @@ export default function DatasetViewerPage(): React.JSX.Element {
     setOffset(0)
   }, [debouncedQuery])
 
-  const { data: rowsPage, isLoading: rowsLoading } = useDatasetRows(
+  const { data: rowsPage, isLoading: rowsLoading } = useTableRows(
     starshipId,
-    datasetId,
+    tableId,
     limit,
     offset,
     debouncedQuery || undefined,
-    Boolean(starshipId && datasetId)
+    Boolean(starshipId && tableId)
   )
 
   const [schemaOpen, setSchemaOpen] = useState(false)
@@ -158,12 +158,12 @@ export default function DatasetViewerPage(): React.JSX.Element {
   const [columnsDraft, setColumnsDraft] = useState<StarshipTableColumn[]>([])
   const [columnsJsonText, setColumnsJsonText] = useState('[]')
 
-  const canSaveSchema = Boolean(starshipId && datasetId) && !updateDataset.isPending
+  const canSaveSchema = Boolean(starshipId && tableId) && !updateTable.isPending
 
   function openSchemaEditor() {
-    const pk = dataset?.primaryKey ? String(dataset.primaryKey) : ''
+    const pk = table?.primaryKey ? String(table.primaryKey) : ''
     setPrimaryKeyText(pk)
-    const cols = (dataset?.columns ?? []) as StarshipTableColumn[]
+    const cols = (table?.columns ?? []) as StarshipTableColumn[]
     setColumnsDraft(Array.isArray(cols) ? cols : [])
     setColumnsJsonText(JSON.stringify(cols ?? [], null, 2))
     setSchemaTab('guided')
@@ -191,7 +191,7 @@ export default function DatasetViewerPage(): React.JSX.Element {
     }
 
     try {
-      await updateDataset.mutateAsync({
+      await updateTable.mutateAsync({
         columns: cols,
         primaryKey: primaryKeyText.trim() ? primaryKeyText.trim() : null,
       })
@@ -207,9 +207,9 @@ export default function DatasetViewerPage(): React.JSX.Element {
   const canNext = offset + limit < total
 
   const columns = useMemo(() => {
-    const cols = rowsPage?.columns ?? dataset?.columns ?? []
+    const cols = rowsPage?.columns ?? table?.columns ?? []
     return Array.isArray(cols) ? cols : []
-  }, [dataset?.columns, rowsPage?.columns])
+  }, [table?.columns, rowsPage?.columns])
 
   const tableColumns = useMemo(() => toDataTableColumns(columns), [columns])
 
@@ -218,15 +218,15 @@ export default function DatasetViewerPage(): React.JSX.Element {
     return Array.isArray(d) ? (d as Array<Record<string, any>>) : []
   }, [rowsPage?.data])
 
-  const primaryKey = typeof dataset?.primaryKey === 'string' ? dataset.primaryKey.trim() : ''
-  const isResolving = starshipLoading || Boolean(slug && !starshipId && !starshipError) || datasetLoading || rowsLoading
+  const primaryKey = typeof table?.primaryKey === 'string' ? table.primaryKey.trim() : ''
+  const isResolving = starshipLoading || Boolean(slug && !starshipId && !starshipError) || tableLoading || rowsLoading
 
   const handleExportCsv = () => {
     try {
-      const table = adaptDataTable(tableColumns as any, data as any)
-      const baseName = sanitizeFilename(dataset?.name || 'dataset')
+      const exportTable = adaptDataTable(tableColumns as any, data as any)
+      const baseName = sanitizeFilename(table?.name || 'table')
       const filename = `${baseName}-${Date.now()}.csv`
-      downloadTableAsCsv(table, filename)
+      downloadTableAsCsv(exportTable, filename)
       toast.success('Table exported')
     } catch {
       toast.error('Export failed')
@@ -250,9 +250,9 @@ export default function DatasetViewerPage(): React.JSX.Element {
                     <button
                       type="button"
                       className="inline-flex h-4 w-4 items-center justify-center text-foreground hover:text-foreground transition-colors"
-                      onClick={() => router.push(`/ship/${encodeURIComponent(slug)}/datasets`)}
-                      aria-label="Back to datasets"
-                      title="Back to datasets"
+                      onClick={() => router.push(`/ship/${encodeURIComponent(slug)}/tables`)}
+                      aria-label="Back to tables"
+                      title="Back to tables"
                     >
                       <Icon name="arrow-left" className="h-4 w-4" />
                     </button>
@@ -261,15 +261,15 @@ export default function DatasetViewerPage(): React.JSX.Element {
                     </span>
                     <h3 className="flex-1 text-base font-medium text-foreground truncate leading-tight min-w-0">
                       <span className="inline-flex items-center whitespace-nowrap text-foreground">
-                        <span>Datasets</span>
+                        <span>Tables</span>
                         <span className="mx-1 text-muted-foreground">/</span>
                       </span>
-                      {dataset?.name || 'Untitled'}
+                      {table?.name || 'Untitled'}
                     </h3>
                   </div>
                   <div className="min-w-0 text-xs leading-snug text-muted-foreground">
                     <span className="block min-w-0 truncate font-medium leading-snug text-muted-foreground">
-                      {dataset?.description || '—'}
+                      {table?.description || '—'}
                     </span>
                   </div>
                 </div>
@@ -277,7 +277,7 @@ export default function DatasetViewerPage(): React.JSX.Element {
             </div>
 
             <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={openSchemaEditor} disabled={!dataset || updateDataset.isPending}>
+              <Button variant="outline" size="sm" onClick={openSchemaEditor} disabled={!table || updateTable.isPending}>
                 <Icon name="settings" className="h-4 w-4 mr-1.5" />
                 Schema
               </Button>
@@ -311,7 +311,7 @@ export default function DatasetViewerPage(): React.JSX.Element {
                     size="icon"
                     className="rounded-none"
                     aria-label="Columns"
-                    disabled={datasetLoading || !dataset}
+                    disabled={tableLoading || !table}
                   >
                     <Icon name="list" className="h-4 w-4" />
                   </Button>
@@ -413,17 +413,17 @@ export default function DatasetViewerPage(): React.JSX.Element {
 
       <div className="flex-1 min-h-0 overflow-hidden">
         <div className="w-full bg-transparent min-h-0 flex flex-col">
-          {Boolean(starshipId) && !datasetLoading && !dataset ? (
+          {Boolean(starshipId) && !tableLoading && !table ? (
             <div className="px-4 pt-4 pb-4">
               <Card className="border-border/60 p-6">
-                <div className="text-sm text-muted-foreground">Dataset not found.</div>
+                <div className="text-sm text-muted-foreground">Table not found.</div>
               </Card>
             </div>
           ) : (
             <>
-              {Boolean(dataset) && !datasetLoading && !primaryKey && (
+              {Boolean(table) && !tableLoading && !primaryKey && (
                 <div className="px-4 pt-4 pb-3 text-xs text-muted-foreground shrink-0">
-                  Editing/paste is disabled until a dataset <span className="font-medium">primary key</span> is set (Schema → Primary key).
+                  Editing/paste is disabled until a table <span className="font-medium">primary key</span> is set (Schema → Primary key).
                 </div>
               )}
 
@@ -462,7 +462,7 @@ export default function DatasetViewerPage(): React.JSX.Element {
                   }}
                   onCommitRows={async ({ rows }) => {
                     if (!primaryKey) {
-                      throw new Error('Dataset primaryKey is required to edit rows')
+                      throw new Error('Table primaryKey is required to edit rows')
                     }
                     const resp = await upsertRows.mutateAsync({ rows, mode: 'upsert' })
                     if (Array.isArray((resp as any)?.errors) && (resp as any).errors.length > 0) {
@@ -483,7 +483,7 @@ export default function DatasetViewerPage(): React.JSX.Element {
       <Dialog open={schemaOpen} onOpenChange={setSchemaOpen}>
         <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Edit dataset schema</DialogTitle>
+            <DialogTitle>Edit table schema</DialogTitle>
             <DialogDescription>
               Update columns and primary key. This controls validation, reference hydration, and formula projection.
             </DialogDescription>
@@ -494,7 +494,7 @@ export default function DatasetViewerPage(): React.JSX.Element {
               <div className="space-y-2">
                 <div className="text-sm font-medium">Primary key</div>
                 <Input value={primaryKeyText} onChange={(e) => setPrimaryKeyText(e.target.value)} placeholder="e.g. id" />
-                <div className="text-xs text-muted-foreground">Used for upsert mode and dataset-row references (row_key).</div>
+                <div className="text-xs text-muted-foreground">Used for upsert mode and table-row references (row_key).</div>
               </div>
               <div className="space-y-2">
                 <div className="text-sm font-medium">Primary key helper</div>
@@ -675,17 +675,17 @@ export default function DatasetViewerPage(): React.JSX.Element {
                                 <div className="space-y-1">
                                   <div className="text-[11px] text-muted-foreground">Target kind</div>
                                   <Select
-                                    value={String((col as any)?.reference?.target?.kind || '') || 'dataset_row'}
+                                    value={String((col as any)?.reference?.target?.kind || '') || 'table_row'}
                                     onValueChange={(v) => {
                                       if (v === 'task_card') setCol({ reference: { target: { kind: 'task_card' } } } as any)
-                                      else setCol({ reference: { target: { kind: 'dataset_row', datasetIdOrSlug: '' } } } as any)
+                                      else setCol({ reference: { target: { kind: 'table_row', tableIdOrSlug: '' } } } as any)
                                     }}
                                   >
                                     <SelectTrigger>
                                       <SelectValue placeholder="Select target" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                      <SelectItem value="dataset_row">Dataset row</SelectItem>
+                                      <SelectItem value="table_row">Table row</SelectItem>
                                       <SelectItem value="task_card">Task card</SelectItem>
                                     </SelectContent>
                                   </Select>
@@ -701,20 +701,20 @@ export default function DatasetViewerPage(): React.JSX.Element {
                                 </div>
                               </div>
 
-                              {String((col as any)?.reference?.target?.kind || '') === 'dataset_row' && (
+                              {String((col as any)?.reference?.target?.kind || '') === 'table_row' && (
                                 <div className="space-y-1">
-                                  <div className="text-[11px] text-muted-foreground">Target dataset</div>
+                                  <div className="text-[11px] text-muted-foreground">Target table</div>
                                   <Select
-                                    value={String((col as any)?.reference?.target?.datasetIdOrSlug || '')}
+                                    value={String((col as any)?.reference?.target?.tableIdOrSlug || '')}
                                     onValueChange={(v) =>
-                                      setCol({ reference: { ...(col as any).reference, target: { kind: 'dataset_row', datasetIdOrSlug: v } } } as any)
+                                      setCol({ reference: { ...(col as any).reference, target: { kind: 'table_row', tableIdOrSlug: v } } } as any)
                                     }
                                   >
                                     <SelectTrigger>
-                                      <SelectValue placeholder="Select dataset" />
+                                      <SelectValue placeholder="Select table" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                      {(Array.isArray(datasets) ? datasets : []).map((d) => (
+                                      {(Array.isArray(tables) ? tables : []).map((d) => (
                                         <SelectItem key={d.id} value={d.slug}>
                                           {d.name} ({d.slug})
                                         </SelectItem>

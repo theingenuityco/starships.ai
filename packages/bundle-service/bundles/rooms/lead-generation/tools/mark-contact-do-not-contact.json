@@ -67,16 +67,16 @@
             "name": "Build Do-Not-Contact Update Row",
             "type": "code",
             "parameters": {
-              "code": "\nfunction assertFiniteNumber(path, value) {\n  if (value == null) return;\n  if (typeof value !== 'number' || !Number.isFinite(value)) throw new Error(`${path} must be a finite number`);\n}\n\nasync function main(ctx) {\n  const input = ctx.input || {};\n\n  const starshipId = String(input.starshipId ?? ctx.env('STARSHIP_ID') ?? '');\n  if (!starshipId) throw new Error('starshipId is required (or STARSHIP_ID must be available in env)');\n\n  const contactId = input.contact_id;\n  if (contactId == null) throw new Error('contact_id is required');\n  assertFiniteNumber('contact_id', contactId);\n\n  const row = {\n    contact_id: contactId,\n    lead_status: 'do_not_contact'\n  };\n\n  if (typeof input.notes === 'string' && input.notes.trim()) {\n    row.notes = input.notes.trim();\n  }\n\n  return {\n    starshipId,\n    datasetSlug: 'contacts',\n    mode: 'upsert',\n    rows: [row]\n  };\n}\n",
+              "code": "\nfunction assertFiniteNumber(path, value) {\n  if (value == null) return;\n  if (typeof value !== 'number' || !Number.isFinite(value)) throw new Error(`${path} must be a finite number`);\n}\n\nasync function main(ctx) {\n  const input = ctx.input || {};\n\n  const starshipId = String(input.starshipId ?? ctx.env('STARSHIP_ID') ?? '');\n  if (!starshipId) throw new Error('starshipId is required (or STARSHIP_ID must be available in env)');\n\n  const contactId = input.contact_id;\n  if (contactId == null) throw new Error('contact_id is required');\n  assertFiniteNumber('contact_id', contactId);\n\n  const row = {\n    contact_id: contactId,\n    lead_status: 'do_not_contact'\n  };\n\n  if (typeof input.notes === 'string' && input.notes.trim()) {\n    row.notes = input.notes.trim();\n  }\n\n  return {\n    starshipId,\n    tableSlug: 'contacts',\n    mode: 'upsert',\n    rows: [row]\n  };\n}\n",
               "timeout": 5000
             }
           },
           {
             "ref": "upsert",
-            "name": "Connector: upsert-dataset-rows",
+            "name": "Connector: upsert-table-rows",
             "type": "connector_action",
             "parameters": {
-              "action": "upsert-dataset-rows",
+              "action": "upsert-table-rows",
               "timeout": 30000,
               "connector": "starships",
               "failOnNon2xx": true
@@ -87,7 +87,7 @@
             "name": "Unwrap Response",
             "type": "code",
             "parameters": {
-              "code": "\nasync function main(ctx) {\n  const resp = ctx.input || {};\n  const body = resp.body;\n\n  const prep = (typeof ctx.lastOutputOf === 'function' ? ctx.lastOutputOf('prep') : null) || {};\n  const datasetIdOrSlug = typeof prep.datasetSlug === 'string' ? prep.datasetSlug : '';\n\n  const widget = datasetIdOrSlug\n    ? {\n        widgetType: 'dataset_card',\n        props: {\n          id: 'dataset:' + datasetIdOrSlug,\n          datasetIdOrSlug,\n          title: 'Contacts Dataset',\n          description: 'Contact marked as do-not-contact',\n        },\n      }\n    : null;\n\n  if (body && typeof body === 'object' && body.success === true && 'data' in body) {\n    const data = body.data;\n    if (widget && data && typeof data === 'object' && !Array.isArray(data)) {\n      return { ...data, widget };\n    }\n    if (widget) return { data, widget };\n    return data;\n  }\n\n  if (widget && body && typeof body === 'object' && !Array.isArray(body)) {\n    return { ...body, widget };\n  }\n\n  return body ?? resp;\n}\n",
+              "code": "\nasync function main(ctx) {\n  const resp = ctx.input || {};\n  const body = resp.body;\n\n  const prep = (typeof ctx.lastOutputOf === 'function' ? ctx.lastOutputOf('prep') : null) || {};\n  const tableIdOrSlug = typeof prep.tableSlug === 'string' ? prep.tableSlug : '';\n\n  const widget = tableIdOrSlug\n    ? {\n        widgetType: 'table_card',\n        props: {\n          id: 'table:' + tableIdOrSlug,\n          tableIdOrSlug,\n          title: 'Contacts Table',\n          description: 'Contact marked as do-not-contact',\n        },\n      }\n    : null;\n\n  if (body && typeof body === 'object' && body.success === true && 'data' in body) {\n    const data = body.data;\n    if (widget && data && typeof data === 'object' && !Array.isArray(data)) {\n      return { ...data, widget };\n    }\n    if (widget) return { data, widget };\n    return data;\n  }\n\n  if (widget && body && typeof body === 'object' && !Array.isArray(body)) {\n    return { ...body, widget };\n  }\n\n  return body ?? resp;\n}\n",
               "timeout": 5000
             }
           },

@@ -44,24 +44,24 @@
       }
     ],
     "views": [],
-    "datasets": [
+    "tables": [
       {
-        "kind": "dataset",
+        "kind": "table",
         "fromSlug": "repos",
         "fromStarshipSlug": "starborn-eng",
-        "file": "datasets/repos.json"
+        "file": "tables/repos.json"
       },
       {
-        "kind": "dataset",
+        "kind": "table",
         "fromSlug": "ownership",
         "fromStarshipSlug": "starborn-eng",
-        "file": "datasets/ownership.json"
+        "file": "tables/ownership.json"
       },
       {
-        "kind": "dataset",
+        "kind": "table",
         "fromSlug": "tracking",
         "fromStarshipSlug": "starborn-eng",
-        "file": "datasets/tracking.json"
+        "file": "tables/tracking.json"
       }
     ],
     "taskBoards": [

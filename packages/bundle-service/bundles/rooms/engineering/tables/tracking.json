@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1",
-  "kind": "dataset",
+  "kind": "table",
   "exportedAt": "2026-05-26T00:00:00.000Z",
   "metadata": {
     "fromSlug": "tracking",
@@ -11,7 +11,7 @@
     "version": "0.0.0"
   },
   "payload": {
-    "dataset": {
+    "table": {
       "name": "Tracking",
       "description": "Tracks each change through the pipeline: issue -> spec -> branch -> PR -> status.",
       "columns": [

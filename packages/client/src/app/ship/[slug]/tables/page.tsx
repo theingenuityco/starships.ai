@@ -20,7 +20,7 @@ import { getSafeErrorMessage } from '@/lib/error-utils'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu'
 
 import { useStarshipBySlug } from '@/hooks/useStarships'
-import { useArchiveDataset, useCreateDataset, useHardDeleteDataset, useStarshipTables } from '@/hooks/useDatasets'
+import { useArchiveTable, useCreateTable, useHardDeleteTable, useStarshipTables } from '@/hooks/useTables'
 import type { StarshipTableColumn, StarshipTableColumnFormat, StarshipTableColumnType } from '@starships/protocol'
 import { useAuth } from '@/hooks/useAuth'
 import { useStarshipMembersAndInvites } from '@/hooks/useStarshipMembers'
@@ -73,12 +73,12 @@ export default function TablesIndexPage(): React.JSX.Element {
           membersAndInvites?.members?.some((m) => String(m.userId) === String(user.id) && (m.role === 'owner' || m.role === 'admin'))))
   )
 
-  const { data: datasets = [], isLoading: datasetsLoading } = useStarshipTables(starshipId, Boolean(starshipId))
+  const { data: tables = [], isLoading: tablesLoading } = useStarshipTables(starshipId, Boolean(starshipId))
 
   const sorted = useMemo(() => {
-    const list = Array.isArray(datasets) ? datasets : []
+    const list = Array.isArray(tables) ? tables : []
     return list.slice().sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))
-  }, [datasets])
+  }, [tables])
 
   const [searchText, setSearchText] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
@@ -100,13 +100,13 @@ export default function TablesIndexPage(): React.JSX.Element {
     })
   }, [debouncedSearch, sorted])
 
-  const createDataset = useCreateDataset(starshipId)
-  const canCreate = Boolean(starshipId) && !createDataset.isPending
+  const createTable = useCreateTable(starshipId)
+  const canCreate = Boolean(starshipId) && !createTable.isPending
 
-  const archiveDataset = useArchiveDataset(starshipId)
-  const hardDeleteDataset = useHardDeleteDataset(starshipId)
+  const archiveTable = useArchiveTable(starshipId)
+  const hardDeleteTable = useHardDeleteTable(starshipId)
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string; slug?: string | null } | null>(null)
-  const [deletingDatasetId, setDeletingDatasetId] = useState<string | null>(null)
+  const [deletingTableId, setDeletingTableId] = useState<string | null>(null)
   const [deleteMode, setDeleteMode] = useState<'archive' | 'hard'>('archive')
 
   const [open, setOpen] = useState(false)
@@ -159,52 +159,52 @@ export default function TablesIndexPage(): React.JSX.Element {
     }
 
     try {
-      const created = await createDataset.mutateAsync({
-        name: name.trim() || 'New dataset',
+      const created = await createTable.mutateAsync({
+        name: name.trim() || 'New table',
         description: description.trim() || undefined,
         columns: cols,
         primaryKey: primaryKey.trim() ? primaryKey.trim() : null,
       })
       setOpen(false)
       resetCreateModal()
-      router.push(`/ship/${encodeURIComponent(slug)}/datasets/${encodeURIComponent(created.id)}`)
+      router.push(`/ship/${encodeURIComponent(slug)}/tables/${encodeURIComponent(created.id)}`)
     } catch (e) {
-      toast.error('Failed to create dataset', { description: getSafeErrorMessage(e) })
+      toast.error('Failed to create table', { description: getSafeErrorMessage(e) })
     }
   }
 
-  async function onConfirmDeleteDataset() {
+  async function onConfirmDeleteTable() {
     const target = deleteTarget
     if (!target || !starshipId) return
     if (deleteMode === 'hard') {
       if (!canHardDelete) {
-        toast.error('Only owners/admins can permanently delete datasets')
+        toast.error('Only owners/admins can permanently delete tables')
         return
       }
-      if (hardDeleteDataset.isPending) return
-      setDeletingDatasetId(target.id)
+      if (hardDeleteTable.isPending) return
+      setDeletingTableId(target.id)
       try {
-        await hardDeleteDataset.mutateAsync(target.id)
-        toast.success('Dataset deleted permanently', { description: `${target.name} and its rows were deleted.` })
+        await hardDeleteTable.mutateAsync(target.id)
+        toast.success('Table deleted permanently', { description: `${target.name} and its rows were deleted.` })
         setDeleteTarget(null)
       } catch (e) {
-        toast.error('Failed to delete dataset', { description: getSafeErrorMessage(e) })
+        toast.error('Failed to delete table', { description: getSafeErrorMessage(e) })
       } finally {
-        setDeletingDatasetId((prev) => (prev === target.id ? null : prev))
+        setDeletingTableId((prev) => (prev === target.id ? null : prev))
       }
       return
     }
 
-    if (archiveDataset.isPending) return
-    setDeletingDatasetId(target.id)
+    if (archiveTable.isPending) return
+    setDeletingTableId(target.id)
     try {
-      await archiveDataset.mutateAsync(target.id)
-      toast.success('Dataset deleted', { description: `${target.name} was archived.` })
+      await archiveTable.mutateAsync(target.id)
+      toast.success('Table deleted', { description: `${target.name} was archived.` })
       setDeleteTarget(null)
     } catch (e) {
-      toast.error('Failed to delete dataset', { description: getSafeErrorMessage(e) })
+      toast.error('Failed to delete table', { description: getSafeErrorMessage(e) })
     } finally {
-      setDeletingDatasetId((prev) => (prev === target.id ? null : prev))
+      setDeletingTableId((prev) => (prev === target.id ? null : prev))
     }
   }
 
@@ -221,14 +221,14 @@ export default function TablesIndexPage(): React.JSX.Element {
             disabled={!canCreate}
           >
             <Icon name="plus" className="h-4 w-4 mr-1.5" />
-            New dataset
+            New table
           </Button>
         ) : null}
       </div>
     )
   }
 
-  const renderDatasetRowSkeleton = (key: string) => {
+  const renderTableRowSkeleton = (key: string) => {
     return (
       <div key={key} className={cn('rounded-lg border border-border/60 bg-card px-4 py-3 flex items-start justify-between gap-3')}>
         <div className="min-w-0 flex-1">
@@ -254,7 +254,7 @@ export default function TablesIndexPage(): React.JSX.Element {
 
   return (
     <div className="relative flex flex-col min-h-full min-w-0">
-      <PageHeader icon="database" title="Datasets" />
+      <PageHeader icon="database" title="Tables" />
 
       <div className="flex-1 min-h-0 overflow-y-visible md:overflow-y-auto px-4 pt-6 pb-8 md:pb-8">
         <div className={cn('w-full bg-transparent max-w-4xl mx-auto min-h-full flex flex-col')}>
@@ -270,7 +270,7 @@ export default function TablesIndexPage(): React.JSX.Element {
                   disabled={!canCreate}
                 >
                   <Icon name="plus" className="h-4 w-4 mr-1.5" />
-                  New dataset
+                  New table
                 </Button>
               </div>
 
@@ -280,10 +280,10 @@ export default function TablesIndexPage(): React.JSX.Element {
                   <Input
                     value={searchText}
                     onChange={(e) => setSearchText(e.target.value)}
-                    placeholder="Search datasets"
+                    placeholder="Search tables"
                     className="pl-9 h-9 py-1.5 text-[13px] rounded-2xl border-border/60 bg-card shadow-sm"
-                    aria-label="Search datasets"
-                    disabled={!starshipId || datasetsLoading}
+                    aria-label="Search tables"
+                    disabled={!starshipId || tablesLoading}
                   />
                 </div>
               </div>
@@ -294,23 +294,23 @@ export default function TablesIndexPage(): React.JSX.Element {
             renderCenteredState('Loading…')
           ) : !starshipId ? (
             renderCenteredState('No starship selected.')
-          ) : datasetsLoading ? (
-            <div className="space-y-2">{Array.from({ length: 3 }, (_, i) => renderDatasetRowSkeleton(`dataset-skel-${i}`))}</div>
+          ) : tablesLoading ? (
+            <div className="space-y-2">{Array.from({ length: 3 }, (_, i) => renderTableRowSkeleton(`table-skel-${i}`))}</div>
           ) : filteredSorted.length === 0 ? (
             renderCenteredState(
-              debouncedSearch.trim() ? `No datasets match “${debouncedSearch.trim()}”.` : 'No datasets yet.',
+              debouncedSearch.trim() ? `No tables match “${debouncedSearch.trim()}”.` : 'No tables yet.',
               { showCreate: true }
             )
           ) : (
             <div className="space-y-2">
               {filteredSorted.map((d) => {
-                const href = `/ship/${encodeURIComponent(slug)}/datasets/${encodeURIComponent(d.id)}`
+                const href = `/ship/${encodeURIComponent(slug)}/tables/${encodeURIComponent(d.id)}`
                 return (
                   <div
                     key={d.id}
                     className={cn('rounded-lg border border-border/60 bg-card px-4 py-3 flex items-start justify-between gap-3')}
                   >
-                    <div className={cn('min-w-0 flex-1')} aria-label={String(d.name || 'Dataset')}>
+                    <div className={cn('min-w-0 flex-1')} aria-label={String(d.name || 'Table')}>
                       <div className="flex items-start gap-3">
                         <div className="relative mt-0.5 h-10 w-10 flex-shrink-0">
                           <span className="flex h-10 w-10 items-center justify-center rounded-lg ring-1 ring-border/50 bg-muted/10 overflow-hidden">
@@ -365,7 +365,7 @@ export default function TablesIndexPage(): React.JSX.Element {
                           <DropdownMenuItem
                             onClick={() => {
                               setDeleteMode('archive')
-                              setDeleteTarget({ id: String(d.id), name: String(d.name || 'Dataset'), slug: (d as any)?.slug })
+                              setDeleteTarget({ id: String(d.id), name: String(d.name || 'Table'), slug: (d as any)?.slug })
                             }}
                             className="flex items-center gap-2 cursor-pointer"
                           >
@@ -377,7 +377,7 @@ export default function TablesIndexPage(): React.JSX.Element {
                             disabled={!canHardDelete}
                             onClick={() => {
                               setDeleteMode('hard')
-                              setDeleteTarget({ id: String(d.id), name: String(d.name || 'Dataset'), slug: (d as any)?.slug })
+                              setDeleteTarget({ id: String(d.id), name: String(d.name || 'Table'), slug: (d as any)?.slug })
                             }}
                             className="flex items-center gap-2 cursor-pointer hover:bg-destructive/10 focus:bg-destructive/10 text-destructive focus:text-destructive disabled:opacity-60"
                           >
@@ -406,7 +406,7 @@ export default function TablesIndexPage(): React.JSX.Element {
       >
         <DialogContent className="w-[calc(100vw-2rem)] sm:max-w-[560px] max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Create dataset</DialogTitle>
+            <DialogTitle>Create table</DialogTitle>
             <DialogDescription>Define columns now. You can append/upsert rows later.</DialogDescription>
           </DialogHeader>
 
@@ -418,7 +418,7 @@ export default function TablesIndexPage(): React.JSX.Element {
 
             <div className="space-y-2">
               <div className="text-xs text-muted-foreground">Description</div>
-              <Textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="What is this dataset used for?" rows={3} />
+              <Textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="What is this table used for?" rows={3} />
             </div>
 
             <div className="space-y-2">
@@ -583,12 +583,12 @@ export default function TablesIndexPage(): React.JSX.Element {
                                   <div className="space-y-1">
                                     <div className="text-[11px] text-muted-foreground">Target kind</div>
                                     <Select
-                                      value={String((col as any)?.reference?.target?.kind || '') || 'dataset_row'}
+                                      value={String((col as any)?.reference?.target?.kind || '') || 'table_row'}
                                       onValueChange={(v) => {
                                         if (v === 'task_card') {
                                           setCol({ reference: { target: { kind: 'task_card' } } } as any)
                                         } else {
-                                          setCol({ reference: { target: { kind: 'dataset_row', datasetIdOrSlug: '' } } } as any)
+                                          setCol({ reference: { target: { kind: 'table_row', tableIdOrSlug: '' } } } as any)
                                         }
                                       }}
                                     >
@@ -596,7 +596,7 @@ export default function TablesIndexPage(): React.JSX.Element {
                                         <SelectValue placeholder="Select target" />
                                       </SelectTrigger>
                                       <SelectContent>
-                                        <SelectItem value="dataset_row">Dataset row</SelectItem>
+                                        <SelectItem value="table_row">Table row</SelectItem>
                                         <SelectItem value="task_card">Task card</SelectItem>
                                       </SelectContent>
                                     </Select>
@@ -619,17 +619,17 @@ export default function TablesIndexPage(): React.JSX.Element {
                                   </div>
                                 </div>
 
-                                {String((col as any)?.reference?.target?.kind || '') === 'dataset_row' && (
+                                {String((col as any)?.reference?.target?.kind || '') === 'table_row' && (
                                   <div className="space-y-1">
-                                    <div className="text-[11px] text-muted-foreground">Target dataset</div>
+                                    <div className="text-[11px] text-muted-foreground">Target table</div>
                                     <Select
-                                      value={String((col as any)?.reference?.target?.datasetIdOrSlug || '')}
+                                      value={String((col as any)?.reference?.target?.tableIdOrSlug || '')}
                                       onValueChange={(v) =>
-                                        setCol({ reference: { ...(col as any).reference, target: { kind: 'dataset_row', datasetIdOrSlug: v } } } as any)
+                                        setCol({ reference: { ...(col as any).reference, target: { kind: 'table_row', tableIdOrSlug: v } } } as any)
                                       }
                                     >
                                       <SelectTrigger>
-                                        <SelectValue placeholder="Select dataset" />
+                                        <SelectValue placeholder="Select table" />
                                       </SelectTrigger>
                                       <SelectContent>
                                         {(sorted ?? []).map((d) => (
@@ -640,7 +640,7 @@ export default function TablesIndexPage(): React.JSX.Element {
                                       </SelectContent>
                                     </Select>
                                     <div className="text-[11px] text-muted-foreground">
-                                      Uses the target dataset’s primaryKey (row_key) to resolve labels.
+                                      Uses the target table’s primaryKey (row_key) to resolve labels.
                                     </div>
                                   </div>
                                 )}
@@ -684,17 +684,17 @@ export default function TablesIndexPage(): React.JSX.Element {
         open={deleteTarget !== null}
         onOpenChange={(next) => {
           if (!next) {
-            if (!archiveDataset.isPending && !hardDeleteDataset.isPending) setDeleteTarget(null)
+            if (!archiveTable.isPending && !hardDeleteTable.isPending) setDeleteTarget(null)
           }
         }}
       >
         <DialogContent className="sm:max-w-[520px]">
           <DialogHeader>
-            <DialogTitle className="text-destructive">{deleteMode === 'hard' ? 'Delete dataset permanently' : 'Archive dataset'}</DialogTitle>
+            <DialogTitle className="text-destructive">{deleteMode === 'hard' ? 'Delete table permanently' : 'Archive table'}</DialogTitle>
             <DialogDescription>
               {deleteMode === 'hard'
-                ? 'This will permanently delete the dataset and all of its rows. This action cannot be undone.'
-                : 'This will archive the dataset so it no longer appears in the list.'}
+                ? 'This will permanently delete the table and all of its rows. This action cannot be undone.'
+                : 'This will archive the table so it no longer appears in the list.'}
             </DialogDescription>
           </DialogHeader>
 
@@ -718,17 +718,17 @@ export default function TablesIndexPage(): React.JSX.Element {
               type="button"
               variant="ghost"
               onClick={() => setDeleteTarget(null)}
-              disabled={archiveDataset.isPending || hardDeleteDataset.isPending}
+              disabled={archiveTable.isPending || hardDeleteTable.isPending}
             >
               Cancel
             </Button>
             <Button
               type="button"
               variant="destructive"
-              onClick={onConfirmDeleteDataset}
-              disabled={!deleteTarget || archiveDataset.isPending || hardDeleteDataset.isPending || (deleteMode === 'hard' && !canHardDelete)}
+              onClick={onConfirmDeleteTable}
+              disabled={!deleteTarget || archiveTable.isPending || hardDeleteTable.isPending || (deleteMode === 'hard' && !canHardDelete)}
             >
-              {(archiveDataset.isPending || hardDeleteDataset.isPending) && deletingDatasetId === deleteTarget?.id ? 'Deleting…' : deleteMode === 'hard' ? 'Delete permanently' : 'Archive'}
+              {(archiveTable.isPending || hardDeleteTable.isPending) && deletingTableId === deleteTarget?.id ? 'Deleting…' : deleteMode === 'hard' ? 'Delete permanently' : 'Archive'}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -3,7 +3,7 @@
   "kind": "tool",
   "exportedAt": "2026-03-13T00:00:00.000Z",
   "metadata": {
-    "fromSlug": "show-dataset-card",
+    "fromSlug": "show-table-card",
     "fromStarshipSlug": "starborn-dvlif0"
   },
   "source": {
@@ -12,14 +12,14 @@
   },
   "payload": {
     "tool": {
-      "name": "Show Dataset Card",
-      "description": "Render a clickable dataset card in the chat UI (opens the dataset page).",
+      "name": "Show Table Card",
+      "description": "Render a clickable table card in the chat UI (opens the table page).",
       "parameters": {
         "type": "object",
         "properties": {
-          "datasetIdOrSlug": {
+          "tableIdOrSlug": {
             "type": "string",
-            "description": "Dataset identifier (id or slug). Example: \"accounts\"."
+            "description": "Table identifier (id or slug). Example: \"accounts\"."
           },
           "title": {
             "type": "string",
@@ -30,7 +30,7 @@
             "description": "Optional card description (small text)."
           }
         },
-        "required": ["datasetIdOrSlug"],
+        "required": ["tableIdOrSlug"],
         "additionalProperties": false
       },
       "blueprint": {
@@ -45,7 +45,7 @@
             "name": "Build widget payload",
             "type": "code",
             "parameters": {
-              "code": "async function main(ctx) {\n  const input = ctx.input || {};\n  const datasetIdOrSlug = typeof input.datasetIdOrSlug === 'string' ? input.datasetIdOrSlug.trim() : '';\n  if (!datasetIdOrSlug) throw new Error('datasetIdOrSlug is required');\n\n  const title = typeof input.title === 'string' ? input.title.trim() : '';\n  const description = typeof input.description === 'string' ? input.description.trim() : '';\n\n  return {\n    widgetType: 'dataset_card',\n    props: {\n      id: 'dataset:' + datasetIdOrSlug,\n      datasetIdOrSlug,\n      ...(title ? { title } : {}),\n      ...(description ? { description } : {})\n    }\n  };\n}\n",
+              "code": "async function main(ctx) {\n  const input = ctx.input || {};\n  const tableIdOrSlug = typeof input.tableIdOrSlug === 'string' ? input.tableIdOrSlug.trim() : '';\n  if (!tableIdOrSlug) throw new Error('tableIdOrSlug is required');\n\n  const title = typeof input.title === 'string' ? input.title.trim() : '';\n  const description = typeof input.description === 'string' ? input.description.trim() : '';\n\n  return {\n    widgetType: 'table_card',\n    props: {\n      id: 'table:' + tableIdOrSlug,\n      tableIdOrSlug,\n      ...(title ? { title } : {}),\n      ...(description ? { description } : {})\n    }\n  };\n}\n",
               "timeout": 2000
             }
           },

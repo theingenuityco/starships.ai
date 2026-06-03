@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1",
-  "kind": "dataset",
+  "kind": "table",
   "exportedAt": "2026-05-26T00:00:00.000Z",
   "metadata": {
     "fromSlug": "ownership",
@@ -11,7 +11,7 @@
     "version": "0.0.0"
   },
   "payload": {
-    "dataset": {
+    "table": {
       "name": "Ownership",
       "description": "Path/module ownership map used to route reviews and flag sensitive areas.",
       "columns": [

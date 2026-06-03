@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1",
-  "kind": "dataset",
+  "kind": "table",
   "exportedAt": "2026-03-10T19:02:15.317Z",
   "metadata": {
     "fromSlug": "accounts",
@@ -11,7 +11,7 @@
     "version": "0.0.0"
   },
   "payload": {
-    "dataset": {
+    "table": {
       "name": "Accounts",
       "description": "Companies/accounts for lead generation. Includes direct ICP reference.",
       "columns": [
@@ -82,8 +82,8 @@
           "type": "reference",
           "reference": {
             "target": {
-              "kind": "dataset_row",
-              "datasetIdOrSlug": "icp-profiles"
+              "kind": "table_row",
+              "tableIdOrSlug": "icp-profiles"
             },
             "labelColumn": "icp_name"
           },

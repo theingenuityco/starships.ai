@@ -1,0 +1,47 @@
+{
+  "schemaVersion": "1",
+  "kind": "bundle",
+  "exportedAt": "2026-05-28T00:00:00.000Z",
+  "entities": {
+    "rooms": [
+      {
+        "kind": "room",
+        "fromSlug": "support",
+        "fromStarshipSlug": "starborn-support",
+        "file": "rooms/support.json"
+      }
+    ],
+    "agents": [
+      {
+        "kind": "agent",
+        "fromSlug": "triage",
+        "fromStarshipSlug": "starborn-support",
+        "file": "agents/triage.json"
+      },
+      {
+        "kind": "agent",
+        "fromSlug": "reply",
+        "fromStarshipSlug": "starborn-support",
+        "file": "agents/reply.json"
+      }
+    ],
+    "views": [],
+    "datasets": [
+      {
+        "kind": "dataset",
+        "fromSlug": "tickets",
+        "fromStarshipSlug": "starborn-support",
+        "file": "datasets/tickets.json"
+      }
+    ],
+    "taskBoards": [
+      {
+        "kind": "task_board",
+        "fromSlug": "support-tickets",
+        "fromStarshipSlug": "starborn-support",
+        "file": "task-boards/support-tickets.json"
+      }
+    ],
+    "tools": []
+  }
+}

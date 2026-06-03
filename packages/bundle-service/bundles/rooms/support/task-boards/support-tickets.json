@@ -1,0 +1,42 @@
+{
+  "schemaVersion": "1",
+  "kind": "task_board",
+  "exportedAt": "2026-05-28T00:00:00.000Z",
+  "metadata": {
+    "fromSlug": "support-tickets",
+    "fromStarshipSlug": "starborn-support"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "taskBoard": {
+      "name": "Support Tickets",
+      "description": "Ticket lifecycle: each ticket flows NEW -> TRIAGED -> RESOLVED.",
+      "pos": 1,
+      "createDefaultColumns": false
+    },
+    "columns": [
+      {
+        "title": "New",
+        "key": null,
+        "pos": 1,
+        "wipLimit": null
+      },
+      {
+        "title": "Triaged",
+        "key": null,
+        "pos": 2,
+        "wipLimit": null
+      },
+      {
+        "title": "Resolved",
+        "key": null,
+        "pos": 3,
+        "wipLimit": null
+      }
+    ],
+    "cards": []
+  }
+}

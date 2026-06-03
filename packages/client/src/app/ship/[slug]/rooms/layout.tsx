@@ -6,6 +6,8 @@ import { PageHeader } from '@/components/ui/PageHeader'
 import { ViewPane } from '@/components/views/ViewPane'
 import { RoomConversationIndexView } from '@/components/rooms/RoomConversationIndexView'
 import { LeadgenDashboard } from '@/components/rooms/LeadgenDashboard'
+import { SupportRoomDashboard } from '@/components/rooms/SupportRoomDashboard'
+import { EngineeringRoomDashboard } from '@/components/rooms/EngineeringRoomDashboard'
 import { EngineeringDashboard } from '@/components/rooms/EngineeringDashboard'
 import { RoomHistoryPane } from '@/components/rooms/RoomHistoryPane'
 import { RoomResourcesPane } from '@/components/rooms/RoomResourcesPane'
@@ -37,6 +39,8 @@ import {
 import { useStarshipViews } from '@/hooks/useViews'
 import { useStarshipDatasets } from '@/hooks/useDatasets'
 import { useStarshipDocs } from '@/hooks/useDocs'
+import { useDemo } from '@/components/demo/DemoContext'
+import { DEMO_ROOMS, isDemoRoomConversationId } from '@/components/demo/demoRooms'
 import { cn } from '@/lib/utils'
 import type { AgentModel, MessageModel, RoomModel } from '@starships/protocol'
 import { useParams, usePathname, useRouter, useSearchParams } from 'next/navigation'
@@ -234,6 +238,11 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
   const { data: starshipData } = useStarshipBySlug(routeParams.slug)
   const { data: roomsData, isLoading: roomsLoading } = useStarshipRooms(starshipData?.id ?? '', Boolean(starshipData?.id))
 
+  // Demo clock: while the hero-video demo is active, the three toured rooms
+  // (Support / Engineering / Growth) are supplied from client-side mock data
+  // rather than the DB, so they resolve and render their boards without seeding.
+  const { active: demoActive } = useDemo()
+
   const normalizedRoomSlug = useMemo(
     () =>
       String(routeParams.roomSlug || '')
@@ -242,26 +251,41 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
     [routeParams.roomSlug]
   )
 
+  const mergedRooms = useMemo<RoomModel[]>(() => {
+    const real = (roomsData?.rooms ?? []) as RoomModel[]
+    return demoActive ? DEMO_ROOMS : real
+  }, [roomsData?.rooms, demoActive])
+
   const activeRoom = useMemo(() => {
-    const rooms = roomsData?.rooms ?? []
     if (!normalizedRoomSlug) return null
     return (
-      rooms.find(
+      mergedRooms.find(
         (r: RoomModel) =>
           String(r.slug || '')
             .trim()
             .toLowerCase() === normalizedRoomSlug
       ) ?? null
     )
-  }, [roomsData?.rooms, normalizedRoomSlug])
+  }, [mergedRooms, normalizedRoomSlug])
+
+  // Is the resolved room one of the synthetic demo rooms? When so we bypass the
+  // real-data gates (participation, pins, not-found) since it has no DB backing.
+  const isDemoRoom = useMemo(
+    () => Boolean(demoActive && activeRoom?.conversationId && isDemoRoomConversationId(String(activeRoom.conversationId))),
+    [demoActive, activeRoom?.conversationId]
+  )
 
   const isLeadGenRoom =
     String((activeRoom as any)?.provisionedByBundle || '').trim() === 'lead-generation' ||
-    String(activeRoom?.slug || '').trim().toLowerCase() === 'leadgen'
+    ['leadgen', 'growth'].includes(String(activeRoom?.slug || '').trim().toLowerCase())
+
+  const isSupportRoom =
+    String((activeRoom as any)?.provisionedByBundle || '').trim() === 'support' ||
+    String(activeRoom?.slug || '').trim().toLowerCase() === 'support'
 
   const isEngineeringRoom =
     String((activeRoom as any)?.provisionedByBundle || '').trim() === 'engineering' ||
-    String(activeRoom?.slug || '').trim().toLowerCase() === 'engineering'
+    ['engineering', 'eng'].includes(String(activeRoom?.slug || '').trim().toLowerCase())
 
   // Lead-gen flow guardrail:
   // If we somehow land in the Lobby while there is still a pending lead-gen prompt in sessionStorage
@@ -526,13 +550,15 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
   // If slug is present but doesn't match a room, show a not-found UI (hard cutover; no redirects).
   const isInvalidRoomSlug = Boolean(routeParams.roomSlug && !roomsLoading && !activeRoom)
 
-  const roomParticipation = useRoomParticipation(activeConversationId || '', Boolean(activeConversationId))
-  const isRoomParticipant = Boolean(roomParticipation.data?.isParticipant)
+  const roomParticipation = useRoomParticipation(activeConversationId || '', Boolean(activeConversationId) && !isDemoRoom)
+  // Demo rooms have no DB backing, so there's nothing to join — treat the viewer
+  // as a participant so the board renders straight through.
+  const isRoomParticipant = isDemoRoom || Boolean(roomParticipation.data?.isParticipant)
   const joinRoom = useJoinRoom(activeConversationId || '')
-  const roomParticipants = useRoomParticipants(activeConversationId || '', Boolean(activeConversationId && isRoomParticipant))
+  const roomParticipants = useRoomParticipants(activeConversationId || '', Boolean(activeConversationId && isRoomParticipant) && !isDemoRoom)
 
-  const { data: pinsData } = useRoomPins(activeConversationId || '', Boolean(activeConversationId && isRoomParticipant))
-  const { data: roomToolsData } = useRoomTools(activeConversationId || '', Boolean(activeConversationId && isRoomParticipant))
+  const { data: pinsData } = useRoomPins(activeConversationId || '', Boolean(activeConversationId && isRoomParticipant) && !isDemoRoom)
+  const { data: roomToolsData } = useRoomTools(activeConversationId || '', Boolean(activeConversationId && isRoomParticipant) && !isDemoRoom)
   const { data: starshipViews = [] } = useStarshipViews(starshipData?.id ?? '', Boolean(starshipData?.id))
   const { data: datasets = [] } = useStarshipDatasets(starshipData?.id ?? '', Boolean(starshipData?.id))
   const { data: taskBoards = [] } = useStarshipTaskBoards(starshipData?.id ?? '', Boolean(starshipData?.id))
@@ -902,8 +928,26 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
             hideCloseButton={true}
             className="h-full"
           />
-        ) : activeConversationId && isDashboardRoute && isLeadGenRoom ? (
+        ) : activeConversationId && (isDashboardRoute || isDemoRoom) && isLeadGenRoom ? (
           <LeadgenDashboard
+            starshipId={starshipData.id}
+            starshipSlug={routeParams.slug}
+            roomSlug={activeRoom?.slug ?? normalizedRoomSlug}
+            roomName={activeRoom?.name}
+            pinnedDatasets={pinsData?.datasets ?? []}
+            pinnedTaskBoards={pinsData?.taskBoards ?? []}
+          />
+        ) : activeConversationId && (isDashboardRoute || isDemoRoom) && isSupportRoom ? (
+          <SupportRoomDashboard
+            starshipId={starshipData.id}
+            starshipSlug={routeParams.slug}
+            roomSlug={activeRoom?.slug ?? normalizedRoomSlug}
+            roomName={activeRoom?.name}
+            pinnedDatasets={pinsData?.datasets ?? []}
+            pinnedTaskBoards={pinsData?.taskBoards ?? []}
+          />
+        ) : activeConversationId && isDemoRoom && isEngineeringRoom ? (
+          <EngineeringRoomDashboard
             starshipId={starshipData.id}
             starshipSlug={routeParams.slug}
             roomSlug={activeRoom?.slug ?? normalizedRoomSlug}

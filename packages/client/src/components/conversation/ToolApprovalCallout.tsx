@@ -22,6 +22,10 @@ export interface ToolApprovalCalloutProps {
   onDeny: () => void
 }
 
+// PR-class tools render the callout as a PR review (Approve / Request changes) rather
+// than a generic tool gate. The "Always allow" path doesn't fit per-PR review semantics.
+const REVIEW_CLASS_TOOL_SLUGS = new Set(['open-pr-with-changes', 'post-pr-review', 'merge-pr', 'deploy'])
+
 export function ToolApprovalCallout({ approval, isSubmitting = false, onApproveOnce, onAlwaysAllow, onDeny }: ToolApprovalCalloutProps) {
   const toolLabel = useMemo(() => {
     const slug = approval.toolSlug && String(approval.toolSlug).trim() ? String(approval.toolSlug).trim() : ''
@@ -31,6 +35,10 @@ export function ToolApprovalCallout({ approval, isSubmitting = false, onApproveO
   }, [approval.toolSlug, approval.toolName])
 
   const canAlwaysAllow = Boolean(approval.toolSlug && String(approval.toolSlug).trim().length > 0)
+  const isReviewClass = useMemo(() => {
+    const slug = String(approval.toolSlug || '').trim()
+    return REVIEW_CLASS_TOOL_SLUGS.has(slug)
+  }, [approval.toolSlug])
 
   const prettyArgs = useMemo(() => {
     try {
@@ -42,13 +50,17 @@ export function ToolApprovalCallout({ approval, isSubmitting = false, onApproveO
 
   return (
     <ApprovalCallout
-      title="Approval required"
+      title={isReviewClass ? 'Review required' : 'Approval required'}
       badge={
         <Badge variant="outline" className="font-mono text-[11px]">
           {toolLabel}
         </Badge>
       }
-      description={(approval.agentName || 'An agent') + ' wants to run this tool.'}
+      description={
+        isReviewClass
+          ? (approval.agentName || 'An agent') + ' is waiting on your review.'
+          : (approval.agentName || 'An agent') + ' wants to run this tool.'
+      }
       details={
         <details>
           <summary className="cursor-pointer select-none text-xs text-muted-foreground hover:text-foreground">View arguments</summary>
@@ -58,24 +70,26 @@ export function ToolApprovalCallout({ approval, isSubmitting = false, onApproveO
       actions={
         <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
           <Button variant="outline" size="sm" onClick={onDeny} disabled={isSubmitting}>
-            Deny
+            {isReviewClass ? 'Request changes' : 'Deny'}
           </Button>
 
           <div className="flex-1" />
 
           <div className="flex flex-col sm:flex-row gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onAlwaysAllow}
-              disabled={isSubmitting || !canAlwaysAllow}
-              className={cn(!canAlwaysAllow && 'opacity-60')}
-              title={!canAlwaysAllow ? 'Tool slug unavailable; cannot set always-allow.' : undefined}
-            >
-              Always allow
-            </Button>
+            {!isReviewClass ? (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onAlwaysAllow}
+                disabled={isSubmitting || !canAlwaysAllow}
+                className={cn(!canAlwaysAllow && 'opacity-60')}
+                title={!canAlwaysAllow ? 'Tool slug unavailable; cannot set always-allow.' : undefined}
+              >
+                Always allow
+              </Button>
+            ) : null}
             <Button variant="default" size="sm" onClick={onApproveOnce} disabled={isSubmitting}>
-              Allow once
+              {isReviewClass ? 'Approve' : 'Allow once'}
             </Button>
           </div>
         </div>

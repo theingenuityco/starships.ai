@@ -28,9 +28,9 @@ export async function runCliJobAgent(spec: CliAgentJobSpec): Promise<void> {
 }
 
 async function main(): Promise<void> {
-  const jobFile = process.env.CLI_JOB_FILE || process.argv[2];
+  const jobFile = process.env.CLI_JOB_FILE;
   if (!jobFile) {
-    emit({ t: 'error', message: 'CLI_JOB_FILE (or argv[2]) is required' });
+    emit({ t: 'error', message: 'CLI_JOB_FILE is required' });
     process.exit(1);
     return;
   }

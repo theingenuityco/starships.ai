@@ -119,13 +119,17 @@ function toChatMessages(messages: LlmMessage[]): ChatMessage[] {
         args: parseArgs(fn.arguments),
       };
     });
+    // Accept both casings: the loaded history uses camelCase `toolCallId`, but the wire
+    // format is snake_case `tool_call_id` — without this a tool result links to nothing on resume.
+    const toolCallId =
+      typeof rec.toolCallId === 'string' ? rec.toolCallId : typeof rec.tool_call_id === 'string' ? rec.tool_call_id : undefined;
     return {
       role: m.role as ChatMessage['role'],
       content: (m.content as ChatMessage['content']) ?? '',
       ...(typeof rec.reasoning === 'string' ? { reasoning: rec.reasoning } : {}),
       ...(Array.isArray(rec.reasoningDetails) ? { reasoningDetails: rec.reasoningDetails as unknown[] } : {}),
       ...(toolCalls.length > 0 ? { toolCalls } : {}),
-      ...(typeof rec.toolCallId === 'string' ? { toolCallId: rec.toolCallId } : {}),
+      ...(toolCallId ? { toolCallId } : {}),
     };
   });
 }
@@ -244,8 +248,13 @@ export async function executeCliAgentTurn(deps: CliAgentTurnDeps, args: CliAgent
           });
           approvalId = created.id;
         }
-      } catch {
-        // Best-effort: still surface the prompt even if persistence failed.
+      } catch (err) {
+        // Best-effort: still surface the prompt even if persistence failed. Log so a rare
+        // toolCallId collision (UNIQUE conflict against a stale decided row) is observable —
+        // in that case the prompt would have no backing record to approve.
+        console.warn(
+          `[CliAgentTurn] approval persist failed for toolCallId=${event.toolCallId}: ${err instanceof Error ? err.message : String(err)}`
+        );
       }
       await deps.streamBus.publish(conversationId, {
         type: 'ui_action',

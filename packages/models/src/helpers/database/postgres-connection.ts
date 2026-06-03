@@ -10,6 +10,10 @@ export interface PostgresConfig {
   max?: number;
   idleTimeoutMillis?: number;
   connectionTimeoutMillis?: number;
+  /** Overrides the pool's `application_name` (defaults to 'starships-ai'). */
+  applicationName?: string;
+  /** Overrides statement/query timeout in ms (defaults to 30000). */
+  statementTimeoutMs?: number;
 }
 
 /** PostgreSQL database connection manager */
@@ -37,9 +41,9 @@ export class PostgresConnection {
         max: this.config.max || 20, // Maximum number of clients in the pool
         idleTimeoutMillis: this.config.idleTimeoutMillis || 30000, // Close idle clients after 30 seconds
         connectionTimeoutMillis: this.config.connectionTimeoutMillis || 10000, // Return an error if no connection is available within 10 seconds
-        statement_timeout: 30000, // 30 second query timeout
-        query_timeout: 30000, // 30 second query timeout
-        application_name: 'starships-ai',
+        statement_timeout: this.config.statementTimeoutMs ?? 30000, // query timeout (default 30s)
+        query_timeout: this.config.statementTimeoutMs ?? 30000, // query timeout (default 30s)
+        application_name: this.config.applicationName ?? 'starships-ai',
       };
 
       this.pool = new Pool(poolConfig);
@@ -227,23 +231,47 @@ export class PostgresConnection {
   }
 }
 
-let connectionInstance: PostgresConnection | null = null;
+// The app pool (privileged role) backs every repository and migration.
+// The agent pool (restricted, read-only role) is used only by the per-starship
+// SQL surface; see getAgentConnection().
+let appConnection: PostgresConnection | null = null;
+let agentConnection: PostgresConnection | null = null;
 
 export function createConnection(config: PostgresConfig): PostgresConnection {
-  if (!connectionInstance) {
-    connectionInstance = new PostgresConnection(config);
+  if (!appConnection) {
+    appConnection = new PostgresConnection(config);
   }
-  return connectionInstance;
+  return appConnection;
 }
 
 export function getConnection(): PostgresConnection {
-  if (!connectionInstance) {
+  if (!appConnection) {
     throw new Error('PostgreSQL connection not initialized. Call createConnection() first.');
   }
-  return connectionInstance;
+  return appConnection;
 }
 
-// Test helper function to reset connection instance
+/**
+ * Create the restricted agent pool. Authenticates as the read-only agent login
+ * role; used exclusively by the per-starship SQL surface (which assumes a
+ * per-starship role via SET ROLE). Never used for app reads/writes or migrations.
+ */
+export function createAgentConnection(config: PostgresConfig): PostgresConnection {
+  if (!agentConnection) {
+    agentConnection = new PostgresConnection(config);
+  }
+  return agentConnection;
+}
+
+export function getAgentConnection(): PostgresConnection {
+  if (!agentConnection) {
+    throw new Error('PostgreSQL agent connection not initialized. Call createAgentConnection() first.');
+  }
+  return agentConnection;
+}
+
+// Test helper function to reset both connection instances
 export function resetConnection(): void {
-  connectionInstance = null;
+  appConnection = null;
+  agentConnection = null;
 }

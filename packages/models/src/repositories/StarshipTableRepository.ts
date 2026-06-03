@@ -1,0 +1,283 @@
+import type { StarshipDatasetColumn } from '@starships/protocol';
+import { BaseRepository } from './BaseRepository';
+import { NotFoundError, ValidationError } from '@starships/errors';
+import { nanoid } from 'nanoid';
+import type { PostgresConnection } from '@/helpers/database';
+import { generateUniqueSlugIncremental } from '@/utils/slugGenerator';
+import { schemaName, qualifiedTable, sanitizeTableName, assertSafeId } from '@/helpers/starship-tables/identifiers';
+import { compileCreateTable, compileAlterTable, TableSchemaChangeError } from '@/services/StarshipTableDdlCompiler';
+import { StarshipDatabaseProvisioner } from '@/services/StarshipDatabaseProvisioner';
+
+type DbRow = Record<string, unknown>;
+
+/** A Table = a real Postgres table inside a starship's Database schema. */
+export interface StarshipTableRecord {
+  id: string;
+  starshipId: string;
+  name: string;
+  slug: string;
+  description: string;
+  columns: StarshipDatasetColumn[];
+  primaryKey: string | null;
+  schemaName: string;
+  physicalTable: string;
+  archived: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateStarshipTableInput {
+  starshipId: string;
+  name: string;
+  description?: string;
+  columns: StarshipDatasetColumn[];
+  primaryKey?: string | null;
+}
+
+export interface UpdateStarshipTableInput {
+  name?: string;
+  description?: string;
+  columns?: StarshipDatasetColumn[];
+  primaryKey?: string | null;
+  archived?: boolean;
+}
+
+const SELECT_COLS = `
+  id, starship_id, name, slug, description, schema_name, physical_table,
+  columns_meta_json AS columns_meta, primary_key, archived, created_at, updated_at
+`;
+
+function toIso(value: unknown): string {
+  if (value instanceof Date) return value.toISOString();
+  return typeof value === 'string' ? value : new Date(String(value)).toISOString();
+}
+
+function dropFormula(columns: StarshipDatasetColumn[] | undefined): StarshipDatasetColumn[] {
+  return (Array.isArray(columns) ? columns : []).filter((c) => c && c.name && c.type !== 'formula');
+}
+
+export class StarshipTableRepository extends BaseRepository {
+  constructor(connection?: PostgresConnection) {
+    super('StarshipTableRepository', connection);
+  }
+
+  private mapRow(row: DbRow): StarshipTableRecord {
+    const rawCols = row['columns_meta'];
+    const columns: StarshipDatasetColumn[] = Array.isArray(rawCols)
+      ? (rawCols as StarshipDatasetColumn[])
+      : typeof rawCols === 'string'
+        ? (JSON.parse(rawCols) as StarshipDatasetColumn[])
+        : [];
+    return {
+      id: String(row['id']),
+      starshipId: String(row['starship_id']),
+      name: String(row['name']),
+      slug: String(row['slug']),
+      description: typeof row['description'] === 'string' ? (row['description'] as string) : '',
+      columns,
+      primaryKey: row['primary_key'] == null ? null : String(row['primary_key']),
+      schemaName: String(row['schema_name']),
+      physicalTable: String(row['physical_table']),
+      archived: Boolean(row['archived']),
+      createdAt: toIso(row['created_at']),
+      updatedAt: toIso(row['updated_at']),
+    };
+  }
+
+  async findById(id: string): Promise<StarshipTableRecord | null> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const row = await this.getConnection().queryOne<DbRow>(`SELECT ${SELECT_COLS} FROM starship_tables WHERE id = $1`, [id]);
+        return row ? this.mapRow(row) : null;
+      },
+      'findById',
+      'StarshipTable',
+      id
+    );
+  }
+
+  async findBySlug(slug: string, starshipId: string): Promise<StarshipTableRecord | null> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const row = await this.getConnection().queryOne<DbRow>(
+          `SELECT ${SELECT_COLS} FROM starship_tables WHERE starship_id = $1 AND slug = $2 LIMIT 1`,
+          [starshipId, slug]
+        );
+        return row ? this.mapRow(row) : null;
+      },
+      'findBySlug',
+      'StarshipTable',
+      slug
+    );
+  }
+
+  async listByStarship(starshipId: string, opts?: { includeArchived?: boolean }): Promise<StarshipTableRecord[]> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const includeArchived = Boolean(opts?.includeArchived);
+        const rows = await this.getConnection().query<DbRow>(
+          `SELECT ${SELECT_COLS} FROM starship_tables
+           WHERE starship_id = $1 AND ($2::boolean = TRUE OR archived = FALSE)
+           ORDER BY archived ASC, created_at DESC`,
+          [starshipId, includeArchived]
+        );
+        return rows.map((r) => this.mapRow(r));
+      },
+      'listByStarship',
+      'StarshipTable'
+    );
+  }
+
+  private async physicalTableExists(schema: string, name: string): Promise<boolean> {
+    const row = await this.getConnection().queryOne<DbRow>(
+      `SELECT 1 AS one FROM starship_tables WHERE schema_name = $1 AND physical_table = $2 LIMIT 1`,
+      [schema, name]
+    );
+    return Boolean(row);
+  }
+
+  private async uniquePhysicalTable(schema: string, slug: string): Promise<string> {
+    const base = sanitizeTableName(slug);
+    let candidate = base;
+    let i = 2;
+    while (await this.physicalTableExists(schema, candidate)) {
+      const suffix = `_${i++}`;
+      candidate = `${base.slice(0, 63 - suffix.length)}${suffix}`;
+    }
+    return candidate;
+  }
+
+  async create(data: CreateStarshipTableInput): Promise<StarshipTableRecord> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const starshipId = assertSafeId(data.starshipId, 'starshipId');
+        const columns = dropFormula(data.columns);
+        const primaryKey = typeof data.primaryKey === 'string' ? data.primaryKey : null;
+
+        // Ensure the starship's Database schema + read-only role exist.
+        await new StarshipDatabaseProvisioner(this.getConnection()).ensureProvisioned(starshipId);
+
+        const id = nanoid();
+        const now = new Date().toISOString();
+        const slug = await generateUniqueSlugIncremental(
+          String(data.name || 'table'),
+          async (candidate: string) => Boolean(await this.findBySlug(candidate, starshipId)),
+          { fallbackBase: 'table', maxLength: 100 }
+        );
+        const schema = schemaName(starshipId);
+        const physicalTable = await this.uniquePhysicalTable(schema, slug);
+        const ddl = compileCreateTable({ table: qualifiedTable(starshipId, physicalTable), physicalTable, columns, primaryKey });
+
+        await this.getConnection().transaction(async (client) => {
+          await client.query(
+            `INSERT INTO starship_tables
+               (id, starship_id, name, slug, description, schema_name, physical_table, columns_meta_json, primary_key, archived, created_at, updated_at)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9,$10,$11,$12)`,
+            [id, starshipId, data.name, slug, data.description ?? '', schema, physicalTable, JSON.stringify(columns), primaryKey, false, now, now]
+          );
+          for (const stmt of ddl) await client.query(stmt);
+        });
+
+        const created = await this.findById(id);
+        if (!created) throw new NotFoundError('StarshipTable', id);
+        return created;
+      },
+      'create',
+      'StarshipTable'
+    );
+  }
+
+  async update(id: string, updates: UpdateStarshipTableInput): Promise<StarshipTableRecord | null> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const existing = await this.findById(id);
+        if (!existing) return null;
+
+        const columnsChanged = updates.columns !== undefined;
+        const nextColumns = columnsChanged ? dropFormula(updates.columns) : existing.columns;
+        const nextPrimaryKey =
+          updates.primaryKey !== undefined ? (typeof updates.primaryKey === 'string' ? updates.primaryKey : null) : existing.primaryKey;
+
+        let alter: string[] = [];
+        if (columnsChanged) {
+          try {
+            alter = compileAlterTable({
+              table: qualifiedTable(existing.starshipId, existing.physicalTable),
+              physicalTable: existing.physicalTable,
+              oldColumns: existing.columns,
+              columns: nextColumns,
+              primaryKey: nextPrimaryKey,
+            });
+          } catch (e) {
+            // Surface as a 400-mappable validation error rather than a 500.
+            if (e instanceof TableSchemaChangeError) throw new ValidationError(e.message);
+            throw e;
+          }
+        }
+
+        const sets: string[] = [];
+        const values: unknown[] = [];
+        let i = 1;
+        if (updates.name !== undefined) {
+          sets.push(`name = $${i++}`);
+          values.push(updates.name);
+        }
+        if (updates.description !== undefined) {
+          sets.push(`description = $${i++}`);
+          values.push(updates.description);
+        }
+        if (columnsChanged) {
+          sets.push(`columns_meta_json = $${i++}::jsonb`);
+          values.push(JSON.stringify(nextColumns));
+        }
+        if (updates.primaryKey !== undefined) {
+          sets.push(`primary_key = $${i++}`);
+          values.push(nextPrimaryKey);
+        }
+        if (updates.archived !== undefined) {
+          sets.push(`archived = $${i++}`);
+          values.push(Boolean(updates.archived));
+        }
+        sets.push(`updated_at = $${i++}`);
+        values.push(new Date().toISOString());
+
+        await this.getConnection().transaction(async (client) => {
+          for (const stmt of alter) await client.query(stmt);
+          if (sets.length > 0) {
+            values.push(id);
+            await client.query(`UPDATE starship_tables SET ${sets.join(', ')} WHERE id = $${i}`, values);
+          }
+        });
+
+        return this.findById(id);
+      },
+      'update',
+      'StarshipTable',
+      id
+    );
+  }
+
+  async archive(id: string): Promise<StarshipTableRecord | null> {
+    return this.update(id, { archived: true });
+  }
+
+  async delete(id: string): Promise<boolean> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const existing = await this.findById(id);
+        if (!existing) return false;
+        const table = qualifiedTable(existing.starshipId, existing.physicalTable);
+        await this.getConnection().transaction(async (client) => {
+          await client.query(`DROP TABLE IF EXISTS ${table} CASCADE`);
+          await client.query(`DELETE FROM starship_tables WHERE id = $1`, [id]);
+        });
+        return true;
+      },
+      'delete',
+      'StarshipTable',
+      id
+    );
+  }
+}
+
+export default StarshipTableRepository;

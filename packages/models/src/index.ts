@@ -1,5 +1,5 @@
 // Database connections and utilities
-export { createConnection, getConnection, PostgresConnection } from './helpers/database';
+export { createConnection, getConnection, createAgentConnection, getAgentConnection, PostgresConnection } from './helpers/database';
 export type { PostgresConfig } from './helpers/database';
 
 /* Entity exports */
@@ -94,6 +94,11 @@ export { StarshipDatasetRepository } from './repositories/StarshipDatasetReposit
 export { StarshipDatasetRowRepository } from './repositories/StarshipDatasetRowRepository';
 export { StarshipDocRepository } from './repositories/StarshipDocRepository';
 export type { DatasetRowFilter, DatasetRowFilterOp } from './repositories/StarshipDatasetRowRepository';
+// New per-starship Database of Tables (replaces the JSONB dataset repos above; old ones removed in route migration).
+export { StarshipTableRepository } from './repositories/StarshipTableRepository';
+export type { StarshipTableRecord, CreateStarshipTableInput, UpdateStarshipTableInput } from './repositories/StarshipTableRepository';
+export { StarshipTableRowRepository } from './repositories/StarshipTableRowRepository';
+export type { TableRef, TableRowModel, TableRowFilter, TableRowFilterOp } from './repositories/StarshipTableRowRepository';
 export { AutopilotAwaitRepository } from './repositories/AutopilotAwaitRepository';
 export { AutopilotAwaitFiringRepository } from './repositories/AutopilotAwaitFiringRepository';
 export { ToolCallApprovalRepository } from './repositories/ToolCallApprovalRepository';
@@ -110,6 +115,33 @@ export type { HealthStatus, LogContext, LogLevel, PerformanceMetrics } from './h
 
 /* Management scripts */
 export { migrationRunner } from './scripts/migration-runner';
+
+/* Starship Database (per-starship schema of Tables) */
+export { StarshipDatabaseProvisioner } from './services/StarshipDatabaseProvisioner';
+export {
+  schemaName as starshipSchemaName,
+  roleName as starshipRoleName,
+  qualifiedTable as starshipQualifiedTable,
+  quoteIdent as quoteSqlIdent,
+  assertSafeId as assertSafeStarshipId,
+  sanitizeTableName,
+  constraintName as tableConstraintName,
+} from './helpers/starship-tables/identifiers';
+export {
+  compileCreateTable,
+  compileAlterTable,
+  pgTypeFor,
+  TableSchemaChangeError,
+  HIDDEN_COLUMNS,
+  type CompileTableArgs,
+  type CompileAlterArgs,
+} from './services/StarshipTableDdlCompiler';
+export {
+  buildColumnsIntrospectionSql,
+  physicalUserColumns,
+  reassembleColumns,
+  type IntrospectedColumn,
+} from './helpers/starship-tables/introspection';
 
 // Utilities
 export { generateRandomSuffix, generateUniqueAgentSlug, generateSimpleAgentSlug } from './utils/slugGenerator';

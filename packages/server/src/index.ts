@@ -11,6 +11,7 @@ import { autopilot } from '@starships/autopilot';
 import { getEnvConfig } from '@starships/env';
 import {
   createConnection,
+  createAgentConnection,
   migrationRunner,
 } from '@starships/models';
 import cookieParser from 'cookie-parser';
@@ -38,7 +39,7 @@ import widgetRoutes from '@/routes/widgets';
 import viewRoutes from '@/routes/views';
 import scheduleRoutes from '@/routes/schedules';
 import taskBoardRoutes from '@/routes/task-boards';
-import datasetRoutes from '@/routes/datasets';
+import datasetRoutes from '@/routes/tables';
 import starshipDocsRoutes from '@/routes/starship-docs';
 import autopilotAwaitsRoutes from '@/routes/autopilot-awaits';
 import platformSecretRoutes from '@/routes/platform-secrets';
@@ -85,6 +86,23 @@ const dbConnection = createConnection({
   database: config.POSTGRES_DATABASE,
   ssl: config.POSTGRES_SSL,
 });
+
+// Restricted read-only pool backing the per-starship agent SQL surface.
+// Only created when the agent role password is configured; otherwise the
+// agent SQL surface stays disabled and nothing else is affected.
+const agentDbConnection = config.POSTGRES_AGENT_PASSWORD
+  ? createAgentConnection({
+      host: config.POSTGRES_HOST,
+      port: config.POSTGRES_PORT,
+      user: config.POSTGRES_AGENT_USER,
+      password: config.POSTGRES_AGENT_PASSWORD,
+      database: config.POSTGRES_DATABASE,
+      ssl: config.POSTGRES_SSL,
+      applicationName: 'starships-agent',
+      statementTimeoutMs: 10000,
+      max: 5,
+    })
+  : null;
 
 // Middleware - Order is important!
 app.use(cors());
@@ -175,6 +193,14 @@ httpServer.listen(PORT, async () => {
     // Initialize database connection FIRST
     await dbConnection.connect();
     console.log('✅ PostgreSQL database connected');
+
+    // Connect the restricted agent pool when configured (read-only SQL surface)
+    if (agentDbConnection) {
+      await agentDbConnection.connect();
+      console.log('✅ PostgreSQL agent (read-only) pool connected');
+    } else {
+      console.log('ℹ️  Agent SQL surface disabled (POSTGRES_AGENT_PASSWORD not set)');
+    }
 
     // Initialize complete database schema (includes seeding)
     await migrationRunner.runAllPendingMigrations();

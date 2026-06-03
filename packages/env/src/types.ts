@@ -22,6 +22,10 @@ export interface EnvironmentConfig {
   POSTGRES_PASSWORD: string;
   POSTGRES_DATABASE: string;
   POSTGRES_SSL: boolean;
+  // Restricted read-only role backing the per-starship agent SQL surface.
+  // Optional: when the password is absent the agent SQL surface is disabled.
+  POSTGRES_AGENT_USER: string;
+  POSTGRES_AGENT_PASSWORD?: string;
 
   // LLM Provider Configuration
   OPENROUTER_API_KEY?: string;

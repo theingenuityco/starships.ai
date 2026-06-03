@@ -84,3 +84,12 @@ Critical env vars: `POSTGRES_*`, `REDIS_*`, `JWT_SECRET` (32+ chars), `ENCRYPTIO
 - Path aliases: `@starships/*` for cross-package imports; `@/` inside the autopilot package
 - The autopilot package has `cache: false` in Turbo — its outputs are intentionally never cached
 - Protocol Buffer definitions live in `packages/autopilot-runner/proto/`; regenerate with `pnpm --filter @starships/autopilot-runner gen`
+
+### Database vs Table terminology
+
+The "datasets" feature is being restructured into a two-level hierarchy backed by real Postgres objects:
+
+- **Database** (product) = a starship's private data namespace, implemented as the Postgres schema `db_<starshipId>`. One per starship.
+- **Table** (product) = a real, typed Postgres table of rows inside a Database (this is what a "dataset" becomes).
+- In code the feature is always qualified (`StarshipTable*`, `starship_tables`, `schemaName()`, `roleName()`). The bare word **"database" stays infrastructure-only** (the Postgres instance/connection in `helpers/database/`, `PostgresConfig.database`, `POSTGRES_DATABASE`).
+- Agents query their Database via a read-only SQL surface: a per-starship role `ship_ro_<starshipId>` (USAGE+SELECT on only that schema) which the `NOINHERIT` agent login role assumes via `SET ROLE`, giving real per-starship isolation. Bootstrap the login role once with `pnpm --filter @starships/models provision:agent-role`.

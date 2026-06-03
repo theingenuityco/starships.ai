@@ -21,7 +21,7 @@ export const searchConnector: CodeAction = {
   },
   run: (args, ctx) => ctx.http.get(`/connectors/catalog`, {
   query: {
-    "q": String(args.q ?? ""),
+    "q": args.q == null ? undefined : String(args.q),
     "limit": Number(args.limit ?? 20),
   },
   timeoutMs: 5000,

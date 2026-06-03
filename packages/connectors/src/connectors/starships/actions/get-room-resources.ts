@@ -46,7 +46,7 @@ export const getRoomResources: CodeAction = {
   },
   run: (args, ctx) => ctx.http.get(`/rooms/${encodeURIComponent(String(args.roomId ?? args.id ?? ctx.runtimeEnv.CONVERSATION_ID ?? ""))}/resources`, {
   query: {
-    "q": String(args.q ?? ""),
+    "q": args.q == null ? undefined : String(args.q),
     "kinds": args.kinds == null ? undefined : (Array.isArray(args.kinds) ? args.kinds.map((x) => String(x)).join(",") : String(args.kinds)),
     "limitPerKind": args.limitPerKind == null ? undefined : String(args.limitPerKind),
     "includeArchived": args.includeArchived == null ? undefined : String(args.includeArchived),

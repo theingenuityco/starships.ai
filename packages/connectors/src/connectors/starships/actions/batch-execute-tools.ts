@@ -47,6 +47,8 @@ export const batchExecuteTools: CodeAction = {
     "agentId": String(args.agentId ?? ""),
     "tools": args.tools ?? [],
   },
+  // 60 min (intentional, carried over from the connector template): a batch can fan out to
+  // many agent tool calls, each of which may itself be long-running, so it needs a wide ceiling.
   timeoutMs: 3600000,
 }),
 };

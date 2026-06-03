@@ -9,7 +9,16 @@ import { verifyStarshipAccess, verifyStarshipAdminAccess } from '@/middleware/ve
 import { sendError, sendSuccess, handleError } from '@/utils/responseHelpers';
 import { coerceBoolean, isPlainObject, toIsoDateOnly, toIsoInstantWithOffset as toIsoInstant } from '@/utils/value-coercion';
 
-import { StarshipTableRepository, StarshipTableRowRepository, getConnection } from '@starships/models';
+import {
+  StarshipTableRepository,
+  StarshipTableRowRepository,
+  StarshipDatabaseProvisioner,
+  getConnection,
+  getAgentConnection,
+  starshipSchemaName,
+  starshipRoleName,
+  quoteSqlIdent,
+} from '@starships/models';
 import type { StarshipTableRecord, TableRef, TableRowFilter } from '@starships/models';
 import type { StarshipDatasetColumn } from '@starships/protocol';
 
@@ -787,6 +796,87 @@ router.post('/starships/:starshipId/datasets/refs:resolve', jwtAuthMiddleware, a
     sendSuccess(res, { resolved });
   } catch (error) {
     handleError(error, res, 'resolve table refs');
+  }
+});
+
+/**
+ * POST /api/v1/starships/:starshipId/database/sql
+ * Read-only SQL over the starship's Database (its schema of Tables).
+ *
+ * Isolation is a Postgres guarantee: the restricted agent login role (NOINHERIT)
+ * assumes the per-starship role `ship_ro_<id>` via SET ROLE, which has USAGE +
+ * SELECT on only this starship's schema. Combined with a READ ONLY transaction,
+ * a statement timeout, and parameterized (single-statement) execution, the agent
+ * cannot read another starship's data, touch `public`, or write anything.
+ */
+const SqlQuerySchema = z
+  .object({
+    sql: z.string().trim().min(1).max(20_000),
+    params: z.array(z.unknown()).max(100).optional(),
+  })
+  .strict();
+
+const SQL_ROW_CAP = 1000;
+
+router.post('/starships/:starshipId/database/sql', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = requireAuthUserId(req, res);
+    if (!userId) return;
+    const params = validateData(z.object({ starshipId: IdSchema }), req.params, res, 'database sql params');
+    if (!params) return;
+    if (!(await verifyStarshipAccess(params.starshipId, userId, res))) return;
+    const body = validateData(SqlQuerySchema, req.body, res, 'database sql body');
+    if (!body) return;
+
+    let agentConn;
+    try {
+      agentConn = getAgentConnection();
+    } catch {
+      sendError(res, 'SERVICE_UNAVAILABLE', 'Agent SQL surface is not enabled on this instance', 503);
+      return;
+    }
+
+    // Ensure the starship's schema + read-only role exist before assuming it.
+    await new StarshipDatabaseProvisioner(getConnection()).ensureProvisioned(params.starshipId);
+
+    const role = quoteSqlIdent(starshipRoleName(params.starshipId));
+    const schema = quoteSqlIdent(starshipSchemaName(params.starshipId));
+
+    const client = await agentConn.getClient();
+    try {
+      await client.query(`SET ROLE ${role}`);
+      await client.query(`SET search_path TO ${schema}`);
+      await client.query('BEGIN READ ONLY');
+      await client.query('SET LOCAL statement_timeout = 10000');
+      const result = await client.query(body.sql, (body.params ?? []) as unknown[]);
+      await client.query('COMMIT');
+
+      const rows = Array.isArray(result.rows) ? result.rows : [];
+      const fields = Array.isArray(result.fields) ? result.fields.map((f) => f.name) : [];
+      sendSuccess(res, {
+        fields,
+        rows: rows.slice(0, SQL_ROW_CAP),
+        rowCount: rows.length,
+        truncated: rows.length > SQL_ROW_CAP,
+      });
+    } catch (err) {
+      try {
+        await client.query('ROLLBACK');
+      } catch {
+        /* ignore */
+      }
+      const message = err instanceof Error ? err.message : 'Query failed';
+      sendError(res, 'DATABASE_QUERY_FAILED', message, 400);
+    } finally {
+      try {
+        await client.query('RESET ROLE');
+      } catch {
+        /* ignore */
+      }
+      client.release();
+    }
+  } catch (error) {
+    handleError(error, res, 'database sql');
   }
 });
 

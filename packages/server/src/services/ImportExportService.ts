@@ -8,8 +8,10 @@ import {
   RoomTaskBoardsRepository,
   RoomToolsRepository,
   RoomViewsRepository,
-  StarshipDatasetRepository,
-  StarshipDatasetRowRepository,
+  StarshipTableRepository,
+  StarshipTableRowRepository,
+  type StarshipTableRecord,
+  type TableRef,
   StarshipRepository,
   TaskBoardRepository,
   TaskCardRepository,
@@ -43,8 +45,8 @@ export class ImportExportService {
   private roomToolsRepo: RoomToolsRepository;
   private participantRepo: ConversationParticipantRepository;
   private viewRepo: ViewRepository;
-  private datasetRepo: StarshipDatasetRepository;
-  private datasetRowRepo: StarshipDatasetRowRepository;
+  private datasetRepo: StarshipTableRepository;
+  private datasetRowRepo: StarshipTableRowRepository;
   private taskBoardRepo: TaskBoardRepository;
   private taskColumnRepo: TaskColumnRepository;
   private taskCardRepo: TaskCardRepository;
@@ -61,8 +63,8 @@ export class ImportExportService {
     this.roomToolsRepo = new RoomToolsRepository();
     this.participantRepo = new ConversationParticipantRepository();
     this.viewRepo = new ViewRepository();
-    this.datasetRepo = new StarshipDatasetRepository();
-    this.datasetRowRepo = new StarshipDatasetRowRepository();
+    this.datasetRepo = new StarshipTableRepository();
+    this.datasetRowRepo = new StarshipTableRowRepository();
     this.taskBoardRepo = new TaskBoardRepository();
     this.taskColumnRepo = new TaskColumnRepository();
     this.taskCardRepo = new TaskCardRepository();
@@ -99,12 +101,18 @@ export class ImportExportService {
     return typeof starship?.slug === 'string' && starship.slug.trim().length > 0 ? starship.slug : undefined;
   }
 
-  private async listAllDatasetRows(datasetId: string): Promise<Array<{ rowKey?: string | null; data: Record<string, unknown> }>> {
+  private async listAllDatasetRows(table: StarshipTableRecord): Promise<Array<{ rowKey?: string | null; data: Record<string, unknown> }>> {
     const rows: Array<{ rowKey?: string | null; data: Record<string, unknown> }> = [];
     let offset = 0;
+    const ref: TableRef = {
+      starshipId: table.starshipId,
+      physicalTable: table.physicalTable,
+      columns: table.columns,
+      primaryKey: table.primaryKey,
+    };
 
     while (true) {
-      const page = await this.datasetRowRepo.listByDataset(datasetId, { limit: 200, offset, order: 'asc' });
+      const page = await this.datasetRowRepo.listByDataset(ref, { limit: 200, offset, order: 'asc' });
       if (page.length === 0) break;
       for (const row of page) {
         rows.push({
@@ -394,7 +402,7 @@ export class ImportExportService {
         columns: dataset.columns,
         ...(dataset.primaryKey !== undefined ? { primaryKey: dataset.primaryKey ?? null } : {}),
       },
-      rows: await this.listAllDatasetRows(dataset.id),
+      rows: await this.listAllDatasetRows(dataset),
     };
 
     return this.buildContainer('dataset', {

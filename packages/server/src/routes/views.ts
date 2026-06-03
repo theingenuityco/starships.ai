@@ -9,7 +9,9 @@ import { sendError, sendSuccess, handleError } from '../utils/responseHelpers';
 import { verifyStarshipAccess } from '@/middleware/verify-starship-access';
 import { ViewStreamBus } from '@/services/ViewStreamBus';
 import { buildAutopilotExecutionBundle } from '@/services/autopilot-execution-bundle';
-import type { ConnectorActionParams, EndParams, Node, StartParams } from '@starships/autopilot';
+import { connectorActionExecutor } from '@/services/ConnectorActionExecutor';
+import { getEnvConfig } from '@starships/env';
+import type { Node } from '@starships/autopilot';
 import { ExecutionItemUtils, RunnerFactory, type Blueprint, type EngineConfig } from '@starships/autopilot';
 import { ToolRepository, ViewWidgetRepository } from '@starships/models';
 import { applyPatch } from 'fast-json-patch';
@@ -447,71 +449,28 @@ router.post('/views/:id/queries/:queryId/run', jwtAuthMiddleware, async (req: Re
       return sendError(res, 'ACCESS_DENIED', 'Connector not permitted for this view', 403, { connector });
     }
 
-    // Connector actions require the remote runner in this server configuration.
-    // (ChildProcessRunner would require a parent HostRuntime.connectorAction implementation.)
-    if (!process.env.RUNNER_URL) {
-      return sendError(
-        res,
-        'VALIDATION_ERROR',
-        'RUNNER_URL is required to execute connector_action view queries (configure remote runner)',
-        400
-      );
-    }
-
     const state = isRecord(body.state) ? (body.state as Record<string, unknown>) : {};
     const argsTemplate = isRecord(specUnknown.argsTemplate) ? (specUnknown.argsTemplate as Record<string, unknown>) : {};
     const args = (templateDeep(argsTemplate, state) as Record<string, unknown>) ?? {};
 
+    const env = getEnvConfig();
     const runtimeEnv: Record<string, unknown> = {
       STARSHIP_ID: view.starshipId,
       VIEW_ID: viewId,
-    };
-    const { engineConfig } = await buildAutopilotExecutionBundle({ starshipId: view.starshipId, authUserId: userId, runtimeEnv });
-
-    const nodes: Node[] = [
-      {
-        ref: 'start',
-        type: 'start',
-        name: 'Start',
-        description: 'Start',
-        parameters: {} satisfies StartParams,
-      },
-      {
-        ref: 'q',
-        type: 'connector_action',
-        name: 'Query',
-        description: 'Execute connector action query',
-        parameters: { connector, action, args, failOnNon2xx: false } satisfies ConnectorActionParams,
-      },
-      {
-        ref: 'end',
-        type: 'end',
-        name: 'End',
-        description: 'End',
-        parameters: { output: "{{ lastOutputOf('q') }}" } satisfies EndParams,
-      },
-    ];
-
-    const blueprint: Blueprint = {
-      nodes,
-      edges: [
-        { ref: 'e1', from: 'start', to: 'q' },
-        { ref: 'e2', from: 'q', to: 'end' },
-      ],
-      metadata: {},
+      SERVER_URL: env.SERVER_URL,
     };
 
-    const execution = ExecutionItemUtils.createExecution();
-    const runner = RunnerFactory.getTopLevelRunner(execution.depth ?? 0);
-
-    const items = await runner.run(blueprint, execution, {
-      failOnNodeError: true,
-      ...(engineConfig as unknown as EngineConfig),
+    // Connector actions execute server-side via the in-process executor (no runner needed).
+    const envelope = await connectorActionExecutor.execute({
+      connector,
+      action,
+      args,
+      starshipId: view.starshipId,
+      authUserId: userId,
+      runtimeEnv,
     });
 
-    const result = ExecutionItemUtils.unwrapSingle(items);
-    const data = isRecord(result) && 'result' in result ? (result as { result: unknown }).result : result;
-    return sendSuccess(res, data);
+    return sendSuccess(res, envelope.body);
   } catch (error) {
     return handleError(error, res, 'run view query');
   }

@@ -8,7 +8,6 @@ import {
   type LlmRuntimeConfig,
   type ProviderRoute,
 } from '../hostRuntime/RunnerHostRuntime';
-import type { ConnectorTemplateRuntimeFieldsV2 } from '@starships/protocol/src/domains/connector';
 import { executionRegistry } from '@/execution/ExecutionRegistry';
 import { LocalWorkspaceProvider } from '@/workspace/LocalWorkspaceProvider';
 
@@ -40,18 +39,12 @@ export class InProcessExecutor implements Executor {
       failOnNodeError?: boolean;
       runtimeEnv?: Record<string, unknown>;
       /**
-       * Connector templates (safe) passed from embedding host.
-       */
-      connectorTemplates?: Record<string, ConnectorTemplateRuntimeFieldsV2 | undefined>;
-      /**
-       * Connector sessions (auth headers) passed from embedding host.
+       * Connector sessions (auth headers) passed from embedding host. Retained only for
+       * the internal "starships" session, which llm() uses to authenticate attachment
+       * preview URL fetches. Connector action execution is delegated via
+       * connectorActionCallback, so connector templates/metadata are no longer sent.
        */
       connectorSessions?: Record<string, ConnectorSession | undefined>;
-      /**
-       * Connector instance metadata (non-secret) passed from embedding host.
-       * Used for template evaluation in baseUrl/mappings.
-       */
-      connectorMetadata?: Record<string, Record<string, unknown> | undefined>;
       /**
        * Optional LLM runtime configuration used by HostRuntime.llm. When set,
        * the runner does not need to read provider keys from its own env.
@@ -70,6 +63,12 @@ export class InProcessExecutor implements Executor {
        */
       modelRoutes?: Record<string, ProviderRoute[] | undefined>;
       /**
+       * Server callback for connector action execution (server-authority mode). When
+       * present, the runner delegates connector actions to the host instead of receiving
+       * connector templates/sessions.
+       */
+      connectorActionCallback?: { url: string; secret?: string; starshipId?: string; authUserId?: string };
+      /**
        * Workspace-backed (native code) run. `root` is the absolute checkout path
        * inside the sandbox (a persistent, mounted per-conversation dir). On the
        * first (provisioning) job `spec`+`git` are present so we clone into `root`;
@@ -85,9 +84,8 @@ export class InProcessExecutor implements Executor {
     // intended to be exposed to templates via env("KEY") and to user-authored
     // Code/Mutate nodes, but MUST NOT contain secrets.
     const {
-      connectorTemplates,
       connectorSessions,
-      connectorMetadata,
+      connectorActionCallback,
       llm,
       aws,
       azureAiFoundry,
@@ -112,9 +110,8 @@ export class InProcessExecutor implements Executor {
     const controller = new AbortController();
 
     const hostRuntime = createRunnerHostRuntime({
-      connectorTemplates: connectorTemplates ?? {},
       connectorSessions: connectorSessions ?? {},
-      connectorMetadata: connectorMetadata ?? {},
+      connectorActionCallback,
       runtimeEnv: runtimeEnv ?? {},
       llm,
       aws,

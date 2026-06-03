@@ -37,6 +37,7 @@ import webhooksRoutes from '@/routes/webhooks';
 import docsRoutes from '@/routes/docs';
 import widgetRoutes from '@/routes/widgets';
 import viewRoutes from '@/routes/views';
+import internalConnectorActionRoutes from '@/routes/internal-connector-action';
 import scheduleRoutes from '@/routes/schedules';
 import taskBoardRoutes from '@/routes/task-boards';
 import tableRoutes from '@/routes/tables';
@@ -137,6 +138,7 @@ app.use('/api/v1', openrouterRoutes);
 app.use('/api/v1', llmModelsRoutes);
 app.use('/api/v1', widgetRoutes);
 app.use('/api/v1', viewRoutes);
+app.use('/api/v1', internalConnectorActionRoutes); // Runner -> server connector action execution (shared-secret auth)
 app.use('/api/v1', scheduleRoutes);
 app.use('/api/v1', taskBoardRoutes);
 app.use('/api/v1', tableRoutes);

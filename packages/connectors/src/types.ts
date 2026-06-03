@@ -21,6 +21,7 @@ import type {
   JsonSchemaObject,
   SecretRef,
 } from '@starships/protocol';
+import type { CodeAction } from './framework';
 
 // ============================================================================
 // Injected host capabilities
@@ -191,9 +192,19 @@ export interface ConnectorDefinition {
   isEnabled: boolean;
   demoVideoUrl?: string;
 
+  /**
+   * Base URL for the connector's HTTP actions. Informational on the runtime template;
+   * actual request execution uses `resolveBaseUrl(runtimeEnv)` when present (e.g. the
+   * internal Starships connector resolves it against SERVER_URL), else this string.
+   */
   baseUrl: string;
+  /** Resolve the effective base URL at call time from the runtime env. */
+  resolveBaseUrl?(env: Record<string, unknown>): string;
+  /** Headers applied to every action request (e.g. a provider Accept header). */
+  defaultHeaders?: Record<string, string>;
   auth: AuthStrategy;
-  actions: ConnectorEndpointV2[];
+  /** Code-driven actions. Executed server-side as plain functions (no template DSL). */
+  actions: CodeAction[];
 
   metadataSchema?: JsonSchemaObject;
   variables?: NonNullable<ConnectorTemplateRuntimeFieldsV2['variables']>;

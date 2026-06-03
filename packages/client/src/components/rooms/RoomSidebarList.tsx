@@ -4,7 +4,12 @@ import Icon from '@/components/primitives/Icon'
 import { NavigationItem } from '@/components/navigation/NavigationItem'
 import { useStarshipRooms } from '@/hooks/useRooms'
 import { RoomNestedRecentConversations } from '@/components/rooms/RoomNestedRecentConversations'
+import { useDemo } from '@/components/demo/DemoContext'
+import { DEMO_ROOMS } from '@/components/demo/demoRooms'
+import { demoRoomAttentionStatus } from '@/components/demo/demoActivity'
+import { DemoStatusIndicator } from '@/components/demo/DemoStatusIndicator'
 import type { RoomModel } from '@starships/protocol'
+import { AnimatePresence, motion } from 'motion/react'
 import { usePathname, useRouter } from 'next/navigation'
 import { useMemo } from 'react'
 
@@ -13,7 +18,31 @@ export function RoomSidebarList(props: { starshipId: string; starshipSlug: strin
   const pathname = usePathname()
 
   const { data: roomsData, isLoading } = useStarshipRooms(props.starshipId, Boolean(props.starshipId))
-  const rooms = (roomsData?.rooms || []) as RoomModel[]
+
+  // Demo clock: while the hero-video demo is running, the sidebar highlight
+  // follows the "camera" (the room the VO is on for the current beat) instead
+  // of the URL. Inert for real users — `active` is false off the demo surface.
+  const { active: demoActive, beat, spotlight } = useDemo()
+
+  // When the demo is active, the sidebar shows ONLY the three toured rooms
+  // (Support / Engineering / Growth) from client-side mock data — the real
+  // wired rooms are hidden so the demo navigation stays clean and scripted.
+  const rooms = useMemo<RoomModel[]>(() => {
+    const real = (roomsData?.rooms || []) as RoomModel[]
+    return demoActive ? DEMO_ROOMS : real
+  }, [roomsData?.rooms, demoActive])
+  const demoConversationId = demoActive ? spotlight.conversationId : null
+  // The spotlight names a lane ('support' | 'engineering' | 'growth'); map it to
+  // the real room slugs those bundles produce (the Growth lane is the leadgen room).
+  const demoSlugCandidates = useMemo<string[] | null>(() => {
+    if (!demoActive || !spotlight.room) return null
+    const map: Record<string, string[]> = {
+      support: ['support'],
+      engineering: ['engineering', 'eng'],
+      growth: ['growth', 'leadgen', 'lead-generation'],
+    }
+    return map[spotlight.room] ?? [spotlight.room]
+  }, [demoActive, spotlight.room])
 
   const sorted = useMemo(() => {
     const list = Array.isArray(rooms) ? rooms.slice() : []
@@ -54,14 +83,18 @@ export function RoomSidebarList(props: { starshipId: string; starshipSlug: strin
   const openRoom = (roomSlug: string) => {
     const slug = String(roomSlug || '').trim()
     if (!slug) return
-    router.push(`/ship/${encodeURIComponent(props.starshipSlug)}/rooms/${encodeURIComponent(slug)}`)
+    const base = `/ship/${encodeURIComponent(props.starshipSlug)}/rooms/${encodeURIComponent(slug)}`
+    // During the demo we leave the /mission-control route, so we must carry
+    // `?demo=1` forward to keep the demo clock active. Without it the synthetic
+    // DEMO_ROOMS drop out of the room list and the slug resolves as not-found.
+    router.push(demoActive ? `${base}?demo=1` : base)
     props.onNavigate?.()
   }
 
   return (
     <div className="flex flex-col min-h-0">
       <div className="flex items-center justify-between px-1 pb-1">
-        <div className="text-[11px] font-medium text-muted-foreground">Rooms</div>
+        <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/70">Rooms</div>
         <button
           type="button"
           onClick={() => {
@@ -85,41 +118,68 @@ export function RoomSidebarList(props: { starshipId: string; starshipSlug: strin
             {!isLoading && sorted.length === 0 ? (
               <div className="text-xs text-muted-foreground px-1 py-2">No rooms yet</div>
             ) : null}
-            {sorted.map((r) => {
-              const slug = String(r.slug || '').trim()
-              const name = String(r.name || '').trim() || slug || 'Room'
-              const isActive = activeRoomSlug ? String(activeRoomSlug).toLowerCase() === slug.toLowerCase() : false
-              const href = `/ship/${encodeURIComponent(props.starshipSlug)}/rooms/${encodeURIComponent(slug)}`
-              const roomConversationId = typeof (r as any)?.conversationId === 'string' ? String((r as any).conversationId).trim() : ''
-              return (
-                <div key={String(r.conversationId || slug)} className="w-full">
-                  <NavigationItem
-                    href={href}
-                    label={name}
-                    icon="hash"
-                    isActive={isActive}
-                    expanded
-                    onClick={() => openRoom(slug)}
-                    trailing={
-                      r.isPrivate ? (
-                        <span className="flex-shrink-0 text-muted-foreground" title="Private room" aria-label="Private room">
-                          <Icon name="lock" weight="fill" className="h-3 w-3" />
-                        </span>
-                      ) : null
-                    }
-                  />
-                  {roomConversationId ? (
-                    <RoomNestedRecentConversations
-                      starshipSlug={props.starshipSlug}
-                      roomSlug={slug}
-                      roomConversationId={roomConversationId}
-                      activeConversationId={isActive ? activeConversationId : null}
-                      onNavigate={props.onNavigate}
+            {/* Rooms enter/exit and reorder with the same opacity + `layout="position"`
+                language as Mission Control's activity log. */}
+            <AnimatePresence initial={false} mode="popLayout">
+              {sorted.map((r) => {
+                const slug = String(r.slug || '').trim()
+                const name = String(r.name || '').trim() || slug || 'Room'
+                const isActive = demoSlugCandidates
+                  ? demoSlugCandidates.includes(slug.toLowerCase())
+                  : activeRoomSlug
+                    ? String(activeRoomSlug).toLowerCase() === slug.toLowerCase()
+                    : false
+                const href = `/ship/${encodeURIComponent(props.starshipSlug)}/rooms/${encodeURIComponent(slug)}`
+                const roomConversationId = typeof (r as any)?.conversationId === 'string' ? String((r as any).conversationId).trim() : ''
+                // Demo: a single dot when the room has something needing you or just completed.
+                const attentionStatus = demoActive ? demoRoomAttentionStatus(slug, beat) : 'idle'
+                return (
+                  <motion.div
+                    key={String(r.conversationId || slug)}
+                    layout="position"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.25, ease: 'easeOut' }}
+                    className="w-full"
+                  >
+                    <NavigationItem
+                      href={href}
+                      label={name}
+                      icon="hash"
+                      isActive={demoActive ? false : isActive}
+                      expanded
+                      onClick={() => openRoom(slug)}
+                      trailing={
+                        attentionStatus !== 'idle' || r.isPrivate ? (
+                          <span
+                            className="flex items-center gap-1"
+                            title={attentionStatus === 'needs-you' ? 'Needs your attention' : attentionStatus === 'done' ? 'Task completed' : undefined}
+                          >
+                            <DemoStatusIndicator status={attentionStatus} />
+                            {r.isPrivate ? (
+                              <span className="flex-shrink-0 text-muted-foreground" title="Private room" aria-label="Private room">
+                                <Icon name="lock" weight="fill" className="h-3 w-3" />
+                              </span>
+                            ) : null}
+                          </span>
+                        ) : null
+                      }
                     />
-                  ) : null}
-                </div>
-              )
-            })}
+                    {roomConversationId ? (
+                      <RoomNestedRecentConversations
+                        starshipSlug={props.starshipSlug}
+                        roomSlug={slug}
+                        roomConversationId={roomConversationId}
+                        activeConversationId={isActive ? (demoSlugCandidates ? demoConversationId : activeConversationId) : null}
+                        highlightFirst={Boolean(isActive && demoSlugCandidates && !demoConversationId)}
+                        onNavigate={props.onNavigate}
+                      />
+                    ) : null}
+                  </motion.div>
+                )
+              })}
+            </AnimatePresence>
           </div>
         </div>
       </div>

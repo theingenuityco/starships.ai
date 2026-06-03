@@ -154,7 +154,7 @@ export function AgentForm({ agent, onSave, onCancel, starshipId }: AgentFormProp
                   value={formData.name}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData(prev => ({ ...prev, name: e.target.value }))}
                   placeholder="Agent name"
-                  className="border-muted-foreground/20 focus:border-primary"
+                  className="border-muted-foreground/20 focus:border-primary/50"
                   required
                 />
                 <p className="text-xs text-muted-foreground">Choose a descriptive name for your agent</p>
@@ -169,7 +169,7 @@ export function AgentForm({ agent, onSave, onCancel, starshipId }: AgentFormProp
                   value={formData.role || ''}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData(prev => ({ ...prev, role: e.target.value }))}
                   placeholder="e.g. Customer Support Agent"
-                  className="border-muted-foreground/20 focus:border-primary"
+                  className="border-muted-foreground/20 focus:border-primary/50"
                   required
                 />
                 <p className="text-xs text-muted-foreground">A short role label (shown in UI; used by templates and tooling)</p>
@@ -213,7 +213,7 @@ export function AgentForm({ agent, onSave, onCancel, starshipId }: AgentFormProp
                   value={formData.description}
                   onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setFormData(prev => ({ ...prev, description: e.target.value }))}
                   placeholder="Brief description of what this agent does"
-                  className="border-muted-foreground/20 focus:border-primary min-h-[80px]"
+                  className="border-muted-foreground/20 focus:border-primary/50 min-h-[80px]"
                   rows={2}
                 />
                 <p className="text-xs text-muted-foreground">Provide a clear, concise description of your agent&apos;s capabilities</p>
@@ -228,7 +228,7 @@ export function AgentForm({ agent, onSave, onCancel, starshipId }: AgentFormProp
                   value={systemPrompt}
                   onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setSystemPrompt(e.target.value)}
                   placeholder="Instructions that define the agent's behavior and personality"
-                  className="border-muted-foreground/20 focus:border-primary min-h-[120px]"
+                  className="border-muted-foreground/20 focus:border-primary/50 min-h-[120px]"
                   rows={4}
                 />
                 <p className="text-xs text-muted-foreground">Define how your agent should behave, what knowledge it should have, and any constraints it should follow</p>
@@ -251,7 +251,7 @@ export function AgentForm({ agent, onSave, onCancel, starshipId }: AgentFormProp
                     setFormData(prev => ({ ...prev, previewPrompts: lines }))
                   }}
                   placeholder={'One prompt per line (max 10).\nExample: Create a customer support agent that can help users with common questions'}
-                  className="border-muted-foreground/20 focus:border-primary min-h-[120px] font-mono text-sm"
+                  className="border-muted-foreground/20 focus:border-primary/50 min-h-[120px] font-mono text-sm"
                   rows={4}
                 />
                 <p className="text-xs text-muted-foreground">These appear as example prompts in the chat input when this agent is mentioned. Recommended 3–5 concise prompts, max 10.</p>
@@ -291,7 +291,7 @@ export function AgentForm({ agent, onSave, onCancel, starshipId }: AgentFormProp
                     value={newTag}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewTag(e.target.value)}
                     placeholder="Add tag"
-                    className="border-muted-foreground/20 focus:border-primary"
+                    className="border-muted-foreground/20 focus:border-primary/50"
                     onKeyPress={(e: React.KeyboardEvent<HTMLInputElement>) => e.key === 'Enter' && (e.preventDefault(), addTag())}
                   />
                   <Button type="button" onClick={addTag} size="sm" className="px-3">
@@ -351,7 +351,7 @@ export function AgentForm({ agent, onSave, onCancel, starshipId }: AgentFormProp
                         }))
                       }
                       placeholder="0.7"
-                      className="border-muted-foreground/20 focus:border-primary"
+                      className="border-muted-foreground/20 focus:border-primary/50"
                     />
                     <p className="text-xs text-muted-foreground">Controls randomness: lower values are more deterministic, higher values more creative (0-2)</p>
                   </div>
@@ -373,7 +373,7 @@ export function AgentForm({ agent, onSave, onCancel, starshipId }: AgentFormProp
                         }))
                       }
                       placeholder="4096"
-                      className="border-muted-foreground/20 focus:border-primary"
+                      className="border-muted-foreground/20 focus:border-primary/50"
                     />
                     <p className="text-xs text-muted-foreground">Maximum length of the response (1-8192)</p>
                   </div>
@@ -388,7 +388,7 @@ export function AgentForm({ agent, onSave, onCancel, starshipId }: AgentFormProp
                     value={customInstructions}
                     onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setCustomInstructions(e.target.value)}
                     placeholder="Additional instructions or constraints"
-                    className="border-muted-foreground/20 focus:border-primary min-h-[100px]"
+                    className="border-muted-foreground/20 focus:border-primary/50 min-h-[100px]"
                     rows={3}
                   />
                   <p className="text-xs text-muted-foreground">Add any additional instructions that should be applied to every interaction</p>

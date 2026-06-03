@@ -3,6 +3,7 @@
 import React, { useMemo, useState } from 'react'
 import type { RoomPinnedTable, RoomPinnedTaskBoard } from '@starships/protocol'
 import { useStarshipTables, useTableRows } from '@/hooks/useTables'
+import { useDemo } from '@/components/demo/DemoContext'
 import type { TableRowFilter } from '@/hooks/useTables'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -485,9 +486,51 @@ function AccountsTable({ rows, allContactRows, loading, contactsLoading, primary
   )
 }
 
+// Demo data: a credible slice of the Q2 outbound list so the Growth board looks
+// alive during the hero-video glance, without depending on seeded tables.
+// (The headline counts — 1,240 accounts / 3,640 verified — live on Mission
+// Control; this shows the qualified buyers behind them.)
+function demoAccounts(): Record<string, unknown>[] {
+  return [
+    { account_id: 'a1', company_name: 'Northwind Analytics', status: 'qualified',  industry: 'Analytics',  location: 'San Francisco, CA', employee_count: '120', website: 'northwind.io' },
+    { account_id: 'a2', company_name: 'Brightwave Labs',     status: 'qualified',  industry: 'Developer Tools', location: 'Austin, TX',  employee_count: '85',  website: 'brightwave.dev' },
+    { account_id: 'a3', company_name: 'Cobalt Security',     status: 'qualified',  industry: 'Security',    location: 'Remote',         employee_count: '64',  website: 'cobalt.sh' },
+    { account_id: 'a4', company_name: 'Meridian Health',     status: 'researched', industry: 'Healthtech',  location: 'Boston, MA',     employee_count: '320', website: 'meridianhealth.com' },
+    { account_id: 'a5', company_name: 'Lumen Logistics',     status: 'researched', industry: 'Logistics',   location: 'Chicago, IL',    employee_count: '240', website: 'lumenlogistics.com' },
+    { account_id: 'a6', company_name: 'Verdant Climate',     status: 'researched', industry: 'Climate',     location: 'Denver, CO',     employee_count: '95',  website: 'verdant.eco' },
+    { account_id: 'a7', company_name: 'Atlas Fintech',       status: 'new',        industry: 'Fintech',     location: 'New York, NY',   employee_count: '410', website: 'atlasfintech.com' },
+    { account_id: 'a8', company_name: 'Quill Education',     status: 'new',        industry: 'Edtech',      location: 'Seattle, WA',    employee_count: '150', website: 'quill.education' },
+  ]
+}
+
+function demoContacts(): Record<string, unknown>[] {
+  const c = (
+    account: string, first: string, last: string, title: string, status: string, domain: string
+  ): Record<string, unknown> => ({
+    account: { kind: 'table_row', tableIdOrSlug: 'accounts', key: account },
+    first_name: first,
+    last_name: last,
+    title,
+    lead_status: status,
+    email: `${first.toLowerCase()}.${last.toLowerCase()}@${domain}`,
+    linkedin_url: `https://linkedin.com/in/${first.toLowerCase()}${last.toLowerCase()}`,
+  })
+  return [
+    c('a1', 'Dana', 'Okafor', 'VP Engineering', 'connected', 'northwind.io'),
+    c('a1', 'Priya', 'Sharma', 'Head of Support', 'qualified', 'northwind.io'),
+    c('a2', 'Marcus', 'Lindqvist', 'Founder & CEO', 'qualified', 'brightwave.dev'),
+    c('a2', 'Lena', 'Park', 'VP Engineering', 'attempted', 'brightwave.dev'),
+    c('a3', 'Owen', 'Bright', 'Head of Security', 'connected', 'cobalt.sh'),
+    c('a4', 'Sofia', 'Romano', 'Director of Engineering', 'qualified', 'meridianhealth.com'),
+    c('a5', 'Tomas', 'Vrabel', 'VP Operations', 'new', 'lumenlogistics.com'),
+    c('a7', 'Aisha', 'Khan', 'Head of Growth', 'new', 'atlasfintech.com'),
+  ]
+}
+
 // --- LeadgenDashboard ---
 
 export function LeadgenDashboard({ starshipId, starshipSlug, roomSlug, roomName, pinnedTables }: LeadgenDashboardProps) {
+  const { active: demoActive } = useDemo()
   const [icpFilter, setIcpFilter] = useState<string>('all')
   const { data: allTables = [] } = useStarshipTables(starshipId)
 
@@ -507,7 +550,7 @@ export function LeadgenDashboard({ starshipId, starshipSlug, roomSlug, roomName,
     100,
     0,
     undefined,
-    Boolean(icpProfilesTableId),
+    Boolean(icpProfilesTableId) && !demoActive,
   )
 
   const icpProfiles = useMemo<IcpProfile[]>(() => {
@@ -551,32 +594,38 @@ export function LeadgenDashboard({ starshipId, starshipSlug, roomSlug, roomName,
     return []
   }, [icpFilter, icpProfiles])
 
-  const { data: accountsPage, isLoading: accountsLoading } = useTableRows(
+  const { data: accountsPage, isLoading: accountsLoadingReal } = useTableRows(
     starshipId,
     accountsTable?.id ?? '',
     200,
     0,
     undefined,
-    Boolean(accountsTable?.id),
+    Boolean(accountsTable?.id) && !demoActive,
     accountFilters,
   )
 
-  const { data: contactsPage, isLoading: contactsLoading } = useTableRows(
+  const { data: contactsPage, isLoading: contactsLoadingReal } = useTableRows(
     starshipId,
     contactsTableId ?? '',
     500,
     0,
     undefined,
-    Boolean(contactsTableId),
+    Boolean(contactsTableId) && !demoActive,
   )
 
   const accountRows = useMemo(
     () =>
-      [...(accountsPage?.data ?? [])].sort(
-        (a, b) => (ACCOUNT_SORT[getStr(a, 'status')] ?? 99) - (ACCOUNT_SORT[getStr(b, 'status')] ?? 99),
-      ),
-    [accountsPage?.data],
+      demoActive
+        ? demoAccounts()
+        : [...(accountsPage?.data ?? [])].sort(
+            (a, b) => (ACCOUNT_SORT[getStr(a, 'status')] ?? 99) - (ACCOUNT_SORT[getStr(b, 'status')] ?? 99),
+          ),
+    [accountsPage?.data, demoActive],
   )
+
+  const contactRows = useMemo(() => (demoActive ? demoContacts() : (contactsPage?.data ?? [])), [contactsPage?.data, demoActive])
+  const accountsLoading = accountsLoadingReal && !demoActive
+  const contactsLoading = contactsLoadingReal && !demoActive
 
   return (
     <div className="h-full flex flex-col overflow-hidden">
@@ -598,10 +647,10 @@ export function LeadgenDashboard({ starshipId, starshipSlug, roomSlug, roomName,
         <div className="max-w-7xl mx-auto px-6 py-6">
           <AccountsTable
             rows={accountRows}
-            allContactRows={contactsPage?.data ?? []}
+            allContactRows={contactRows}
             loading={accountsLoading}
             contactsLoading={contactsLoading}
-            primaryKey={accountsTable?.primaryKey}
+            primaryKey={demoActive ? 'account_id' : accountsTable?.primaryKey}
             tableName={accountsTable?.name}
             icpProfiles={icpProfiles}
             icpFilter={icpFilter}

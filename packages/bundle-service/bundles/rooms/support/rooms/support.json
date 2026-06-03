@@ -1,0 +1,99 @@
+{
+  "schemaVersion": "1",
+  "kind": "room",
+  "exportedAt": "2026-05-28T00:00:00.000Z",
+  "metadata": {
+    "fromSlug": "support",
+    "fromStarshipSlug": "starborn-support"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "room": {
+      "name": "Support",
+      "isPrivate": false,
+      "topic": "Triage incoming tickets, reply when resolved."
+    },
+    "viewPins": [],
+    "tablePins": [
+      {
+        "tableSlug": "tickets",
+        "position": 0
+      }
+    ],
+    "taskBoardPins": [
+      {
+        "taskBoardSlug": "support-tickets",
+        "position": 0
+      }
+    ],
+    "toolAssignments": [
+      {
+        "toolSlug": "search-room-resources",
+        "permission": "allow"
+      },
+      {
+        "toolSlug": "web-search",
+        "permission": "allow"
+      },
+      {
+        "toolSlug": "web-fetch",
+        "permission": "allow"
+      },
+      {
+        "toolSlug": "call-agent",
+        "permission": "allow"
+      },
+      {
+        "toolSlug": "read-conversation-messages",
+        "permission": "allow"
+      },
+      {
+        "toolSlug": "search-conversations-threads",
+        "permission": "allow"
+      },
+      {
+        "toolSlug": "get-doc",
+        "permission": "allow"
+      },
+      {
+        "toolSlug": "search-docs",
+        "permission": "allow"
+      },
+      {
+        "toolSlug": "create-doc",
+        "permission": "allow"
+      },
+      {
+        "toolSlug": "edit-doc",
+        "permission": "allow"
+      },
+      {
+        "toolSlug": "add-task",
+        "permission": "allow"
+      },
+      {
+        "toolSlug": "move-task-card",
+        "permission": "allow"
+      },
+      {
+        "toolSlug": "show-table-card",
+        "permission": "allow"
+      },
+      {
+        "toolSlug": "search-agents",
+        "permission": "allow"
+      },
+      {
+        "toolSlug": "get-agent",
+        "permission": "allow"
+      }
+    ],
+    "agentParticipantSlugs": [
+      "triage",
+      "reply"
+    ]
+  }
+}

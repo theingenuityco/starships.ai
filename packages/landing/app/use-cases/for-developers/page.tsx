@@ -4,7 +4,8 @@ import { FadeIn } from '@/components/FadeIn';
 import { Footer } from '@/components/Footer';
 import { Icon } from '@/components/Icon';
 import { TrustControl } from '@/components/TrustControl';
-import { RoomDashboard } from '@/components/RoomDashboard';
+import { AppWindow } from '@/components/AppWindow';
+import { EngineeringDashboardMock } from '@/components/EngineeringDashboardMock';
 import { UseCasesScroller } from '@/components/UseCasesScroller';
 
 export const metadata: Metadata = {
@@ -14,18 +15,6 @@ export const metadata: Metadata = {
 };
 
 export const dynamic = 'force-static';
-
-const engineeringFeed = [
-  { agent: 'Triage', action: 'pulled 4 new issues, queued 2 as small and testable', state: 'done' as const },
-  { agent: 'Triage', action: 'deduped #318 against #290', state: 'done' as const },
-  { agent: 'Scoper', action: 'wrote a spec for "fix null deref in billing"', state: 'done' as const },
-  { agent: 'Scoper', action: 'reading the payments module for edge cases', state: 'working' as const },
-  { agent: 'Builder', action: 'cloned the repo on branch fix/billing-null', state: 'working' as const },
-  { agent: 'Builder', action: 'ran your test suite: 142 passing', state: 'done' as const },
-  { agent: 'Builder', action: 'opened PR #441, checks green', state: 'done' as const },
-  { agent: 'Reviewer', action: 'reviewed #441 against your conventions', state: 'done' as const },
-  { agent: 'Reviewer', action: 'flagged a missing test on #438', state: 'needs-you' as const },
-];
 
 const engineeringRooms = [
   { name: 'Lobby' },
@@ -349,13 +338,15 @@ export default function ForDevelopersPage() {
       </section>
 
       {/* Room dashboard mockup */}
-      <RoomDashboard
+      <AppWindow
         title="starships · engineering"
-        activeRoom="Engineering"
+        activeNav="Dashboard"
         rooms={engineeringRooms}
-        feedPool={engineeringFeed}
+        activeRoom="Engineering"
         wallpaper="linear-gradient(180deg, rgba(7,8,11,0.45) 0%, rgba(7,8,11,0.75) 100%), url(/wallpaper-engineering.jpg)"
-      />
+      >
+        <EngineeringDashboardMock />
+      </AppWindow>
 
       {/* The loop */}
       <UseCasesScroller items={useCases} visuals={useCases.map((_, i) => <MockVisual key={i} index={i} />)} />

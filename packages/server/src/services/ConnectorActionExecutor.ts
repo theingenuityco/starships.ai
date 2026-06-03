@@ -69,7 +69,7 @@ function normalizeEnvelope(result: unknown): HttpEnvelope {
       return {
         status: r.status,
         statusText: typeof r.statusText === 'string' ? r.statusText : 'OK',
-        headers: (r.headers as Record<string, unknown>) ?? {},
+        headers: (r.headers && typeof r.headers === 'object' ? r.headers : {}) as Record<string, unknown>,
         body: r.body,
         url: typeof r.url === 'string' ? r.url : '',
       };

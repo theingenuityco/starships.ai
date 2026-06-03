@@ -57,11 +57,11 @@ export const listTableRows: CodeAction = {
   },
   run: (args, ctx) => ctx.http.get(`/starships/${encodeURIComponent(String(args.starshipId ?? ctx.runtimeEnv.STARSHIP_ID ?? ""))}/tables/${encodeURIComponent(String(args.tableSlug ?? args.tableId ?? ""))}/rows`, {
   query: {
-    "limit": args.limit == null ? "" : String(args.limit),
-    "expand": args.expandRefs ? "refs" : (args.expand == null ? "" : String(args.expand)),
-    "offset": args.offset == null ? "" : String(args.offset),
-    "search": args.search == null ? "" : String(args.search),
-    "filters": args.filters == null ? "" : (typeof args.filters === "string" ? args.filters : JSON.stringify(args.filters)),
+    "limit": args.limit == null ? undefined : String(args.limit),
+    "expand": args.expandRefs ? "refs" : (args.expand == null ? undefined : String(args.expand)),
+    "offset": args.offset == null ? undefined : String(args.offset),
+    "search": args.search == null ? undefined : String(args.search),
+    "filters": args.filters == null ? undefined : (typeof args.filters === "string" ? args.filters : JSON.stringify(args.filters)),
   },
   timeoutMs: 10000,
 }),

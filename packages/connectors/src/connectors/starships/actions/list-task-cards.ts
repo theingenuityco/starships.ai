@@ -31,7 +31,7 @@ export const listTaskCards: CodeAction = {
   },
   run: (args, ctx) => ctx.http.get(`/starships/${encodeURIComponent(String(args.starshipId ?? ctx.runtimeEnv.STARSHIP_ID ?? ""))}/task-boards/${encodeURIComponent(String(args.boardSlug ?? args.boardId ?? args.id ?? ""))}/cards`, {
   query: {
-    "includeArchived": args.includeArchived == null ? "" : String(args.includeArchived),
+    "includeArchived": args.includeArchived == null ? undefined : String(args.includeArchived),
   },
   timeoutMs: 5000,
 }),

@@ -81,7 +81,7 @@ export function createAuthedHttp(opts: AuthedHttpOptions): AuthedHttp {
           (typeof URLSearchParams !== 'undefined' && body instanceof URLSearchParams) ||
           (typeof FormData !== 'undefined' && body instanceof FormData) ||
           body instanceof ArrayBuffer ||
-          ArrayBuffer.isView(body as ArrayBufferLike)
+          ArrayBuffer.isView(body)
         ) {
           init.body = body as RequestInit['body'];
         } else {

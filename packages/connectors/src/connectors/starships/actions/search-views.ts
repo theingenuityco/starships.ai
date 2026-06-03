@@ -31,10 +31,10 @@ export const searchViews: CodeAction = {
   },
   run: (args, ctx) => ctx.http.get(`/starships/${encodeURIComponent(String(args.starshipId ?? ctx.runtimeEnv.STARSHIP_ID ?? ""))}/views`, {
   query: {
-    "name": args.name == null ? "" : String(args.name),
-    "slug": args.slug == null ? "" : String(args.slug),
-    "limit": args.limit == null ? "" : String(args.limit),
-    "offset": args.offset == null ? "" : String(args.offset),
+    "name": args.name == null ? undefined : String(args.name),
+    "slug": args.slug == null ? undefined : String(args.slug),
+    "limit": args.limit == null ? undefined : String(args.limit),
+    "offset": args.offset == null ? undefined : String(args.offset),
   },
   timeoutMs: 5000,
 }),

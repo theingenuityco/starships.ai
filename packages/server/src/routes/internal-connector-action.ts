@@ -12,6 +12,7 @@
 
 import type { Request, Response } from 'express';
 import { Router } from 'express';
+import { timingSafeEqual } from 'node:crypto';
 import { connectorActionExecutor } from '@/services/ConnectorActionExecutor';
 import { sendError } from '../utils/responseHelpers';
 
@@ -25,7 +26,9 @@ router.post('/internal/connector-action', async (req: Request, res: Response) =>
   const expected = process.env.RUNNER_INTERNAL_SECRET;
   if (expected) {
     const provided = req.header('x-runner-secret') ?? '';
-    if (provided !== expected) {
+    // Constant-time comparison; length check first since timingSafeEqual requires equal-length buffers.
+    const ok = provided.length === expected.length && timingSafeEqual(Buffer.from(provided), Buffer.from(expected));
+    if (!ok) {
       return sendError(res, 'ACCESS_DENIED', 'Invalid runner secret', 403);
     }
   } else if (process.env.NODE_ENV === 'production') {

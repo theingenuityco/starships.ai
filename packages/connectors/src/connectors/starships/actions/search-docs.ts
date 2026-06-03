@@ -20,7 +20,7 @@ export const searchDocs: CodeAction = {
   run: (args, ctx) => ctx.http.get(`/docs`, {
   query: {
     "q": String(args.q ?? ""),
-    "limit": args.limit == null ? "" : String(args.limit),
+    "limit": args.limit == null ? undefined : String(args.limit),
   },
   timeoutMs: 5000,
 }),

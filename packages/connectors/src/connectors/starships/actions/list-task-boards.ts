@@ -22,7 +22,7 @@ export const listTaskBoards: CodeAction = {
   },
   run: (args, ctx) => ctx.http.get(`/starships/${encodeURIComponent(String(args.starshipId ?? ctx.runtimeEnv.STARSHIP_ID ?? ""))}/task-boards`, {
   query: {
-    "includeArchived": args.includeArchived == null ? "" : String(args.includeArchived),
+    "includeArchived": args.includeArchived == null ? undefined : String(args.includeArchived),
   },
   timeoutMs: 5000,
 }),

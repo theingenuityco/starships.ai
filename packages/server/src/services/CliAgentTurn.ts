@@ -29,8 +29,13 @@ import type { PermissionTable } from '@starships/autopilot-cli';
 import { cliAgentContainerLauncher } from '@/execution/CliAgentContainerLauncher';
 import { buildAutopilotRuntimeEnv, buildAutopilotExecutionBundle } from '@/services/autopilot-execution-bundle';
 
-const connectorRepo = new ConnectorRepository();
-const approvalRepo = new ToolCallApprovalRepository();
+// Lazily instantiated so importing this module never constructs repositories at
+// load time. Avoids breaking test suites that partially mock @starships/models,
+// and defers any DB-connection setup until a CLI turn actually runs.
+let _connectorRepo: ConnectorRepository | undefined;
+let _approvalRepo: ToolCallApprovalRepository | undefined;
+const connectorRepo = (): ConnectorRepository => (_connectorRepo ??= new ConnectorRepository());
+const approvalRepo = (): ToolCallApprovalRepository => (_approvalRepo ??= new ToolCallApprovalRepository());
 
 /**
  * Default permission policy. Opt-in via CLI_AGENT_TOOL_APPROVALS=true: when set,
@@ -48,7 +53,7 @@ const ALWAYS_DISCOVERABLE_CONNECTORS = ['system', 'starships'];
 /** Connector names a starship has connected, plus the always-available ones. */
 async function resolveDiscoverableConnectors(starshipId: string): Promise<string[]> {
   try {
-    const rows = await connectorRepo.findByStarship(starshipId);
+    const rows = await connectorRepo().findByStarship(starshipId);
     const connected = rows.map((r) => String(r.provider)).filter(Boolean);
     return Array.from(new Set([...connected, ...ALWAYS_DISCOVERABLE_CONNECTORS]));
   } catch {
@@ -231,14 +236,14 @@ export async function executeCliAgentTurn(deps: CliAgentTurnDeps, args: CliAgent
       // existing approve/deny UI + routes can resolve it; resume re-enters the CLI loop.
       let approvalId: string | undefined;
       try {
-        const existing = await approvalRepo.findByConversationAndToolCallId(conversationId, event.toolCallId).catch(() => null);
+        const existing = await approvalRepo().findByConversationAndToolCallId(conversationId, event.toolCallId).catch(() => null);
         // Only reuse a still-pending record. A stale decided record (e.g. a reused toolCallId
         // from a prior turn) must not be handed back as the approvalId, or approve/deny would
         // be a no-op (they only update `pending` rows) and the turn would hang.
         if (existing && existing.status === 'pending') {
           approvalId = existing.id;
         } else {
-          const created = await approvalRepo.createPendingForCli({
+          const created = await approvalRepo().createPendingForCli({
             starshipId,
             conversationId,
             agentId: agentModel.id,

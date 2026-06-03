@@ -32,13 +32,14 @@ This folder contains documentation for the Starships workflow system, including 
   - [Direct messages (DMs)](./conversations/direct-messages.md)
 
 - **Data**
-  - [Starship datasets (tabular)](./data/datasets.md)
-    - [Schema & columns](./data/datasets/schema.md)
-    - [Rows, coercion, and upserts](./data/datasets/rows.md)
-    - [HTTP API](./data/datasets/api.md)
-    - [Connector actions & agent tools](./data/datasets/connector-actions.md)
-    - [UI + Views integration](./data/datasets/ui-and-views.md)
-    - [Troubleshooting](./data/datasets/troubleshooting.md)
+  - [Starship Databases & Tables (tabular)](./data/databases.md)
+    - [Schema & columns](./data/databases/schema.md)
+    - [Rows, coercion, and upserts](./data/databases/rows.md)
+    - [HTTP API](./data/databases/api.md)
+    - [Querying a Database with SQL](./data/databases/sql.md)
+    - [Connector actions & agent tools](./data/databases/connector-actions.md)
+    - [UI + Views integration](./data/databases/ui-and-views.md)
+    - [Troubleshooting](./data/databases/troubleshooting.md)
 
 Audience and access modes
 

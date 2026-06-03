@@ -90,6 +90,11 @@ export class CliAgent {
   constructor(config: CliAgentConfig) {
     this.config = config;
     this.tools = config.tools ?? [...buildSystemTools(), ...buildConnectorTools()];
+    if (!config.tools && !config.catalog) {
+      // Connector tools are part of the default set but need a catalog to do
+      // anything; without one they silently return errors to the model.
+      console.warn('[CliAgent] default connector tools wired without config.catalog — search_actions/run_action will error');
+    }
     this.toolByName = new Map(this.tools.map((t) => [t.name, t]));
     this.modelTools = this.tools.map(toModelTool);
   }

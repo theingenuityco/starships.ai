@@ -292,7 +292,10 @@ const grep: AgentTool = {
       const files: string[] = [];
       await walk(ctx.cwd, (rel) => {
         if (!pathMatcher || pathMatcher.test(rel)) files.push(rel);
-        return true;
+        // Stop walking once we have plenty of candidates: a single file can hold
+        // many matches, so collect a generous multiple of the result cap rather
+        // than traversing the entire tree on large workspaces.
+        return files.length < GREP_MAX_RESULTS * 10;
       });
 
       const results: Array<{ file: string; line: number; text: string }> = [];

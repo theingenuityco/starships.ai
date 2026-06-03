@@ -2847,6 +2847,13 @@ export class ConversationService {
         // otherwise the agent gets a no-repo scratch cwd. A repo session that has
         // not been checked out yet stays on the blueprint path so checkout-repo can
         // provision it. Defaults OFF.
+        //
+        // KNOWN LIMITATION (blocks enabling the flag for repo-backed rooms): there is
+        // no CLI-native repo provisioning yet. A brand-new conversation has no existing
+        // workspace session, so it takes the scratch path (cwd = mount root) and nothing
+        // registers a checkout in workspaceSessionManager. The engineering room therefore
+        // needs a CLI-side `checkout_repo` equivalent that binds + provisions the session
+        // before the CLI path can share the blueprint's checkout. Safe while OFF.
         const cliTurnId = this.currentTurnId.get(data.conversationId);
         let cliHandled = false;
         const cliExistingWs = cliTurnId ? workspaceSessionManager.get(data.conversationId) : undefined;
@@ -3373,6 +3380,13 @@ export class ConversationService {
       // Flag-gated resume into the code-native CLI agent (mirrors addConversationMessage).
       // Gathers approval decisions for the pending tool calls and re-enters the loop,
       // which finishes the approved/denied calls without re-calling the LLM.
+      //
+      // KNOWN LIMITATION (blocks enabling the flag by default): cliResumeTurnId comes from
+      // the in-memory currentTurnId map, which is empty after a server restart. A turn that
+      // was waiting_for_tools when the process restarted will skip the CLI resume path and
+      // fall through to the blueprint path (which can't resume a CLI approval), leaving the
+      // conversation stuck. Resolving this needs a DB lookup for the active turn id
+      // (e.g. turnRepository.findActiveTurnId) as the fallback. Safe while OFF.
       const cliResumeTurnId = this.currentTurnId.get(conversationId);
       const cliResumeWs = cliResumeTurnId ? workspaceSessionManager.get(conversationId) : undefined;
       const cliResumeUnprovisionedRepo = Boolean(

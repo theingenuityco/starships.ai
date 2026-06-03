@@ -111,6 +111,7 @@ const runAction: AgentTool = {
   },
   async run(args, ctx) {
     if (!ctx.catalog) return { content: { error: 'no action catalog available' }, isError: true };
+    if (!ctx.connectors) return { content: { error: 'no connector runner available' }, isError: true };
     const connector = String(args.connector ?? '');
     const action = String(args.action ?? '');
     if (!connector || !action) return { content: { error: 'connector and action are required' }, isError: true };

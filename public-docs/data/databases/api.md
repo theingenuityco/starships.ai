@@ -203,7 +203,7 @@ Notes:
 
 `POST /api/v1/starships/:starshipId/tables/:tableIdOrSlug/rows:upsert`
 
-> Note: `:upsert` is a literal suffix (not a route parameter). The full path segment is the fixed string `rows:upsert`.
+> Note: `:upsert` is a **literal suffix**, not a route parameter. The full path segment is the fixed string `rows:upsert`.
 
 Body:
 

@@ -90,7 +90,7 @@ Supported constraint keys:
 - `autoincrement?: boolean`
 - `default?: unknown`
 - `min?: number`, `max?: number`
-- `minLength?: number`, `maxLength?: number` (the server validates `maxLength` in the range 0-63; when set it also makes the column `varchar(maxLength)` instead of `text`)
+- `minLength?: number`, `maxLength?: number` (bounds on the string **value** length, not the column name; the server validates `maxLength` in the range 0-63 and, when set, stores the column as `varchar(maxLength)`. Leave `maxLength` unset for unbounded `text` — that is the right choice for long values like URLs or emails.)
 - `pattern?: string` (JS regex string; validated server-side)
 
 Important server rules:

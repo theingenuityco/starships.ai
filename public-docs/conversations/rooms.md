@@ -208,7 +208,9 @@ Combined response shape:
 { "views": [], "tables": [], "taskBoards": [], "tools": [], "participants": { "users": [], "agents": [] } }
 ```
 
-Pinned-kind endpoints return an `items` array of `{ pin, <resource> }` objects (e.g. `{ pin, view }`).\n\nRoom tools are returned as `{ assignment, tool }` objects.
+Pinned-kind endpoints return an `items` array of `{ pin, <resource> }` objects (e.g. `{ pin, view }`).
+
+Room tools are returned as `{ assignment, tool }` objects.
 Participants are returned as:
 
 - `participants.users[]`: `{ id, slug: "u:<userId>", displayName, avatar, role }`

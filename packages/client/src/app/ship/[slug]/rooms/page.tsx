@@ -82,7 +82,7 @@ export default function RoomsIndexPage(): React.JSX.Element {
   const [importDecisions, setImportDecisions] = useState<any>({
     rooms: {},
     views: {},
-    datasets: {},
+    tables: {},
     taskBoards: {},
     tools: {},
     agents: {},
@@ -105,7 +105,7 @@ export default function RoomsIndexPage(): React.JSX.Element {
       const data = json?.data ?? json
       setImportAnalysis(data)
 
-      const nextDecisions: any = { rooms: {}, views: {}, datasets: {}, taskBoards: {}, tools: {}, agents: {} }
+      const nextDecisions: any = { rooms: {}, views: {}, tables: {}, taskBoards: {}, tools: {}, agents: {} }
       for (const x of (data?.rooms ?? []) as any[]) {
         const status = x?.status
         const action: 'skip' | 'copy' | 'overwrite' = status === 'same' ? 'skip' : 'copy'
@@ -116,10 +116,10 @@ export default function RoomsIndexPage(): React.JSX.Element {
         const action: 'skip' | 'copy' | 'overwrite' = status === 'same' ? 'skip' : 'copy'
         nextDecisions.views[String(x.bundleHash)] = { action, targetId: x?.existing?.id }
       }
-      for (const x of (data?.datasets ?? []) as any[]) {
+      for (const x of (data?.tables ?? []) as any[]) {
         const status = x?.status
         const action: 'skip' | 'copy' | 'overwrite' = status === 'same' ? 'skip' : 'copy'
-        nextDecisions.datasets[String(x.bundleHash)] = { action, targetId: x?.existing?.id }
+        nextDecisions.tables[String(x.bundleHash)] = { action, targetId: x?.existing?.id }
       }
       for (const x of (data?.taskBoards ?? []) as any[]) {
         const status = x?.status
@@ -165,7 +165,7 @@ export default function RoomsIndexPage(): React.JSX.Element {
       const data = json?.data ?? json
       const importedRooms = Number(data?.imported?.rooms ?? 0)
       const importedViews = Number(data?.imported?.views ?? 0)
-      const importedDatasets = Number(data?.imported?.datasets ?? 0)
+      const importedTables = Number(data?.imported?.tables ?? 0)
       const importedBoards = Number(data?.imported?.taskBoards ?? 0)
       const importedAgents = Number(data?.imported?.agents ?? 0)
       const importedTools = Number(data?.imported?.tools ?? 0)
@@ -176,10 +176,10 @@ export default function RoomsIndexPage(): React.JSX.Element {
       queryClient.invalidateQueries({ queryKey: ['agents'] })
       queryClient.invalidateQueries({ queryKey: ['tools'] })
       queryClient.invalidateQueries({ queryKey: ['views'] })
-      queryClient.invalidateQueries({ queryKey: ['datasets'] })
+      queryClient.invalidateQueries({ queryKey: ['tables'] })
       queryClient.invalidateQueries({ queryKey: ['task-boards'] })
       toast.success('Import complete', {
-        description: `${importedRooms} room(s), ${importedViews} view(s), ${importedDatasets} dataset(s), ${importedBoards} task board(s), ${importedAgents} agent(s), ${importedTools} tool(s) imported${warnings ? ` · ${warnings} warning(s)` : ''}.`,
+        description: `${importedRooms} room(s), ${importedViews} view(s), ${importedTables} table(s), ${importedBoards} task board(s), ${importedAgents} agent(s), ${importedTools} tool(s) imported${warnings ? ` · ${warnings} warning(s)` : ''}.`,
       })
       setImportOpen(false)
       return true
@@ -293,7 +293,7 @@ export default function RoomsIndexPage(): React.JSX.Element {
                 setImportStep(1)
                 setImportFile(null)
                 setImportAnalysis(null)
-                setImportDecisions({ rooms: {}, views: {}, datasets: {}, taskBoards: {}, tools: {}, agents: {} })
+                setImportDecisions({ rooms: {}, views: {}, tables: {}, taskBoards: {}, tools: {}, agents: {} })
               }}
               disabled={!canManageRooms || !starshipId}
             >
@@ -441,7 +441,7 @@ export default function RoomsIndexPage(): React.JSX.Element {
         starshipId={starshipId}
         kindFilter={['room']}
         title="Browse room bundles"
-        description="Install pre-built rooms with agents, datasets, and task boards from the bundle service."
+        description="Install pre-built rooms with agents, tables, and task boards from the bundle service."
       />
 
       {/* Create */}
@@ -525,7 +525,7 @@ export default function RoomsIndexPage(): React.JSX.Element {
             setImportStep(1)
             setImportFile(null)
             setImportAnalysis(null)
-            setImportDecisions({ rooms: {}, views: {}, datasets: {}, taskBoards: {}, tools: {}, agents: {} })
+            setImportDecisions({ rooms: {}, views: {}, tables: {}, taskBoards: {}, tools: {}, agents: {} })
           }
         }}
       >
@@ -554,7 +554,7 @@ export default function RoomsIndexPage(): React.JSX.Element {
                         const f = e.target.files?.[0] ?? null
                         setImportFile(f)
                         setImportAnalysis(null)
-                        setImportDecisions({ rooms: {}, views: {}, datasets: {}, taskBoards: {}, tools: {}, agents: {} })
+                        setImportDecisions({ rooms: {}, views: {}, tables: {}, taskBoards: {}, tools: {}, agents: {} })
                       }}
                     />
                   </div>
@@ -582,7 +582,7 @@ export default function RoomsIndexPage(): React.JSX.Element {
                         [
                           { key: 'rooms', label: 'Rooms', allowOverwrite: false },
                           { key: 'views', label: 'Views', allowOverwrite: true },
-                          { key: 'datasets', label: 'Datasets', allowOverwrite: true },
+                          { key: 'tables', label: 'Tables', allowOverwrite: true },
                           { key: 'taskBoards', label: 'Task boards', allowOverwrite: false },
                           { key: 'tools', label: 'Tools', allowOverwrite: true },
                           { key: 'agents', label: 'Agents', allowOverwrite: true },

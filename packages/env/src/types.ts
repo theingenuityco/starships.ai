@@ -22,6 +22,10 @@ export interface EnvironmentConfig {
   POSTGRES_PASSWORD: string;
   POSTGRES_DATABASE: string;
   POSTGRES_SSL: boolean;
+  // Restricted read-only role backing the per-starship agent SQL surface.
+  // Optional: when the password is absent the agent SQL surface is disabled.
+  POSTGRES_AGENT_USER: string;
+  POSTGRES_AGENT_PASSWORD?: string;
 
   // LLM Provider Configuration
   OPENROUTER_API_KEY?: string;
@@ -57,6 +61,10 @@ export interface EnvironmentConfig {
   // GitHub OAuth App (used for user login)
   GH_OAUTH_CLIENT_ID?: string;
   GH_OAUTH_CLIENT_SECRET?: string;
+  // GitHub App (used for the GitHub connector: installation tokens, bot identity)
+  GITHUB_APP_ID?: string;
+  GITHUB_APP_PRIVATE_KEY?: string; // base64-encoded PEM
+  GITHUB_APP_SLUG?: string;
 
   // Environment Variables Encryption Key
   ENCRYPTION_KEY?: string;

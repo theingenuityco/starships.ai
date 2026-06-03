@@ -1,0 +1,60 @@
+{
+  "schemaVersion": "1",
+  "kind": "table",
+  "exportedAt": "2026-05-26T00:00:00.000Z",
+  "metadata": {
+    "fromSlug": "ownership",
+    "fromStarshipSlug": "starborn-eng"
+  },
+  "source": {
+    "app": "starships.ai",
+    "version": "0.0.0"
+  },
+  "payload": {
+    "table": {
+      "name": "Ownership",
+      "description": "Path/module ownership map used to route reviews and flag sensitive areas.",
+      "columns": [
+        {
+          "name": "ownership_id",
+          "type": "number",
+          "constraints": {
+            "unique": true,
+            "autoincrement": true
+          },
+          "description": "Internal id"
+        },
+        {
+          "name": "path_pattern",
+          "type": "string",
+          "constraints": {
+            "required": true
+          },
+          "description": "Glob or path prefix"
+        },
+        {
+          "name": "owner",
+          "type": "string",
+          "description": "Owner (person or handle)"
+        },
+        {
+          "name": "team",
+          "type": "string",
+          "description": "Owning team"
+        },
+        {
+          "name": "sensitive",
+          "type": "boolean",
+          "description": "Requires extra care / human review"
+        },
+        {
+          "name": "notes",
+          "type": "string",
+          "description": "Notes"
+        }
+      ],
+      "primaryKey": "ownership_id"
+    },
+    "rows": []
+  }
+}

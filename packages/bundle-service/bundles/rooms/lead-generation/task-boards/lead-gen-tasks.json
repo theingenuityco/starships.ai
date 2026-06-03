@@ -13,7 +13,7 @@
   "payload": {
     "taskBoard": {
       "name": "Lead Gen Tasks",
-      "description": "Simple dev-style Kanban board for lead gen execution. Use datasets (Accounts/Contacts) for lifecycle states; this board tracks task execution only.",
+      "description": "Simple dev-style Kanban board for lead gen execution. Use tables (Accounts/Contacts) for lifecycle states; this board tracks task execution only.",
       "pos": 9,
       "createDefaultColumns": false
     },

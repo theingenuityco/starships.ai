@@ -1,10 +1,10 @@
 'use client'
 
 import React, { useMemo, useState } from 'react'
-import type { RoomPinnedDataset, RoomPinnedTaskBoard } from '@starships/protocol'
-import { useStarshipDatasets, useDatasetRows } from '@/hooks/useDatasets'
+import type { RoomPinnedTable, RoomPinnedTaskBoard } from '@starships/protocol'
+import { useStarshipTables, useTableRows } from '@/hooks/useTables'
 import { useDemo } from '@/components/demo/DemoContext'
-import type { DatasetRowFilter } from '@/hooks/useDatasets'
+import type { TableRowFilter } from '@/hooks/useTables'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -19,7 +19,7 @@ interface LeadgenDashboardProps {
   starshipSlug: string
   roomSlug: string
   roomName: string | null | undefined
-  pinnedDatasets: RoomPinnedDataset[]
+  pinnedTables: RoomPinnedTable[]
   pinnedTaskBoards: RoomPinnedTaskBoard[]
 }
 
@@ -215,13 +215,13 @@ interface AccountsTableProps {
   loading: boolean
   contactsLoading: boolean
   primaryKey: string | null | undefined
-  datasetName?: string
+  tableName?: string
   icpProfiles: IcpProfile[]
   icpFilter: string
   onIcpFilterChange: (value: string) => void
 }
 
-function AccountsTable({ rows, allContactRows, loading, contactsLoading, primaryKey, datasetName, icpProfiles, icpFilter, onIcpFilterChange }: AccountsTableProps) {
+function AccountsTable({ rows, allContactRows, loading, contactsLoading, primaryKey, tableName, icpProfiles, icpFilter, onIcpFilterChange }: AccountsTableProps) {
   const [query, setQuery] = useState('')
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set())
   const [page, setPage] = useState(1)
@@ -274,7 +274,7 @@ function AccountsTable({ rows, allContactRows, loading, contactsLoading, primary
       employees: getStr(r, 'employee_count', 'employee_range', 'employees', 'company_size'),
       website: getStr(r, 'website', 'website_url'),
     }))
-    downloadTableAsCsv(adaptDataTable(cols, data), `${sanitizeFilename(datasetName ?? 'accounts')}-${Date.now()}.csv`)
+    downloadTableAsCsv(adaptDataTable(cols, data), `${sanitizeFilename(tableName ?? 'accounts')}-${Date.now()}.csv`)
   }
 
   return (
@@ -487,7 +487,7 @@ function AccountsTable({ rows, allContactRows, loading, contactsLoading, primary
 }
 
 // Demo data: a credible slice of the Q2 outbound list so the Growth board looks
-// alive during the hero-video glance, without depending on seeded datasets.
+// alive during the hero-video glance, without depending on seeded tables.
 // (The headline counts — 1,240 accounts / 3,640 verified — live on Mission
 // Control; this shows the qualified buyers behind them.)
 function demoAccounts(): Record<string, unknown>[] {
@@ -507,7 +507,7 @@ function demoContacts(): Record<string, unknown>[] {
   const c = (
     account: string, first: string, last: string, title: string, status: string, domain: string
   ): Record<string, unknown> => ({
-    account: { kind: 'dataset_row', datasetIdOrSlug: 'accounts', key: account },
+    account: { kind: 'table_row', tableIdOrSlug: 'accounts', key: account },
     first_name: first,
     last_name: last,
     title,
@@ -529,28 +529,28 @@ function demoContacts(): Record<string, unknown>[] {
 
 // --- LeadgenDashboard ---
 
-export function LeadgenDashboard({ starshipId, starshipSlug, roomSlug, roomName, pinnedDatasets }: LeadgenDashboardProps) {
+export function LeadgenDashboard({ starshipId, starshipSlug, roomSlug, roomName, pinnedTables }: LeadgenDashboardProps) {
   const { active: demoActive } = useDemo()
   const [icpFilter, setIcpFilter] = useState<string>('all')
-  const { data: allDatasets = [] } = useStarshipDatasets(starshipId)
+  const { data: allTables = [] } = useStarshipTables(starshipId)
 
-  const { accountsDataset, contactsDatasetId, icpProfilesDatasetId } = useMemo(() => {
-    const pinnedIds = new Set(pinnedDatasets.map((p) => p.datasetId))
-    const pinned = allDatasets.filter((d) => pinnedIds.has(d.id))
+  const { accountsTable, contactsTableId, icpProfilesTableId } = useMemo(() => {
+    const pinnedIds = new Set(pinnedTables.map((p) => p.tableId))
+    const pinned = allTables.filter((d) => pinnedIds.has(d.id))
     return {
-      accountsDataset: pinned.find((d) => d.slug.includes('accounts')) ?? null,
-      contactsDatasetId: pinned.find((d) => d.slug.includes('contacts'))?.id ?? null,
-      icpProfilesDatasetId: pinned.find((d) => d.slug === 'icp-profiles')?.id ?? null,
+      accountsTable: pinned.find((d) => d.slug.includes('accounts')) ?? null,
+      contactsTableId: pinned.find((d) => d.slug.includes('contacts'))?.id ?? null,
+      icpProfilesTableId: pinned.find((d) => d.slug === 'icp-profiles')?.id ?? null,
     }
-  }, [allDatasets, pinnedDatasets])
+  }, [allTables, pinnedTables])
 
-  const { data: icpProfilesPage } = useDatasetRows(
+  const { data: icpProfilesPage } = useTableRows(
     starshipId,
-    icpProfilesDatasetId ?? '',
+    icpProfilesTableId ?? '',
     100,
     0,
     undefined,
-    Boolean(icpProfilesDatasetId) && !demoActive,
+    Boolean(icpProfilesTableId) && !demoActive,
   )
 
   const icpProfiles = useMemo<IcpProfile[]>(() => {
@@ -566,7 +566,7 @@ export function LeadgenDashboard({ starshipId, starshipSlug, roomSlug, roomName,
     })
   }, [icpProfilesPage?.data])
 
-  const accountFilters = useMemo<DatasetRowFilter[]>(() => {
+  const accountFilters = useMemo<TableRowFilter[]>(() => {
     if (icpFilter === 'all') return []
     const icp = icpProfiles.find((p) => p.id === icpFilter)
     if (!icp) return []
@@ -574,10 +574,10 @@ export function LeadgenDashboard({ starshipId, starshipSlug, roomSlug, roomName,
     if (icp.icpId !== null) {
       // Rows created via the upsert API have icp_id in data_json and a valid row_key.
       // Accounts reference ICPs via the icp_profile column as a JSON object
-      // { "kind": "dataset_row", "datasetIdOrSlug": "icp-profiles", "key": <icp_id> }.
+      // { "kind": "table_row", "tableIdOrSlug": "icp-profiles", "key": <icp_id> }.
       // PostgreSQL jsonb serialises keys alphabetically with a space after the colon, so the
       // text representation is:
-      //   {"datasetIdOrSlug": "icp-profiles", "key": <id>, "kind": "dataset_row"}
+      //   {"tableIdOrSlug": "icp-profiles", "key": <id>, "kind": "table_row"}
       // Using contains on `"key": <id>,` uniquely identifies this ICP without false positives.
       return [{ column: 'icp_profile', op: 'contains', value: `"key": ${icp.icpId},` }]
     }
@@ -594,23 +594,23 @@ export function LeadgenDashboard({ starshipId, starshipSlug, roomSlug, roomName,
     return []
   }, [icpFilter, icpProfiles])
 
-  const { data: accountsPage, isLoading: accountsLoadingReal } = useDatasetRows(
+  const { data: accountsPage, isLoading: accountsLoadingReal } = useTableRows(
     starshipId,
-    accountsDataset?.id ?? '',
+    accountsTable?.id ?? '',
     200,
     0,
     undefined,
-    Boolean(accountsDataset?.id) && !demoActive,
+    Boolean(accountsTable?.id) && !demoActive,
     accountFilters,
   )
 
-  const { data: contactsPage, isLoading: contactsLoadingReal } = useDatasetRows(
+  const { data: contactsPage, isLoading: contactsLoadingReal } = useTableRows(
     starshipId,
-    contactsDatasetId ?? '',
+    contactsTableId ?? '',
     500,
     0,
     undefined,
-    Boolean(contactsDatasetId) && !demoActive,
+    Boolean(contactsTableId) && !demoActive,
   )
 
   const accountRows = useMemo(
@@ -650,8 +650,8 @@ export function LeadgenDashboard({ starshipId, starshipSlug, roomSlug, roomName,
             allContactRows={contactRows}
             loading={accountsLoading}
             contactsLoading={contactsLoading}
-            primaryKey={demoActive ? 'account_id' : accountsDataset?.primaryKey}
-            datasetName={accountsDataset?.name}
+            primaryKey={demoActive ? 'account_id' : accountsTable?.primaryKey}
+            tableName={accountsTable?.name}
             icpProfiles={icpProfiles}
             icpFilter={icpFilter}
             onIcpFilterChange={setIcpFilter}

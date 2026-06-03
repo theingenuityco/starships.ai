@@ -13,13 +13,13 @@
   "payload": {
     "tool": {
       "name": "Search Accounts",
-      "description": "Search rows from the Accounts dataset via list-dataset-rows. Supports server-side search (q/search) + filters, with optional client-side field-scoped refinement. Defaults starshipId to env('STARSHIP_ID').",
+      "description": "Search rows from the Accounts table via list-table-rows. Supports server-side search (q/search) + filters, with optional client-side field-scoped refinement. Defaults starshipId to env('STARSHIP_ID').",
       "parameters": {
         "type": "object",
         "properties": {
           "q": {
             "type": "string",
-            "description": "Optional search string (alias of `search`). Passed to the server for dataset row search."
+            "description": "Optional search string (alias of `search`). Passed to the server for table row search."
           },
           "limit": {
             "type": "number",
@@ -42,11 +42,11 @@
           },
           "search": {
             "type": "string",
-            "description": "Optional search string. Passed to the server for dataset row search."
+            "description": "Optional search string. Passed to the server for table row search."
           },
           "filters": {
             "default": null,
-            "description": "Optional server-side row filters for list-dataset-rows.\n\nLoosely typed: can be an object map, an array of filter objects, or a JSON string (and will be passed through to the connector as-is). See datasets docs for supported operators/shape."
+            "description": "Optional server-side row filters for list-table-rows.\n\nLoosely typed: can be an object map, an array of filter objects, or a JSON string (and will be passed through to the connector as-is). See tables docs for supported operators/shape."
           },
           "expandRefs": {
             "type": "boolean",
@@ -98,17 +98,17 @@
             "name": "Validate & Normalize Input",
             "type": "code",
             "parameters": {
-              "code": "\nasync function main(ctx) {\n  const input = ctx.input || {};\n\n  const starshipId = String(input.starshipId ?? ctx.env('STARSHIP_ID') ?? '');\n  if (!starshipId) throw new Error('starshipId is required (or STARSHIP_ID must be available in env)');\n\n  const datasetSlug = 'accounts';\n\n  const limitRaw = input.limit;\n  const offsetRaw = input.offset;\n\n  const limit = (typeof limitRaw === 'number' && Number.isFinite(limitRaw))\n    ? Math.max(0, Math.min(200, Math.trunc(limitRaw)))\n    : 10;\n\n  const offset = (typeof offsetRaw === 'number' && Number.isFinite(offsetRaw))\n    ? Math.max(0, Math.trunc(offsetRaw))\n    : 0;\n\n  const q = (typeof input.search === 'string' && input.search.trim())\n    ? input.search.trim()\n    : ((typeof input.q === 'string' && input.q.trim()) ? input.q.trim() : '');\n\n  const fields = Array.isArray(input.fields)\n    ? input.fields.map(v => (typeof v === 'string' ? v.trim() : '')).filter(Boolean)\n    : [];\n\n  const filtersRaw = input.filters;\n  const filters = (filtersRaw == null)\n    ? undefined\n    : ((typeof filtersRaw === 'string' || Array.isArray(filtersRaw) || (typeof filtersRaw === 'object' && !Array.isArray(filtersRaw)))\n      ? filtersRaw\n      : undefined);\n\n  const expandRefs = Boolean(input.expandRefs);\n  const expand = (typeof input.expand === 'string' && input.expand.trim()) ? input.expand.trim() : undefined;\n\n  return {\n    listArgs: {\n      starshipId,\n      datasetSlug,\n      limit,\n      offset,\n      expandRefs,\n      expand,\n      search: q || undefined,\n      filters\n    },\n    q,\n    fields\n  };\n}\n",
+              "code": "\nasync function main(ctx) {\n  const input = ctx.input || {};\n\n  const starshipId = String(input.starshipId ?? ctx.env('STARSHIP_ID') ?? '');\n  if (!starshipId) throw new Error('starshipId is required (or STARSHIP_ID must be available in env)');\n\n  const tableSlug = 'accounts';\n\n  const limitRaw = input.limit;\n  const offsetRaw = input.offset;\n\n  const limit = (typeof limitRaw === 'number' && Number.isFinite(limitRaw))\n    ? Math.max(0, Math.min(200, Math.trunc(limitRaw)))\n    : 10;\n\n  const offset = (typeof offsetRaw === 'number' && Number.isFinite(offsetRaw))\n    ? Math.max(0, Math.trunc(offsetRaw))\n    : 0;\n\n  const q = (typeof input.search === 'string' && input.search.trim())\n    ? input.search.trim()\n    : ((typeof input.q === 'string' && input.q.trim()) ? input.q.trim() : '');\n\n  const fields = Array.isArray(input.fields)\n    ? input.fields.map(v => (typeof v === 'string' ? v.trim() : '')).filter(Boolean)\n    : [];\n\n  const filtersRaw = input.filters;\n  const filters = (filtersRaw == null)\n    ? undefined\n    : ((typeof filtersRaw === 'string' || Array.isArray(filtersRaw) || (typeof filtersRaw === 'object' && !Array.isArray(filtersRaw)))\n      ? filtersRaw\n      : undefined);\n\n  const expandRefs = Boolean(input.expandRefs);\n  const expand = (typeof input.expand === 'string' && input.expand.trim()) ? input.expand.trim() : undefined;\n\n  return {\n    listArgs: {\n      starshipId,\n      tableSlug,\n      limit,\n      offset,\n      expandRefs,\n      expand,\n      search: q || undefined,\n      filters\n    },\n    q,\n    fields\n  };\n}\n",
               "timeout": 5000
             }
           },
           {
             "ref": "list",
-            "name": "Connector: list-dataset-rows",
+            "name": "Connector: list-table-rows",
             "type": "connector_action",
             "parameters": {
               "args": "{{ (input || {}).listArgs || ({}) }}",
-              "action": "list-dataset-rows",
+              "action": "list-table-rows",
               "timeout": 30000,
               "connector": "starships",
               "failOnNon2xx": true

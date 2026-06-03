@@ -26,12 +26,12 @@
       }
     ],
     "views": [],
-    "datasets": [
+    "tables": [
       {
-        "kind": "dataset",
+        "kind": "table",
         "fromSlug": "tickets",
         "fromStarshipSlug": "starborn-support",
-        "file": "datasets/tickets.json"
+        "file": "tables/tickets.json"
       }
     ],
     "taskBoards": [

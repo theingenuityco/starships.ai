@@ -1007,13 +1007,13 @@ export function ConversationMessageContent({
             : null
         if (!props) return null
 
-        if (widgetType === 'dataset_card') {
-          const datasetIdOrSlug = typeof props.datasetIdOrSlug === 'string' ? props.datasetIdOrSlug.trim() : ''
-          if (!datasetIdOrSlug) return null
+        if (widgetType === 'table_card') {
+          const tableIdOrSlug = typeof props.tableIdOrSlug === 'string' ? props.tableIdOrSlug.trim() : ''
+          if (!tableIdOrSlug) return null
           const title = typeof props.title === 'string' ? props.title.trim() : ''
           const description = typeof props.description === 'string' ? props.description.trim() : ''
           const href = resolvedStarshipSlug
-            ? `/ship/${encodeURIComponent(resolvedStarshipSlug)}/datasets/${encodeURIComponent(datasetIdOrSlug)}`
+            ? `/ship/${encodeURIComponent(resolvedStarshipSlug)}/tables/${encodeURIComponent(tableIdOrSlug)}`
             : null
 
           const cardInner = (
@@ -1036,14 +1036,14 @@ export function ConversationMessageContent({
                       <div className="min-w-0">
                         <div className="flex items-center gap-2 min-w-0">
                           <CardTitle className="text-sm font-semibold leading-tight truncate">
-                            {title || 'Dataset'}
+                            {title || 'Table'}
                           </CardTitle>
                           <Badge variant="outline" className="font-mono text-[10px] flex-shrink-0">
-                            dataset
+                            table
                           </Badge>
                         </div>
-                        <div className="mt-0.5 text-[11px] text-muted-foreground font-mono truncate" title={datasetIdOrSlug}>
-                          {datasetIdOrSlug}
+                        <div className="mt-0.5 text-[11px] text-muted-foreground font-mono truncate" title={tableIdOrSlug}>
+                          {tableIdOrSlug}
                         </div>
                       </div>
 

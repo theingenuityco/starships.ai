@@ -20,14 +20,16 @@ import { getEnvConfig } from '@starships/env';
 import { validateOAuthState } from '@/utils/jwt';
 import type { ConnectorProvider } from '@starships/protocol';
 import { PlatformSecretService } from '@/services/PlatformSecretService';
-import { ConnectorTemplateRegistryClient } from '@/services/ConnectorTemplateRegistryClient';
+import { ConnectorRegistryClient } from '@/services/ConnectorRegistryClient';
+import { isStrategyDispatchProvider } from '@/services/connectorStrategy';
+import { isInstanceAdmin } from '@/utils/auth-helpers';
 import { parseExternalLaunchConfigFromAuthJson, verifyExternalLaunchQuery } from '@/utils/external-launch';
 
 const env = getEnvConfig();
 
 const router: Router = Router();
 
-const connectorTemplateRegistry = new ConnectorTemplateRegistryClient();
+const connectorTemplateRegistry = new ConnectorRegistryClient();
 
 
 
@@ -460,6 +462,42 @@ async function startConnectorHandler(req: Request, res: Response): Promise<void>
 // POST /starships/:id/connectors/:provider/start - Generic connector start route
 router.post('/starships/:id/connectors/:provider/start', jwtAuthMiddleware, startConnectorHandler);
 
+// POST /connectors/:provider/configure - set instance-wide platform config for a code
+// connector (e.g. GitHub App credentials). Instance-admin only; values are stored as
+// platform secrets and never returned.
+const ConfigureConnectorSchema = z.object({
+  values: z.record(z.string(), z.string()),
+});
+
+router.post('/connectors/:provider/configure', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const paramsValidation = validateData(z.object({ provider: z.string().min(1, 'provider is required') }), req.params, res, 'connector provider');
+    if (!paramsValidation) return;
+
+    const user = req.user as { id?: string; isInstanceAdmin?: boolean } | undefined;
+    if (!user?.id) {
+      sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
+      return;
+    }
+    if (!isInstanceAdmin(user)) {
+      sendError(res, 'FORBIDDEN', 'Only instance admins can configure connectors', 403);
+      return;
+    }
+
+    const bodyValidation = validateData(ConfigureConnectorSchema, req.body, res, 'connector configuration');
+    if (!bodyValidation) return;
+
+    const result = await new ConnectorService().configureConnector(
+      paramsValidation.provider as ConnectorProvider,
+      bodyValidation.values,
+      user.id
+    );
+    sendSuccess(res, result);
+  } catch (error) {
+    handleError(error, res, 'configuring connector');
+  }
+});
+
 const OAuthCallbackSchema = z.object({
   code: z.string().min(1, 'Authorization code is required').optional(),
   state: z.string().min(1, 'State parameter is required'),
@@ -550,6 +588,28 @@ async function connectorCallbackHandler(req: Request, res: Response): Promise<vo
           : `/ship/${encodeURIComponent(starshipId)}/connectors`;
       return `${basePath}?${params.toString()}`;
     };
+
+    // Code-driven connectors (e.g. GitHub App) complete via their strategy. The callback
+    // carries provider-specific params (installation_id) rather than an OAuth code.
+    if (isStrategyDispatchProvider(provider)) {
+      try {
+        const result = await connectorService.completeCodeConnector(provider as ConnectorProvider, state, req.query as Record<string, unknown>);
+        const successParams = new URLSearchParams({ connector: provider, status: 'success' });
+        if (result.returnUrl && isValidRedirectUrl(result.returnUrl)) {
+          res.redirect(addQueryParamsToPath(result.returnUrl, { connector: provider, status: 'success' }));
+          return;
+        }
+        res.redirect(buildStarshipRedirect(result.starshipId, result.starshipSlug, successParams));
+        return;
+      } catch (codeErr) {
+        console.error('[CONNECTOR_CALLBACK] code connector completion failed', {
+          provider,
+          errorMessage: (codeErr as Error | undefined)?.message,
+        });
+        res.redirect(`/?${new URLSearchParams({ connector: provider, status: 'error' }).toString()}`);
+        return;
+      }
+    }
 
     // Custom connector completion is removed in v2 (no fallback).
 

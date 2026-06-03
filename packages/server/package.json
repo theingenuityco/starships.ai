@@ -29,6 +29,7 @@
     "@lezer/json": "^1.0.3",
     "@sentry/node": "^10.27.0",
     "@starships/autopilot": "workspace:*",
+    "@starships/connectors": "workspace:*",
     "@starships/env": "workspace:*",
     "@starships/errors": "workspace:*",
     "@starships/models": "workspace:*",

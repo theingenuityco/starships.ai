@@ -5,7 +5,7 @@
   "entities": {
     "rooms": [],
     "views": [],
-    "datasets": [],
+    "tables": [],
     "taskBoards": [],
     "agents": [],
     "tools": [
@@ -76,8 +76,8 @@
       },
       {
         "kind": "tool",
-        "fromSlug": "show-dataset-card",
-        "file": "tools/show-dataset-card.json"
+        "fromSlug": "show-table-card",
+        "file": "tools/show-table-card.json"
       },
       {
         "kind": "tool",

@@ -25,12 +25,12 @@ function entityCount(bundle: BundleSummary): string {
   const agents = e.agents?.length ?? 0
   const tools = e.tools?.length ?? 0
   const rooms = e.rooms?.length ?? 0
-  const datasets = e.datasets?.length ?? 0
+  const tables = e.tables?.length ?? 0
   const taskBoards = e.taskBoards?.length ?? 0
   if (agents > 0) parts.push(`${agents} agent${agents > 1 ? 's' : ''}`)
   if (tools > 0) parts.push(`${tools} tool${tools > 1 ? 's' : ''}`)
   if (rooms > 0) parts.push(`${rooms} room${rooms > 1 ? 's' : ''}`)
-  if (datasets > 0) parts.push(`${datasets} dataset${datasets > 1 ? 's' : ''}`)
+  if (tables > 0) parts.push(`${tables} table${tables > 1 ? 's' : ''}`)
   if (taskBoards > 0) parts.push(`${taskBoards} board${taskBoards > 1 ? 's' : ''}`)
   return parts.join(' · ') || 'Empty bundle'
 }

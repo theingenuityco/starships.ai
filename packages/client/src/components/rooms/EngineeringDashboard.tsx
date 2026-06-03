@@ -1,7 +1,7 @@
 'use client'
 
 import React from 'react'
-import type { RoomPinnedDataset, RoomPinnedTaskBoard } from '@starships/protocol'
+import type { RoomPinnedTable, RoomPinnedTaskBoard } from '@starships/protocol'
 import { cn } from '@/lib/utils'
 import { avatarColour } from '@/components/dashboard/utils'
 import Icon from '@/components/primitives/Icon'
@@ -12,7 +12,7 @@ interface EngineeringDashboardProps {
   starshipSlug: string
   roomSlug: string
   roomName: string | null | undefined
-  pinnedDatasets: RoomPinnedDataset[]
+  pinnedTables: RoomPinnedTable[]
   pinnedTaskBoards: RoomPinnedTaskBoard[]
 }
 

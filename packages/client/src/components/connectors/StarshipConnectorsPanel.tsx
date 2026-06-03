@@ -2,6 +2,7 @@
 
 import Icon from '@/components/primitives/Icon'
 import {
+  useConfigureConnector,
   useConnectApiKeyConnector,
   useConnectBasicAuthConnector,
   useConnectorCatalog,
@@ -25,6 +26,8 @@ import { toast } from 'sonner'
 import { usePathname, useSearchParams } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { ConnectorLogo } from '@/components/marketplace/ConnectorLogo'
+import { useAuth } from '@/hooks/useAuth'
+import type { ConnectorCatalogItem } from '@starships/protocol'
 
 const CONNECTOR_CTA_BUTTON_CLASS =
   'h-9 px-3 font-medium transition-all duration-200 border border-transparent text-primary/80 hover:text-primary hover:border-primary/25 hover:bg-primary/10 hover:shadow-sm disabled:text-muted-foreground disabled:hover:text-muted-foreground disabled:hover:border-transparent disabled:hover:bg-transparent disabled:hover:shadow-none'
@@ -225,10 +228,15 @@ export function StarshipConnectorsPanel({
   const disconnectMutation = useDisconnectConnector(starshipId)
   const oauthMutation = useStartOAuthConnector(starshipId)
   const apiKeyMutation = useConnectApiKeyConnector(starshipId)
+  const configureMutation = useConfigureConnector()
+  const { isInstanceAdmin } = useAuth()
   const basicMutation = useConnectBasicAuthConnector(starshipId)
 
   const [pendingDisconnect, setPendingDisconnect] = useState<string | null>(null)
   const [hiddenLogos, setHiddenLogos] = useState<Record<string, boolean>>({})
+  const [configureItem, setConfigureItem] = useState<ConnectorCatalogItem | null>(null)
+  const [configureValues, setConfigureValues] = useState<Record<string, string>>({})
+  const [configureFileNames, setConfigureFileNames] = useState<Record<string, string>>({})
   const [apiKeyDialogProvider, setApiKeyDialogProvider] = useState<string | null>(null)
   const [apiKeyValue, setApiKeyValue] = useState('')
   const [apiKeyExtraConfigText, setApiKeyExtraConfigText] = useState('')
@@ -345,6 +353,26 @@ export function StarshipConnectorsPanel({
       returnUrl,
     } as any)
     if (result) window.location.href = result
+  }
+
+  const openConfigureDialog = (item: ConnectorCatalogItem) => {
+    setConfigureItem(item)
+    const init: Record<string, string> = {}
+    for (const f of item.configFields ?? []) init[f.key] = ''
+    setConfigureValues(init)
+    setConfigureFileNames({})
+  }
+
+  const submitConfigure = async () => {
+    if (!configureItem) return
+    const fields = configureItem.configFields ?? []
+    const missing = fields.find(f => f.required && !(configureValues[f.key] ?? '').trim())
+    if (missing) {
+      toast.error('Missing required field', { description: missing.label })
+      return
+    }
+    await configureMutation.mutateAsync({ provider: configureItem.provider as any, values: configureValues })
+    setConfigureItem(null)
   }
 
   const openApiKeyDialog = (provider: string) => {
@@ -701,7 +729,11 @@ export function StarshipConnectorsPanel({
     const logoSrc = getConnectorLogoSrc(provider)
     const authType = catalogItem.auth?.type
     const canDisconnect = !hideDisconnect && isConnected && authType !== 'platform_jwt'
-    const isOauthConnectable = authType === 'oauth2'
+    // GitHub App installs use the same redirect-based connect flow as OAuth.
+    const isOauthConnectable = authType === 'oauth2' || authType === 'github_app'
+    // Connectors needing instance-wide setup (e.g. a GitHub App) must be configured first.
+    const needsConfig = catalogItem.configurable === true && catalogItem.configured === false
+    const canConfigure = needsConfig && isInstanceAdmin === true
     const isApiKeyConnectable = authType === 'api_key'
     const isBasicConnectable = authType === 'basic'
     const isManaged = authType === 'platform_jwt'
@@ -722,10 +754,11 @@ export function StarshipConnectorsPanel({
         <Button
           variant="ghost"
           size="sm"
-          disabled={oauthMutation.isPending || apiKeyMutation.isPending || basicMutation.isPending || isManaged || (!isOauthConnectable && !isApiKeyConnectable && !isBasicConnectable) || isConnected}
+          disabled={oauthMutation.isPending || apiKeyMutation.isPending || basicMutation.isPending || isManaged || (needsConfig && !canConfigure) || (!needsConfig && !isOauthConnectable && !isApiKeyConnectable && !isBasicConnectable) || isConnected}
           onClick={() => {
             if (isConnected) return
             if (isManaged) return
+            if (needsConfig) { if (canConfigure) openConfigureDialog(catalogItem); return }
             if (isOauthConnectable) return void handleConnect(provider)
             if (isApiKeyConnectable) return openApiKeyDialog(provider)
             if (isBasicConnectable) return openBasicDialog(provider)
@@ -746,6 +779,8 @@ export function StarshipConnectorsPanel({
             </>
           ) : isManaged ? (
             'Managed by platform'
+          ) : needsConfig ? (
+            canConfigure ? 'Configure' : 'Not configured'
           ) : (
             (connectButtonLabel ?? 'Connect')
           )}
@@ -881,14 +916,17 @@ export function StarshipConnectorsPanel({
         className={`${CONNECTOR_CTA_BUTTON_CLASS} group min-w-[140px] justify-center shrink-0`}
         onClick={() => {
           if (isManaged) return
+          if (needsConfig) { if (canConfigure) openConfigureDialog(catalogItem); return }
           if (isOauthConnectable) return void handleConnect(provider)
           if (isApiKeyConnectable) return openApiKeyDialog(provider)
           if (isBasicConnectable) return openBasicDialog(provider)
         }}
-        disabled={oauthMutation.isPending || apiKeyMutation.isPending || basicMutation.isPending || isManaged || (!isOauthConnectable && !isApiKeyConnectable && !isBasicConnectable)}
+        disabled={oauthMutation.isPending || apiKeyMutation.isPending || basicMutation.isPending || isManaged || (needsConfig && !canConfigure) || (!needsConfig && !isOauthConnectable && !isApiKeyConnectable && !isBasicConnectable)}
       >
         <Icon name={isConnected ? 'repeat' : 'plug'} className={CONNECTOR_CTA_ICON_CLASS} />
-        {isManaged
+        {needsConfig
+          ? (canConfigure ? 'Configure' : 'Not configured')
+          : isManaged
           ? 'Managed by platform'
           : isOauthConnectable
             ? isConnected
@@ -979,7 +1017,11 @@ export function StarshipConnectorsPanel({
     const logoSrc = getConnectorLogoSrc(provider)
     const authType = catalogItem.auth?.type
     const canDisconnect = !hideDisconnect && isConnected && authType !== 'platform_jwt'
-    const isOauthConnectable = authType === 'oauth2'
+    // GitHub App installs use the same redirect-based connect flow as OAuth.
+    const isOauthConnectable = authType === 'oauth2' || authType === 'github_app'
+    // Connectors needing instance-wide setup (e.g. a GitHub App) must be configured first.
+    const needsConfig = catalogItem.configurable === true && catalogItem.configured === false
+    const canConfigure = needsConfig && isInstanceAdmin === true
     const isApiKeyConnectable = authType === 'api_key'
     const isBasicConnectable = authType === 'basic'
     const isManaged = authType === 'platform_jwt'
@@ -996,14 +1038,15 @@ export function StarshipConnectorsPanel({
         className={cn(CONNECTOR_CTA_BUTTON_CLASS, 'h-8 group min-w-[130px] justify-center shrink-0')}
         onClick={() => {
           if (isManaged) return
+          if (needsConfig) { if (canConfigure) openConfigureDialog(catalogItem); return }
           if (isOauthConnectable) return void handleConnect(provider)
           if (isApiKeyConnectable) return openApiKeyDialog(provider)
           if (isBasicConnectable) return openBasicDialog(provider)
         }}
-        disabled={oauthMutation.isPending || apiKeyMutation.isPending || basicMutation.isPending || isManaged || (!isOauthConnectable && !isApiKeyConnectable && !isBasicConnectable)}
+        disabled={oauthMutation.isPending || apiKeyMutation.isPending || basicMutation.isPending || isManaged || (needsConfig && !canConfigure) || (!needsConfig && !isOauthConnectable && !isApiKeyConnectable && !isBasicConnectable)}
       >
         <Icon name={isConnected ? 'repeat' : 'plug'} className={CONNECTOR_CTA_ICON_CLASS} />
-        {isManaged ? 'Managed by platform' : (connectButtonLabel ?? 'Connect')}
+        {needsConfig ? (canConfigure ? 'Configure' : 'Not configured') : isManaged ? 'Managed by platform' : (connectButtonLabel ?? 'Connect')}
       </Button>
     )
 
@@ -1224,6 +1267,71 @@ export function StarshipConnectorsPanel({
               disabled={oauthMutation.isPending}
             >
               {oauthMutation.isPending ? 'Continuing…' : 'Next'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={configureItem !== null} onOpenChange={open => !open && setConfigureItem(null)}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitlePrimitive>Configure {configureItem?.name ?? 'connector'}</DialogTitlePrimitive>
+            <DialogDescription>
+              These values are stored as encrypted platform secrets and apply to the whole instance.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-4 py-2">
+            {(configureItem?.configFields ?? []).map(field => (
+              <div key={field.key} className="flex flex-col gap-1.5">
+                <label className="text-sm font-medium text-foreground">
+                  {field.label}
+                  {field.required ? <span className="text-destructive"> *</span> : null}
+                </label>
+                {field.type === 'file' ? (
+                  <div className="flex flex-col gap-1">
+                    <Input
+                      type="file"
+                      accept={field.accept}
+                      className="cursor-pointer file:mr-3 file:rounded file:border-0 file:bg-muted file:px-2 file:py-1 file:text-xs"
+                      onChange={async e => {
+                        const file = e.target.files?.[0]
+                        if (!file) {
+                          setConfigureValues(v => ({ ...v, [field.key]: '' }))
+                          setConfigureFileNames(n => ({ ...n, [field.key]: '' }))
+                          return
+                        }
+                        const text = await file.text()
+                        setConfigureValues(v => ({ ...v, [field.key]: text }))
+                        setConfigureFileNames(n => ({ ...n, [field.key]: file.name }))
+                      }}
+                    />
+                    {configureFileNames[field.key] ? (
+                      <p className="text-xs text-emerald-600 dark:text-emerald-400">Loaded {configureFileNames[field.key]}</p>
+                    ) : null}
+                  </div>
+                ) : field.type === 'textarea' ? (
+                  <Textarea
+                    value={configureValues[field.key] ?? ''}
+                    onChange={e => setConfigureValues(v => ({ ...v, [field.key]: e.target.value }))}
+                    rows={4}
+                  />
+                ) : (
+                  <Input
+                    type={field.type === 'password' ? 'password' : 'text'}
+                    value={configureValues[field.key] ?? ''}
+                    onChange={e => setConfigureValues(v => ({ ...v, [field.key]: e.target.value }))}
+                  />
+                )}
+                {field.description ? <p className="text-xs text-muted-foreground">{field.description}</p> : null}
+              </div>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setConfigureItem(null)} disabled={configureMutation.isPending}>
+              Cancel
+            </Button>
+            <Button onClick={() => void submitConfigure()} disabled={configureMutation.isPending}>
+              {configureMutation.isPending ? 'Saving…' : 'Save configuration'}
             </Button>
           </DialogFooter>
         </DialogContent>

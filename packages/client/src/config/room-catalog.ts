@@ -15,9 +15,17 @@ export const ROOM_CATALOG: RoomCatalogEntry[] = [
     name: 'Lead Generation',
     description: 'Find, qualify, and engage your ideal target accounts using AI-powered research and outreach.',
     icon: '🎯',
-    features: ['ICP Profiles', 'Accounts dataset', '5 AI agents'],
+    features: ['ICP Profiles', 'Accounts table', '5 AI agents'],
     previewImage: '/landing/showcase/lead-generation.png',
     ensureEndpoint: 'ensure-leadgen-room',
+  },
+  {
+    bundleId: 'engineering',
+    name: 'Engineering',
+    description: 'Triage your backlog, build and test changes on a real checkout, and open reviewed pull requests.',
+    icon: '🛠️',
+    features: ['Repos table', 'GitHub PRs', '5 AI agents'],
+    ensureEndpoint: 'ensure-engineering-room',
   },
   {
     bundleId: 'outreach',

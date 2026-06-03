@@ -17,12 +17,15 @@ import {
   StarshipRepository,
   ConnectorTemplateEntity,
   ConnectorWebhookBindingRepository,
+  PlatformSecretRepository,
 } from '@starships/models';
-import { ConnectorTemplateRegistryClient } from './ConnectorTemplateRegistryClient';
+import { ConnectorRegistryClient } from './ConnectorRegistryClient';
 import { ConnectorSecretService } from './ConnectorSecretService';
 import { getEnvConfig } from '@starships/env';
 import axios from 'axios';
 import { generateOAuthState, validateOAuthState } from '@/utils/jwt';
+import { connectorRegistry } from '@starships/connectors';
+import { connectorEnv, makeSecretResolver, isStrategyDispatchProvider } from './connectorStrategy';
 import { PlatformSecretService } from './PlatformSecretService';
 import { AppError } from '@starships/errors';
 
@@ -34,7 +37,7 @@ import { AppError } from '@starships/errors';
  */
 export class ConnectorService {
   private connectorRepository: ConnectorRepository;
-  private connectorTemplateRegistry: ConnectorTemplateRegistryClient;
+  private connectorTemplateRegistry: ConnectorRegistryClient;
   private connectorSecretRepository: ConnectorSecretRepository;
   private connectorSecretService: ConnectorSecretService;
   private starshipRepository: StarshipRepository;
@@ -43,7 +46,7 @@ export class ConnectorService {
 
   constructor() {
     this.connectorRepository = new ConnectorRepository();
-    this.connectorTemplateRegistry = new ConnectorTemplateRegistryClient();
+    this.connectorTemplateRegistry = new ConnectorRegistryClient();
     this.connectorSecretRepository = new ConnectorSecretRepository();
     this.connectorSecretService = new ConnectorSecretService();
     this.starshipRepository = new StarshipRepository();
@@ -267,38 +270,64 @@ export class ConnectorService {
    */
   async getConnectorCatalog(): Promise<ConnectorCatalogItem[]> {
     const templates = await this.connectorTemplateRegistry.list();
-    const dbCatalog = templates
-      .filter((tpl) => tpl.isEnabled !== false)
-      .map((tpl): ConnectorCatalogItem => {
-        const authType = ((tpl.authJson as unknown as { type?: string })?.type || 'none') as ConnectorCatalogItem['auth']['type'];
-        const metadataSchema =
-          tpl.metadataSchemaJson && typeof tpl.metadataSchemaJson === 'object' && !Array.isArray(tpl.metadataSchemaJson)
-            ? (tpl.metadataSchemaJson as ConnectorCatalogItem['metadataSchema'])
-            : undefined;
-        return {
-          provider: tpl.provider as ConnectorProvider,
-          name: tpl.name,
-          description: tpl.description,
-          auth: { type: authType },
-          metadataSchema,
-          ...(tpl.demoVideoUrl ? { demoVideoUrl: tpl.demoVideoUrl } : {}),
-          ...(authType === 'oauth2' && (tpl.authJson as unknown as ConnectorAuthOAuth2V2)?.type === 'oauth2'
-            ? (() => {
-                const auth = tpl.authJson as unknown as ConnectorAuthOAuth2V2 & { authorizeUrl?: string };
-                const authUrl = auth?.authorizationUrl ?? auth?.authorizeUrl;
-                const tokenUrl = auth?.tokenUrl;
-                return {
-                  oauthRequiredMetadataKeys: Array.from(
-                    new Set([
-                      ...this.extractUrlTemplateVars(authUrl),
-                      ...this.extractUrlTemplateVars(tokenUrl),
-                    ])
-                  ),
-                };
-              })()
-            : {}),
-        };
-      });
+    const dbCatalog = await Promise.all(
+      templates
+        .filter((tpl) => tpl.isEnabled !== false)
+        .map(async (tpl): Promise<ConnectorCatalogItem> => {
+          // Code connectors (e.g. GitHub App) surface their catalog auth kind so the UI can
+          // show the right CTA; declarative connectors fall back to their runtime auth type.
+          const codeDef = connectorRegistry.get(tpl.provider as ConnectorProvider);
+          const authType = (codeDef?.auth.catalogAuthType ??
+            ((tpl.authJson as unknown as { type?: string })?.type || 'none')) as ConnectorCatalogItem['auth']['type'];
+          const metadataSchema =
+            tpl.metadataSchemaJson && typeof tpl.metadataSchemaJson === 'object' && !Array.isArray(tpl.metadataSchemaJson)
+              ? (tpl.metadataSchemaJson as ConnectorCatalogItem['metadataSchema'])
+              : undefined;
+
+          // Connectors that need instance-wide platform config (e.g. a GitHub App) report
+          // whether that setup is done so the UI can show "Not configured" + a Configure CTA.
+          let configFragment: Pick<ConnectorCatalogItem, 'configurable' | 'configured' | 'configFields'> = {};
+          if (codeDef?.auth.configFields && codeDef.auth.configFields.length > 0) {
+            const configured = codeDef.auth.isConfigured
+              ? await codeDef.auth.isConfigured({ env: connectorEnv, secrets: makeSecretResolver({}) }).catch(() => false)
+              : false;
+            configFragment = {
+              configurable: true,
+              configured,
+              configFields: codeDef.auth.configFields.map((f) => ({
+                key: f.key,
+                label: f.label,
+                type: f.type,
+                required: f.required,
+                ...(f.description ? { description: f.description } : {}),
+                ...(f.accept ? { accept: f.accept } : {}),
+              })),
+            };
+          }
+
+          return {
+            provider: tpl.provider as ConnectorProvider,
+            name: tpl.name,
+            description: tpl.description,
+            auth: { type: authType },
+            metadataSchema,
+            ...configFragment,
+            ...(tpl.demoVideoUrl ? { demoVideoUrl: tpl.demoVideoUrl } : {}),
+            ...(authType === 'oauth2' && (tpl.authJson as unknown as ConnectorAuthOAuth2V2)?.type === 'oauth2'
+              ? (() => {
+                  const auth = tpl.authJson as unknown as ConnectorAuthOAuth2V2 & { authorizeUrl?: string };
+                  const authUrl = auth?.authorizationUrl ?? auth?.authorizeUrl;
+                  const tokenUrl = auth?.tokenUrl;
+                  return {
+                    oauthRequiredMetadataKeys: Array.from(
+                      new Set([...this.extractUrlTemplateVars(authUrl), ...this.extractUrlTemplateVars(tokenUrl)])
+                    ),
+                  };
+                })()
+              : {}),
+          };
+        })
+    );
 
     // Built-in reserved connector: "system" (not DB-backed).
     // It is configured via platform secrets and does not require per-starship installation.
@@ -311,6 +340,44 @@ export class ConnectorService {
     };
 
     return [...dbCatalog, systemCatalogItem];
+  }
+
+  /**
+   * Set instance-wide platform configuration for a code-driven connector (e.g. GitHub App
+   * credentials), persisting each declared field as a platform secret. Instance-admin only.
+   * Never returns secret values; reports whether the connector is now fully configured.
+   */
+  async configureConnector(
+    provider: ConnectorProvider,
+    values: Record<string, string>,
+    userId: string
+  ): Promise<{ configured: boolean }> {
+    const def = connectorRegistry.get(provider);
+    const fields = def?.auth.configFields;
+    if (!def || !fields || fields.length === 0) {
+      throw new AppError(`Connector ${provider} does not support configuration`, 'VALIDATION_ERROR', 400);
+    }
+
+    const allowed = new Set(fields.map((f) => f.key));
+    for (const f of fields) {
+      if (!f.required) continue;
+      const v = values[f.key];
+      if (typeof v !== 'string' || !v.trim()) {
+        throw new AppError(`Missing required config field: ${f.key}`, 'MISSING_REQUIRED_FIELD', 400, { details: { field: f.key } });
+      }
+    }
+
+    const repo = new PlatformSecretRepository();
+    for (const [key, value] of Object.entries(values)) {
+      if (!allowed.has(key)) continue;
+      if (typeof value !== 'string' || !value.trim()) continue;
+      await repo.upsertSecret({ key, value: value.trim(), description: `${def.name} connector configuration`, updatedBy: userId });
+    }
+
+    const configured = def.auth.isConfigured
+      ? await def.auth.isConfigured({ env: connectorEnv, secrets: makeSecretResolver({}) })
+      : true;
+    return { configured };
   }
 
   /**
@@ -327,6 +394,11 @@ export class ConnectorService {
     provider: ConnectorProvider,
     opts?: { metadata?: Record<string, unknown>; returnUrl?: string }
   ): Promise<string> {
+    // Code-driven connectors (e.g. GitHub App) own their connect flow via the strategy.
+    if (isStrategyDispatchProvider(provider)) {
+      return this.startCodeConnector(starshipId, userId, provider, opts);
+    }
+
     const template = await this.loadTemplateOrThrow(provider);
     if (template.isEnabled === false) {
       throw new Error(`Connector ${provider} is disabled by the instance admin`);
@@ -418,6 +490,100 @@ export class ConnectorService {
 
     const resolvedAuthUrl = this.resolveUrlTemplate(auth.authorizationUrl, mergedMetadata, 'auth.authorizationUrl');
     return `${resolvedAuthUrl}?${params.toString()}`;
+  }
+
+  /**
+   * Start a connect flow for a code-driven connector (e.g. GitHub App) by delegating
+   * to its AuthStrategy.begin(). Returns the redirect URL (App installation page).
+   */
+  private async startCodeConnector(
+    starshipId: string,
+    userId: string,
+    provider: ConnectorProvider,
+    opts?: { metadata?: Record<string, unknown>; returnUrl?: string }
+  ): Promise<string> {
+    const def = connectorRegistry.get(provider);
+    if (!def) throw new Error(`Connector ${provider} is not registered`);
+    if (!def.isEnabled) throw new Error(`Connector ${provider} is disabled by the instance admin`);
+
+    const env = getEnvConfig();
+    const redirectUri = `${env.PUBLIC_URL}/api/v1/connectors/${encodeURIComponent(String(provider))}/callback`;
+
+    const result = await def.auth.begin({
+      starshipId,
+      authUserId: userId,
+      redirectUri,
+      ...(opts?.returnUrl ? { returnUrl: opts.returnUrl } : {}),
+      ...(opts?.metadata ? { requestedMetadata: opts.metadata } : {}),
+      env: connectorEnv,
+      secrets: makeSecretResolver({}),
+      encodeState: (payload) =>
+        generateOAuthState(true, userId, {
+          starshipId,
+          provider,
+          ...(opts?.returnUrl ? { returnUrl: opts.returnUrl } : {}),
+          ...payload,
+        }),
+    });
+
+    if (result.kind === 'redirect') return result.redirectUrl;
+    throw new Error(`Connector ${provider} returned an unsupported start result (${result.kind})`);
+  }
+
+  /**
+   * Complete a connect flow for a code-driven connector (e.g. GitHub App) from its
+   * callback query, delegating to AuthStrategy.complete() and persisting the result.
+   */
+  async completeCodeConnector(
+    provider: ConnectorProvider,
+    stateToken: string,
+    callbackQuery: Record<string, unknown> | undefined
+  ): Promise<{ starshipId: string; starshipSlug?: string; userId: string; returnUrl?: string }> {
+    const def = connectorRegistry.get(provider);
+    if (!def) throw new Error(`Connector ${provider} is not registered`);
+
+    const stateValidation = await validateOAuthState(stateToken);
+    if (!stateValidation.valid) throw new Error('Invalid or expired connector state');
+    const { userId, context } = stateValidation;
+    if (!userId) throw new Error('Connector state missing user information');
+
+    const starshipId = context?.starshipId as string | undefined;
+    const providerFromState = context?.provider as string | undefined;
+    const returnUrl = context?.returnUrl as string | undefined;
+    if (!starshipId || providerFromState !== provider) {
+      throw new Error('Connector state missing starship context');
+    }
+
+    const env = getEnvConfig();
+    const redirectUri = `${env.PUBLIC_URL}/api/v1/connectors/${encodeURIComponent(String(provider))}/callback`;
+
+    const input: Record<string, string | undefined> = {};
+    if (callbackQuery && typeof callbackQuery === 'object') {
+      for (const [k, v] of Object.entries(callbackQuery)) {
+        input[k] = v === undefined || v === null ? undefined : String(v);
+      }
+    }
+
+    const result = await def.auth.complete({
+      starshipId,
+      env: connectorEnv,
+      secrets: makeSecretResolver({}),
+      input,
+      redirectUri,
+      decodeState: async (token) => {
+        const v = await validateOAuthState(token);
+        return v.valid ? (v.context ?? {}) : null;
+      },
+    });
+
+    const template = await this.loadTemplateOrThrow(provider);
+    const applied = await this.applyConnectOutput(starshipId, userId, provider, template, {
+      status: result.status,
+      metadata: result.metadata,
+      envUpdates: result.secrets,
+    });
+
+    return { starshipId, starshipSlug: applied.starshipSlug, userId, ...(returnUrl ? { returnUrl } : {}) };
   }
 
   /**

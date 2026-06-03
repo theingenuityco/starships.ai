@@ -50,7 +50,7 @@ export * from './domains/openrouter';
 export * from './domains/schedule';
 export * from './domains/heartbeat';
 export * from './domains/task-board';
-export * from './domains/dataset';
+export * from './domains/table';
 export * from './domains/doc';
 export * from './domains/widget';
 export * from './domains/view';

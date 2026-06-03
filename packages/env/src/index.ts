@@ -57,6 +57,7 @@ export function getEnvConfig(): EnvironmentConfig {
   const resolvedPostgresUser = process.env.POSTGRES_USER || 'postgres';
   const resolvedPostgresDatabase = process.env.POSTGRES_DATABASE || 'starships';
   const resolvedPostgresSSL = process.env.POSTGRES_SSL === 'true';
+  const resolvedPostgresAgentUser = process.env.POSTGRES_AGENT_USER || 'starships_agent';
 
   // Safe default: if ENABLE_EMAILS is unset, treat emails as disabled.
   // Set ENABLE_EMAILS=true explicitly in environments where outbound email is desired.
@@ -89,6 +90,8 @@ export function getEnvConfig(): EnvironmentConfig {
     POSTGRES_PASSWORD: requiredEnvVars.POSTGRES_PASSWORD!,
     POSTGRES_DATABASE: resolvedPostgresDatabase,
     POSTGRES_SSL: resolvedPostgresSSL,
+    POSTGRES_AGENT_USER: resolvedPostgresAgentUser,
+    POSTGRES_AGENT_PASSWORD: process.env.POSTGRES_AGENT_PASSWORD,
 
     // LLM Provider Configuration
     OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY,
@@ -116,6 +119,10 @@ export function getEnvConfig(): EnvironmentConfig {
     // GitHub OAuth App (used for user login)
     GH_OAUTH_CLIENT_ID: process.env.GH_OAUTH_CLIENT_ID,
     GH_OAUTH_CLIENT_SECRET: process.env.GH_OAUTH_CLIENT_SECRET,
+    // GitHub App (used for the GitHub connector)
+    GITHUB_APP_ID: process.env.GITHUB_APP_ID,
+    GITHUB_APP_PRIVATE_KEY: process.env.GITHUB_APP_PRIVATE_KEY,
+    GITHUB_APP_SLUG: process.env.GITHUB_APP_SLUG,
 
     // Environment Variables Encryption Key
     ENCRYPTION_KEY: process.env.ENCRYPTION_KEY,

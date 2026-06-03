@@ -138,6 +138,9 @@ export function getEnvConfig(): EnvironmentConfig {
     // Bundle service (optional)
     BUNDLE_SERVICE_URL: process.env.BUNDLE_SERVICE_URL || undefined,
 
+    // Experimental: route repo-backed agent turns through the code-native CLI agent.
+    USE_CLI_AGENT_PATH: process.env.USE_CLI_AGENT_PATH === 'true',
+
     // Email Service Configuration (optional; email delivery disabled if not set)
     ENABLE_EMAILS: resolvedEnableEmails,
     EMAIL_FROM_ADDRESS: process.env.EMAIL_FROM_ADDRESS,

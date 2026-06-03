@@ -79,6 +79,58 @@ export class ToolCallApprovalRepository extends BaseRepository {
     );
   }
 
+  /**
+   * Create a pending approval for a code-native CLI agent tool call. These have no
+   * `tools` row, so `tool_id` is null and `tool_name` carries the system-tool or
+   * connector-action name instead.
+   */
+  async createPendingForCli(input: {
+    starshipId: string;
+    conversationId: string;
+    agentId: string;
+    toolName: string;
+    toolCallId: string;
+    argsJson: Record<string, unknown>;
+  }): Promise<ToolCallApprovalModel> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const now = new Date().toISOString();
+        const id = nanoid();
+
+        const data: ToolCallApprovalModel = {
+          id,
+          starshipId: input.starshipId,
+          conversationId: input.conversationId,
+          agentId: input.agentId,
+          toolId: null,
+          toolName: input.toolName,
+          toolCallId: input.toolCallId,
+          argsJson: input.argsJson || {},
+          status: 'pending',
+          createdAt: now,
+          decidedAt: null,
+        };
+
+        await ToolCallApprovalEntity.validate(data, 'create');
+        const entity = toEntityInstance(ToolCallApprovalEntity, data as unknown as Record<string, unknown>);
+        const serialized = toDatabase(entity);
+
+        try {
+          const result = await this.createEntity<Record<string, unknown>>('tool_call_approvals', serialized);
+          return fromDatabase(ToolCallApprovalEntity, result);
+        } catch (e: unknown) {
+          const msg = e instanceof Error ? e.message : String(e);
+          if (msg.toLowerCase().includes('duplicate') || msg.toLowerCase().includes('unique')) {
+            throw new ConflictError('Tool approval already exists for this tool call');
+          }
+          throw e;
+        }
+      },
+      'createPendingForCli',
+      'ToolCallApproval'
+    );
+  }
+
   async findById(id: string): Promise<ToolCallApprovalModel | null> {
     return this.executeWithErrorHandling(
       async () => {

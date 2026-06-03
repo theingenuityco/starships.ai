@@ -34,12 +34,14 @@ export interface WorkspaceSession {
   key: string;
   /** Persistent host dir, bind-mounted into sandbox containers. */
   hostDir: string;
-  /** HTTPS clone URL (no embedded credentials). */
+  /** HTTPS clone URL (no embedded credentials). Empty for scratch (no-repo) workspaces. */
   repoUrl: string;
   /** Base ref/branch the working branch was cut from. */
   ref?: string;
   /** Working branch where changes/commits land. */
   branch?: string;
+  /** True for a no-repo scratch workspace: the agent's cwd is the mount root, not a checkout. */
+  scratch?: boolean;
   createdAt: number;
   lastUsedAt: number;
 }
@@ -90,6 +92,32 @@ export class WorkspaceSessionManager {
       lastUsedAt: Date.now(),
     };
     this.sessions.set(args.key, session);
+    return session;
+  }
+
+  /**
+   * Allocate (or reuse) a no-repo scratch workspace for a conversation, giving a
+   * non-repo agent a real working directory (the mount root). If a repo session
+   * already exists for this key it is returned as-is (a checkout always wins).
+   */
+  async bindScratch(key: string): Promise<WorkspaceSession> {
+    this.ensureSweeper();
+    const existing = this.sessions.get(key);
+    if (existing) {
+      existing.lastUsedAt = Date.now();
+      return existing;
+    }
+    const hostDir = await mkdtemp(join(this.baseDir(), 'ws-'));
+    await chmod(hostDir, 0o777);
+    const session: WorkspaceSession = {
+      key,
+      hostDir,
+      repoUrl: '',
+      scratch: true,
+      createdAt: Date.now(),
+      lastUsedAt: Date.now(),
+    };
+    this.sessions.set(key, session);
     return session;
   }
 

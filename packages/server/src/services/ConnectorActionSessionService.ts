@@ -9,7 +9,9 @@ import type {
 import { ConnectorRepository } from '@starships/models';
 import { ConnectorSecretService } from './ConnectorSecretService';
 import { PlatformSecretService } from './PlatformSecretService';
-import { ConnectorTemplateRegistryClient } from './ConnectorTemplateRegistryClient';
+import { ConnectorRegistryClient } from './ConnectorRegistryClient';
+import { connectorRegistry } from '@starships/connectors';
+import { connectorEnv, makeSecretResolver } from './connectorStrategy';
 import { generateJWT } from '@/utils/jwt';
 import { buildBasicAuthHeaderValue } from '@/utils/basicAuth';
 
@@ -22,7 +24,7 @@ export interface ConnectorActionSessionBundle {
 }
 
 export class ConnectorActionSessionService {
-  private templateRegistry = new ConnectorTemplateRegistryClient();
+  private templateRegistry = new ConnectorRegistryClient();
   private connectorRepo = new ConnectorRepository();
   private connectorSecrets = new ConnectorSecretService();
   private platformSecrets = new PlatformSecretService();
@@ -137,6 +139,33 @@ export class ConnectorActionSessionService {
 
       connectorTemplates[provider] = runtimeTemplate;
       connectorMetadata[provider] = byProvider.get(provider)?.metadata ?? {};
+
+      // Code-driven connectors (e.g. GitHub App) build their session via the strategy:
+      // the host mints a short-lived credential (installation token) per session and
+      // injects it as session headers. Only exposed when the connector is connected.
+      const codeDef = connectorRegistry.get(provider);
+      if (codeDef && codeDef.auth.kind === 'github_app') {
+        const conn = byProvider.get(provider);
+        if (!conn || conn.status !== 'connected') continue;
+        try {
+          const session = await codeDef.auth.buildSession({
+            starshipId,
+            authUserId,
+            env: connectorEnv,
+            secrets: makeSecretResolver(decrypted as Record<string, unknown>),
+            metadata: conn.metadata ?? {},
+          });
+          if (session) connectorSessions[provider] = session;
+        } catch (err) {
+          // A misconfigured App (or a transient GitHub error) must not break the whole
+          // session bundle for other connectors; just skip this connector's session.
+          console.error('[CONNECTOR] Failed to build code-connector session', {
+            provider,
+            errorMessage: err instanceof Error ? err.message : String(err),
+          });
+        }
+        continue;
+      }
 
       const auth = runtimeTemplate.auth;
       const type = auth.type;

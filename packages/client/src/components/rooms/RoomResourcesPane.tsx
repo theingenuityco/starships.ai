@@ -4,7 +4,7 @@ import Icon from '@/components/primitives/Icon'
 import { NotificationMenu } from '@/components/conversation/NotificationMenu'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import type { RoomPinnedDataset, RoomPinnedDoc, RoomPinnedTaskBoard, RoomPinnedView, RoomToolAssignment } from '@starships/protocol'
+import type { RoomPinnedTable, RoomPinnedDoc, RoomPinnedTaskBoard, RoomPinnedView, RoomToolAssignment } from '@starships/protocol'
 import { useParams, useRouter } from 'next/navigation'
 import { useMemo, useState } from 'react'
 
@@ -15,26 +15,26 @@ export function RoomResourcesPane(props: {
   roomSlug?: string | null
   roomName?: string | null
   pinnedViews?: RoomPinnedView[] | null
-  pinnedDatasets?: RoomPinnedDataset[] | null
+  pinnedTables?: RoomPinnedTable[] | null
   pinnedTaskBoards?: RoomPinnedTaskBoard[] | null
   pinnedDocs?: RoomPinnedDoc[] | null
   assignedTools?: RoomToolAssignment[] | null
   viewLabelById?: Map<string, string> | null
-  datasetLabelById?: Map<string, string> | null
+  tableLabelById?: Map<string, string> | null
   taskBoardLabelById?: Map<string, string> | null
   docLabelById?: Map<string, string> | null
   toolLabelById?: Map<string, string> | null
   toolSlugById?: Map<string, string> | null
   canManagePins?: boolean | null
   availableViews?: Array<{ id: string; name: string }> | null
-  availableDatasets?: Array<{ id: string; name: string }> | null
+  availableTables?: Array<{ id: string; name: string }> | null
   availableTaskBoards?: Array<{ id: string; name: string }> | null
   availableDocs?: Array<{ id: string; title: string }> | null
   availableTools?: Array<{ id: string; name: string }> | null
   onPinView?: (viewId: string) => void
   onUnpinView?: (viewId: string) => void
-  onPinDataset?: (datasetId: string) => void
-  onUnpinDataset?: (datasetId: string) => void
+  onPinTable?: (tableId: string) => void
+  onUnpinTable?: (tableId: string) => void
   onPinTaskBoard?: (boardId: string) => void
   onUnpinTaskBoard?: (boardId: string) => void
   onPinDoc?: (docId: string) => void
@@ -49,17 +49,17 @@ export function RoomResourcesPane(props: {
   const effectiveStarshipSlug = (props.starshipSlug || (params.slug as string | undefined) || '').trim()
 
   const [pickViewId, setPickViewId] = useState<string>('')
-  const [pickDatasetId, setPickDatasetId] = useState<string>('')
+  const [pickTableId, setPickTableId] = useState<string>('')
   const [pickBoardId, setPickBoardId] = useState<string>('')
   const [pickDocId, setPickDocId] = useState<string>('')
   const [pickToolId, setPickToolId] = useState<string>('')
 
   const pinnedViews = (props.pinnedViews || []).slice().sort((a, b) => Number(a.position) - Number(b.position))
-  const pinnedDatasets = (props.pinnedDatasets || []).slice().sort((a, b) => Number(a.position) - Number(b.position))
+  const pinnedTables = (props.pinnedTables || []).slice().sort((a, b) => Number(a.position) - Number(b.position))
   const pinnedBoards = (props.pinnedTaskBoards || []).slice().sort((a, b) => Number(a.position) - Number(b.position))
   const pinnedDocs = (props.pinnedDocs || []).slice().sort((a, b) => Number(a.position) - Number(b.position))
   const assignedTools = (props.assignedTools || []).slice()
-  const totalSaved = assignedTools.length + pinnedViews.length + pinnedDatasets.length + pinnedBoards.length + pinnedDocs.length
+  const totalSaved = assignedTools.length + pinnedViews.length + pinnedTables.length + pinnedBoards.length + pinnedDocs.length
 
   const roomLabel = useMemo(() => {
     const name = String(props.roomName || '').trim()
@@ -75,10 +75,10 @@ export function RoomResourcesPane(props: {
     props.onOpenPinnedView?.(id)
   }
 
-  const openPinnedDataset = (datasetId: string) => {
-    const id = String(datasetId || '').trim()
+  const openPinnedTable = (tableId: string) => {
+    const id = String(tableId || '').trim()
     if (!id) return
-    const href = effectiveStarshipSlug ? `/ship/${encodeURIComponent(effectiveStarshipSlug)}/datasets/${encodeURIComponent(id)}` : null
+    const href = effectiveStarshipSlug ? `/ship/${encodeURIComponent(effectiveStarshipSlug)}/tables/${encodeURIComponent(id)}` : null
     if (!href) return
     props.onClose()
     router.push(href)
@@ -273,15 +273,15 @@ export function RoomResourcesPane(props: {
         </div>
 
         <div className="border-t border-border/60 pt-6 space-y-3">
-          <div className="text-xs font-medium text-muted-foreground">Datasets</div>
+          <div className="text-xs font-medium text-muted-foreground">Tables</div>
           {props.canManagePins ? (
             <div className="flex items-center gap-2">
-              <Select value={pickDatasetId} onValueChange={setPickDatasetId}>
+              <Select value={pickTableId} onValueChange={setPickTableId}>
                 <SelectTrigger className="flex-1">
-                  <SelectValue placeholder="Add a dataset" />
+                  <SelectValue placeholder="Add a table" />
                 </SelectTrigger>
                 <SelectContent>
-                  {(props.availableDatasets || []).map(d => (
+                  {(props.availableTables || []).map(d => (
                     <SelectItem key={d.id} value={d.id}>
                       {d.name}
                     </SelectItem>
@@ -291,26 +291,26 @@ export function RoomResourcesPane(props: {
               <Button
                 type="button"
                 onClick={() => {
-                  const id = pickDatasetId.trim()
+                  const id = pickTableId.trim()
                   if (!id) return
-                  props.onPinDataset?.(id)
-                  setPickDatasetId('')
+                  props.onPinTable?.(id)
+                  setPickTableId('')
                 }}
-                disabled={!pickDatasetId.trim()}
+                disabled={!pickTableId.trim()}
               >
                 Add
               </Button>
             </div>
           ) : null}
-          {pinnedDatasets.length === 0 ? (
+          {pinnedTables.length === 0 ? (
             <div className="text-sm text-muted-foreground">None</div>
           ) : (
             <div className="space-y-1">
-              {pinnedDatasets.map(p => (
-                <div key={`pd:${p.datasetId}`} className="flex items-center justify-between gap-2">
-                  <Row icon="database" label={props.datasetLabelById?.get(String(p.datasetId)) || String(p.datasetId)} onClick={() => openPinnedDataset(String(p.datasetId))} />
+              {pinnedTables.map(p => (
+                <div key={`pd:${p.tableId}`} className="flex items-center justify-between gap-2">
+                  <Row icon="database" label={props.tableLabelById?.get(String(p.tableId)) || String(p.tableId)} onClick={() => openPinnedTable(String(p.tableId))} />
                   {props.canManagePins ? (
-                    <Button type="button" variant="ghost" size="sm" onClick={() => props.onUnpinDataset?.(String(p.datasetId))}>
+                    <Button type="button" variant="ghost" size="sm" onClick={() => props.onUnpinTable?.(String(p.tableId))}>
                       Remove
                     </Button>
                   ) : null}

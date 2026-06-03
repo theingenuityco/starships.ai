@@ -448,7 +448,7 @@ interface ConversationMessageListProps {
   conversationId: string | null
   starshipId?: string
   /**
-   * Optional starship slug override (used for deep-links like datasets/agents).
+   * Optional starship slug override (used for deep-links like tables/agents).
    * When omitted, the list will attempt to resolve it from route params (`/ship/[slug]/*`)
    * or by fetching the starship by id.
    */

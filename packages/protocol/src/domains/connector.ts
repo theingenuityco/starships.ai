@@ -237,7 +237,13 @@ export interface ConnectorSessionV2 {
  * Declarative auth configuration stored on connector_templates.auth_json.
  * Must never contain raw secret values; only SecretRefs.
  */
-export type ConnectorAuthTypeV2 = 'oauth2' | 'api_key' | 'basic' | 'platform_jwt' | 'none';
+/**
+ * Connector auth descriptor types. 'github_app' is a host-side connect kind (GitHub
+ * App installation, bot identity) surfaced to the catalog/UI; it is NOT a member of
+ * the declarative ConnectorAuthV2 union (its runtime auth degrades to { type: 'none' }
+ * with a host-minted installation token injected via the session headers).
+ */
+export type ConnectorAuthTypeV2 = 'oauth2' | 'api_key' | 'basic' | 'platform_jwt' | 'none' | 'github_app';
 
 export interface ConnectorAuthNoneV2 {
   type: 'none';
@@ -419,6 +425,20 @@ export interface ConnectorListResponse {
   connectors: ConnectorListItem[];
 }
 
+/**
+ * A platform-level configuration field for a connector (e.g. GitHub App credentials).
+ * Collected from an instance admin and stored as platform secrets. Never carries values.
+ */
+export interface ConnectorConfigField {
+  key: string;
+  label: string;
+  type: 'string' | 'password' | 'textarea' | 'file';
+  required: boolean;
+  description?: string;
+  /** For type 'file': the accept attribute hint (e.g. '.pem,.txt'). */
+  accept?: string;
+}
+
 export interface ConnectorCatalogItem {
   provider: ConnectorProvider;
   name: string;
@@ -439,6 +459,14 @@ export interface ConnectorCatalogItem {
    * Used by the UI to validate pre-OAuth metadata inputs.
    */
   metadataSchema?: JsonSchemaObject;
+  /**
+   * True when this connector needs instance-wide platform config (e.g. a GitHub App)
+   * before it can be connected. When true, `configured` reflects whether that setup is done.
+   */
+  configurable?: boolean;
+  configured?: boolean;
+  /** The platform-level fields an instance admin must provide (never includes values). */
+  configFields?: ConnectorConfigField[];
 }
 
 export interface ConnectorCatalogResponse {

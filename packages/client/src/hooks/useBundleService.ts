@@ -28,7 +28,7 @@ export interface BundleManifest {
     tools?: BundleManifestEntity[]
     rooms?: BundleManifestEntity[]
     views?: BundleManifestEntity[]
-    datasets?: BundleManifestEntity[]
+    tables?: BundleManifestEntity[]
     taskBoards?: BundleManifestEntity[]
   }
 }
@@ -67,7 +67,7 @@ export function useInstallBundleFromService(starshipId: string) {
         qc.invalidateQueries({ queryKey: ['agents'] }),
         qc.invalidateQueries({ queryKey: ['tools'] }),
         qc.invalidateQueries({ queryKey: ['views'] }),
-        qc.invalidateQueries({ queryKey: ['datasets'] }),
+        qc.invalidateQueries({ queryKey: ['tables'] }),
         qc.invalidateQueries({ queryKey: ['task-boards'] }),
       ])
       const imported = data?.imported ?? {}

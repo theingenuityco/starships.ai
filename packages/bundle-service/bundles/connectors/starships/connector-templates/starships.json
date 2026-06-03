@@ -2759,10 +2759,10 @@
         "timeoutMs": 10000
       },
       {
-        "name": "list-datasets",
-        "description": "List datasets for a starship",
+        "name": "list-tables",
+        "description": "List tables for a starship",
         "method": "GET",
-        "path": "/starships/{starshipId}/datasets",
+        "path": "/starships/{starshipId}/tables",
         "requestStyle": "query",
         "parameters": {
           "type": "object",
@@ -2790,10 +2790,10 @@
         "timeoutMs": 5000
       },
       {
-        "name": "create-dataset",
-        "description": "Create a dataset for a starship",
+        "name": "create-table",
+        "description": "Create a table for a starship",
         "method": "POST",
-        "path": "/starships/{starshipId}/datasets",
+        "path": "/starships/{starshipId}/tables",
         "requestStyle": "json",
         "parameters": {
           "type": "object",
@@ -2894,16 +2894,16 @@
                             "type": "object",
                             "required": [
                               "kind",
-                              "datasetIdOrSlug"
+                              "tableIdOrSlug"
                             ],
                             "properties": {
                               "kind": {
                                 "enum": [
-                                  "dataset_row"
+                                  "table_row"
                                 ],
                                 "type": "string"
                               },
-                              "datasetIdOrSlug": {
+                              "tableIdOrSlug": {
                                 "type": "string"
                               }
                             },
@@ -3002,10 +3002,10 @@
         "timeoutMs": 10000
       },
       {
-        "name": "get-dataset",
-        "description": "Get a dataset by id or slug (scoped to a starship)",
+        "name": "get-table",
+        "description": "Get a table by id or slug (scoped to a starship)",
         "method": "GET",
-        "path": "/starships/{starshipId}/datasets/{datasetIdOrSlug}",
+        "path": "/starships/{starshipId}/tables/{tableIdOrSlug}",
         "requestStyle": "query",
         "parameters": {
           "type": "object",
@@ -3013,13 +3013,13 @@
             "starshipId"
           ],
           "properties": {
-            "datasetId": {
+            "tableId": {
               "type": "string"
             },
             "starshipId": {
               "type": "string"
             },
-            "datasetSlug": {
+            "tableSlug": {
               "type": "string"
             }
           },
@@ -3028,16 +3028,16 @@
         "mapping": {
           "path": {
             "starshipId": "{{ String(args.starshipId ?? runtimeEnv.STARSHIP_ID ?? \"\") }}",
-            "datasetIdOrSlug": "{{ String(args.datasetSlug ?? args.datasetId ?? \"\") }}"
+            "tableIdOrSlug": "{{ String(args.tableSlug ?? args.tableId ?? \"\") }}"
           }
         },
         "timeoutMs": 5000
       },
       {
-        "name": "list-dataset-rows",
-        "description": "List rows for a dataset (paginated) (by id or slug)",
+        "name": "list-table-rows",
+        "description": "List rows for a table (paginated) (by id or slug)",
         "method": "GET",
-        "path": "/starships/{starshipId}/datasets/{datasetIdOrSlug}/rows",
+        "path": "/starships/{starshipId}/tables/{tableIdOrSlug}/rows",
         "requestStyle": "query",
         "parameters": {
           "type": "object",
@@ -3073,7 +3073,7 @@
               ],
               "description": "Row filters. Accepts either a JSON string or a JSON-serializable array/object. Server expects a JSON string in query params."
             },
-            "datasetId": {
+            "tableId": {
               "type": "string"
             },
             "expandRefs": {
@@ -3083,7 +3083,7 @@
             "starshipId": {
               "type": "string"
             },
-            "datasetSlug": {
+            "tableSlug": {
               "type": "string"
             }
           },
@@ -3092,7 +3092,7 @@
         "mapping": {
           "path": {
             "starshipId": "{{ String(args.starshipId ?? runtimeEnv.STARSHIP_ID ?? \"\") }}",
-            "datasetIdOrSlug": "{{ String(args.datasetSlug ?? args.datasetId ?? \"\") }}"
+            "tableIdOrSlug": "{{ String(args.tableSlug ?? args.tableId ?? \"\") }}"
           },
           "query": {
             "limit": "{{ args.limit == null ? \"\" : String(args.limit) }}",
@@ -3105,10 +3105,10 @@
         "timeoutMs": 10000
       },
       {
-        "name": "upsert-dataset-rows",
-        "description": "Append or upsert rows in a dataset (by id or slug)",
+        "name": "upsert-table-rows",
+        "description": "Append or upsert rows in a table (by id or slug)",
         "method": "POST",
-        "path": "/starships/{starshipId}/datasets/{datasetIdOrSlug}/rows:upsert",
+        "path": "/starships/{starshipId}/tables/{tableIdOrSlug}/rows:upsert",
         "requestStyle": "json",
         "parameters": {
           "type": "object",
@@ -3127,13 +3127,13 @@
             "rows": {
               "type": "array"
             },
-            "datasetId": {
+            "tableId": {
               "type": "string"
             },
             "starshipId": {
               "type": "string"
             },
-            "datasetSlug": {
+            "tableSlug": {
               "type": "string"
             }
           },
@@ -3146,7 +3146,7 @@
           },
           "path": {
             "starshipId": "{{ String(args.starshipId ?? runtimeEnv.STARSHIP_ID ?? \"\") }}",
-            "datasetIdOrSlug": "{{ String(args.datasetSlug ?? args.datasetId ?? \"\") }}"
+            "tableIdOrSlug": "{{ String(args.tableSlug ?? args.tableId ?? \"\") }}"
           }
         },
         "timeoutMs": 30000
@@ -3178,10 +3178,10 @@
         "timeoutMs": 20000
       },
       {
-        "name": "get-room-pins-datasets",
-        "description": "Get pinned datasets (resolved to dataset objects) for a room",
+        "name": "get-room-pins-tables",
+        "description": "Get pinned tables (resolved to table objects) for a room",
         "method": "GET",
-        "path": "/rooms/{roomId}/pins/datasets",
+        "path": "/rooms/{roomId}/pins/tables",
         "requestStyle": "query",
         "parameters": {
           "type": "object",
@@ -3231,7 +3231,7 @@
       },
       {
         "name": "get-room-resources",
-        "description": "Get resolved room resources in one response (pinned views/datasets/task boards + assigned tools)",
+        "description": "Get resolved room resources in one response (pinned views/tables/task boards + assigned tools)",
         "method": "GET",
         "path": "/rooms/{roomId}/resources",
         "requestStyle": "query",
@@ -3257,7 +3257,7 @@
                   }
                 }
               ],
-              "description": "Optional kind filter (comma-separated or array). Allowed: views, datasets, taskBoards, tools"
+              "description": "Optional kind filter (comma-separated or array). Allowed: views, tables, taskBoards, tools"
             },
             "roomId": {
               "type": "string",
@@ -3269,7 +3269,7 @@
             },
             "includeArchived": {
               "type": "boolean",
-              "description": "When true, includes archived datasets/task boards (default false)"
+              "description": "When true, includes archived tables/task boards (default false)"
             }
           },
           "additionalProperties": false
@@ -3294,7 +3294,7 @@
             "views": {
               "type": "array"
             },
-            "datasets": {
+            "tables": {
               "type": "array"
             },
             "taskBoards": {
@@ -3389,10 +3389,10 @@
         "timeoutMs": 30000
       },
       {
-        "name": "update-dataset",
-        "description": "Update a dataset (including columns/primaryKey/archived) by id or slug",
+        "name": "update-table",
+        "description": "Update a table (including columns/primaryKey/archived) by id or slug",
         "method": "PATCH",
-        "path": "/starships/{starshipId}/datasets/{datasetIdOrSlug}",
+        "path": "/starships/{starshipId}/tables/{tableIdOrSlug}",
         "requestStyle": "json",
         "parameters": {
           "type": "object",
@@ -3491,16 +3491,16 @@
                             "type": "object",
                             "required": [
                               "kind",
-                              "datasetIdOrSlug"
+                              "tableIdOrSlug"
                             ],
                             "properties": {
                               "kind": {
                                 "enum": [
-                                  "dataset_row"
+                                  "table_row"
                                 ],
                                 "type": "string"
                               },
-                              "datasetIdOrSlug": {
+                              "tableIdOrSlug": {
                                 "type": "string"
                               }
                             },
@@ -3573,7 +3573,7 @@
             "archived": {
               "type": "boolean"
             },
-            "datasetId": {
+            "tableId": {
               "type": "string"
             },
             "primaryKey": {
@@ -3585,7 +3585,7 @@
             "starshipId": {
               "type": "string"
             },
-            "datasetSlug": {
+            "tableSlug": {
               "type": "string"
             },
             "description": {
@@ -3604,7 +3604,7 @@
           },
           "path": {
             "starshipId": "{{ String(args.starshipId ?? runtimeEnv.STARSHIP_ID ?? \"\") }}",
-            "datasetIdOrSlug": "{{ String(args.datasetSlug ?? args.datasetId ?? \"\") }}"
+            "tableIdOrSlug": "{{ String(args.tableSlug ?? args.tableId ?? \"\") }}"
           }
         },
         "timeoutMs": 15000
@@ -3908,7 +3908,7 @@
       },
       {
         "name": "get-room-pins",
-        "description": "List pinned resources for a room (views/datasets/taskBoards/agents/tools)",
+        "description": "List pinned resources for a room (views/tables/taskBoards/agents/tools)",
         "method": "GET",
         "path": "/rooms/{roomId}/pins",
         "requestStyle": "query",
@@ -3998,16 +3998,16 @@
         "timeoutMs": 20000
       },
       {
-        "name": "pin-room-dataset",
-        "description": "Pin a dataset to a room (optionally at a position)",
+        "name": "pin-room-table",
+        "description": "Pin a table to a room (optionally at a position)",
         "method": "POST",
-        "path": "/rooms/{roomId}/pins/datasets",
+        "path": "/rooms/{roomId}/pins/tables",
         "requestStyle": "json",
         "parameters": {
           "type": "object",
           "required": [
             "roomId",
-            "datasetId"
+            "tableId"
           ],
           "properties": {
             "roomId": {
@@ -4016,7 +4016,7 @@
             "position": {
               "type": "number"
             },
-            "datasetId": {
+            "tableId": {
               "type": "string"
             }
           },
@@ -4025,7 +4025,7 @@
         "mapping": {
           "body": {
             "position": "{{ args.position }}",
-            "datasetId": "{{ String(args.datasetId ?? \"\") }}"
+            "tableId": "{{ String(args.tableId ?? \"\") }}"
           },
           "path": {
             "roomId": "{{ String(args.roomId ?? args.id ?? runtimeEnv.CONVERSATION_ID ?? \"\") }}"
@@ -4034,22 +4034,22 @@
         "timeoutMs": 20000
       },
       {
-        "name": "unpin-room-dataset",
-        "description": "Unpin a dataset from a room",
+        "name": "unpin-room-table",
+        "description": "Unpin a table from a room",
         "method": "DELETE",
-        "path": "/rooms/{roomId}/pins/datasets/{datasetId}",
+        "path": "/rooms/{roomId}/pins/tables/{tableId}",
         "requestStyle": "query",
         "parameters": {
           "type": "object",
           "required": [
             "roomId",
-            "datasetId"
+            "tableId"
           ],
           "properties": {
             "roomId": {
               "type": "string"
             },
-            "datasetId": {
+            "tableId": {
               "type": "string"
             }
           },
@@ -4058,7 +4058,7 @@
         "mapping": {
           "path": {
             "roomId": "{{ String(args.roomId ?? args.id ?? runtimeEnv.CONVERSATION_ID ?? \"\") }}",
-            "datasetId": "{{ String(args.datasetId ?? \"\") }}"
+            "tableId": "{{ String(args.tableId ?? \"\") }}"
           }
         },
         "timeoutMs": 20000
@@ -4165,22 +4165,22 @@
         "timeoutMs": 30000
       },
       {
-        "name": "reorder-room-pins-datasets",
-        "description": "Reorder pinned datasets within a room",
+        "name": "reorder-room-pins-tables",
+        "description": "Reorder pinned tables within a room",
         "method": "POST",
-        "path": "/rooms/{roomId}/pins/datasets/reorder",
+        "path": "/rooms/{roomId}/pins/tables/reorder",
         "requestStyle": "json",
         "parameters": {
           "type": "object",
           "required": [
             "roomId",
-            "datasetIds"
+            "tableIds"
           ],
           "properties": {
             "roomId": {
               "type": "string"
             },
-            "datasetIds": {
+            "tableIds": {
               "type": "array",
               "items": {
                 "type": "string"
@@ -4191,7 +4191,7 @@
         },
         "mapping": {
           "body": {
-            "datasetIds": "{{ args.datasetIds ?? [] }}"
+            "tableIds": "{{ args.tableIds ?? [] }}"
           },
           "path": {
             "roomId": "{{ String(args.roomId ?? args.id ?? runtimeEnv.CONVERSATION_ID ?? \"\") }}"

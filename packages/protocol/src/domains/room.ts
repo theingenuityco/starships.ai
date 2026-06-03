@@ -36,9 +36,9 @@ export interface RoomModel extends Room {
   updatedAt: string;
 }
 
-export type RoomPinnedResourceKind = 'view' | 'dataset' | 'task_board' | 'doc';
+export type RoomPinnedResourceKind = 'view' | 'table' | 'task_board' | 'doc';
 
-export const ROOM_PIN_KINDS: readonly RoomPinnedResourceKind[] = ['view', 'dataset', 'task_board', 'doc'] as const;
+export const ROOM_PIN_KINDS: readonly RoomPinnedResourceKind[] = ['view', 'table', 'task_board', 'doc'] as const;
 
 export interface RoomPinBase {
   roomConversationId: string;
@@ -52,9 +52,9 @@ export interface RoomPinnedView extends RoomPinBase {
   viewId: string;
 }
 
-export interface RoomPinnedDataset extends RoomPinBase {
-  kind: 'dataset';
-  datasetId: string;
+export interface RoomPinnedTable extends RoomPinBase {
+  kind: 'table';
+  tableId: string;
 }
 
 export interface RoomPinnedTaskBoard extends RoomPinBase {
@@ -67,7 +67,7 @@ export interface RoomPinnedDoc extends RoomPinBase {
   docId: string;
 }
 
-export type RoomPin = RoomPinnedView | RoomPinnedDataset | RoomPinnedTaskBoard | RoomPinnedDoc;
+export type RoomPin = RoomPinnedView | RoomPinnedTable | RoomPinnedTaskBoard | RoomPinnedDoc;
 
 // ============================================================================
 // ROOM ↔ TOOL ASSIGNMENTS (unordered)

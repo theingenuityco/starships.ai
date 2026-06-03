@@ -10,7 +10,7 @@ import {
   ConnectorSecretRepository,
   ConnectorWebhookBindingRepository,
 } from '@starships/models';
-import { ConnectorTemplateRegistryClient } from './ConnectorTemplateRegistryClient';
+import { ConnectorRegistryClient } from './ConnectorRegistryClient';
 import { PlatformSecretService } from '@/services/PlatformSecretService';
 import { getAutopilotAutomationQueue } from '@/queues/autopilotAutomationQueue';
 import { logger } from '@/utils/logger';
@@ -187,7 +187,7 @@ function resolveField(source: WebhookFieldSource | undefined, req: Request, pars
 
 export class ConnectorEventIngestionService {
   private connectorRepo = new ConnectorRepository();
-  private templateRegistry = new ConnectorTemplateRegistryClient();
+  private templateRegistry = new ConnectorRegistryClient();
   private connectorEventRepo = new ConnectorEventRepository();
   private awaitRepo = new AutopilotAwaitRepository();
   private awaitFiringRepo = new AutopilotAwaitFiringRepository();

@@ -512,6 +512,25 @@ importers:
         specifier: ^3.6.2
         version: 3.6.2
 
+  packages/connectors:
+    dependencies:
+      '@starships/protocol':
+        specifier: workspace:*
+        version: link:../protocol
+      jose:
+        specifier: ^6.0.11
+        version: 6.0.11
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.10
+        version: 24.10.13
+      tsc-alias:
+        specifier: ^1.8.16
+        version: 1.8.16
+      typescript:
+        specifier: ^5.8.3
+        version: 5.9.3
+
   packages/docs:
     dependencies:
       '@starships/env':
@@ -833,6 +852,9 @@ importers:
       '@starships/autopilot':
         specifier: workspace:*
         version: link:../autopilot
+      '@starships/connectors':
+        specifier: workspace:*
+        version: link:../connectors
       '@starships/env':
         specifier: workspace:*
         version: link:../env

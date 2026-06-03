@@ -10,7 +10,7 @@ import { badgeVariants } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useStarshipAgents } from '@/hooks/useAgents'
 import { cn } from '@/lib/utils'
-import type { AgentModel, RoomPinnedDataset, RoomPinnedDoc, RoomPinnedTaskBoard, RoomPinnedView, RoomToolAssignment } from '@starships/protocol'
+import type { AgentModel, RoomPinnedTable, RoomPinnedDoc, RoomPinnedTaskBoard, RoomPinnedView, RoomToolAssignment } from '@starships/protocol'
 import Link from 'next/link'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -39,12 +39,12 @@ export function RoomConversationIndexView(props: {
   allowedMentionUserIds?: string[] | null
   allowedMentionAgentIds?: string[] | null
   pinnedViews?: RoomPinnedView[] | null
-  pinnedDatasets?: RoomPinnedDataset[] | null
+  pinnedTables?: RoomPinnedTable[] | null
   pinnedTaskBoards?: RoomPinnedTaskBoard[] | null
   pinnedDocs?: RoomPinnedDoc[] | null
   assignedTools?: RoomToolAssignment[] | null
   viewLabelById?: Map<string, string> | null
-  datasetLabelById?: Map<string, string> | null
+  tableLabelById?: Map<string, string> | null
   taskBoardLabelById?: Map<string, string> | null
   docLabelById?: Map<string, string> | null
   toolLabelById?: Map<string, string> | null
@@ -54,14 +54,14 @@ export function RoomConversationIndexView(props: {
   onOpenHistoryPane?: () => void
   onOpenResourcesPane?: () => void
   availableViews?: Array<{ id: string; name: string }> | null
-  availableDatasets?: Array<{ id: string; name: string }> | null
+  availableTables?: Array<{ id: string; name: string }> | null
   availableTaskBoards?: Array<{ id: string; name: string }> | null
   availableDocs?: Array<{ id: string; title: string }> | null
   availableTools?: Array<{ id: string; name: string }> | null
   onPinView?: (viewId: string) => void
   onUnpinView?: (viewId: string) => void
-  onPinDataset?: (datasetId: string) => void
-  onUnpinDataset?: (datasetId: string) => void
+  onPinTable?: (tableId: string) => void
+  onUnpinTable?: (tableId: string) => void
   onPinTaskBoard?: (boardId: string) => void
   onUnpinTaskBoard?: (boardId: string) => void
   onPinDoc?: (docId: string) => void
@@ -84,7 +84,7 @@ export function RoomConversationIndexView(props: {
   const starterInputRef = useRef<ConversationMessageInputRef | null>(null)
   const participantsButtonRef = useRef<HTMLButtonElement | null>(null)
   const [starterSelectedAgent, setStarterSelectedAgent] = useState<AgentModel | null>(null)
-  const [starterTab, setStarterTab] = useState<'suggestions' | 'datasets' | 'docs'>('suggestions')
+  const [starterTab, setStarterTab] = useState<'suggestions' | 'tables' | 'docs'>('suggestions')
 
   // Optional deep-link support: preselect an agent in the room starter composer.
   // Used as a replacement for the removed `/dm/...` routes.
@@ -228,16 +228,16 @@ export function RoomConversationIndexView(props: {
   }
 
   const pinnedViews = (props.pinnedViews || []).slice().sort((a, b) => Number(a.position) - Number(b.position))
-  const pinnedDatasets = (props.pinnedDatasets || []).slice().sort((a, b) => Number(a.position) - Number(b.position))
+  const pinnedTables = (props.pinnedTables || []).slice().sort((a, b) => Number(a.position) - Number(b.position))
   const pinnedBoards = (props.pinnedTaskBoards || []).slice().sort((a, b) => Number(a.position) - Number(b.position))
   const pinnedDocs = (props.pinnedDocs || []).slice().sort((a, b) => Number(a.position) - Number(b.position))
   const assignedTools = (props.assignedTools || []).slice()
-  const hasAnyResources = assignedTools.length > 0 || pinnedViews.length > 0 || pinnedDatasets.length > 0 || pinnedBoards.length > 0 || pinnedDocs.length > 0
+  const hasAnyResources = assignedTools.length > 0 || pinnedViews.length > 0 || pinnedTables.length > 0 || pinnedBoards.length > 0 || pinnedDocs.length > 0
 
-  const openPinnedDataset = (datasetId: string) => {
-    const id = String(datasetId || '').trim()
+  const openPinnedTable = (tableId: string) => {
+    const id = String(tableId || '').trim()
     if (!id) return
-    const href = effectiveStarshipSlug ? `/ship/${encodeURIComponent(effectiveStarshipSlug)}/datasets/${encodeURIComponent(id)}` : null
+    const href = effectiveStarshipSlug ? `/ship/${encodeURIComponent(effectiveStarshipSlug)}/tables/${encodeURIComponent(id)}` : null
     if (!href) return
     router.push(href)
   }
@@ -353,7 +353,7 @@ export function RoomConversationIndexView(props: {
                     <span>Suggestions</span>
                   </span>
                 </button>
-                <button type="button" onClick={() => setStarterTab('datasets')} className={starterBadgeClass(starterTab === 'datasets')} role="tab" aria-selected={starterTab === 'datasets'}>
+                <button type="button" onClick={() => setStarterTab('tables')} className={starterBadgeClass(starterTab === 'tables')} role="tab" aria-selected={starterTab === 'tables'}>
                   <span className="inline-flex items-center gap-1.5">
                     <Icon name="database" className="h-3.5 w-3.5" />
                     <span>Database</span>
@@ -396,14 +396,14 @@ export function RoomConversationIndexView(props: {
                   </div>
                 ) : null}
 
-              {starterTab === 'datasets' ? (
-                pinnedDatasets.length > 0 ? (
+              {starterTab === 'tables' ? (
+                pinnedTables.length > 0 ? (
                   <div className="flex items-center justify-center gap-2 flex-wrap">
-                    {pinnedDatasets.map(p => {
-                      const id = String(p.datasetId)
-                      const name = props.datasetLabelById?.get(id) || `Dataset ${id.slice(0, 8)}`
+                    {pinnedTables.map(p => {
+                      const id = String(p.tableId)
+                      const name = props.tableLabelById?.get(id) || `Table ${id.slice(0, 8)}`
                       return (
-                        <Button key={`starter:dataset:${id}`} type="button" size="sm" variant="outline" onClick={() => openPinnedDataset(id)}>
+                        <Button key={`starter:table:${id}`} type="button" size="sm" variant="outline" onClick={() => openPinnedTable(id)}>
                           <Icon name="database" className="h-4 w-4 mr-1.5" />
                           {name}
                         </Button>
@@ -412,7 +412,7 @@ export function RoomConversationIndexView(props: {
                   </div>
                 ) : (
                   <div className="text-center text-sm text-muted-foreground">
-                    No pinned datasets in this room.
+                    No pinned tables in this room.
                     {props.onOpenResourcesPane ? (
                       <>
                         {' '}

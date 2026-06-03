@@ -237,6 +237,32 @@ export function useConnectApiKeyConnector(starshipId: string) {
   })
 }
 
+/**
+ * Set instance-wide platform configuration for a code-driven connector (e.g. GitHub App
+ * credentials). Instance-admin only. Not starship-scoped; invalidates the catalog so the
+ * "configured" state refreshes.
+ */
+export function useConfigureConnector() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({ provider, values }: { provider: ConnectorProvider; values: Record<string, string> }): Promise<{ configured: boolean }> => {
+      const response: FetchResponse<ApiResponse<{ configured: boolean }>> = await api.post(`/api/v1/connectors/${provider}/configure`, { values })
+      return response.data.data
+    },
+    onSuccess: (_res, vars) => {
+      queryClient.invalidateQueries({ queryKey: CONNECTOR_QUERY_KEYS.catalog() })
+      const label = String(vars.provider).charAt(0).toUpperCase() + String(vars.provider).slice(1)
+      toast.success(`${label} configured`, { description: 'Connector configuration saved.' })
+    },
+    onError: (error: any, vars) => {
+      const errorMessage = error?.response?.data?.error || error?.message || 'Failed to save configuration'
+      const label = vars?.provider ? String(vars.provider).charAt(0).toUpperCase() + String(vars.provider).slice(1) : 'Connector'
+      toast.error(`Failed to configure ${label}`, { description: errorMessage })
+    },
+  })
+}
+
 export function useConnectBasicAuthConnector(starshipId: string) {
   const queryClient = useQueryClient()
 

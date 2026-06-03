@@ -17,17 +17,17 @@
       "topic": "Backlog execution: triage, scope, build (with your tests), review, merge."
     },
     "viewPins": [],
-    "datasetPins": [
+    "tablePins": [
       {
-        "datasetSlug": "repos",
+        "tableSlug": "repos",
         "position": 0
       },
       {
-        "datasetSlug": "tracking",
+        "tableSlug": "tracking",
         "position": 1
       },
       {
-        "datasetSlug": "ownership",
+        "tableSlug": "ownership",
         "position": 2
       }
     ],
@@ -87,7 +87,7 @@
         "permission": "allow"
       },
       {
-        "toolSlug": "show-dataset-card",
+        "toolSlug": "show-table-card",
         "permission": "allow"
       },
       {

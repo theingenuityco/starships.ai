@@ -1,6 +1,6 @@
 {
   "name": "Lead Generation Suite",
-  "description": "Full lead generation room with AI agents, datasets, task board, and CRM tools",
+  "description": "Full lead generation room with AI agents, tables, task board, and CRM tools",
   "version": "1.0.0",
   "tags": ["room", "crm", "sales", "lead-gen"],
   "kind": "room"

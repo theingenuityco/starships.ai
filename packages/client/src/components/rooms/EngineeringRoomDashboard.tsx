@@ -3,8 +3,8 @@
 import React, { useMemo } from 'react'
 import Link from 'next/link'
 import { AnimatePresence, motion } from 'motion/react'
-import type { RoomPinnedDataset, RoomPinnedTaskBoard } from '@starships/protocol'
-import { useStarshipDatasets, useDatasetRows } from '@/hooks/useDatasets'
+import type { RoomPinnedTable, RoomPinnedTaskBoard } from '@starships/protocol'
+import { useStarshipTables, useTableRows } from '@/hooks/useTables'
 import { useDemo } from '@/components/demo/DemoContext'
 import { cn } from '@/lib/utils'
 import { avatarColour } from '@/components/dashboard/utils'
@@ -15,7 +15,7 @@ interface EngineeringRoomDashboardProps {
   starshipSlug: string
   roomSlug: string
   roomName: string | null | undefined
-  pinnedDatasets: RoomPinnedDataset[]
+  pinnedTables: RoomPinnedTable[]
   pinnedTaskBoards: RoomPinnedTaskBoard[]
 }
 
@@ -208,27 +208,27 @@ function PipelineColumn({ col, cards }: { col: (typeof COLUMNS)[number]; cards: 
   )
 }
 
-export function EngineeringRoomDashboard({ starshipId, starshipSlug, roomSlug, roomName, pinnedDatasets }: EngineeringRoomDashboardProps) {
+export function EngineeringRoomDashboard({ starshipId, starshipSlug, roomSlug, roomName, pinnedTables }: EngineeringRoomDashboardProps) {
   const { active: demoActive, beat } = useDemo()
 
   // Real-data path (used outside the demo): pull rows from a pinned pipeline /
-  // pull-requests dataset and bucket them by status. Mirrors SupportRoomDashboard.
-  const { data: allDatasets = [] } = useStarshipDatasets(starshipId)
-  const pipelineDataset = useMemo(() => {
-    const pinnedIds = new Set(pinnedDatasets.map((p) => p.datasetId))
-    const pinned = allDatasets.filter((d) => pinnedIds.has(d.id))
+  // pull-requests table and bucket them by status. Mirrors SupportRoomDashboard.
+  const { data: allTables = [] } = useStarshipTables(starshipId)
+  const pipelineTable = useMemo(() => {
+    const pinnedIds = new Set(pinnedTables.map((p) => p.tableId))
+    const pinned = allTables.filter((d) => pinnedIds.has(d.id))
     return (
       pinned.find((d) => d.slug === 'pull-requests' || d.slug.includes('pipeline') || d.slug.includes('pull') || d.slug.includes('pr')) ?? null
     )
-  }, [allDatasets, pinnedDatasets])
+  }, [allTables, pinnedTables])
 
-  const { data: rowsPage, isLoading } = useDatasetRows(
+  const { data: rowsPage, isLoading } = useTableRows(
     starshipId,
-    pipelineDataset?.id ?? '',
+    pipelineTable?.id ?? '',
     500,
     0,
     undefined,
-    Boolean(pipelineDataset?.id) && !demoActive
+    Boolean(pipelineTable?.id) && !demoActive
   )
 
   const grouped = useMemo<Record<ColKey, PipelineCard[]>>(() => {
@@ -267,7 +267,7 @@ export function EngineeringRoomDashboard({ starshipId, starshipSlug, roomSlug, r
   }, [demoActive, beat, rowsPage?.data])
 
   const total = COLUMNS.reduce((sum, c) => sum + grouped[c.key].length, 0)
-  const showEmptyState = !demoActive && !pipelineDataset
+  const showEmptyState = !demoActive && !pipelineTable
 
   return (
     <div className="h-full flex flex-col overflow-hidden">
@@ -295,7 +295,7 @@ export function EngineeringRoomDashboard({ starshipId, starshipSlug, roomSlug, r
             <div className="w-full text-center py-12 text-sm text-muted-foreground">Loading pipeline…</div>
           ) : showEmptyState ? (
             <div className="w-full text-center py-12 text-sm text-muted-foreground">
-              No pipeline dataset pinned to this room.
+              No pipeline table pinned to this room.
             </div>
           ) : (
             COLUMNS.map((col) => <PipelineColumn key={col.key} col={col} cards={grouped[col.key]} />)

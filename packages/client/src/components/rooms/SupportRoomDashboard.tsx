@@ -2,8 +2,8 @@
 
 import React, { useMemo } from 'react'
 import Link from 'next/link'
-import type { RoomPinnedDataset, RoomPinnedTaskBoard } from '@starships/protocol'
-import { useStarshipDatasets, useDatasetRows } from '@/hooks/useDatasets'
+import type { RoomPinnedTable, RoomPinnedTaskBoard } from '@starships/protocol'
+import { useStarshipTables, useTableRows } from '@/hooks/useTables'
 import { useDemo } from '@/components/demo/DemoContext'
 import { cn } from '@/lib/utils'
 import { avatarColour } from '@/components/dashboard/utils'
@@ -14,7 +14,7 @@ interface SupportRoomDashboardProps {
   starshipSlug: string
   roomSlug: string
   roomName: string | null | undefined
-  pinnedDatasets: RoomPinnedDataset[]
+  pinnedTables: RoomPinnedTable[]
   pinnedTaskBoards: RoomPinnedTaskBoard[]
 }
 
@@ -197,23 +197,23 @@ function demoTickets(beat: number): Record<string, unknown>[] {
   ]
 }
 
-export function SupportRoomDashboard({ starshipId, starshipSlug, roomSlug, roomName, pinnedDatasets }: SupportRoomDashboardProps) {
+export function SupportRoomDashboard({ starshipId, starshipSlug, roomSlug, roomName, pinnedTables }: SupportRoomDashboardProps) {
   const { active: demoActive, beat } = useDemo()
-  const { data: allDatasets = [] } = useStarshipDatasets(starshipId)
+  const { data: allTables = [] } = useStarshipTables(starshipId)
 
-  const ticketsDataset = useMemo(() => {
-    const pinnedIds = new Set(pinnedDatasets.map((p) => p.datasetId))
-    const pinned = allDatasets.filter((d) => pinnedIds.has(d.id))
+  const ticketsTable = useMemo(() => {
+    const pinnedIds = new Set(pinnedTables.map((p) => p.tableId))
+    const pinned = allTables.filter((d) => pinnedIds.has(d.id))
     return pinned.find((d) => d.slug === 'tickets' || d.slug.includes('ticket')) ?? null
-  }, [allDatasets, pinnedDatasets])
+  }, [allTables, pinnedTables])
 
-  const { data: ticketsPage, isLoading } = useDatasetRows(
+  const { data: ticketsPage, isLoading } = useTableRows(
     starshipId,
-    ticketsDataset?.id ?? '',
+    ticketsTable?.id ?? '',
     500,
     0,
     undefined,
-    Boolean(ticketsDataset?.id) && !demoActive
+    Boolean(ticketsTable?.id) && !demoActive
   )
 
   const grouped = useMemo<Record<Status, Record<string, unknown>[]>>(() => {
@@ -271,9 +271,9 @@ export function SupportRoomDashboard({ starshipId, starshipSlug, roomSlug, roomN
         <div className="h-full flex md:flex-row flex-col gap-4 px-4 py-4 md:overflow-x-auto">
           {isLoading && total === 0 ? (
             <div className="w-full text-center py-12 text-sm text-muted-foreground">Loading tickets…</div>
-          ) : !demoActive && !ticketsDataset ? (
+          ) : !demoActive && !ticketsTable ? (
             <div className="w-full text-center py-12 text-sm text-muted-foreground">
-              No tickets dataset pinned to this room.
+              No tickets table pinned to this room.
             </div>
           ) : (
             COLUMNS.map((col) => (

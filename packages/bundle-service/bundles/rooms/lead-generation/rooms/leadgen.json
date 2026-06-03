@@ -17,17 +17,17 @@
       "topic": null
     },
     "viewPins": [],
-    "datasetPins": [
+    "tablePins": [
       {
-        "datasetSlug": "accounts",
+        "tableSlug": "accounts",
         "position": 0
       },
       {
-        "datasetSlug": "icp-profiles",
+        "tableSlug": "icp-profiles",
         "position": 1
       },
       {
-        "datasetSlug": "contacts",
+        "tableSlug": "contacts",
         "position": 2
       }
     ],
@@ -111,7 +111,7 @@
         "permission": "allow"
       },
       {
-        "toolSlug": "show-dataset-card",
+        "toolSlug": "show-table-card",
         "permission": "allow"
       }
     ],

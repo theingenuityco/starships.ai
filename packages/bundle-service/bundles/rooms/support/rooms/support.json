@@ -17,9 +17,9 @@
       "topic": "Triage incoming tickets, reply when resolved."
     },
     "viewPins": [],
-    "datasetPins": [
+    "tablePins": [
       {
-        "datasetSlug": "tickets",
+        "tableSlug": "tickets",
         "position": 0
       }
     ],
@@ -79,7 +79,7 @@
         "permission": "allow"
       },
       {
-        "toolSlug": "show-dataset-card",
+        "toolSlug": "show-table-card",
         "permission": "allow"
       },
       {

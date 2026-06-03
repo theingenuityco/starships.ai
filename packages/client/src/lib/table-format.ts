@@ -2,7 +2,7 @@ export type DataCellValue = unknown
 export type DataCellFormat = 'text' | 'number' | 'currency' | 'date' | 'datetime' | 'percentage'
 
 type RefValue =
-  | { kind: 'dataset_row'; datasetIdOrSlug: string; key: string; label?: string; url?: string }
+  | { kind: 'table_row'; tableIdOrSlug: string; key: string; label?: string; url?: string }
   | { kind: 'task_card'; cardId: string; label?: string; url?: string }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -15,7 +15,7 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 function isRefValue(value: unknown): value is RefValue {
   if (!isPlainObject(value)) return false
   const kind = String((value as any).kind || '').trim()
-  if (kind === 'dataset_row') return typeof (value as any).datasetIdOrSlug === 'string' && typeof (value as any).key === 'string'
+  if (kind === 'table_row') return typeof (value as any).tableIdOrSlug === 'string' && typeof (value as any).key === 'string'
   if (kind === 'task_card') return typeof (value as any).cardId === 'string'
   return false
 }

@@ -253,7 +253,7 @@ export function Navigation(props: NavigationProps) {
     if (!starshipSlug) {
       return {
         isDashboardRoute: false,
-        isDatasetsRoute: false,
+        isTablesRoute: false,
         isTasksRoute: false,
         isDocsRoute: false,
         isAgentsRoute: false,
@@ -261,7 +261,7 @@ export function Navigation(props: NavigationProps) {
     }
     return {
       isDashboardRoute: pathname.startsWith(`/ship/${starshipSlug}/dashboard`),
-      isDatasetsRoute: pathname.startsWith(`/ship/${starshipSlug}/datasets`),
+      isTablesRoute: pathname.startsWith(`/ship/${starshipSlug}/tables`),
       isTasksRoute: pathname.startsWith(`/ship/${starshipSlug}/tasks`),
       isDocsRoute: pathname.startsWith(`/ship/${starshipSlug}/docs`),
       isAgentsRoute: pathname.startsWith(`/ship/${starshipSlug}/agents`) || pathname.startsWith(`/ship/${starshipSlug}/agent/`),
@@ -269,7 +269,7 @@ export function Navigation(props: NavigationProps) {
     }
   }, [pathname, starshipSlug])
 
-  const { isDashboardRoute, isDatasetsRoute, isTasksRoute, isDocsRoute, isAgentsRoute, isConnectorsRoute } = routeChecks
+  const { isDashboardRoute, isTablesRoute, isTasksRoute, isDocsRoute, isAgentsRoute, isConnectorsRoute } = routeChecks
 
   // Get starship data to access starship ID - only fetch when needed
   const { data: starshipData } = useStarshipBySlug(starshipSlug || '', !!starshipSlug && isAuthenticated)
@@ -377,10 +377,10 @@ export function Navigation(props: NavigationProps) {
               isActive: isDashboardRoute,
             },
             {
-              href: `/ship/${starshipSlug}/datasets`,
-              label: 'Datasets',
+              href: `/ship/${starshipSlug}/tables`,
+              label: 'Tables',
               icon: 'database',
-              isActive: isDatasetsRoute,
+              isActive: isTablesRoute,
             },
             {
               href: `/ship/${starshipSlug}/tasks`,
@@ -419,7 +419,7 @@ export function Navigation(props: NavigationProps) {
           ]
         : []),
     ],
-    [isAuthenticated, starshipSlug, pathname, isDashboardRoute, isDatasetsRoute, isTasksRoute, isDocsRoute, isAgentsRoute, isConnectorsRoute, isInstanceAdmin]
+    [isAuthenticated, starshipSlug, pathname, isDashboardRoute, isTablesRoute, isTasksRoute, isDocsRoute, isAgentsRoute, isConnectorsRoute, isInstanceAdmin]
   )
 
   const handleSidebarBackgroundClick = useCallback(

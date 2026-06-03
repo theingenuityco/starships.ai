@@ -123,7 +123,10 @@ export class CliAgentContainerLauncher {
       let stderrBuffer = '';
       let result: CliAgentResult | undefined;
       let failure: string | undefined;
-      const pending: Promise<void>[] = [];
+      // Serialize event handling: each onEvent (DB write + stream publish) runs after the
+      // previous one. This preserves message ordering and bounds in-flight work (no unbounded
+      // array of fire-and-forget promises).
+      let eventChain: Promise<void> = Promise.resolve();
 
       // Hard deadline: if the container hangs (stuck Node process, stalled Docker), kill it so
       // the turn never stays in-flight forever. `--rm` reaps the killed container.
@@ -146,7 +149,7 @@ export class CliAgentContainerLauncher {
         }
         if (parsed.t === 'event') {
           if (onEvent) {
-            pending.push(Promise.resolve(onEvent(parsed.data as CliAgentEvent)).catch(() => undefined));
+            eventChain = eventChain.then(() => Promise.resolve(onEvent(parsed.data as CliAgentEvent)).catch(() => undefined));
           }
         } else if (parsed.t === 'result') {
           result = parsed.data as CliAgentResult;
@@ -174,7 +177,7 @@ export class CliAgentContainerLauncher {
       child.on('close', async (code) => {
         clearTimeout(deadline);
         if (stdoutBuffer) handleLine(stdoutBuffer);
-        await Promise.allSettled(pending);
+        await eventChain;
         if (failure) {
           reject(new Error(failure));
           return;

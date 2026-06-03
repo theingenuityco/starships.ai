@@ -87,6 +87,7 @@ const searchActions: AgentTool = {
     },
   },
   async run(args, ctx) {
+    if (!ctx.catalog) return { content: { error: 'no action catalog available' }, isError: true };
     const query = String(args.query ?? '');
     const limit = typeof args.limit === 'number' && args.limit > 0 ? args.limit : DEFAULT_SEARCH_LIMIT;
     const matches = ctx.catalog.search(query, limit);
@@ -109,6 +110,7 @@ const runAction: AgentTool = {
     },
   },
   async run(args, ctx) {
+    if (!ctx.catalog) return { content: { error: 'no action catalog available' }, isError: true };
     const connector = String(args.connector ?? '');
     const action = String(args.action ?? '');
     if (!connector || !action) return { content: { error: 'connector and action are required' }, isError: true };

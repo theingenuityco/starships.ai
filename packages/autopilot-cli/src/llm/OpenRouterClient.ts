@@ -101,7 +101,11 @@ function parseArgs(raw: string): Record<string, unknown> {
 function toWireMessages(messages: ChatMessage[]): Array<Record<string, unknown>> {
   return messages.map((m) => {
     if (m.role === 'assistant') {
-      const wire: Record<string, unknown> = { role: 'assistant', content: m.content ?? '' };
+      const hasToolCalls = !!(m.toolCalls && m.toolCalls.length > 0);
+      // Tool-call-only turns must send content: null (not ""): several providers
+      // (e.g. Anthropic via OpenRouter) reject an empty-string content there.
+      const content = typeof m.content === 'string' && m.content.length === 0 && hasToolCalls ? null : (m.content ?? '');
+      const wire: Record<string, unknown> = { role: 'assistant', content };
       if (m.reasoning) wire.reasoning = m.reasoning;
       if (m.reasoningDetails && m.reasoningDetails.length > 0) wire.reasoning_details = m.reasoningDetails;
       if (m.images && m.images.length > 0) wire.images = m.images;

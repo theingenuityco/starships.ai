@@ -20,7 +20,7 @@
 
 import type { LlmMessage } from '@starships/autopilot';
 import { serializeToolResult } from '@starships/autopilot-cli';
-import type { CliAgentEvent, ChatMessage, AssistantToolCall, CliAgentJobSpec } from '@starships/autopilot-cli';
+import type { CliAgentEvent, CliAgentResult, ChatMessage, AssistantToolCall, CliAgentJobSpec } from '@starships/autopilot-cli';
 import type { MessageService } from '@/services/MessageService';
 import type { ConversationStreamBus } from '@/services/ConversationStreamBus';
 import type { TurnRepository, ConversationRepository } from '@starships/models';
@@ -265,12 +265,34 @@ export async function executeCliAgentTurn(deps: CliAgentTurnDeps, args: CliAgent
     }
   };
 
-  const result = await cliAgentContainerLauncher.launch({
-    spec,
-    hostDir: args.hostDir,
-    ...(args.scratch ? { scratch: true } : {}),
-    onEvent,
-  });
+  let result: CliAgentResult;
+  try {
+    result = await cliAgentContainerLauncher.launch({
+      spec,
+      hostDir: args.hostDir,
+      ...(args.scratch ? { scratch: true } : {}),
+      onEvent,
+    });
+  } catch (err) {
+    // Container failure (Docker missing, crash, OOM, timeout) must not leave the turn
+    // stuck active — mark it failed and clear pending state before rethrowing.
+    const failedAt = new Date().toISOString();
+    await deps.conversationRepository.mergeState(conversationId, { turnActive: false, pendingToolCalls: [] }).catch(() => undefined);
+    await deps.turnRepository.updateTurn(turnId, { status: 'failed', completedAt: failedAt }).catch(() => undefined);
+    await deps.streamBus
+      .publish(conversationId, {
+        type: 'turn.status',
+        data: {
+          conversationId,
+          turnId,
+          status: 'failed',
+          at: failedAt,
+          error: { code: 'CLI_AGENT_EXECUTION_FAILED', message: err instanceof Error ? err.message : String(err) },
+        },
+      })
+      .catch(() => undefined);
+    throw err;
+  }
 
   const at = new Date().toISOString();
   if (result.reason === 'awaiting_approval') {

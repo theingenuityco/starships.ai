@@ -2,6 +2,7 @@ import type { StarshipTableColumn } from '@starships/protocol';
 import { BaseRepository } from './BaseRepository';
 import { nanoid } from 'nanoid';
 import type { PostgresConnection } from '@/helpers/database';
+import type { PoolClient } from 'pg';
 import { qualifiedTable, quoteIdent } from '@/helpers/starship-tables/identifiers';
 
 type DbRow = Record<string, unknown>;
@@ -225,29 +226,36 @@ export class StarshipTableRowRepository extends BaseRepository {
     return null;
   }
 
+  /** Insert rows on an already-open transaction client. Returns the count inserted. */
+  private async insertRowsInTx(
+    client: PoolClient,
+    ref: TableRef,
+    rows: Array<{ rowKey?: string | null; data: Record<string, unknown> }>
+  ): Promise<number> {
+    const known = new Set(ref.columns.filter((c) => c && c.name).map((c) => c.name));
+    const table = qualifiedTable(ref.starshipId, ref.physicalTable);
+    let inserted = 0;
+    for (const r of rows) {
+      const data = r?.data && typeof r.data === 'object' && !Array.isArray(r.data) ? r.data : {};
+      const provided = Object.keys(data).filter((k) => known.has(k));
+      const id = nanoid();
+      const rowKey = this.rowKeyFor(ref, { rowKey: r?.rowKey, data });
+
+      const cols = [quoteIdent('__id'), quoteIdent('__row_key'), ...provided.map((k) => quoteIdent(k))];
+      const params: unknown[] = [id, rowKey, ...provided.map((k) => data[k])];
+      const placeholders = params.map((_, idx) => `$${idx + 1}`);
+      await client.query(`INSERT INTO ${table} (${cols.join(', ')}) VALUES (${placeholders.join(', ')})`, params);
+      inserted++;
+    }
+    return inserted;
+  }
+
   async appendMany(ref: TableRef, rows: Array<{ rowKey?: string | null; data: Record<string, unknown> }>): Promise<{ inserted: number }> {
     return this.executeWithErrorHandling(
       async () => {
         const safe = Array.isArray(rows) ? rows : [];
         if (safe.length === 0) return { inserted: 0 };
-        const known = new Set(ref.columns.filter((c) => c && c.name).map((c) => c.name));
-        const table = qualifiedTable(ref.starshipId, ref.physicalTable);
-        let inserted = 0;
-
-        await this.getConnection().transaction(async (client) => {
-          for (const r of safe) {
-            const data = r?.data && typeof r.data === 'object' && !Array.isArray(r.data) ? r.data : {};
-            const provided = Object.keys(data).filter((k) => known.has(k));
-            const id = nanoid();
-            const rowKey = this.rowKeyFor(ref, { rowKey: r?.rowKey, data });
-
-            const cols = [quoteIdent('__id'), quoteIdent('__row_key'), ...provided.map((k) => quoteIdent(k))];
-            const params: unknown[] = [id, rowKey, ...provided.map((k) => data[k])];
-            const placeholders = params.map((_, idx) => `$${idx + 1}`);
-            await client.query(`INSERT INTO ${table} (${cols.join(', ')}) VALUES (${placeholders.join(', ')})`, params);
-            inserted++;
-          }
-        });
+        const inserted = await this.getConnection().transaction((client) => this.insertRowsInTx(client, ref, safe));
         return { inserted };
       },
       'appendMany',
@@ -287,7 +295,7 @@ export class StarshipTableRowRepository extends BaseRepository {
                RETURNING (xmax = 0) AS inserted`,
               params
             );
-            const wasInserted = Array.isArray(res) ? Boolean(res[0]?.inserted) : false;
+            const wasInserted = Boolean(res.rows[0]?.inserted);
             if (wasInserted) inserted++;
             else updated++;
           }
@@ -308,6 +316,28 @@ export class StarshipTableRowRepository extends BaseRepository {
         await this.getConnection().query(`DELETE FROM ${table}`);
       },
       'truncate',
+      'StarshipTableRow',
+      ref.physicalTable
+    );
+  }
+
+  /**
+   * Atomically replace all rows: delete existing rows and insert `rows` in a
+   * single transaction, so a failed insert rolls back the delete (no data loss).
+   */
+  async replaceAll(ref: TableRef, rows: Array<{ rowKey?: string | null; data: Record<string, unknown> }>): Promise<{ inserted: number }> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const safe = Array.isArray(rows) ? rows : [];
+        const table = qualifiedTable(ref.starshipId, ref.physicalTable);
+        const inserted = await this.getConnection().transaction(async (client) => {
+          await client.query(`DELETE FROM ${table}`);
+          if (safe.length === 0) return 0;
+          return this.insertRowsInTx(client, ref, safe);
+        });
+        return { inserted };
+      },
+      'replaceAll',
       'StarshipTableRow',
       ref.physicalTable
     );

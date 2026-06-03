@@ -829,10 +829,8 @@ async function applyRoomBundleToStarship(opts: {
           archived: false,
         });
         if (updated) {
-          await tableRowRepo.truncate(tableRefOf(updated));
-          if (rows.length > 0) {
-            await tableRowRepo.appendMany(tableRefOf(updated), rows);
-          }
+          // Atomic: a failed insert rolls back the delete so existing rows aren't lost.
+          await tableRowRepo.replaceAll(tableRefOf(updated), rows);
           imported.tables += 1;
           if (sourceSlug) tableSlugMap.set(sourceSlug, updated.slug);
         }
@@ -4023,10 +4021,8 @@ router.post(
               archived: false,
             });
             if (updated) {
-              await tableRowRepo.truncate(tableRefOf(updated));
-              if (rows.length > 0) {
-                await tableRowRepo.appendMany(tableRefOf(updated), rows);
-              }
+              // Atomic: a failed insert rolls back the delete so existing rows aren't lost.
+              await tableRowRepo.replaceAll(tableRefOf(updated), rows);
               imported.tables += 1;
               if (sourceSlug) tableSlugMap.set(sourceSlug, updated.slug);
             }

@@ -197,9 +197,11 @@ export class StarshipTableRepository extends BaseRepository {
         const nextColumns = columnsChanged ? dropFormula(updates.columns) : existing.columns;
         const nextPrimaryKey =
           updates.primaryKey !== undefined ? (typeof updates.primaryKey === 'string' ? updates.primaryKey : null) : existing.primaryKey;
+        const primaryKeyChanged = nextPrimaryKey !== existing.primaryKey;
 
         let alter: string[] = [];
-        if (columnsChanged) {
+        // Run the diff when columns OR the primaryKey changed — the latter toggles the __row_key UNIQUE constraint.
+        if (columnsChanged || primaryKeyChanged) {
           try {
             alter = compileAlterTable({
               table: qualifiedTable(existing.starshipId, existing.physicalTable),
@@ -207,6 +209,7 @@ export class StarshipTableRepository extends BaseRepository {
               oldColumns: existing.columns,
               columns: nextColumns,
               primaryKey: nextPrimaryKey,
+              oldPrimaryKey: existing.primaryKey,
             });
           } catch (e) {
             // Surface as a 400-mappable validation error rather than a 500.

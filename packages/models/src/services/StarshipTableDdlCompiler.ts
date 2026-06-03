@@ -126,6 +126,11 @@ export interface CompileTableArgs {
   primaryKey?: string | null;
 }
 
+/** Deterministic name for the `__row_key` UNIQUE constraint (present iff a primaryKey is set). */
+function rowKeyUniqueName(physicalTable: string): string {
+  return constraintName(physicalTable, '__row_key', 'key');
+}
+
 /** Statements to create a Table (CREATE TABLE + indexes). Run inside a transaction. */
 export function compileCreateTable(args: CompileTableArgs): string[] {
   const userCols = (args.columns ?? []).filter((c) => c && c.name);
@@ -133,12 +138,14 @@ export function compileCreateTable(args: CompileTableArgs): string[] {
 
   const lines: string[] = [
     `${quoteIdent('__id')} text PRIMARY KEY`,
-    `${quoteIdent('__row_key')} text${hasPk ? ' UNIQUE' : ''}`,
+    `${quoteIdent('__row_key')} text`,
     `${quoteIdent('__created_at')} timestamptz NOT NULL DEFAULT now()`,
     `${quoteIdent('__updated_at')} timestamptz NOT NULL DEFAULT now()`,
   ];
 
   const checks: string[] = [];
+  // Named (not inline) so compileAlterTable can ADD/DROP it by name when the primaryKey toggles.
+  if (hasPk) checks.push(`CONSTRAINT ${quoteIdent(rowKeyUniqueName(args.physicalTable))} UNIQUE (${quoteIdent('__row_key')})`);
   for (const col of userCols) {
     lines.push(columnDefinition(col));
     for (const c of checkConstraints(args.physicalTable, col)) {
@@ -157,6 +164,8 @@ export function compileCreateTable(args: CompileTableArgs): string[] {
 
 export interface CompileAlterArgs extends CompileTableArgs {
   oldColumns: Col[];
+  /** primaryKey as it was before this change, so the `__row_key` UNIQUE constraint can be reconciled. */
+  oldPrimaryKey?: string | null;
 }
 
 /**
@@ -170,6 +179,16 @@ export function compileAlterTable(args: CompileAlterArgs): string[] {
   const newByName = new Map(args.columns.filter((c) => c && c.name).map((c) => [c.name, c]));
   const stmts: string[] = [];
   const t = args.table;
+
+  // Reconcile the __row_key UNIQUE constraint when the primaryKey toggles on/off.
+  const hadPk = typeof args.oldPrimaryKey === 'string' && args.oldPrimaryKey.length > 0;
+  const hasPk = typeof args.primaryKey === 'string' && args.primaryKey.length > 0;
+  const rowKeyConstraint = quoteIdent(rowKeyUniqueName(args.physicalTable));
+  if (hasPk && !hadPk) {
+    stmts.push(`ALTER TABLE ${t} ADD CONSTRAINT ${rowKeyConstraint} UNIQUE (${quoteIdent('__row_key')})`);
+  } else if (!hasPk && hadPk) {
+    stmts.push(`ALTER TABLE ${t} DROP CONSTRAINT IF EXISTS ${rowKeyConstraint}`);
+  }
 
   // Dropped columns
   for (const name of oldByName.keys()) {

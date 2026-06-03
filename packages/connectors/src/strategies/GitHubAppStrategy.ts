@@ -29,6 +29,7 @@ import type {
   SecretResolver,
   SessionCtx,
 } from '../types';
+import { sanitizeForLog } from './shared';
 
 /** Minimal context needed to resolve GitHub App configuration. */
 type ConfigCtx = { env: ConnectorEnv; secrets: SecretResolver };
@@ -83,7 +84,7 @@ export class GitHubAppStrategy implements AuthStrategy {
 
   async complete(ctx: CompleteCtx): Promise<CompleteResult> {
     if (ctx.input.error) {
-      throw new Error(`GitHub App install returned error: ${ctx.input.error}`);
+      throw new Error(`GitHub App install returned error: ${sanitizeForLog(ctx.input.error)}`);
     }
     const installationId = ctx.input.installation_id;
     if (!installationId) throw new Error('GitHub App callback is missing installation_id');

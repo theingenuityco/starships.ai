@@ -72,6 +72,17 @@ export function buildPostgresDbSession(args: {
   };
 }
 
+/**
+ * Sanitize an untrusted value (e.g. an OAuth callback query parameter) before
+ * embedding it in a log line or error message. Strips CR/LF to prevent log
+ * injection / forged log entries and caps the length.
+ */
+export function sanitizeForLog(value: unknown, maxLength = 200): string {
+  return String(value ?? '')
+    .replace(/[\r\n]/g, ' ')
+    .slice(0, maxLength);
+}
+
 /** Replace `{{ key }}` occurrences in a template string with values from `vars`. */
 export function resolveTemplateVars(input: string, vars: Record<string, unknown>): string {
   return input.replace(/\{\{\s*([\w.-]+)\s*\}\}/g, (_match, key: string) => {

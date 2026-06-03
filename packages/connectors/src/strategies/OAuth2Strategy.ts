@@ -14,7 +14,7 @@ import type {
   ConnectorCatalogAuthType,
   SessionCtx,
 } from '../types';
-import { buildHeaderInjection, resolveTemplateVars } from './shared';
+import { buildHeaderInjection, resolveTemplateVars, sanitizeForLog } from './shared';
 
 interface TokenResponseFields {
   accessToken?: string;
@@ -58,7 +58,9 @@ export class OAuth2Strategy implements AuthStrategy {
 
   async complete(ctx: CompleteCtx): Promise<CompleteResult> {
     if (ctx.input.error) {
-      throw new Error(`OAuth provider returned error: ${ctx.input.error}${ctx.input.error_description ? ` (${ctx.input.error_description})` : ''}`);
+      const err = sanitizeForLog(ctx.input.error);
+      const desc = ctx.input.error_description ? ` (${sanitizeForLog(ctx.input.error_description)})` : '';
+      throw new Error(`OAuth provider returned error: ${err}${desc}`);
     }
     const code = ctx.input.code;
     if (!code) throw new Error('OAuth callback is missing the authorization code');
@@ -69,7 +71,10 @@ export class OAuth2Strategy implements AuthStrategy {
       throw new Error('OAuth2 connector is missing client credentials');
     }
 
-    const tokenUrl = resolveTemplateVars(this.config.tokenUrl, { ...(ctx.metadata ?? {}), ...ctx.input });
+    // metadata (server-controlled, set at connect time) must win over ctx.input
+    // (attacker-controlled OAuth callback query string) so a crafted callback
+    // param can't override a {{var}} in tokenUrl and redirect the token exchange.
+    const tokenUrl = resolveTemplateVars(this.config.tokenUrl, { ...ctx.input, ...(ctx.metadata ?? {}) });
     const fields = await this.exchangeCode({ tokenUrl, code, clientId, clientSecret, redirectUri: ctx.redirectUri });
 
     if (!fields.accessToken) throw new Error('OAuth token exchange did not return an access token');

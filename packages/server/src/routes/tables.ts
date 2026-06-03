@@ -7,6 +7,7 @@ import { validateData } from '@/utils/validation';
 import { IdSchema, SlugSchema, noXSS, XSS_ERROR_MESSAGE } from '@/schemas/common';
 import { verifyStarshipAccess, verifyStarshipAdminAccess } from '@/middleware/verify-starship-access';
 import { sendError, sendSuccess, handleError } from '@/utils/responseHelpers';
+import { logger } from '@/utils/logger';
 import { coerceBoolean, isPlainObject, toIsoDateOnly, toIsoInstantWithOffset as toIsoInstant } from '@/utils/value-coercion';
 
 import {
@@ -844,9 +845,12 @@ router.post('/starships/:starshipId/database/sql', jwtAuthMiddleware, async (req
 
     const client = await agentConn.getClient();
     try {
-      await client.query(`SET ROLE ${role}`);
-      await client.query(`SET search_path TO ${schema}`);
+      // Open the transaction FIRST, then scope role/search_path/timeout to it with
+      // SET LOCAL so they auto-revert on COMMIT or ROLLBACK and can never leak onto
+      // the pooled connection (cross-tenant contamination) if a later step fails.
       await client.query('BEGIN READ ONLY');
+      await client.query(`SET LOCAL ROLE ${role}`);
+      await client.query(`SET LOCAL search_path TO ${schema}`);
       await client.query('SET LOCAL statement_timeout = 10000');
       const result = await client.query(body.sql, (body.params ?? []) as unknown[]);
       await client.query('COMMIT');
@@ -865,15 +869,21 @@ router.post('/starships/:starshipId/database/sql', jwtAuthMiddleware, async (req
       } catch {
         /* ignore */
       }
-      const message = err instanceof Error ? err.message : 'Query failed';
-      sendError(res, 'DATABASE_QUERY_FAILED', message, 400);
+      // Raw Postgres errors leak the physical schema/table/column names. Log the
+      // detail server-side and return a generic message to the caller.
+      const detail = err instanceof Error ? err.message : 'unknown';
+      logger.warn('Agent SQL query failed', { starshipId: params.starshipId, detail });
+      sendError(res, 'DATABASE_QUERY_FAILED', 'Query failed', 400);
     } finally {
+      // SET LOCAL ROLE already reverted at transaction end; RESET ROLE is defensive.
+      // If it throws (e.g. connection dropped mid-reset), destroy the connection
+      // rather than return a possibly role-contaminated one to the pool.
       try {
         await client.query('RESET ROLE');
+        client.release();
       } catch {
-        /* ignore */
+        client.release(true);
       }
-      client.release();
     }
   } catch (error) {
     handleError(error, res, 'database sql');

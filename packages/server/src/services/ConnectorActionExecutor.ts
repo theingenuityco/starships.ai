@@ -42,7 +42,9 @@ export class ConnectorActionExecutor {
     // Connector instance metadata + auth session (installation token, JWT, api key, ...).
     const { metadata, session } = await resolveConnectorContext(provider, req.starshipId, req.authUserId);
 
-    const runtimeEnv = req.runtimeEnv ?? { STARSHIP_ID: req.starshipId };
+    // Fallback for direct in-process callers that omit runtimeEnv: SERVER_URL is required
+    // so the Starships connector's resolveBaseUrl produces an absolute URL.
+    const runtimeEnv = req.runtimeEnv ?? { STARSHIP_ID: req.starshipId, SERVER_URL: process.env.SERVER_URL };
     const baseUrl = def.resolveBaseUrl ? def.resolveBaseUrl(runtimeEnv) : def.baseUrl;
 
     const http = createAuthedHttp({

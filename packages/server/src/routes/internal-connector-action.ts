@@ -28,8 +28,15 @@ router.post('/internal/connector-action', async (req: Request, res: Response) =>
     if (provided !== expected) {
       return sendError(res, 'ACCESS_DENIED', 'Invalid runner secret', 403);
     }
+  } else if (process.env.NODE_ENV === 'production') {
+    // Never allow unauthenticated connector execution in production: this endpoint runs
+    // actions with the server's own credentials for any starship.
+    console.error('[internal/connector-action] RUNNER_INTERNAL_SECRET is not set; rejecting in production. Set it before enabling RUNNER_URL.');
+    return sendError(res, 'ACCESS_DENIED', 'RUNNER_INTERNAL_SECRET is not configured', 403);
   } else {
-    console.warn('[internal/connector-action] RUNNER_INTERNAL_SECRET is not set; endpoint is unauthenticated');
+    console.error(
+      '[internal/connector-action] RUNNER_INTERNAL_SECRET is not set; endpoint accepts unauthenticated calls — set this env var before enabling RUNNER_URL in production'
+    );
   }
 
   const body = isRecord(req.body) ? req.body : {};

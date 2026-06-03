@@ -27,7 +27,8 @@ export const starshipsConnector: ConnectorDefinition = {
   category: 'connector',
   version: '1.0.0',
   isEnabled: true,
-  baseUrl: '{{ runtimeEnv.SERVER_URL }}/api/v1',
+  // Informational only; the effective base URL is always computed by resolveBaseUrl against SERVER_URL.
+  baseUrl: '/api/v1',
   resolveBaseUrl: (env) => `${String((env as Record<string, unknown>).SERVER_URL ?? '').replace(/\/+$/, '')}/api/v1`,
   auth: new PlatformJwtStrategy(auth),
   actions: starshipsActions,

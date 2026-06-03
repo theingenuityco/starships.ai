@@ -31,7 +31,7 @@ export const getRepoContents: CodeAction = {
       }
     }
   },
-  run: (args, ctx) => ctx.http.get(`/repos/${encodeURIComponent(String(args.owner))}/${encodeURIComponent(String(args.repo))}/contents/${encodeURIComponent(String(args.path))}`, {
+  run: (args, ctx) => ctx.http.get(`/repos/${encodeURIComponent(String(args.owner))}/${encodeURIComponent(String(args.repo))}/contents/${String(args.path).split('/').map(encodeURIComponent).join('/')}`, {
   query: {
     "ref": args.ref ? String(args.ref) : undefined,
   },

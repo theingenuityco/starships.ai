@@ -45,7 +45,7 @@ export const createOrUpdateFile: CodeAction = {
       }
     }
   },
-  run: (args, ctx) => ctx.http.put(`/repos/${encodeURIComponent(String(args.owner))}/${encodeURIComponent(String(args.repo))}/contents/${encodeURIComponent(String(args.path))}`, {
+  run: (args, ctx) => ctx.http.put(`/repos/${encodeURIComponent(String(args.owner))}/${encodeURIComponent(String(args.repo))}/contents/${String(args.path).split('/').map(encodeURIComponent).join('/')}`, {
   body: {
     "message": String(args.message),
     "content": Buffer.from(String(args.content), 'utf-8').toString('base64'),

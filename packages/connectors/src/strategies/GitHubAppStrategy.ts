@@ -14,6 +14,7 @@
  * managed) and falls back to env vars of the same name for local development.
  */
 
+import { createPrivateKey } from 'node:crypto';
 import type { ConnectorAuthV2, ConnectorSessionV2 } from '@starships/protocol';
 import type {
   AuthStrategy,
@@ -121,9 +122,14 @@ export class GitHubAppStrategy implements AuthStrategy {
 
   /** Accept a PEM directly (from a .pem file upload) or a base64-encoded PEM (env/legacy). */
   private normalizePem(value: string): string {
-    const trimmed = value.trim();
-    if (trimmed.includes('-----BEGIN')) return trimmed;
-    return Buffer.from(trimmed, 'base64').toString('utf-8');
+    let s = value.trim();
+    // A bare base64 blob (no PEM header) is the base64-encoded PEM: decode it first.
+    if (!s.includes('-----BEGIN')) {
+      s = Buffer.from(s, 'base64').toString('utf-8').trim();
+    }
+    // Tolerate keys stored with escaped newlines (common in single-line env / secret stores).
+    if (s.includes('\\n')) s = s.replace(/\\r?\\n/g, '\n');
+    return s;
   }
 
   /** Resolve App config: platform secret first (encrypted), env var fallback for local dev. */
@@ -171,10 +177,13 @@ export class GitHubAppStrategy implements AuthStrategy {
 
     // jose@6 is ESM-only; load it via a real dynamic import so it works from a
     // CommonJS build / Jest environment (a top-level import compiles to require()).
-    const { SignJWT, importPKCS8 } = await dynamicImport<typeof import('jose')>('jose');
+    const { SignJWT } = await dynamicImport<typeof import('jose')>('jose');
 
     const pem = this.normalizePem(privateKeyRaw);
-    const key = await importPKCS8(pem, 'RS256');
+    // GitHub issues App private keys in PKCS#1 ("BEGIN RSA PRIVATE KEY"), but jose's
+    // importPKCS8 only accepts PKCS#8. Node's createPrivateKey auto-detects PKCS#1,
+    // PKCS#8 and SEC1, so use it and hand the KeyObject to jose.
+    const key = createPrivateKey(pem);
 
     const nowSec = Math.floor(Date.now() / 1000);
     return new SignJWT({})

@@ -6,11 +6,13 @@ import { cn } from '@/lib/utils'
 import { avatarColour } from '@/components/dashboard/utils'
 import Icon from '@/components/primitives/Icon'
 import Link from 'next/link'
+import { RoomSetupGate } from '@/components/rooms/RoomSetupGate'
 
 interface EngineeringDashboardProps {
   starshipId: string
   starshipSlug: string
   roomSlug: string
+  roomConversationId?: string | null
   roomName: string | null | undefined
   pinnedTables: RoomPinnedTable[]
   pinnedTaskBoards: RoomPinnedTaskBoard[]
@@ -272,7 +274,7 @@ function CrewStrip() {
   )
 }
 
-export function EngineeringDashboard({ starshipSlug, roomSlug, roomName }: EngineeringDashboardProps) {
+export function EngineeringDashboard({ starshipId, starshipSlug, roomSlug, roomConversationId, roomName }: EngineeringDashboardProps) {
   return (
     <div className="flex h-full flex-col overflow-hidden">
       {/* Header */}
@@ -295,6 +297,10 @@ export function EngineeringDashboard({ starshipSlug, roomSlug, roomName }: Engin
       {/* Scrollable content */}
       <div className="flex-1 overflow-y-auto">
         <div className="mx-auto flex max-w-7xl flex-col gap-4 px-6 py-6">
+          {roomConversationId ? (
+            <RoomSetupGate roomConversationId={roomConversationId} starshipId={starshipId} />
+          ) : null}
+
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             {STATS.map((s) => (
               <StatCard key={s.label} stat={s} />

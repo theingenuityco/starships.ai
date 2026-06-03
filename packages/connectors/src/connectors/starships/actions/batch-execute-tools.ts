@@ -12,6 +12,9 @@ export const batchExecuteTools: CodeAction = {
       "tools"
     ],
     "properties": {
+      "conversationId": {
+        "type": "string"
+      },
       "agentId": {
         "type": "string"
       },

@@ -28,7 +28,9 @@ function buildQuery(query: Record<string, unknown> | undefined, rawQuery: string
   if (query) {
     const qs = new URLSearchParams();
     for (const [k, v] of Object.entries(query)) {
-      if (v === undefined || v === null) continue;
+      // Drop absent params. Code actions commonly use a "" fallback for optional
+      // query args; treat empty string as absent so we don't emit `key=`.
+      if (v === undefined || v === null || v === '') continue;
       qs.set(k, String(v));
     }
     const s = qs.toString();

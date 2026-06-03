@@ -8,6 +8,7 @@ import { RoomConversationIndexView } from '@/components/rooms/RoomConversationIn
 import { LeadgenDashboard } from '@/components/rooms/LeadgenDashboard'
 import { SupportRoomDashboard } from '@/components/rooms/SupportRoomDashboard'
 import { EngineeringRoomDashboard } from '@/components/rooms/EngineeringRoomDashboard'
+import { EngineeringDashboard } from '@/components/rooms/EngineeringDashboard'
 import { RoomHistoryPane } from '@/components/rooms/RoomHistoryPane'
 import { RoomResourcesPane } from '@/components/rooms/RoomResourcesPane'
 import { RoomParticipantsButton } from '@/components/rooms/RoomParticipantsButton'
@@ -945,8 +946,17 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
             pinnedDatasets={pinsData?.datasets ?? []}
             pinnedTaskBoards={pinsData?.taskBoards ?? []}
           />
-        ) : activeConversationId && (isDashboardRoute || isDemoRoom) && isEngineeringRoom ? (
+        ) : activeConversationId && isDemoRoom && isEngineeringRoom ? (
           <EngineeringRoomDashboard
+            starshipId={starshipData.id}
+            starshipSlug={routeParams.slug}
+            roomSlug={activeRoom?.slug ?? normalizedRoomSlug}
+            roomName={activeRoom?.name}
+            pinnedDatasets={pinsData?.datasets ?? []}
+            pinnedTaskBoards={pinsData?.taskBoards ?? []}
+          />
+        ) : activeConversationId && isDashboardRoute && isEngineeringRoom ? (
+          <EngineeringDashboard
             starshipId={starshipData.id}
             starshipSlug={routeParams.slug}
             roomSlug={activeRoom?.slug ?? normalizedRoomSlug}

@@ -71,9 +71,30 @@ export function Nav() {
   const room = ROOM_BY_PATH[pathname];
   const demoHref = room ? `/request-demo?room=${room}` : '/request-demo';
 
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  // Close the mobile menu whenever navigation lands on a new route.
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [pathname]);
+
+  // Lock background scroll while the fullscreen mobile menu is open.
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, [mobileOpen]);
+
   return (
     <header className="fixed top-8 left-0 right-0 z-50 px-4">
-      <nav className="mx-auto max-w-5xl flex items-center justify-between rounded-full bg-black/30 backdrop-blur-xl pl-6 pr-4 py-3.5 sm:py-4">
+      <nav
+        className={`relative z-10 mx-auto max-w-5xl flex items-center justify-between rounded-full pl-6 pr-4 py-3.5 sm:py-4 sm:bg-black/30 sm:backdrop-blur-xl ${
+          mobileOpen ? 'bg-transparent backdrop-blur-none' : 'bg-black/30 backdrop-blur-xl'
+        }`}
+      >
         <div className="flex items-center gap-9">
           <Link href="/" className="flex items-center gap-3 text-(--color-fg) hover:opacity-80 transition-opacity">
             <Logo size={32} />
@@ -93,13 +114,65 @@ export function Nav() {
           </div>
         </div>
 
-        <Link
-          href={demoHref}
-          className="rounded-full bg-(--color-accent) px-5 py-2.5 text-[15px] font-medium text-(--color-bg) shadow-sm hover:bg-(--color-accent-strong) transition-colors"
-        >
-          Request demo
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            href={demoHref}
+            className="hidden sm:inline-flex rounded-full bg-(--color-accent) px-5 py-2.5 text-[15px] font-medium text-(--color-bg) shadow-sm hover:bg-(--color-accent-strong) transition-colors"
+          >
+            Request demo
+          </Link>
+          <button
+            type="button"
+            onClick={() => setMobileOpen((o) => !o)}
+            aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
+            aria-expanded={mobileOpen}
+            className="flex h-9 w-9 items-center justify-center rounded-full text-(--color-fg-muted) hover:text-(--color-fg) hover:bg-white/5 transition-colors sm:hidden"
+          >
+            <Icon name={mobileOpen ? 'close' : 'menu'} className="h-5 w-5" />
+          </button>
+        </div>
       </nav>
+
+      {/* Mobile menu — a fullscreen sheet that reads like the navbar expanding open */}
+      {mobileOpen && (
+        <div className="sm:hidden fixed inset-0 z-0 flex flex-col bg-black/30 backdrop-blur-xl px-6 pt-28 pb-10">
+          <nav className="flex flex-col">
+            <Link
+              href="/how-it-works"
+              className="border-b border-white/10 py-5 text-3xl font-semibold tracking-tight text-(--color-fg) transition-opacity hover:opacity-70"
+            >
+              How it works
+            </Link>
+
+            <div className="border-b border-white/10 py-5">
+              <Link
+                href="/use-cases"
+                className="block text-3xl font-semibold tracking-tight text-(--color-fg) transition-opacity hover:opacity-70"
+              >
+                Use cases
+              </Link>
+              <div className="mt-3 flex flex-col gap-2.5">
+                {USE_CASES.filter(({ href }) => href !== '/use-cases').map(({ label, href }) => (
+                  <Link
+                    key={href}
+                    href={href}
+                    className="text-xl text-(--color-fg-muted) transition-colors hover:text-(--color-fg)"
+                  >
+                    {label}
+                  </Link>
+                ))}
+              </div>
+            </div>
+          </nav>
+
+          <Link
+            href={demoHref}
+            className="mt-auto flex items-center justify-center rounded-full bg-(--color-accent) px-6 py-4 text-lg font-medium text-(--color-bg) shadow-sm transition-colors hover:bg-(--color-accent-strong)"
+          >
+            Request demo
+          </Link>
+        </div>
+      )}
     </header>
   );
 }

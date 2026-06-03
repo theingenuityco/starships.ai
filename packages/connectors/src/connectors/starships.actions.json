@@ -1,0 +1,4435 @@
+[
+  {
+    "name": "admin-create-connector-template",
+    "description": "Create a connector template (instance admin only)",
+    "method": "POST",
+    "path": "/admin/connector-templates",
+    "requestStyle": "json",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "provider",
+        "name",
+        "description",
+        "authType",
+        "baseUrl",
+        "auth",
+        "endpoints"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "auth": {
+          "type": "object"
+        },
+        "name": {
+          "type": "string"
+        },
+        "slug": {
+          "type": "string"
+        },
+        "baseUrl": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        },
+        "authType": {
+          "enum": [
+            "oauth2",
+            "api_key",
+            "platform_jwt",
+            "none"
+          ],
+          "type": "string"
+        },
+        "category": {
+          "type": "string"
+        },
+        "provider": {
+          "type": "string"
+        },
+        "endpoints": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "isEnabled": {
+          "type": "boolean"
+        },
+        "rateLimit": {
+          "type": "object"
+        },
+        "variables": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "description": {
+          "type": "string"
+        },
+        "metadataSchema": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": false
+    },
+    "mapping": {
+      "body": {
+        "id": "{{ args.id }}",
+        "auth": "{{ args.auth }}",
+        "name": "{{ args.name }}",
+        "slug": "{{ args.slug }}",
+        "baseUrl": "{{ args.baseUrl }}",
+        "version": "{{ args.version }}",
+        "authType": "{{ args.authType }}",
+        "category": "{{ args.category }}",
+        "provider": "{{ args.provider }}",
+        "endpoints": "{{ args.endpoints }}",
+        "isEnabled": "{{ args.isEnabled }}",
+        "rateLimit": "{{ args.rateLimit }}",
+        "variables": "{{ args.variables }}",
+        "description": "{{ args.description }}",
+        "metadataSchema": "{{ args.metadataSchema }}"
+      }
+    },
+    "timeoutMs": 10000
+  },
+  {
+    "name": "admin-delete-connector-template",
+    "description": "Delete a connector template (instance admin only)",
+    "method": "DELETE",
+    "path": "/admin/connector-templates/{id}",
+    "requestStyle": "query",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "id"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "mapping": {
+      "path": {
+        "id": "{{ String(args.id ?? '') }}"
+      }
+    },
+    "timeoutMs": 5000
+  },
+  {
+    "name": "admin-get-connector-template",
+    "description": "Get a connector template (instance admin only)",
+    "method": "GET",
+    "path": "/admin/connector-templates/{id}",
+    "requestStyle": "query",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "id"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "mapping": {
+      "path": {
+        "id": "{{ String(args.id ?? '') }}"
+      }
+    },
+    "timeoutMs": 5000
+  },
+  {
+    "name": "admin-list-connector-templates",
+    "description": "List connector templates (instance admin only)",
+    "method": "GET",
+    "path": "/admin/connector-templates",
+    "requestStyle": "query",
+    "parameters": {
+      "type": "object",
+      "required": [],
+      "properties": {},
+      "additionalProperties": false
+    },
+    "timeoutMs": 5000
+  },
+  {
+    "name": "admin-update-connector-template",
+    "description": "Update a connector template (instance admin only)",
+    "method": "PUT",
+    "path": "/admin/connector-templates/{id}",
+    "requestStyle": "json",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "id"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "auth": {
+          "type": "object"
+        },
+        "name": {
+          "type": "string"
+        },
+        "baseUrl": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        },
+        "authType": {
+          "enum": [
+            "oauth2",
+            "api_key",
+            "platform_jwt",
+            "none"
+          ],
+          "type": "string"
+        },
+        "category": {
+          "type": "string"
+        },
+        "endpoints": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "isEnabled": {
+          "type": "boolean"
+        },
+        "rateLimit": {
+          "type": "object"
+        },
+        "variables": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "description": {
+          "type": "string"
+        },
+        "metadataSchema": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": false
+    },
+    "mapping": {
+      "body": {
+        "auth": "{{ args.auth }}",
+        "name": "{{ args.name }}",
+        "baseUrl": "{{ args.baseUrl }}",
+        "version": "{{ args.version }}",
+        "authType": "{{ args.authType }}",
+        "category": "{{ args.category }}",
+        "endpoints": "{{ args.endpoints }}",
+        "isEnabled": "{{ args.isEnabled }}",
+        "rateLimit": "{{ args.rateLimit }}",
+        "variables": "{{ args.variables }}",
+        "description": "{{ args.description }}",
+        "metadataSchema": "{{ args.metadataSchema }}"
+      },
+      "path": {
+        "id": "{{ String(args.id ?? '') }}"
+      }
+    },
+    "timeoutMs": 10000
+  },
+  {
+    "name": "authorize-and-maybe-execute-tool",
+    "description": "Authorize and optionally execute a tool call via the Starships API",
+    "method": "POST",
+    "path": "/conversations/{conversationId}/tool-calls/authorize-and-maybe-execute",
+    "requestStyle": "json",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "agentId",
+        "toolSlug",
+        "toolCallId",
+        "args"
+      ],
+      "properties": {
+        "args": {
+          "type": "object"
+        },
+        "agentId": {
+          "type": "string"
+        },
+        "toolSlug": {
+          "type": "string"
+        },
+        "toolCallId": {
+          "type": "string"
+        },
+        "conversationId": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "mapping": {
+      "body": {
+        "args": "{{ args.args ?? {} }}",
+        "agentId": "{{ String(args.agentId ?? \"\") }}",
+        "toolSlug": "{{ String(args.toolSlug ?? \"\") }}",
+        "toolCallId": "{{ String(args.toolCallId ?? \"\") }}"
+      },
+      "path": {
+        "conversationId": "{{ String(runtimeEnv.CONVERSATION_ID ?? args.conversationId ?? \"\") }}"
+      }
+    },
+    "timeoutMs": 120000
+  },
+  {
+    "name": "list-connectors",
+    "description": "List connectors for a starship",
+    "method": "GET",
+    "path": "/starships/{starshipId}/connectors",
+    "requestStyle": "query",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "starshipId"
+      ],
+      "properties": {
+        "starshipId": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "mapping": {
+      "path": {
+        "starshipId": "{{ String(args.starshipId ?? runtimeEnv.STARSHIP_ID ?? \"\") }}"
+      }
+    },
+    "timeoutMs": 5000
+  },
+  {
+    "name": "list-tools",
+    "description": "List tools for a starship",
+    "method": "GET",
+    "path": "/starships/{starshipId}/tools",
+    "requestStyle": "query",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "starshipId"
+      ],
+      "properties": {
+        "starshipId": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "mapping": {
+      "path": {
+        "starshipId": "{{ String(args.starshipId ?? runtimeEnv.STARSHIP_ID ?? \"\") }}"
+      }
+    },
+    "timeoutMs": 5000
+  },
+  {
+    "name": "get-tool",
+    "description": "Get a tool by slug within a starship",
+    "method": "GET",
+    "path": "/starships/{starshipId}/tools/{slug}",
+    "requestStyle": "query",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "starshipId",
+        "slug"
+      ],
+      "properties": {
+        "slug": {
+          "type": "string"
+        },
+        "starshipId": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "mapping": {
+      "path": {
+        "slug": "{{ String(args.slug ?? \"\") }}",
+        "starshipId": "{{ String(args.starshipId ?? runtimeEnv.STARSHIP_ID ?? \"\") }}"
+      }
+    },
+    "timeoutMs": 5000
+  },
+  {
+    "name": "create-tool",
+    "description": "Create a tool within a starship",
+    "method": "POST",
+    "path": "/starships/{starshipId}/tools",
+    "requestStyle": "json",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "starshipId",
+        "name",
+        "description"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "blueprint": {
+          "type": "object"
+        },
+        "isEnabled": {
+          "type": "boolean"
+        },
+        "parameters": {
+          "type": "object"
+        },
+        "starshipId": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "configuration": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": true
+    },
+    "mapping": {
+      "body": {
+        "name": "{{ args.name }}",
+        "status": "{{ args.status }}",
+        "blueprint": "{{ args.blueprint }}",
+        "isEnabled": "{{ args.isEnabled }}",
+        "parameters": "{{ args.parameters }}",
+        "description": "{{ args.description }}",
+        "configuration": "{{ args.configuration }}"
+      },
+      "path": {
+        "starshipId": "{{ String(args.starshipId ?? runtimeEnv.STARSHIP_ID ?? \"\") }}"
+      }
+    },
+    "timeoutMs": 10000
+  },
+  {
+    "name": "update-tool",
+    "description": "Update a tool by id (partial updates supported)",
+    "method": "PUT",
+    "path": "/tools/{toolId}",
+    "requestStyle": "json",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "toolId"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "slug": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "toolId": {
+          "type": "string"
+        },
+        "blueprint": {
+          "type": "object"
+        },
+        "isEnabled": {
+          "type": "boolean"
+        },
+        "parameters": {
+          "type": "object"
+        },
+        "description": {
+          "type": "string"
+        },
+        "configuration": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": true
+    },
+    "mapping": {
+      "body": {
+        "name": "{{ args.name }}",
+        "slug": "{{ args.slug }}",
+        "status": "{{ args.status }}",
+        "blueprint": "{{ args.blueprint }}",
+        "isEnabled": "{{ args.isEnabled }}",
+        "parameters": "{{ args.parameters }}",
+        "description": "{{ args.description }}",
+        "configuration": "{{ args.configuration }}"
+      },
+      "path": {
+        "toolId": "{{ String(args.toolId ?? \"\") }}"
+      }
+    },
+    "timeoutMs": 10000
+  },
+  {
+    "name": "create-doc",
+    "description": "Create a doc (unstructured markdown) within a starship",
+    "method": "POST",
+    "path": "/starships/{starshipId}/docs",
+    "requestStyle": "json",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "title",
+        "content"
+      ],
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "content": {
+          "type": "string"
+        },
+        "starshipId": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
+    "mapping": {
+      "body": {
+        "title": "{{ args.title }}",
+        "content": "{{ args.content }}"
+      },
+      "path": {
+        "starshipId": "{{ String(args.starshipId ?? runtimeEnv.STARSHIP_ID ?? \"\") }}"
+      }
+    },
+    "timeoutMs": 10000
+  },
+  {
+    "name": "edit-doc",
+    "description": "Update a doc by id (title, content, archived)",
+    "method": "PATCH",
+    "path": "/starships/{starshipId}/docs/{docId}",
+    "requestStyle": "json",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "docId"
+      ],
+      "properties": {
+        "docId": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "content": {
+          "type": "string"
+        },
+        "archived": {
+          "type": "boolean"
+        },
+        "starshipId": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
+    "mapping": {
+      "body": {
+        "title": "{{ args.title }}",
+        "content": "{{ args.content }}",
+        "archived": "{{ args.archived }}"
+      },
+      "path": {
+        "starshipId": "{{ String(args.starshipId ?? runtimeEnv.STARSHIP_ID ?? \"\") }}",
+        "docId": "{{ String(args.docId ?? \"\") }}"
+      }
+    },
+    "timeoutMs": 10000
+  },
+  {
+    "name": "list-agents",
+    "description": "List agents for a starship",
+    "method": "GET",
+    "path": "/starships/{starshipId}/agents",
+    "requestStyle": "query",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "starshipId"
+      ],
+      "properties": {
+        "starshipId": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "mapping": {
+      "path": {
+        "starshipId": "{{ String(args.starshipId ?? runtimeEnv.STARSHIP_ID ?? \"\") }}"
+      }
+    },
+    "timeoutMs": 5000
+  },
+  {
+    "name": "get-agent",
+    "description": "Get an agent by slug within a starship",
+    "method": "GET",
+    "path": "/starships/{starshipId}/agents/{slug}",
+    "requestStyle": "query",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "starshipId",
+        "slug"
+      ],
+      "properties": {
+        "slug": {
+          "type": "string"
+        },
+        "starshipId": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "mapping": {
+      "path": {
+        "slug": "{{ String(args.slug ?? \"\") }}",
+        "starshipId": "{{ String(args.starshipId ?? runtimeEnv.STARSHIP_ID ?? \"\") }}"
+      }
+    },
+    "timeoutMs": 5000
+  },
+  {
+    "name": "create-agent",
+    "description": "Create an agent (draft) for a starship",
+    "method": "POST",
+    "path": "/agents",
+    "requestStyle": "json",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "starshipId",
+        "name",
+        "role"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "role": {
+          "type": "string"
+        },
+        "model": {
+          "type": "string"
+        },
+        "maxTokens": {
+          "type": "number"
+        },
+        "starshipId": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "temperature": {
+          "type": "number"
+        },
+        "systemPrompt": {
+          "type": "string"
+        },
+        "previewPrompts": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "mapping": {
+      "body": {
+        "name": "{{ args.name }}",
+        "role": "{{ args.role }}",
+        "model": "{{ args.model }}",
+        "maxTokens": "{{ args.maxTokens }}",
+        "starshipId": "{{ String(args.starshipId ?? runtimeEnv.STARSHIP_ID ?? \"\") }}",
+        "description": "{{ args.description }}",
+        "temperature": "{{ args.temperature }}",
+        "systemPrompt": "{{ args.systemPrompt }}",
+        "previewPrompts": "{{ args.previewPrompts }}"
+      }
+    },
+    "timeoutMs": 10000
+  },
+  {
+    "name": "get-agent-by-slug",
+    "description": "Get an agent by slug or id (global agents route)",
+    "method": "GET",
+    "path": "/agents/{slugOrId}",
+    "requestStyle": "query",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "slugOrId"
+      ],
+      "properties": {
+        "slugOrId": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "mapping": {
+      "path": {
+        "slugOrId": "{{ String(args.slugOrId ?? \"\") }}"
+      }
+    },
+    "timeoutMs": 5000
+  },
+  {
+    "name": "update-agent",
+    "description": "Update an agent by id (partial updates supported)",
+    "method": "PUT",
+    "path": "/agents/{agentId}",
+    "requestStyle": "json",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "agentId"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "role": {
+          "type": "string"
+        },
+        "model": {
+          "type": "string"
+        },
+        "agentId": {
+          "type": "string"
+        },
+        "timeout": {
+          "type": "number"
+        },
+        "blueprint": {
+          "type": "object"
+        },
+        "maxTokens": {
+          "type": "number"
+        },
+        "description": {
+          "type": "string"
+        },
+        "temperature": {
+          "type": "number"
+        },
+        "systemPrompt": {
+          "type": "string"
+        },
+        "previewPrompts": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "mapping": {
+      "body": {
+        "name": "{{ args.name }}",
+        "role": "{{ args.role }}",
+        "model": "{{ args.model }}",
+        "timeout": "{{ args.timeout }}",
+        "blueprint": "{{ args.blueprint }}",
+        "maxTokens": "{{ args.maxTokens }}",
+        "description": "{{ args.description }}",
+        "temperature": "{{ args.temperature }}",
+        "systemPrompt": "{{ args.systemPrompt }}",
+        "previewPrompts": "{{ args.previewPrompts }}"
+      },
+      "path": {
+        "agentId": "{{ String(args.agentId ?? \"\") }}"
+      }
+    },
+    "timeoutMs": 10000
+  },
+  {
+    "name": "assign-agent-tool",
+    "description": "Assign a tool to an agent by id + toolSlug",
+    "method": "POST",
+    "path": "/agents/{agentId}/tools/{toolSlug}",
+    "requestStyle": "json",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "agentId",
+        "toolSlug"
+      ],
+      "properties": {
+        "agentId": {
+          "type": "string"
+        },
+        "toolSlug": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "mapping": {
+      "path": {
+        "agentId": "{{ String(args.agentId ?? \"\") }}",
+        "toolSlug": "{{ String(args.toolSlug ?? \"\") }}"
+      }
+    },
+    "timeoutMs": 10000
+  },
+  {
+    "name": "unassign-agent-tool",
+    "description": "Remove a tool from an agent by id + toolSlug",
+    "method": "DELETE",
+    "path": "/agents/{agentId}/tools/{toolSlug}",
+    "requestStyle": "query",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "agentId",
+        "toolSlug"
+      ],
+      "properties": {
+        "agentId": {
+          "type": "string"
+        },
+        "toolSlug": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "mapping": {
+      "path": {
+        "agentId": "{{ String(args.agentId ?? \"\") }}",
+        "toolSlug": "{{ String(args.toolSlug ?? \"\") }}"
+      }
+    },
+    "timeoutMs": 10000
+  },
+  {
+    "name": "search-docs",
+    "description": "Search docs listing / fulltext",
+    "method": "GET",
+    "path": "/docs",
+    "requestStyle": "query",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "q": {
+          "type": "string"
+        },
+        "limit": {
+          "type": "number"
+        }
+      },
+      "additionalProperties": false
+    },
+    "mapping": {
+      "query": {
+        "q": "{{ String(args.q ?? \"\") }}",
+        "limit": "{{ args.limit == null ? \"\" : String(args.limit) }}"
+      }
+    },
+    "timeoutMs": 5000
+  },
+  {
+    "name": "get-doc",
+    "description": "Get a single doc page by slug (supports nested slugs)",
+    "method": "GET",
+    "path": "/docs/{slug}",
+    "requestStyle": "query",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "slug"
+      ],
+      "properties": {
+        "slug": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "mapping": {
+      "path": {
+        "slug": "{{ String(args.slug ?? \"\") }}"
+      }
+    },
+    "timeoutMs": 5000
+  },
+  {
+    "name": "list-models",
+    "description": "List OpenRouter models via Starships proxy",
+    "method": "GET",
+    "path": "/llm/models",
+    "requestStyle": "query",
+    "parameters": {
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    },
+    "timeoutMs": 10000
+  },
+  {
+    "name": "create-conversation",
+    "description": "Create a conversation (optionally as a child conversation)",
+    "method": "POST",
+    "path": "/conversations",
+    "requestStyle": "json",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "starshipId"
+      ],
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "agentSlug": {
+          "type": "string"
+        },
+        "starshipId": {
+          "type": "string"
+        },
+        "parentConversationId": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
+    "mapping": {
+      "body": {
+        "title": "{{ args.title }}",
+        "agentSlug": "{{ args.agentSlug }}",
+        "starshipId": "{{ String(args.starshipId ?? runtimeEnv.STARSHIP_ID ?? \"\") }}",
+        "parentConversationId": "{{ args.parentConversationId }}"
+      }
+    },
+    "timeoutMs": 10000
+  },
+  {
+    "name": "send-message",
+    "description": "Send a message to a conversation",
+    "method": "POST",
+    "path": "/conversations/{conversationId}/messages",
+    "requestStyle": "json",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "conversationId",
+        "content"
+      ],
+      "properties": {
+        "sync": {
+          "type": "boolean"
+        },
+        "content": {
+          "type": "string"
+        },
+        "conversationId": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
+    "mapping": {
+      "body": {
+        "sync": "{{ args.sync }}",
+        "content": "{{ args.content }}"
+      },
+      "path": {
+        "conversationId": "{{ String(args.conversationId ?? \"\") }}"
+      }
+    },
+    "timeoutMs": 300000
+  },
+  {
+    "name": "create-widget",
+    "description": "Create a widget",
+    "method": "POST",
+    "path": "/widgets",
+    "requestStyle": "json",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "name",
+        "description",
+        "widgetType",
+        "props",
+        "starshipId"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "props": {
+          "type": "object"
+        },
+        "starshipId": {
+          "type": "string"
+        },
+        "widgetType": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
+    "mapping": {
+      "body": {
+        "name": "{{ args.name }}",
+        "props": "{{ args.props }}",
+        "starshipId": "{{ String(args.starshipId ?? runtimeEnv.STARSHIP_ID ?? \"\") }}",
+        "widgetType": "{{ args.widgetType }}",
+        "description": "{{ args.description }}"
+      }
+    },
+    "timeoutMs": 5000
+  },
+  {
+    "name": "update-widget",
+    "description": "Update a widget by id",
+    "method": "PUT",
+    "path": "/widgets/{widgetId}",
+    "requestStyle": "json",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "widgetId"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "props": {
+          "type": "object"
+        },
+        "widgetId": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
+    "mapping": {
+      "body": {
+        "name": "{{ args.name }}",
+        "props": "{{ args.props }}",
+        "description": "{{ args.description }}"
+      },
+      "path": {
+        "widgetId": "{{ String(args.widgetId ?? \"\") }}"
+      }
+    },
+    "timeoutMs": 5000
+  },
+  {
+    "name": "list-agents-from-marketplace",
+    "description": "List all agent templates from the marketplace",
+    "method": "GET",
+    "path": "/agent-templates",
+    "requestStyle": "query",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "page": {
+          "type": "number"
+        },
+        "limit": {
+          "type": "number"
+        },
+        "query": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "mapping": {
+      "query": {
+        "page": "{{ args.page ?? 1 }}",
+        "limit": "{{ args.limit ?? 50 }}",
+        "query": "{{ args.query }}"
+      }
+    },
+    "timeoutMs": 5000
+  },
+  {
+    "name": "deploy-agents-from-marketplace",
+    "description": "Create an agent on a starship from a marketplace template",
+    "method": "POST",
+    "path": "/agent-templates/{templateId}/agents",
+    "requestStyle": "json",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "templateId"
+      ],
+      "properties": {
+        "starshipId": {
+          "type": "string"
+        },
+        "templateId": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "mapping": {
+      "body": {
+        "starshipId": "{{ String(args.starshipId || runtimeEnv.STARSHIP_ID || \"\") }}"
+      },
+      "path": {
+        "templateId": "{{ String(args.templateId ?? \"\") }}"
+      }
+    },
+    "timeoutMs": 15000
+  },
+  {
+    "name": "search-widgets",
+    "description": "Search widgets (server-side filtered list)",
+    "method": "GET",
+    "path": "/starships/{starshipId}/widgets",
+    "requestStyle": "query",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "starshipId"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "slug": {
+          "type": "string"
+        },
+        "limit": {
+          "type": "number"
+        },
+        "offset": {
+          "type": "number"
+        },
+        "starshipId": {
+          "type": "string"
+        },
+        "widgetType": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "mapping": {
+      "path": {
+        "starshipId": "{{ String(args.starshipId ?? runtimeEnv.STARSHIP_ID ?? \"\") }}"
+      },
+      "query": {
+        "name": "{{ args.name == null ? \"\" : String(args.name) }}",
+        "slug": "{{ args.slug == null ? \"\" : String(args.slug) }}",
+        "limit": "{{ args.limit == null ? \"\" : String(args.limit) }}",
+        "offset": "{{ args.offset == null ? \"\" : String(args.offset) }}",
+        "widgetType": "{{ args.widgetType == null ? \"\" : String(args.widgetType) }}"
+      }
+    },
+    "timeoutMs": 5000
+  },
+  {
+    "name": "get-starship",
+    "description": "Get a starship by id (or slug)",
+    "method": "GET",
+    "path": "/starships/{starshipId}",
+    "requestStyle": "query",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "starshipId"
+      ],
+      "properties": {
+        "starshipId": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "mapping": {
+      "path": {
+        "starshipId": "{{ String(args.starshipId ?? runtimeEnv.STARSHIP_ID ?? \"\") }}"
+      }
+    },
+    "timeoutMs": 5000
+  },
+  {
+    "name": "get-attachments-preview-urls",
+    "description": "Get attachment metadata + previewUrl (presigned download URLs) for one or more attachment ids",
+    "method": "GET",
+    "path": "/attachments",
+    "requestStyle": "query",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "starshipId",
+        "ids"
+      ],
+      "properties": {
+        "ids": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          ]
+        },
+        "starshipId": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "mapping": {
+      "query": {
+        "ids": "{{ Array.isArray(args.ids) ? args.ids.join(\",\") : String(args.ids ?? \"\") }}",
+        "starshipId": "{{ String(args.starshipId ?? runtimeEnv.STARSHIP_ID ?? \"\") }}"
+      }
+    },
+    "timeoutMs": 15000
+  },
+  {
+    "name": "search-connector",
+    "description": "Search connector templates (catalog) by query",
+    "method": "GET",
+    "path": "/connectors/catalog",
+    "requestStyle": "query",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "q": {
+          "type": "string",
+          "description": "Search query"
+        },
+        "limit": {
+          "type": "number",
+          "description": "Maximum results (1-100)"
+        }
+      },
+      "additionalProperties": false
+    },
+    "mapping": {
+      "query": {
+        "q": "{{ String(args.q ?? \"\") }}",
+        "limit": "{{ Number(args.limit ?? 20) }}"
+      }
+    },
+    "timeoutMs": 5000
+  },
+  {
+    "name": "get-conversation-messages",
+    "description": "Get conversation messages (supports tail-offset and keyset cursor pagination)",
+    "method": "GET",
+    "path": "/conversations/{conversationId}/messages",
+    "requestStyle": "query",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "limit": {
+          "type": "number",
+          "description": "Maximum messages to return (1-200)"
+        },
+        "offset": {
+          "type": "number",
+          "description": "Tail offset (skip N most recent messages)"
+        },
+        "beforeId": {
+          "type": "string",
+          "description": "Keyset cursor id (must be provided with beforeCreatedAt)"
+        },
+        "conversationId": {
+          "type": "string",
+          "description": "Conversation id (defaults to runtimeEnv.CONVERSATION_ID)"
+        },
+        "orderDirection": {
+          "type": "string",
+          "description": "Optional orderDirection: asc or desc"
+        },
+        "beforeCreatedAt": {
+          "type": "string",
+          "description": "Keyset cursor timestamp (must be provided with beforeId)"
+        }
+      },
+      "additionalProperties": false
+    },
+    "mapping": {
+      "path": {
+        "conversationId": "{{ String(args.conversationId ?? runtimeEnv.CONVERSATION_ID ?? \"\") }}"
+      },
+      "query": {
+        "limit": "{{ Number(args.limit ?? 50) }}",
+        "offset": "{{ Number(args.offset ?? 0) }}",
+        "beforeId": "{{ args.beforeId }}",
+        "orderDirection": "{{ args.orderDirection }}",
+        "beforeCreatedAt": "{{ args.beforeCreatedAt }}"
+      }
+    },
+    "timeoutMs": 10000
+  },
+  {
+    "name": "admin-list-connector-template-actions",
+    "description": "List connector template actions (instance admin only)",
+    "method": "GET",
+    "path": "/admin/connector-templates/{templateId}/actions",
+    "requestStyle": "query",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "templateId"
+      ],
+      "properties": {
+        "q": {
+          "type": "string",
+          "description": "Optional search query (name/path/description)"
+        },
+        "limit": {
+          "type": "number",
+          "description": "Page size (1-200)"
+        },
+        "offset": {
+          "type": "number",
+          "description": "Page offset (0+)"
+        },
+        "templateId": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "mapping": {
+      "path": {
+        "templateId": "{{ String(args.templateId ?? args.id ?? \"\") }}"
+      },
+      "query": {
+        "q": "{{ args.q ? String(args.q) : undefined }}",
+        "limit": "{{ args.limit === undefined ? undefined : Number(args.limit) }}",
+        "offset": "{{ args.offset === undefined ? undefined : Number(args.offset) }}"
+      }
+    },
+    "timeoutMs": 10000
+  },
+  {
+    "name": "admin-get-connector-template-action",
+    "description": "Get a connector template action definition (instance admin only)",
+    "method": "GET",
+    "path": "/admin/connector-templates/{templateId}/actions/{actionName}",
+    "requestStyle": "query",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "templateId",
+        "actionName"
+      ],
+      "properties": {
+        "actionName": {
+          "type": "string"
+        },
+        "templateId": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "mapping": {
+      "path": {
+        "actionName": "{{ String(args.actionName ?? args.name ?? \"\") }}",
+        "templateId": "{{ String(args.templateId ?? args.id ?? \"\") }}"
+      }
+    },
+    "timeoutMs": 10000
+  },
+  {
+    "name": "admin-upsert-connector-template-action",
+    "description": "Create or update a connector template action (instance admin only)",
+    "method": "PUT",
+    "path": "/admin/connector-templates/{templateId}/actions/{actionName}",
+    "requestStyle": "json",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "templateId",
+        "actionName",
+        "action"
+      ],
+      "properties": {
+        "action": {
+          "type": "object",
+          "description": "ConnectorEndpointV2 shape"
+        },
+        "ordinal": {
+          "type": "number"
+        },
+        "actionName": {
+          "type": "string"
+        },
+        "templateId": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
+    "mapping": {
+      "body": {
+        "action": "{{ args.action }}",
+        "ordinal": "{{ args.ordinal }}"
+      },
+      "path": {
+        "actionName": "{{ String(args.actionName ?? args.name ?? \"\") }}",
+        "templateId": "{{ String(args.templateId ?? args.id ?? \"\") }}"
+      }
+    },
+    "timeoutMs": 20000
+  },
+  {
+    "name": "admin-delete-connector-template-action",
+    "description": "Delete a connector template action (instance admin only)",
+    "method": "DELETE",
+    "path": "/admin/connector-templates/{templateId}/actions/{actionName}",
+    "requestStyle": "query",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "templateId",
+        "actionName"
+      ],
+      "properties": {
+        "actionName": {
+          "type": "string"
+        },
+        "templateId": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "mapping": {
+      "path": {
+        "actionName": "{{ String(args.actionName ?? args.name ?? \"\") }}",
+        "templateId": "{{ String(args.templateId ?? args.id ?? \"\") }}"
+      }
+    },
+    "timeoutMs": 20000
+  },
+  {
+    "name": "admin-bulk-replace-connector-template-actions",
+    "description": "Replace all connector template actions (instance admin only)",
+    "method": "PUT",
+    "path": "/admin/connector-templates/{templateId}/actions",
+    "requestStyle": "json",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "templateId",
+        "actions"
+      ],
+      "properties": {
+        "actions": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          },
+          "description": "ConnectorEndpointV2[]"
+        },
+        "templateId": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
+    "mapping": {
+      "body": {
+        "actions": "{{ args.actions }}"
+      },
+      "path": {
+        "templateId": "{{ String(args.templateId ?? args.id ?? \"\") }}"
+      }
+    },
+    "timeoutMs": 60000
+  },
+  {
+    "name": "search-views",
+    "description": "Search views (server-side filtered list)",
+    "method": "GET",
+    "path": "/starships/{starshipId}/views",
+    "requestStyle": "query",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "starshipId"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "slug": {
+          "type": "string"
+        },
+        "limit": {
+          "type": "number"
+        },
+        "offset": {
+          "type": "number"
+        },
+        "starshipId": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "mapping": {
+      "path": {
+        "starshipId": "{{ String(args.starshipId ?? runtimeEnv.STARSHIP_ID ?? \"\") }}"
+      },
+      "query": {
+        "name": "{{ args.name == null ? \"\" : String(args.name) }}",
+        "slug": "{{ args.slug == null ? \"\" : String(args.slug) }}",
+        "limit": "{{ args.limit == null ? \"\" : String(args.limit) }}",
+        "offset": "{{ args.offset == null ? \"\" : String(args.offset) }}"
+      }
+    },
+    "timeoutMs": 5000
+  },
+  {
+    "name": "get-view",
+    "description": "Get a view by id",
+    "method": "GET",
+    "path": "/views/{viewId}",
+    "requestStyle": "query",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "viewId"
+      ],
+      "properties": {
+        "viewId": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "mapping": {
+      "path": {
+        "viewId": "{{ String(args.viewId ?? args.id ?? \"\") }}"
+      }
+    },
+    "timeoutMs": 5000
+  },
+  {
+    "name": "get-view-by-slug",
+    "description": "Get a view by slug (requires starshipId query param)",
+    "method": "GET",
+    "path": "/views/slug/{slug}",
+    "requestStyle": "query",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "slug",
+        "starshipId"
+      ],
+      "properties": {
+        "slug": {
+          "type": "string"
+        },
+        "starshipId": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "mapping": {
+      "path": {
+        "slug": "{{ String(args.slug ?? \"\") }}"
+      },
+      "query": {
+        "starshipId": "{{ String(args.starshipId ?? runtimeEnv.STARSHIP_ID ?? \"\") }}"
+      }
+    },
+    "timeoutMs": 5000
+  },
+  {
+    "name": "create-view",
+    "description": "Create a view",
+    "method": "POST",
+    "path": "/views",
+    "requestStyle": "json",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "starshipId",
+        "name",
+        "description"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "root": {
+          "type": "object"
+        },
+        "slug": {
+          "type": "string"
+        },
+        "starshipId": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "runtimeConfig": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": true
+    },
+    "mapping": {
+      "body": {
+        "name": "{{ args.name }}",
+        "root": "{{ args.root }}",
+        "slug": "{{ args.slug }}",
+        "starshipId": "{{ String(args.starshipId ?? runtimeEnv.STARSHIP_ID ?? \"\") }}",
+        "description": "{{ args.description ?? \"\" }}",
+        "runtimeConfig": "{{ args.runtimeConfig }}"
+      }
+    },
+    "timeoutMs": 10000
+  },
+  {
+    "name": "update-view",
+    "description": "Update a view by id (partial updates supported)",
+    "method": "PUT",
+    "path": "/views/{viewId}",
+    "requestStyle": "json",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "viewId"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "root": {
+          "type": "object"
+        },
+        "viewId": {
+          "type": "string"
+        },
+        "version": {
+          "type": "number"
+        },
+        "description": {
+          "type": "string"
+        },
+        "runtimeConfig": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": true
+    },
+    "mapping": {
+      "body": {
+        "name": "{{ args.name }}",
+        "root": "{{ args.root }}",
+        "version": "{{ args.version }}",
+        "description": "{{ args.description }}",
+        "runtimeConfig": "{{ args.runtimeConfig }}"
+      },
+      "path": {
+        "viewId": "{{ String(args.viewId ?? args.id ?? \"\") }}"
+      }
+    },
+    "timeoutMs": 10000
+  },
+  {
+    "name": "delete-view",
+    "description": "Delete a view by id",
+    "method": "DELETE",
+    "path": "/views/{viewId}",
+    "requestStyle": "query",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "viewId"
+      ],
+      "properties": {
+        "viewId": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "mapping": {
+      "path": {
+        "viewId": "{{ String(args.viewId ?? args.id ?? \"\") }}"
+      }
+    },
+    "timeoutMs": 10000
+  },
+  {
+    "name": "attach-view-to-channel",
+    "description": "Attach (or detach) a view to a channel by setting attachedViewId",
+    "method": "PATCH",
+    "path": "/channels/{channelId}",
+    "requestStyle": "json",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "channelId"
+      ],
+      "properties": {
+        "channelId": {
+          "type": "string"
+        },
+        "attachedViewId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": true
+    },
+    "mapping": {
+      "body": {
+        "attachedViewId": "{{ args.attachedViewId }}"
+      },
+      "path": {
+        "channelId": "{{ String(args.channelId ?? \"\") }}"
+      }
+    },
+    "timeoutMs": 10000
+  },
+  {
+    "name": "list-channels",
+    "description": "List channels for a starship",
+    "method": "GET",
+    "path": "/starships/{starshipId}/channels",
+    "requestStyle": "query",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "starshipId"
+      ],
+      "properties": {
+        "starshipId": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "mapping": {
+      "path": {
+        "starshipId": "{{ String(args.starshipId ?? runtimeEnv.STARSHIP_ID ?? \"\") }}"
+      }
+    },
+    "timeoutMs": 10000
+  },
+  {
+    "name": "create-channel",
+    "description": "Create a channel (conversation-backed) within a starship",
+    "method": "POST",
+    "path": "/starships/{starshipId}/channels",
+    "requestStyle": "json",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "starshipId",
+        "slug",
+        "name"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "slug": {
+          "type": "string"
+        },
+        "topic": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "isPrivate": {
+          "type": "boolean"
+        },
+        "starshipId": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
+    "mapping": {
+      "body": {
+        "name": "{{ String(args.name ?? \"\") }}",
+        "slug": "{{ String(args.slug ?? \"\") }}",
+        "topic": "{{ args.topic }}",
+        "isPrivate": "{{ args.isPrivate }}"
+      },
+      "path": {
+        "starshipId": "{{ String(args.starshipId ?? runtimeEnv.STARSHIP_ID ?? \"\") }}"
+      }
+    },
+    "timeoutMs": 20000
+  },
+  {
+    "name": "get-channel",
+    "description": "Get a channel by id (conversation id)",
+    "method": "GET",
+    "path": "/channels/{channelId}",
+    "requestStyle": "query",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "channelId"
+      ],
+      "properties": {
+        "channelId": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "mapping": {
+      "path": {
+        "channelId": "{{ String(args.channelId ?? args.id ?? \"\") }}"
+      }
+    },
+    "timeoutMs": 10000
+  },
+  {
+    "name": "update-channel",
+    "description": "Update a channel by id (conversation id)",
+    "method": "PATCH",
+    "path": "/channels/{channelId}",
+    "requestStyle": "json",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "channelId"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "topic": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "channelId": {
+          "type": "string"
+        },
+        "isPrivate": {
+          "type": "boolean"
+        },
+        "attachedViewId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": true
+    },
+    "mapping": {
+      "body": {
+        "name": "{{ args.name }}",
+        "topic": "{{ args.topic }}",
+        "isPrivate": "{{ args.isPrivate }}",
+        "attachedViewId": "{{ args.attachedViewId }}"
+      },
+      "path": {
+        "channelId": "{{ String(args.channelId ?? args.id ?? \"\") }}"
+      }
+    },
+    "timeoutMs": 20000
+  },
+  {
+    "name": "delete-channel",
+    "description": "Delete a channel by id (conversation id)",
+    "method": "DELETE",
+    "path": "/channels/{channelId}",
+    "requestStyle": "query",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "channelId"
+      ],
+      "properties": {
+        "channelId": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "mapping": {
+      "path": {
+        "channelId": "{{ String(args.channelId ?? args.id ?? \"\") }}"
+      }
+    },
+    "timeoutMs": 20000
+  },
+  {
+    "name": "add-channel-member",
+    "description": "Add a member to a private channel",
+    "method": "POST",
+    "path": "/channels/{channelId}/members",
+    "requestStyle": "json",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "channelId",
+        "userId"
+      ],
+      "properties": {
+        "role": {
+          "enum": [
+            "member",
+            "admin"
+          ],
+          "type": "string"
+        },
+        "userId": {
+          "type": "string"
+        },
+        "channelId": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "mapping": {
+      "body": {
+        "role": "{{ args.role }}",
+        "userId": "{{ String(args.userId ?? \"\") }}"
+      },
+      "path": {
+        "channelId": "{{ String(args.channelId ?? args.id ?? \"\") }}"
+      }
+    },
+    "timeoutMs": 20000
+  },
+  {
+    "name": "remove-channel-member",
+    "description": "Remove a member from a private channel",
+    "method": "DELETE",
+    "path": "/channels/{channelId}/members/{userId}",
+    "requestStyle": "query",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "channelId",
+        "userId"
+      ],
+      "properties": {
+        "userId": {
+          "type": "string"
+        },
+        "channelId": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "mapping": {
+      "path": {
+        "userId": "{{ String(args.userId ?? \"\") }}",
+        "channelId": "{{ String(args.channelId ?? args.id ?? \"\") }}"
+      }
+    },
+    "timeoutMs": 20000
+  },
+  {
+    "name": "get-view-widgets",
+    "description": "List persisted view widget nodes for a view",
+    "method": "GET",
+    "path": "/views/{viewId}/widgets",
+    "requestStyle": "query",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "viewId"
+      ],
+      "properties": {
+        "viewId": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "mapping": {
+      "path": {
+        "viewId": "{{ String(args.viewId ?? args.id ?? \"\") }}"
+      }
+    },
+    "timeoutMs": 5000
+  },
+  {
+    "name": "update-view-widget",
+    "description": "Upsert a single view widget node (merges props on update)",
+    "method": "PATCH",
+    "path": "/views/{viewId}/widgets/{nodeId}",
+    "requestStyle": "json",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "viewId",
+        "nodeId"
+      ],
+      "properties": {
+        "type": {
+          "type": "string"
+        },
+        "props": {
+          "type": "object"
+        },
+        "nodeId": {
+          "type": "string"
+        },
+        "viewId": {
+          "type": "string"
+        },
+        "bindings": {
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "handlers": {
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "permissions": {
+          "type": [
+            "object",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "mapping": {
+      "body": {
+        "type": "{{ args.type }}",
+        "props": "{{ args.props }}",
+        "bindings": "{{ args.bindings }}",
+        "handlers": "{{ args.handlers }}",
+        "permissions": "{{ args.permissions }}"
+      },
+      "path": {
+        "nodeId": "{{ String(args.nodeId ?? \"\") }}",
+        "viewId": "{{ String(args.viewId ?? args.id ?? \"\") }}"
+      }
+    },
+    "timeoutMs": 10000
+  },
+  {
+    "name": "patch-view-root",
+    "description": "Apply JSON Patch ops to persisted structure-only view root",
+    "method": "PATCH",
+    "path": "/views/{viewId}/root",
+    "requestStyle": "json",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "viewId",
+        "patch"
+      ],
+      "properties": {
+        "patch": {
+          "type": "array"
+        },
+        "viewId": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "mapping": {
+      "body": {
+        "patch": "{{ args.patch }}"
+      },
+      "path": {
+        "viewId": "{{ String(args.viewId ?? args.id ?? \"\") }}"
+      }
+    },
+    "timeoutMs": 10000
+  },
+  {
+    "name": "list-task-boards",
+    "description": "List task boards for a starship",
+    "method": "GET",
+    "path": "/starships/{starshipId}/task-boards",
+    "requestStyle": "query",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "starshipId"
+      ],
+      "properties": {
+        "starshipId": {
+          "type": "string"
+        },
+        "includeArchived": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "mapping": {
+      "path": {
+        "starshipId": "{{ String(args.starshipId ?? runtimeEnv.STARSHIP_ID ?? \"\") }}"
+      },
+      "query": {
+        "includeArchived": "{{ args.includeArchived == null ? \"\" : String(args.includeArchived) }}"
+      }
+    },
+    "timeoutMs": 5000
+  },
+  {
+    "name": "create-task-board",
+    "description": "Create a task board for a starship",
+    "method": "POST",
+    "path": "/starships/{starshipId}/task-boards",
+    "requestStyle": "json",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "starshipId",
+        "name"
+      ],
+      "properties": {
+        "pos": {
+          "type": "number"
+        },
+        "name": {
+          "type": "string"
+        },
+        "slug": {
+          "type": "string"
+        },
+        "columns": {
+          "type": "array"
+        },
+        "starshipId": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "createDefaultColumns": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": true
+    },
+    "mapping": {
+      "body": {
+        "pos": "{{ args.pos }}",
+        "name": "{{ args.name }}",
+        "slug": "{{ args.slug }}",
+        "columns": "{{ args.columns }}",
+        "description": "{{ args.description }}",
+        "createDefaultColumns": "{{ args.createDefaultColumns }}"
+      },
+      "path": {
+        "starshipId": "{{ String(args.starshipId ?? runtimeEnv.STARSHIP_ID ?? \"\") }}"
+      }
+    },
+    "timeoutMs": 10000
+  },
+  {
+    "name": "get-task-board",
+    "description": "Get a task board with its columns (by id or slug)",
+    "method": "GET",
+    "path": "/starships/{starshipId}/task-boards/{boardIdOrSlug}",
+    "requestStyle": "query",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "starshipId"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "boardId": {
+          "type": "string"
+        },
+        "boardSlug": {
+          "type": "string"
+        },
+        "starshipId": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "mapping": {
+      "path": {
+        "starshipId": "{{ String(args.starshipId ?? runtimeEnv.STARSHIP_ID ?? \"\") }}",
+        "boardIdOrSlug": "{{ String(args.boardSlug ?? args.boardId ?? args.id ?? \"\") }}"
+      }
+    },
+    "timeoutMs": 5000
+  },
+  {
+    "name": "update-task-board",
+    "description": "Update a task board (by id or slug)",
+    "method": "PATCH",
+    "path": "/starships/{starshipId}/task-boards/{boardIdOrSlug}",
+    "requestStyle": "json",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "starshipId"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "pos": {
+          "type": "number"
+        },
+        "name": {
+          "type": "string"
+        },
+        "slug": {
+          "type": "string"
+        },
+        "boardId": {
+          "type": "string"
+        },
+        "archived": {
+          "type": "boolean"
+        },
+        "boardSlug": {
+          "type": "string"
+        },
+        "starshipId": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
+    "mapping": {
+      "body": {
+        "pos": "{{ args.pos }}",
+        "name": "{{ args.name }}",
+        "slug": "{{ args.slug }}",
+        "archived": "{{ args.archived }}",
+        "description": "{{ args.description }}"
+      },
+      "path": {
+        "starshipId": "{{ String(args.starshipId ?? runtimeEnv.STARSHIP_ID ?? \"\") }}",
+        "boardIdOrSlug": "{{ String(args.boardSlug ?? args.boardId ?? args.id ?? \"\") }}"
+      }
+    },
+    "timeoutMs": 10000
+  },
+  {
+    "name": "archive-task-board",
+    "description": "Archive a task board (soft-delete) (by id or slug)",
+    "method": "DELETE",
+    "path": "/starships/{starshipId}/task-boards/{boardIdOrSlug}",
+    "requestStyle": "query",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "starshipId"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "boardId": {
+          "type": "string"
+        },
+        "boardSlug": {
+          "type": "string"
+        },
+        "starshipId": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "mapping": {
+      "path": {
+        "starshipId": "{{ String(args.starshipId ?? runtimeEnv.STARSHIP_ID ?? \"\") }}",
+        "boardIdOrSlug": "{{ String(args.boardSlug ?? args.boardId ?? args.id ?? \"\") }}"
+      }
+    },
+    "timeoutMs": 10000
+  },
+  {
+    "name": "create-task-column",
+    "description": "Create a column in a task board (by id or slug)",
+    "method": "POST",
+    "path": "/starships/{starshipId}/task-boards/{boardIdOrSlug}/columns",
+    "requestStyle": "json",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "starshipId",
+        "title"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "key": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "pos": {
+          "type": "number"
+        },
+        "title": {
+          "type": "string"
+        },
+        "boardId": {
+          "type": "string"
+        },
+        "wipLimit": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "boardSlug": {
+          "type": "string"
+        },
+        "starshipId": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
+    "mapping": {
+      "body": {
+        "key": "{{ args.key }}",
+        "pos": "{{ args.pos }}",
+        "title": "{{ args.title }}",
+        "wipLimit": "{{ args.wipLimit }}"
+      },
+      "path": {
+        "starshipId": "{{ String(args.starshipId ?? runtimeEnv.STARSHIP_ID ?? \"\") }}",
+        "boardIdOrSlug": "{{ String(args.boardSlug ?? args.boardId ?? args.id ?? \"\") }}"
+      }
+    },
+    "timeoutMs": 10000
+  },
+  {
+    "name": "update-task-column",
+    "description": "Update a task column",
+    "method": "PATCH",
+    "path": "/task-columns/{columnId}",
+    "requestStyle": "json",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "columnId"
+      ],
+      "properties": {
+        "key": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "pos": {
+          "type": "number"
+        },
+        "title": {
+          "type": "string"
+        },
+        "columnId": {
+          "type": "string"
+        },
+        "wipLimit": {
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": true
+    },
+    "mapping": {
+      "body": {
+        "key": "{{ args.key }}",
+        "pos": "{{ args.pos }}",
+        "title": "{{ args.title }}",
+        "wipLimit": "{{ args.wipLimit }}"
+      },
+      "path": {
+        "columnId": "{{ String(args.columnId ?? args.id ?? \"\") }}"
+      }
+    },
+    "timeoutMs": 10000
+  },
+  {
+    "name": "delete-task-column",
+    "description": "Delete a task column",
+    "method": "DELETE",
+    "path": "/task-columns/{columnId}",
+    "requestStyle": "query",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "columnId"
+      ],
+      "properties": {
+        "columnId": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "mapping": {
+      "path": {
+        "columnId": "{{ String(args.columnId ?? args.id ?? \"\") }}"
+      }
+    },
+    "timeoutMs": 10000
+  },
+  {
+    "name": "list-task-cards",
+    "description": "List cards for a task board (by id or slug)",
+    "method": "GET",
+    "path": "/starships/{starshipId}/task-boards/{boardIdOrSlug}/cards",
+    "requestStyle": "query",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "starshipId"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "boardId": {
+          "type": "string"
+        },
+        "boardSlug": {
+          "type": "string"
+        },
+        "starshipId": {
+          "type": "string"
+        },
+        "includeArchived": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "mapping": {
+      "path": {
+        "starshipId": "{{ String(args.starshipId ?? runtimeEnv.STARSHIP_ID ?? \"\") }}",
+        "boardIdOrSlug": "{{ String(args.boardSlug ?? args.boardId ?? args.id ?? \"\") }}"
+      },
+      "query": {
+        "includeArchived": "{{ args.includeArchived == null ? \"\" : String(args.includeArchived) }}"
+      }
+    },
+    "timeoutMs": 5000
+  },
+  {
+    "name": "create-task-card",
+    "description": "Create a card in a task board (by id or slug)",
+    "method": "POST",
+    "path": "/starships/{starshipId}/task-boards/{boardIdOrSlug}/cards",
+    "requestStyle": "json",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "starshipId",
+        "title",
+        "columnName"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "pos": {
+          "type": "number"
+        },
+        "title": {
+          "type": "string"
+        },
+        "boardId": {
+          "type": "string"
+        },
+        "assignee": {
+          "anyOf": [
+            {
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Unified assignee reference: { type: \"user\"|\"agent\", slug } (users use u:<userId>)"
+        },
+        "columnId": {
+          "type": "string"
+        },
+        "priority": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "boardSlug": {
+          "type": "string"
+        },
+        "columnName": {
+          "type": "string",
+          "description": "Task column title/name (unique per board)"
+        },
+        "starshipId": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "assigneeUserId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "assigneeAgentId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": true
+    },
+    "mapping": {
+      "body": {
+        "pos": "{{ args.pos }}",
+        "title": "{{ args.title }}",
+        "assignee": "{{ args.assignee }}",
+        "columnId": "{{ args.columnId }}",
+        "priority": "{{ args.priority }}",
+        "columnName": "{{ args.columnName }}",
+        "description": "{{ args.description }}",
+        "assigneeUserId": "{{ args.assigneeUserId }}",
+        "assigneeAgentId": "{{ args.assigneeAgentId }}"
+      },
+      "path": {
+        "starshipId": "{{ String(args.starshipId ?? runtimeEnv.STARSHIP_ID ?? \"\") }}",
+        "boardIdOrSlug": "{{ String(args.boardSlug ?? args.boardId ?? args.id ?? \"\") }}"
+      }
+    },
+    "timeoutMs": 10000
+  },
+  {
+    "name": "update-task-card",
+    "description": "Update a task card",
+    "method": "PATCH",
+    "path": "/task-cards/{cardId}",
+    "requestStyle": "json",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "cardId"
+      ],
+      "properties": {
+        "pos": {
+          "type": "number"
+        },
+        "title": {
+          "type": "string"
+        },
+        "cardId": {
+          "type": "string"
+        },
+        "archived": {
+          "type": "boolean"
+        },
+        "assignee": {
+          "anyOf": [
+            {
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Unified assignee reference: { type: \"user\"|\"agent\", slug } (users use u:<userId>)"
+        },
+        "priority": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "description": {
+          "type": "string"
+        },
+        "assigneeUserId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "assigneeAgentId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": true
+    },
+    "mapping": {
+      "body": {
+        "pos": "{{ args.pos }}",
+        "title": "{{ args.title }}",
+        "archived": "{{ args.archived }}",
+        "assignee": "{{ args.assignee }}",
+        "priority": "{{ args.priority }}",
+        "description": "{{ args.description }}",
+        "assigneeUserId": "{{ args.assigneeUserId }}",
+        "assigneeAgentId": "{{ args.assigneeAgentId }}"
+      },
+      "path": {
+        "cardId": "{{ String(args.cardId ?? args.id ?? \"\") }}"
+      }
+    },
+    "timeoutMs": 10000
+  },
+  {
+    "name": "move-task-card",
+    "description": "Move a task card to a new column/position",
+    "method": "POST",
+    "path": "/task-cards/{cardId}/move",
+    "requestStyle": "json",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "cardId",
+        "toColumnName"
+      ],
+      "properties": {
+        "toPos": {
+          "type": "number"
+        },
+        "cardId": {
+          "type": "string"
+        },
+        "toColumnId": {
+          "type": "string"
+        },
+        "toColumnName": {
+          "type": "string",
+          "description": "Destination column title/name (unique per board)"
+        }
+      },
+      "additionalProperties": true
+    },
+    "mapping": {
+      "body": {
+        "toPos": "{{ args.toPos }}",
+        "toColumnId": "{{ args.toColumnId }}",
+        "toColumnName": "{{ args.toColumnName }}"
+      },
+      "path": {
+        "cardId": "{{ String(args.cardId ?? args.id ?? \"\") }}"
+      }
+    },
+    "timeoutMs": 10000
+  },
+  {
+    "name": "archive-task-card",
+    "description": "Archive a task card (soft-delete)",
+    "method": "DELETE",
+    "path": "/task-cards/{cardId}",
+    "requestStyle": "query",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "cardId"
+      ],
+      "properties": {
+        "cardId": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "mapping": {
+      "path": {
+        "cardId": "{{ String(args.cardId ?? args.id ?? \"\") }}"
+      }
+    },
+    "timeoutMs": 10000
+  },
+  {
+    "name": "list-tables",
+    "description": "List tables for a starship",
+    "method": "GET",
+    "path": "/starships/{starshipId}/tables",
+    "requestStyle": "query",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "starshipId"
+      ],
+      "properties": {
+        "starshipId": {
+          "type": "string"
+        },
+        "includeArchived": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "mapping": {
+      "path": {
+        "starshipId": "{{ String(args.starshipId ?? runtimeEnv.STARSHIP_ID ?? \"\") }}"
+      },
+      "query": {
+        "includeArchived": "{{ args.includeArchived == null ? \"\" : String(args.includeArchived) }}"
+      }
+    },
+    "timeoutMs": 5000
+  },
+  {
+    "name": "create-table",
+    "description": "Create a table for a starship",
+    "method": "POST",
+    "path": "/starships/{starshipId}/tables",
+    "requestStyle": "json",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "starshipId",
+        "name",
+        "columns"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "columns": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "name"
+            ],
+            "properties": {
+              "enum": {
+                "type": "object",
+                "required": [
+                  "options"
+                ],
+                "properties": {
+                  "options": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "additionalProperties": false
+              },
+              "name": {
+                "type": "string",
+                "description": "Stable key used in row objects"
+              },
+              "type": {
+                "enum": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "date",
+                  "datetime",
+                  "json",
+                  "enum",
+                  "reference",
+                  "formula"
+                ],
+                "type": "string"
+              },
+              "format": {
+                "enum": [
+                  "text",
+                  "number",
+                  "currency",
+                  "date",
+                  "datetime",
+                  "percentage"
+                ],
+                "type": "string"
+              },
+              "formula": {
+                "type": "object",
+                "required": [
+                  "expr"
+                ],
+                "properties": {
+                  "expr": {
+                    "type": "string"
+                  },
+                  "resultType": {
+                    "enum": [
+                      "string",
+                      "number",
+                      "boolean",
+                      "date",
+                      "datetime",
+                      "json",
+                      "enum"
+                    ],
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "reference": {
+                "type": "object",
+                "required": [
+                  "target"
+                ],
+                "properties": {
+                  "target": {
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "required": [
+                          "kind",
+                          "tableIdOrSlug"
+                        ],
+                        "properties": {
+                          "kind": {
+                            "enum": [
+                              "table_row"
+                            ],
+                            "type": "string"
+                          },
+                          "tableIdOrSlug": {
+                            "type": "string"
+                          }
+                        },
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "required": [
+                          "kind"
+                        ],
+                        "properties": {
+                          "kind": {
+                            "enum": [
+                              "task_card"
+                            ],
+                            "type": "string"
+                          }
+                        },
+                        "additionalProperties": false
+                      }
+                    ]
+                  },
+                  "labelColumn": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "constraints": {
+                "type": "object",
+                "properties": {
+                  "max": {
+                    "type": "number"
+                  },
+                  "min": {
+                    "type": "number"
+                  },
+                  "unique": {
+                    "type": "boolean"
+                  },
+                  "default": {},
+                  "pattern": {
+                    "type": "string"
+                  },
+                  "nullable": {
+                    "type": "boolean"
+                  },
+                  "required": {
+                    "type": "boolean"
+                  },
+                  "maxLength": {
+                    "type": "number"
+                  },
+                  "minLength": {
+                    "type": "number"
+                  },
+                  "autoincrement": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "description": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "primaryKey": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "starshipId": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "mapping": {
+      "body": {
+        "name": "{{ args.name }}",
+        "columns": "{{ args.columns ?? [] }}",
+        "primaryKey": "{{ args.primaryKey }}",
+        "description": "{{ args.description }}"
+      },
+      "path": {
+        "starshipId": "{{ String(args.starshipId ?? runtimeEnv.STARSHIP_ID ?? \"\") }}"
+      }
+    },
+    "timeoutMs": 10000
+  },
+  {
+    "name": "get-table",
+    "description": "Get a table by id or slug (scoped to a starship)",
+    "method": "GET",
+    "path": "/starships/{starshipId}/tables/{tableIdOrSlug}",
+    "requestStyle": "query",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "starshipId"
+      ],
+      "properties": {
+        "tableId": {
+          "type": "string"
+        },
+        "starshipId": {
+          "type": "string"
+        },
+        "tableSlug": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "mapping": {
+      "path": {
+        "starshipId": "{{ String(args.starshipId ?? runtimeEnv.STARSHIP_ID ?? \"\") }}",
+        "tableIdOrSlug": "{{ String(args.tableSlug ?? args.tableId ?? \"\") }}"
+      }
+    },
+    "timeoutMs": 5000
+  },
+  {
+    "name": "list-table-rows",
+    "description": "List rows for a table (paginated) (by id or slug)",
+    "method": "GET",
+    "path": "/starships/{starshipId}/tables/{tableIdOrSlug}/rows",
+    "requestStyle": "query",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "starshipId"
+      ],
+      "properties": {
+        "limit": {
+          "type": "number"
+        },
+        "expand": {
+          "type": "string",
+          "description": "Optional expansion. Use \"refs\" to hydrate references."
+        },
+        "offset": {
+          "type": "number"
+        },
+        "search": {
+          "type": "string",
+          "description": "Case-insensitive substring search across row_key and row values"
+        },
+        "filters": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array"
+            },
+            {
+              "type": "object"
+            }
+          ],
+          "description": "Row filters. Accepts either a JSON string or a JSON-serializable array/object. Server expects a JSON string in query params."
+        },
+        "tableId": {
+          "type": "string"
+        },
+        "expandRefs": {
+          "type": "boolean",
+          "description": "Convenience flag for expand=refs"
+        },
+        "starshipId": {
+          "type": "string"
+        },
+        "tableSlug": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "mapping": {
+      "path": {
+        "starshipId": "{{ String(args.starshipId ?? runtimeEnv.STARSHIP_ID ?? \"\") }}",
+        "tableIdOrSlug": "{{ String(args.tableSlug ?? args.tableId ?? \"\") }}"
+      },
+      "query": {
+        "limit": "{{ args.limit == null ? \"\" : String(args.limit) }}",
+        "expand": "{{ args.expandRefs ? \"refs\" : (args.expand == null ? \"\" : String(args.expand)) }}",
+        "offset": "{{ args.offset == null ? \"\" : String(args.offset) }}",
+        "search": "{{ args.search == null ? \"\" : String(args.search) }}",
+        "filters": "{{ args.filters == null ? \"\" : (typeof args.filters === \"string\" ? args.filters : JSON.stringify(args.filters)) }}"
+      }
+    },
+    "timeoutMs": 10000
+  },
+  {
+    "name": "upsert-table-rows",
+    "description": "Append or upsert rows in a table (by id or slug)",
+    "method": "POST",
+    "path": "/starships/{starshipId}/tables/{tableIdOrSlug}/rows:upsert",
+    "requestStyle": "json",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "starshipId",
+        "rows"
+      ],
+      "properties": {
+        "mode": {
+          "enum": [
+            "append",
+            "upsert"
+          ],
+          "type": "string"
+        },
+        "rows": {
+          "type": "array"
+        },
+        "tableId": {
+          "type": "string"
+        },
+        "starshipId": {
+          "type": "string"
+        },
+        "tableSlug": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
+    "mapping": {
+      "body": {
+        "mode": "{{ args.mode }}",
+        "rows": "{{ args.rows ?? [] }}"
+      },
+      "path": {
+        "starshipId": "{{ String(args.starshipId ?? runtimeEnv.STARSHIP_ID ?? \"\") }}",
+        "tableIdOrSlug": "{{ String(args.tableSlug ?? args.tableId ?? \"\") }}"
+      }
+    },
+    "timeoutMs": 30000
+  },
+  {
+    "name": "get-room-pins-views",
+    "description": "Get pinned views (resolved to view objects) for a room",
+    "method": "GET",
+    "path": "/rooms/{roomId}/pins/views",
+    "requestStyle": "query",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "roomId"
+      ],
+      "properties": {
+        "roomId": {
+          "type": "string",
+          "description": "Room id (backing conversation id; defaults to runtimeEnv.CONVERSATION_ID)"
+        }
+      },
+      "additionalProperties": false
+    },
+    "mapping": {
+      "path": {
+        "roomId": "{{ String(args.roomId ?? args.id ?? runtimeEnv.CONVERSATION_ID ?? \"\") }}"
+      }
+    },
+    "timeoutMs": 20000
+  },
+  {
+    "name": "get-room-pins-tables",
+    "description": "Get pinned tables (resolved to table objects) for a room",
+    "method": "GET",
+    "path": "/rooms/{roomId}/pins/tables",
+    "requestStyle": "query",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "roomId"
+      ],
+      "properties": {
+        "roomId": {
+          "type": "string",
+          "description": "Room id (backing conversation id; defaults to runtimeEnv.CONVERSATION_ID)"
+        }
+      },
+      "additionalProperties": false
+    },
+    "mapping": {
+      "path": {
+        "roomId": "{{ String(args.roomId ?? args.id ?? runtimeEnv.CONVERSATION_ID ?? \"\") }}"
+      }
+    },
+    "timeoutMs": 20000
+  },
+  {
+    "name": "get-room-pins-task-boards",
+    "description": "Get pinned task boards (resolved to task board objects) for a room",
+    "method": "GET",
+    "path": "/rooms/{roomId}/pins/task-boards",
+    "requestStyle": "query",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "roomId"
+      ],
+      "properties": {
+        "roomId": {
+          "type": "string",
+          "description": "Room id (backing conversation id; defaults to runtimeEnv.CONVERSATION_ID)"
+        }
+      },
+      "additionalProperties": false
+    },
+    "mapping": {
+      "path": {
+        "roomId": "{{ String(args.roomId ?? args.id ?? runtimeEnv.CONVERSATION_ID ?? \"\") }}"
+      }
+    },
+    "timeoutMs": 20000
+  },
+  {
+    "name": "get-room-resources",
+    "description": "Get resolved room resources in one response (pinned views/tables/task boards + assigned tools)",
+    "method": "GET",
+    "path": "/rooms/{roomId}/resources",
+    "requestStyle": "query",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "roomId"
+      ],
+      "properties": {
+        "q": {
+          "type": "string",
+          "description": "Optional case-insensitive search across name/slug/description"
+        },
+        "kinds": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          ],
+          "description": "Optional kind filter (comma-separated or array). Allowed: views, tables, taskBoards, tools"
+        },
+        "roomId": {
+          "type": "string",
+          "description": "Room id (backing conversation id; defaults to runtimeEnv.CONVERSATION_ID)"
+        },
+        "limitPerKind": {
+          "type": "number",
+          "description": "Optional cap per kind (0-200) applied after filtering"
+        },
+        "includeArchived": {
+          "type": "boolean",
+          "description": "When true, includes archived tables/task boards (default false)"
+        }
+      },
+      "additionalProperties": false
+    },
+    "mapping": {
+      "path": {
+        "roomId": "{{ String(args.roomId ?? args.id ?? runtimeEnv.CONVERSATION_ID ?? \"\") }}"
+      },
+      "query": {
+        "q": "{{ String(args.q ?? \"\") }}",
+        "kinds": "{{ args.kinds == null ? \"\" : (Array.isArray(args.kinds) ? args.kinds.map((x) => String(x)).join(\",\") : String(args.kinds)) }}",
+        "limitPerKind": "{{ args.limitPerKind == null ? \"\" : String(args.limitPerKind) }}",
+        "includeArchived": "{{ args.includeArchived == null ? \"\" : String(args.includeArchived) }}"
+      }
+    },
+    "response": {
+      "type": "object",
+      "properties": {
+        "tools": {
+          "type": "array"
+        },
+        "views": {
+          "type": "array"
+        },
+        "tables": {
+          "type": "array"
+        },
+        "taskBoards": {
+          "type": "array"
+        },
+        "participants": {
+          "type": "object",
+          "required": [
+            "users",
+            "agents"
+          ],
+          "properties": {
+            "users": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "id",
+                  "slug"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "role": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "slug": {
+                    "type": "string",
+                    "description": "User slug in `u:<userId>` format"
+                  },
+                  "avatar": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "displayName": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "agents": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "id",
+                  "slug",
+                  "name"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "slug": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": true
+    },
+    "timeoutMs": 30000
+  },
+  {
+    "name": "update-table",
+    "description": "Update a table (including columns/primaryKey/archived) by id or slug",
+    "method": "PATCH",
+    "path": "/starships/{starshipId}/tables/{tableIdOrSlug}",
+    "requestStyle": "json",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "starshipId"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "columns": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "name"
+            ],
+            "properties": {
+              "enum": {
+                "type": "object",
+                "required": [
+                  "options"
+                ],
+                "properties": {
+                  "options": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "additionalProperties": false
+              },
+              "name": {
+                "type": "string",
+                "description": "Stable key used in row objects"
+              },
+              "type": {
+                "enum": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "date",
+                  "datetime",
+                  "json",
+                  "enum",
+                  "reference",
+                  "formula"
+                ],
+                "type": "string"
+              },
+              "format": {
+                "enum": [
+                  "text",
+                  "number",
+                  "currency",
+                  "date",
+                  "datetime",
+                  "percentage"
+                ],
+                "type": "string"
+              },
+              "formula": {
+                "type": "object",
+                "required": [
+                  "expr"
+                ],
+                "properties": {
+                  "expr": {
+                    "type": "string"
+                  },
+                  "resultType": {
+                    "enum": [
+                      "string",
+                      "number",
+                      "boolean",
+                      "date",
+                      "datetime",
+                      "json",
+                      "enum"
+                    ],
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "reference": {
+                "type": "object",
+                "required": [
+                  "target"
+                ],
+                "properties": {
+                  "target": {
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "required": [
+                          "kind",
+                          "tableIdOrSlug"
+                        ],
+                        "properties": {
+                          "kind": {
+                            "enum": [
+                              "table_row"
+                            ],
+                            "type": "string"
+                          },
+                          "tableIdOrSlug": {
+                            "type": "string"
+                          }
+                        },
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "required": [
+                          "kind"
+                        ],
+                        "properties": {
+                          "kind": {
+                            "enum": [
+                              "task_card"
+                            ],
+                            "type": "string"
+                          }
+                        },
+                        "additionalProperties": false
+                      }
+                    ]
+                  },
+                  "labelColumn": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "constraints": {
+                "type": "object",
+                "properties": {
+                  "max": {
+                    "type": "number"
+                  },
+                  "min": {
+                    "type": "number"
+                  },
+                  "unique": {
+                    "type": "boolean"
+                  },
+                  "default": {},
+                  "pattern": {
+                    "type": "string"
+                  },
+                  "nullable": {
+                    "type": "boolean"
+                  },
+                  "required": {
+                    "type": "boolean"
+                  },
+                  "maxLength": {
+                    "type": "number"
+                  },
+                  "minLength": {
+                    "type": "number"
+                  },
+                  "autoincrement": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "description": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "archived": {
+          "type": "boolean"
+        },
+        "tableId": {
+          "type": "string"
+        },
+        "primaryKey": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "starshipId": {
+          "type": "string"
+        },
+        "tableSlug": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "mapping": {
+      "body": {
+        "name": "{{ args.name === undefined ? undefined : args.name }}",
+        "columns": "{{ args.columns === undefined ? undefined : (args.columns ?? []) }}",
+        "archived": "{{ args.archived === undefined ? undefined : args.archived }}",
+        "primaryKey": "{{ args.primaryKey === undefined ? undefined : args.primaryKey }}",
+        "description": "{{ args.description === undefined ? undefined : args.description }}"
+      },
+      "path": {
+        "starshipId": "{{ String(args.starshipId ?? runtimeEnv.STARSHIP_ID ?? \"\") }}",
+        "tableIdOrSlug": "{{ String(args.tableSlug ?? args.tableId ?? \"\") }}"
+      }
+    },
+    "timeoutMs": 15000
+  },
+  {
+    "name": "list-rooms",
+    "description": "List rooms for a starship (visibility-filtered)",
+    "method": "GET",
+    "path": "/starships/{starshipId}/rooms",
+    "requestStyle": "query",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "starshipId"
+      ],
+      "properties": {
+        "starshipId": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "mapping": {
+      "path": {
+        "starshipId": "{{ String(args.starshipId ?? runtimeEnv.STARSHIP_ID ?? \"\") }}"
+      }
+    },
+    "timeoutMs": 10000
+  },
+  {
+    "name": "create-room",
+    "description": "Create a conversation-backed room within a starship",
+    "method": "POST",
+    "path": "/starships/{starshipId}/rooms",
+    "requestStyle": "json",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "starshipId",
+        "slug",
+        "name"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "slug": {
+          "type": "string"
+        },
+        "topic": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "isPrivate": {
+          "type": "boolean"
+        },
+        "starshipId": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
+    "mapping": {
+      "body": {
+        "name": "{{ String(args.name ?? \"\") }}",
+        "slug": "{{ String(args.slug ?? \"\") }}",
+        "topic": "{{ args.topic }}",
+        "isPrivate": "{{ args.isPrivate }}"
+      },
+      "path": {
+        "starshipId": "{{ String(args.starshipId ?? runtimeEnv.STARSHIP_ID ?? \"\") }}"
+      }
+    },
+    "timeoutMs": 20000
+  },
+  {
+    "name": "get-room",
+    "description": "Get a room by id (roomId is the backing conversation id)",
+    "method": "GET",
+    "path": "/rooms/{roomId}",
+    "requestStyle": "query",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "roomId"
+      ],
+      "properties": {
+        "roomId": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "mapping": {
+      "path": {
+        "roomId": "{{ String(args.roomId ?? args.id ?? runtimeEnv.CONVERSATION_ID ?? \"\") }}"
+      }
+    },
+    "timeoutMs": 10000
+  },
+  {
+    "name": "update-room",
+    "description": "Update a room by id (roomId is the backing conversation id)",
+    "method": "PATCH",
+    "path": "/rooms/{roomId}",
+    "requestStyle": "json",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "roomId"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "topic": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "roomId": {
+          "type": "string"
+        },
+        "isPrivate": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": true
+    },
+    "mapping": {
+      "body": {
+        "name": "{{ args.name }}",
+        "topic": "{{ args.topic }}",
+        "isPrivate": "{{ args.isPrivate }}"
+      },
+      "path": {
+        "roomId": "{{ String(args.roomId ?? args.id ?? runtimeEnv.CONVERSATION_ID ?? \"\") }}"
+      }
+    },
+    "timeoutMs": 20000
+  },
+  {
+    "name": "delete-room",
+    "description": "Delete a room by id (deletes the backing conversation)",
+    "method": "DELETE",
+    "path": "/rooms/{roomId}",
+    "requestStyle": "query",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "roomId"
+      ],
+      "properties": {
+        "roomId": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "mapping": {
+      "path": {
+        "roomId": "{{ String(args.roomId ?? args.id ?? runtimeEnv.CONVERSATION_ID ?? \"\") }}"
+      }
+    },
+    "timeoutMs": 20000
+  },
+  {
+    "name": "get-room-notification-level",
+    "description": "Get your notification level for a room (all/mentions/mute)",
+    "method": "GET",
+    "path": "/rooms/{roomId}/notification-level",
+    "requestStyle": "query",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "roomId"
+      ],
+      "properties": {
+        "roomId": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "mapping": {
+      "path": {
+        "roomId": "{{ String(args.roomId ?? args.id ?? runtimeEnv.CONVERSATION_ID ?? \"\") }}"
+      }
+    },
+    "timeoutMs": 10000
+  },
+  {
+    "name": "update-room-notification-level",
+    "description": "Update your notification level for a room (all/mentions/mute)",
+    "method": "PUT",
+    "path": "/rooms/{roomId}/notification-level",
+    "requestStyle": "json",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "roomId",
+        "level"
+      ],
+      "properties": {
+        "level": {
+          "enum": [
+            "all",
+            "mentions",
+            "mute"
+          ],
+          "type": "string"
+        },
+        "roomId": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "mapping": {
+      "body": {
+        "level": "{{ String(args.level ?? \"\") }}"
+      },
+      "path": {
+        "roomId": "{{ String(args.roomId ?? args.id ?? runtimeEnv.CONVERSATION_ID ?? \"\") }}"
+      }
+    },
+    "timeoutMs": 10000
+  },
+  {
+    "name": "add-room-member",
+    "description": "Add a member to a private room",
+    "method": "POST",
+    "path": "/rooms/{roomId}/members",
+    "requestStyle": "json",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "roomId",
+        "userId"
+      ],
+      "properties": {
+        "role": {
+          "enum": [
+            "member",
+            "admin"
+          ],
+          "type": "string"
+        },
+        "roomId": {
+          "type": "string"
+        },
+        "userId": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "mapping": {
+      "body": {
+        "role": "{{ args.role }}",
+        "userId": "{{ String(args.userId ?? \"\") }}"
+      },
+      "path": {
+        "roomId": "{{ String(args.roomId ?? args.id ?? runtimeEnv.CONVERSATION_ID ?? \"\") }}"
+      }
+    },
+    "timeoutMs": 20000
+  },
+  {
+    "name": "remove-room-member",
+    "description": "Remove a member from a private room",
+    "method": "DELETE",
+    "path": "/rooms/{roomId}/members/{userId}",
+    "requestStyle": "query",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "roomId",
+        "userId"
+      ],
+      "properties": {
+        "roomId": {
+          "type": "string"
+        },
+        "userId": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "mapping": {
+      "path": {
+        "roomId": "{{ String(args.roomId ?? args.id ?? runtimeEnv.CONVERSATION_ID ?? \"\") }}",
+        "userId": "{{ String(args.userId ?? \"\") }}"
+      }
+    },
+    "timeoutMs": 20000
+  },
+  {
+    "name": "get-room-pins",
+    "description": "List pinned resources for a room (views/tables/taskBoards/agents/tools)",
+    "method": "GET",
+    "path": "/rooms/{roomId}/pins",
+    "requestStyle": "query",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "roomId"
+      ],
+      "properties": {
+        "roomId": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "mapping": {
+      "path": {
+        "roomId": "{{ String(args.roomId ?? args.id ?? runtimeEnv.CONVERSATION_ID ?? \"\") }}"
+      }
+    },
+    "timeoutMs": 20000
+  },
+  {
+    "name": "pin-room-view",
+    "description": "Pin a view to a room (optionally at a position)",
+    "method": "POST",
+    "path": "/rooms/{roomId}/pins/views",
+    "requestStyle": "json",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "roomId",
+        "viewId"
+      ],
+      "properties": {
+        "roomId": {
+          "type": "string"
+        },
+        "viewId": {
+          "type": "string"
+        },
+        "position": {
+          "type": "number"
+        }
+      },
+      "additionalProperties": false
+    },
+    "mapping": {
+      "body": {
+        "viewId": "{{ String(args.viewId ?? \"\") }}",
+        "position": "{{ args.position }}"
+      },
+      "path": {
+        "roomId": "{{ String(args.roomId ?? args.id ?? runtimeEnv.CONVERSATION_ID ?? \"\") }}"
+      }
+    },
+    "timeoutMs": 20000
+  },
+  {
+    "name": "unpin-room-view",
+    "description": "Unpin a view from a room",
+    "method": "DELETE",
+    "path": "/rooms/{roomId}/pins/views/{viewId}",
+    "requestStyle": "query",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "roomId",
+        "viewId"
+      ],
+      "properties": {
+        "roomId": {
+          "type": "string"
+        },
+        "viewId": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "mapping": {
+      "path": {
+        "roomId": "{{ String(args.roomId ?? args.id ?? runtimeEnv.CONVERSATION_ID ?? \"\") }}",
+        "viewId": "{{ String(args.viewId ?? \"\") }}"
+      }
+    },
+    "timeoutMs": 20000
+  },
+  {
+    "name": "pin-room-table",
+    "description": "Pin a table to a room (optionally at a position)",
+    "method": "POST",
+    "path": "/rooms/{roomId}/pins/tables",
+    "requestStyle": "json",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "roomId",
+        "tableId"
+      ],
+      "properties": {
+        "roomId": {
+          "type": "string"
+        },
+        "position": {
+          "type": "number"
+        },
+        "tableId": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "mapping": {
+      "body": {
+        "position": "{{ args.position }}",
+        "tableId": "{{ String(args.tableId ?? \"\") }}"
+      },
+      "path": {
+        "roomId": "{{ String(args.roomId ?? args.id ?? runtimeEnv.CONVERSATION_ID ?? \"\") }}"
+      }
+    },
+    "timeoutMs": 20000
+  },
+  {
+    "name": "unpin-room-table",
+    "description": "Unpin a table from a room",
+    "method": "DELETE",
+    "path": "/rooms/{roomId}/pins/tables/{tableId}",
+    "requestStyle": "query",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "roomId",
+        "tableId"
+      ],
+      "properties": {
+        "roomId": {
+          "type": "string"
+        },
+        "tableId": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "mapping": {
+      "path": {
+        "roomId": "{{ String(args.roomId ?? args.id ?? runtimeEnv.CONVERSATION_ID ?? \"\") }}",
+        "tableId": "{{ String(args.tableId ?? \"\") }}"
+      }
+    },
+    "timeoutMs": 20000
+  },
+  {
+    "name": "pin-room-task-board",
+    "description": "Pin a task board to a room (optionally at a position)",
+    "method": "POST",
+    "path": "/rooms/{roomId}/pins/task-boards",
+    "requestStyle": "json",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "roomId",
+        "boardId"
+      ],
+      "properties": {
+        "roomId": {
+          "type": "string"
+        },
+        "boardId": {
+          "type": "string"
+        },
+        "position": {
+          "type": "number"
+        }
+      },
+      "additionalProperties": false
+    },
+    "mapping": {
+      "body": {
+        "boardId": "{{ String(args.boardId ?? \"\") }}",
+        "position": "{{ args.position }}"
+      },
+      "path": {
+        "roomId": "{{ String(args.roomId ?? args.id ?? runtimeEnv.CONVERSATION_ID ?? \"\") }}"
+      }
+    },
+    "timeoutMs": 20000
+  },
+  {
+    "name": "unpin-room-task-board",
+    "description": "Unpin a task board from a room",
+    "method": "DELETE",
+    "path": "/rooms/{roomId}/pins/task-boards/{boardId}",
+    "requestStyle": "query",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "roomId",
+        "boardId"
+      ],
+      "properties": {
+        "roomId": {
+          "type": "string"
+        },
+        "boardId": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "mapping": {
+      "path": {
+        "roomId": "{{ String(args.roomId ?? args.id ?? runtimeEnv.CONVERSATION_ID ?? \"\") }}",
+        "boardId": "{{ String(args.boardId ?? \"\") }}"
+      }
+    },
+    "timeoutMs": 20000
+  },
+  {
+    "name": "reorder-room-pins-views",
+    "description": "Reorder pinned views within a room",
+    "method": "POST",
+    "path": "/rooms/{roomId}/pins/views/reorder",
+    "requestStyle": "json",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "roomId",
+        "viewIds"
+      ],
+      "properties": {
+        "roomId": {
+          "type": "string"
+        },
+        "viewIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "mapping": {
+      "body": {
+        "viewIds": "{{ args.viewIds ?? [] }}"
+      },
+      "path": {
+        "roomId": "{{ String(args.roomId ?? args.id ?? runtimeEnv.CONVERSATION_ID ?? \"\") }}"
+      }
+    },
+    "timeoutMs": 30000
+  },
+  {
+    "name": "reorder-room-pins-tables",
+    "description": "Reorder pinned tables within a room",
+    "method": "POST",
+    "path": "/rooms/{roomId}/pins/tables/reorder",
+    "requestStyle": "json",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "roomId",
+        "tableIds"
+      ],
+      "properties": {
+        "roomId": {
+          "type": "string"
+        },
+        "tableIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "mapping": {
+      "body": {
+        "tableIds": "{{ args.tableIds ?? [] }}"
+      },
+      "path": {
+        "roomId": "{{ String(args.roomId ?? args.id ?? runtimeEnv.CONVERSATION_ID ?? \"\") }}"
+      }
+    },
+    "timeoutMs": 30000
+  },
+  {
+    "name": "reorder-room-pins-task-boards",
+    "description": "Reorder pinned task boards within a room",
+    "method": "POST",
+    "path": "/rooms/{roomId}/pins/task-boards/reorder",
+    "requestStyle": "json",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "roomId",
+        "boardIds"
+      ],
+      "properties": {
+        "roomId": {
+          "type": "string"
+        },
+        "boardIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "mapping": {
+      "body": {
+        "boardIds": "{{ args.boardIds ?? [] }}"
+      },
+      "path": {
+        "roomId": "{{ String(args.roomId ?? args.id ?? runtimeEnv.CONVERSATION_ID ?? \"\") }}"
+      }
+    },
+    "timeoutMs": 30000
+  },
+  {
+    "name": "get-room-tools",
+    "description": "List assigned tools for a room (resolved to tool objects)",
+    "method": "GET",
+    "path": "/rooms/{roomId}/tools",
+    "requestStyle": "query",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "roomId"
+      ],
+      "properties": {
+        "roomId": {
+          "type": "string",
+          "description": "Room id (backing conversation id; defaults to runtimeEnv.CONVERSATION_ID)"
+        }
+      },
+      "additionalProperties": false
+    },
+    "mapping": {
+      "path": {
+        "roomId": "{{ String(args.roomId ?? args.id ?? runtimeEnv.CONVERSATION_ID ?? \"\") }}"
+      }
+    },
+    "timeoutMs": 20000
+  },
+  {
+    "name": "assign-room-tool",
+    "description": "Assign a tool to a room",
+    "method": "POST",
+    "path": "/rooms/{roomId}/tools",
+    "requestStyle": "json",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "roomId",
+        "toolId"
+      ],
+      "properties": {
+        "roomId": {
+          "type": "string"
+        },
+        "toolId": {
+          "type": "string"
+        },
+        "permission": {
+          "enum": [
+            "allow",
+            "ask",
+            "deny"
+          ],
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "mapping": {
+      "body": {
+        "toolId": "{{ String(args.toolId ?? \"\") }}",
+        "permission": "{{ args.permission }}"
+      },
+      "path": {
+        "roomId": "{{ String(args.roomId ?? args.id ?? runtimeEnv.CONVERSATION_ID ?? \"\") }}"
+      }
+    },
+    "timeoutMs": 20000
+  },
+  {
+    "name": "unassign-room-tool",
+    "description": "Unassign a tool from a room",
+    "method": "DELETE",
+    "path": "/rooms/{roomId}/tools/{toolId}",
+    "requestStyle": "query",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "roomId",
+        "toolId"
+      ],
+      "properties": {
+        "roomId": {
+          "type": "string"
+        },
+        "toolId": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "mapping": {
+      "path": {
+        "roomId": "{{ String(args.roomId ?? args.id ?? runtimeEnv.CONVERSATION_ID ?? \"\") }}",
+        "toolId": "{{ String(args.toolId ?? \"\") }}"
+      }
+    },
+    "timeoutMs": 20000
+  },
+  {
+    "name": "list-conversation-children",
+    "description": "List child conversations (threads) for a parent conversation",
+    "method": "GET",
+    "path": "/conversations/{conversationId}/children",
+    "requestStyle": "query",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "conversationId"
+      ],
+      "properties": {
+        "q": {
+          "type": "string",
+          "description": "Optional case-insensitive search on child conversation title"
+        },
+        "limit": {
+          "type": "number",
+          "description": "Page size (optional)"
+        },
+        "beforeId": {
+          "type": "string",
+          "description": "Cursor (conversation id). Must be provided together with beforeUpdatedAt."
+        },
+        "conversationId": {
+          "type": "string",
+          "description": "Parent conversation id (defaults to runtimeEnv.CONVERSATION_ID)"
+        },
+        "beforeUpdatedAt": {
+          "type": "string",
+          "description": "Cursor (ISO datetime). Must be provided together with beforeId."
+        }
+      },
+      "additionalProperties": false
+    },
+    "mapping": {
+      "path": {
+        "conversationId": "{{ String(args.conversationId ?? args.parentConversationId ?? args.id ?? runtimeEnv.CONVERSATION_ID ?? \"\") }}"
+      },
+      "query": {
+        "q": "{{ args.q ? String(args.q) : undefined }}",
+        "limit": "{{ args.limit === undefined ? undefined : Number(args.limit) }}",
+        "beforeId": "{{ args.beforeId ? String(args.beforeId) : undefined }}",
+        "beforeUpdatedAt": "{{ args.beforeUpdatedAt ? String(args.beforeUpdatedAt) : undefined }}"
+      }
+    },
+    "timeoutMs": 20000
+  },
+  {
+    "name": "update-message",
+    "description": "Update a message by id (supports linking to a child conversation via linkedConversationId)",
+    "method": "PUT",
+    "path": "/messages/{messageId}",
+    "requestStyle": "json",
+    "parameters": {
+      "type": "object",
+      "required": [
+        "messageId"
+      ],
+      "properties": {
+        "messageId": {
+          "type": "string",
+          "description": "Message id to update"
+        },
+        "linkedConversationId": {
+          "type": "string",
+          "description": "Optional: link this message to a child conversation (thread)"
+        }
+      },
+      "additionalProperties": true
+    },
+    "mapping": {
+      "body": {
+        "linkedConversationId": "{{ args.linkedConversationId }}"
+      },
+      "path": {
+        "messageId": "{{ String(args.messageId ?? args.id ?? \"\") }}"
+      }
+    },
+    "timeoutMs": 20000
+  },
+  {
+    "name": "batch-execute-tools",
+    "description": "Execute multiple tool calls in parallel via the Starships batch endpoint",
+    "method": "POST",
+    "path": "/conversations/{conversationId}/tool-calls/batch-execute",
+    "requestStyle": "json",
+    "timeoutMs": 3600000,
+    "parameters": {
+      "type": "object",
+      "required": [
+        "agentId",
+        "tools"
+      ],
+      "properties": {
+        "agentId": {
+          "type": "string"
+        },
+        "tools": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "toolSlug",
+              "toolCallId"
+            ],
+            "properties": {
+              "toolSlug": {
+                "type": "string"
+              },
+              "toolCallId": {
+                "type": "string"
+              },
+              "args": {
+                "type": "object"
+              }
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "mapping": {
+      "path": {
+        "conversationId": "{{ String(runtimeEnv.CONVERSATION_ID ?? args.conversationId ?? \"\") }}"
+      },
+      "body": {
+        "agentId": "{{ String(args.agentId ?? \"\") }}",
+        "tools": "{{ args.tools ?? [] }}"
+      }
+    }
+  }
+]

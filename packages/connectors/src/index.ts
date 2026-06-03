@@ -22,3 +22,4 @@ export { PlatformJwtStrategy } from './strategies/PlatformJwtStrategy';
 export { NoneStrategy } from './strategies/NoneStrategy';
 export { GitHubAppStrategy } from './strategies/GitHubAppStrategy';
 export { githubConnector } from './connectors/github';
+export { starshipsConnector } from './connectors/starships';

@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import type { ConnectorProvider } from '@starships/protocol';
-import { connectorRegistry, githubConnector, loadTemplateContainersFromDir } from '@starships/connectors';
+import { connectorRegistry, githubConnector, starshipsConnector, loadTemplateContainersFromDir } from '@starships/connectors';
 import type { ConnectorTemplateEntityLike } from './ConnectorTemplateRegistryClient';
 
 /**
@@ -37,6 +37,7 @@ function resolveBundlesDir(): string {
 /** Register hand-written code connectors. These take precedence over declarative ones. */
 function registerCodeConnectors(): void {
   connectorRegistry.registerCode(githubConnector);
+  connectorRegistry.registerCode(starshipsConnector);
 }
 
 /**

@@ -1,9 +1,0 @@
-{
-  "name": "Starships",
-  "description": "Use the Starships API itself (tools, docs, models, etc.) as a connector-backed capability for this starship.",
-  "version": "1.0.0",
-  "tags": [
-    "connector"
-  ],
-  "kind": "connector"
-}

@@ -45,7 +45,8 @@ async function main(): Promise<void> {
   }
 }
 
-// Run when invoked directly as the container entrypoint.
-if (process.env.CLI_JOB_FILE || process.argv[1]?.includes('cliJobAgent')) {
+// Run when invoked directly as the container entrypoint. CLI_JOB_FILE is the
+// canonical trigger (set by the launcher via `-e CLI_JOB_FILE=...`).
+if (process.env.CLI_JOB_FILE) {
   void main();
 }

@@ -18,8 +18,8 @@
  * follow-ups (see project memory).
  */
 
-import { getEnvConfig } from '@starships/env';
 import type { LlmMessage } from '@starships/autopilot';
+import { serializeToolResult } from '@starships/autopilot-cli';
 import type { CliAgentEvent, ChatMessage, AssistantToolCall, CliAgentJobSpec } from '@starships/autopilot-cli';
 import type { MessageService } from '@/services/MessageService';
 import type { ConversationStreamBus } from '@/services/ConversationStreamBus';
@@ -130,21 +130,11 @@ function toChatMessages(messages: LlmMessage[]): ChatMessage[] {
   });
 }
 
-/** Serialize a tool result the same way CliAgent does, so DB transcripts round-trip. */
-function toolResultContent(result: { content: unknown; isError?: boolean }): string {
-  try {
-    return JSON.stringify({ ok: !result.isError, ...(result.isError ? { error: result.content } : { data: result.content }) });
-  } catch {
-    return JSON.stringify({ ok: false, error: 'tool result could not be serialized' });
-  }
-}
-
 /**
  * Execute one agent turn via the CLI agent. Returns true when handled; false when
  * the caller should fall back to the blueprint path (e.g. missing model/runtime config).
  */
 export async function executeCliAgentTurn(deps: CliAgentTurnDeps, args: CliAgentTurnArgs): Promise<boolean> {
-  const env = getEnvConfig();
   const { conversationId, turnId, agentModel, starshipId, authUserId } = args;
 
   const runtimeEnv = buildAutopilotRuntimeEnv({
@@ -224,7 +214,7 @@ export async function executeCliAgentTurn(deps: CliAgentTurnDeps, args: CliAgent
       const req = {
         conversationId,
         role: 'tool',
-        content: toolResultContent(event.result),
+        content: serializeToolResult(event.result),
         toolCallId: event.toolCallId,
         messageType: 'tool_result',
         agentId: agentModel.id,
@@ -238,7 +228,10 @@ export async function executeCliAgentTurn(deps: CliAgentTurnDeps, args: CliAgent
       let approvalId: string | undefined;
       try {
         const existing = await approvalRepo.findByConversationAndToolCallId(conversationId, event.toolCallId).catch(() => null);
-        if (existing) {
+        // Only reuse a still-pending record. A stale decided record (e.g. a reused toolCallId
+        // from a prior turn) must not be handed back as the approvalId, or approve/deny would
+        // be a no-op (they only update `pending` rows) and the turn would hang.
+        if (existing && existing.status === 'pending') {
           approvalId = existing.id;
         } else {
           const created = await approvalRepo.createPendingForCli({
@@ -291,6 +284,5 @@ export async function executeCliAgentTurn(deps: CliAgentTurnDeps, args: CliAgent
     await deps.streamBus.publish(conversationId, { type: 'turn.status', data: { conversationId, turnId, status: 'completed', at } });
   }
 
-  void env;
   return true;
 }

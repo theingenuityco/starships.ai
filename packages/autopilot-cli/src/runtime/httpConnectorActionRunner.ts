@@ -29,6 +29,10 @@ export function httpConnectorActionRunner(opts: HttpConnectorActionRunnerOptions
     async run(req): Promise<ConnectorActionResult> {
       const timeoutMs = req.timeoutMs ?? 60_000;
       const controller = new AbortController();
+      // The action's own deadline is `timeoutMs` (enforced server-side); we abort the
+      // round-trip 5s later so the server gets a chance to return its own timeout
+      // response first. The abort covers both the fetch and the body read below (both
+      // run before the finally clears the timer).
       const timer = setTimeout(() => controller.abort(), timeoutMs + 5_000);
       try {
         const resp = await fetch(opts.url, {

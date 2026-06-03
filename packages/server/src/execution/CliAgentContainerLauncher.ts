@@ -53,7 +53,9 @@ export class CliAgentContainerLauncher {
     const baseDir = process.env.RUNNER_JOB_BASE_DIR || tmpdir();
     const hostJobDir = await mkdtemp(join(baseDir, 'cjob-'));
     const jobFile = join(hostJobDir, 'job.json');
-    await writeFile(jobFile, JSON.stringify(jobSpec), { mode: 0o644 });
+    // 0o600: the job file holds the LLM API key and the connector-action callback
+    // secret, so it must be readable only by the owner.
+    await writeFile(jobFile, JSON.stringify(jobSpec), { mode: 0o600 });
 
     try {
       return await this.runContainer(jobFile, hostDir, onEvent);
@@ -123,6 +125,15 @@ export class CliAgentContainerLauncher {
       let failure: string | undefined;
       const pending: Promise<void>[] = [];
 
+      // Hard deadline: if the container hangs (stuck Node process, stalled Docker), kill it so
+      // the turn never stays in-flight forever. `--rm` reaps the killed container.
+      const timeoutMs = Number(process.env.RUNNER_SANDBOX_TIMEOUT_MS) || 30 * 60 * 1000;
+      const deadline = setTimeout(() => {
+        failure = failure ?? `sandbox container timed out after ${timeoutMs}ms`;
+        child.kill('SIGKILL');
+      }, timeoutMs);
+      deadline.unref?.();
+
       const handleLine = (line: string) => {
         const trimmed = line.trim();
         if (!trimmed) return;
@@ -155,9 +166,13 @@ export class CliAgentContainerLauncher {
         stderrBuffer += chunk.toString('utf-8');
       });
 
-      child.on('error', (err) => reject(err));
+      child.on('error', (err) => {
+        clearTimeout(deadline);
+        reject(err);
+      });
 
       child.on('close', async (code) => {
+        clearTimeout(deadline);
         if (stdoutBuffer) handleLine(stdoutBuffer);
         await Promise.allSettled(pending);
         if (failure) {

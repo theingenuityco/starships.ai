@@ -23,6 +23,7 @@
 import { OpenRouterClient, type ModelTool } from '@/llm/OpenRouterClient';
 import { buildSystemTools } from '@/tools/system';
 import { buildConnectorTools } from '@/tools/connectors';
+import { serializeToolResult } from '@/serialize';
 import type {
   AgentTool,
   AssistantMessage,
@@ -42,15 +43,6 @@ type EffectivePermission = 'allow' | 'deny' | 'ask';
 
 function toModelTool(tool: AgentTool): ModelTool {
   return { name: tool.name, description: tool.description, parameters: tool.parameters };
-}
-
-/** Serialize a tool result into the string content of a `tool` role message. */
-function toToolMessageContent(result: ToolResult): string {
-  try {
-    return JSON.stringify({ ok: !result.isError, ...(result.isError ? { error: result.content } : { data: result.content }) });
-  } catch {
-    return JSON.stringify({ ok: false, error: 'tool result could not be serialized' });
-  }
 }
 
 /** Shape an assistant message for the transcript, preserving reasoning signatures + images. */
@@ -171,10 +163,17 @@ export class CliAgent {
           messages.push(toTranscriptAssistant(message));
           await this.emit({ type: 'assistant_message', message, ...(usage ? { usage } : {}) });
 
-          // Provider truncated mid-response: ask it to continue (takes priority over tool calls).
-          if (finishReason === 'length') continue;
-
           const calls = message.toolCalls ?? [];
+
+          // Provider truncated mid-text (no tool calls): add an explicit nudge so the model
+          // resumes, rather than leaving its own partial message as the trailing turn (which
+          // some providers won't continue from). When tool calls are present, fall through and
+          // execute them instead of inserting a user turn after an assistant tool-call message.
+          if (finishReason === 'length' && calls.length === 0) {
+            messages.push({ role: 'user', content: 'Please continue.' });
+            continue;
+          }
+
           if (calls.length === 0) {
             await this.emit({ type: 'turn_completed', at: this.now(), reason: 'stop' });
             return { messages, reason: 'stop', steps };
@@ -236,7 +235,7 @@ export class CliAgent {
     }
 
     await this.emit({ type: 'tool_result', toolCallId: call.id, name: call.name, result });
-    return { role: 'tool', toolCallId: call.id, content: toToolMessageContent(result) };
+    return { role: 'tool', toolCallId: call.id, content: serializeToolResult(result) };
   }
 
   private async denyToolCall(call: AssistantToolCall): Promise<ChatMessage> {
@@ -245,6 +244,6 @@ export class CliAgent {
       isError: true,
     };
     await this.emit({ type: 'tool_result', toolCallId: call.id, name: call.name, result });
-    return { role: 'tool', toolCallId: call.id, content: toToolMessageContent(result) };
+    return { role: 'tool', toolCallId: call.id, content: serializeToolResult(result) };
   }
 }

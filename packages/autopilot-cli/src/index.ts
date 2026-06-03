@@ -20,6 +20,7 @@ export type { HttpConnectorActionRunnerOptions } from '@/runtime/httpConnectorAc
 export { buildSystemTools } from '@/tools/system';
 export { buildConnectorTools, connectorRegistryCatalog } from '@/tools/connectors';
 
+export { serializeToolResult } from '@/serialize';
 export { buildPermissionPolicy } from '@/jobSpec';
 export type { CliAgentJobSpec, CliWorkspaceSpec, CliGitCredentials, PermissionTable } from '@/jobSpec';
 

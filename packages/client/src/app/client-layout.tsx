@@ -15,6 +15,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { pickPrimaryStarshipForUser, useSelectedStarship, useUserStarships } from '@/hooks/useStarships'
 import { MobileNavProvider } from '@/components/navigation/MobileNavContext'
+import { DemoProvider } from '@/components/demo/DemoContext'
 import { Suspense } from 'react'
 
 interface ClientLayoutProps {
@@ -146,6 +147,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
             toggle: () => setShowMobileMenu(v => !v),
           }}
         >
+          <DemoProvider>
           <div className="relative h-[100dvh] flex overflow-hidden bg-card">
             {/* Desktop: always visible */}
             {!isMobile && (
@@ -168,6 +170,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
               </div>
             </div>
           </div>
+          </DemoProvider>
         </MobileNavProvider>
       </StarTheme>
     </JwtAuthGate>

@@ -78,10 +78,10 @@ export function NavigationItem({ href, label, icon, isActive, badgeCount, showLa
         special
           ? 'text-primary border-transparent hover:bg-muted/70 dark:hover:bg-[#2C2C30]'
           : isActive
-            ? 'text-primary bg-primary/10 border-transparent'
+            ? 'text-primary border-transparent'
             : hasBadge
               ? 'text-foreground border-transparent hover:bg-muted/70 dark:hover:bg-[#2C2C30]'
-              : 'text-muted-foreground border-transparent hover:text-foreground hover:bg-muted/70 dark:hover:bg-[#2C2C30]'
+              : 'text-foreground border-transparent hover:bg-muted/70 dark:hover:bg-[#2C2C30]'
       )}
       style={{
         justifyContent: 'flex-start',
@@ -101,7 +101,7 @@ export function NavigationItem({ href, label, icon, isActive, badgeCount, showLa
             className={cn(
               'whitespace-nowrap pointer-events-none truncate min-w-0 flex-1 ml-1',
               // Color is controlled by the row container; keep only weight here.
-              isActive ? 'font-medium' : hasBadge ? 'font-bold' : 'font-medium'
+              isActive ? 'font-normal' : hasBadge ? 'font-semibold' : 'font-normal'
             )}
           >
             {label}

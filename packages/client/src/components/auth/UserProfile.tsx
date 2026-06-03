@@ -66,7 +66,7 @@ export const UserProfile = React.memo(function UserProfile({ mode = 'expanded', 
     const iconSize = collapsedSize === 'md' ? 22 : 18
 
     return (
-      <div className={centerInContainer ? 'flex items-center justify-center' : 'flex justify-start -ml-0.5'}>
+      <div className={centerInContainer ? 'flex items-center justify-center' : 'flex justify-start'}>
         <div
           className={`relative transition-all duration-300 rounded-full ${isInteractive ? 'cursor-pointer' : 'cursor-inherit'}`}
           role={isInteractive ? 'button' : undefined}
@@ -79,9 +79,20 @@ export const UserProfile = React.memo(function UserProfile({ mode = 'expanded', 
           }}
         >
           {isImageUrl(userAvatar) ? (
-            <Avatar className={`${avatarSizeClass} rounded-full ring-1 ring-border/40`}>
-              <AvatarImage src={userAvatar!} alt={userName || userEmail || 'User avatar'} referrerPolicy="no-referrer" className="rounded-full object-cover" />
-            </Avatar>
+            <div className={`${avatarSizeClass} relative overflow-hidden rounded-full ring-1 ring-border/40 bg-muted/40`}>
+              <span className="absolute inset-0 flex items-center justify-center">
+                <Icon name="user" className={collapsedSize === 'md' ? 'w-5 h-5 text-muted-foreground' : 'w-4 h-4 text-muted-foreground'} />
+              </span>
+              <img
+                src={userAvatar!}
+                alt={userName || userEmail || 'User avatar'}
+                referrerPolicy="no-referrer"
+                className="relative h-full w-full rounded-full object-cover"
+                onError={e => {
+                  e.currentTarget.style.display = 'none'
+                }}
+              />
+            </div>
           ) : (
             <div className={`${avatarSizeClass} rounded-full flex items-center justify-center bg-muted/40`}>
               <LordIcon src={getLordiconUrl('user')} width={iconSize} height={iconSize} className={collapsedSize === 'md' ? 'w-5 h-5' : 'w-4 h-4'} trigger="click" />

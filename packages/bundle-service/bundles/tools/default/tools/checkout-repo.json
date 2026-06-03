@@ -13,7 +13,7 @@
   "payload": {
     "tool": {
       "name": "Checkout Repo",
-      "description": "Clone a GitHub repository into an isolated workspace for this conversation and create a working branch. Call this FIRST before read-file/write-file/run-tests/open-pr-with-changes. The workspace persists for the rest of the run; subsequent file/terminal/test/PR tools operate inside this checkout. Returns the actual working branch to use when opening the PR.",
+      "description": "Clone a GitHub repository into an isolated workspace and create a working branch. Call this FIRST, before read-file/write-file/run-tests/open-pr-with-changes: those tools operate inside this checkout for the rest of the run. Returns the working branch to use when opening the PR.",
       "parameters": {
         "type": "object",
         "required": ["owner", "repo"],

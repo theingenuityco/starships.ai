@@ -3,6 +3,7 @@ import { verifyStarshipAccess, verifyStarshipOwnerAccess } from '@/middleware/ve
 import { ConversationService } from '@/services/ConversationService';
 import { ImportExportService } from '@/services/ImportExportService';
 import { UIActionService } from '@/services/UIActionService';
+import { roomSetupService } from '@/services/RoomSetupService';
 import { handleError, sendError, sendSuccess } from '@/utils/responseHelpers';
 import { validateData } from '@/utils/validation';
 import { IdSchema } from '@/schemas/common';
@@ -131,6 +132,54 @@ async function requireRoomReadAccess(args: {
 
   return { authUserId, room, conversationStarshipId };
 }
+
+// ============================================================================
+// Room setup API (room-type-specific provisioning, e.g. Engineering -> repos)
+// ============================================================================
+
+/**
+ * GET /rooms/:roomId/setup-status
+ *
+ * Setup state for the room's type (if it has a setup handler): which required
+ * connectors are connected, whether the room's data has been seeded. Returns
+ * `{ setup: null }` for rooms with no setup process. Drives the setup gate.
+ */
+router.get('/rooms/:roomId/setup-status', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const params = validateData(z.object({ roomId: IdSchema }), req.params, res, 'room parameter');
+    if (!params) return;
+
+    const access = await requireRoomReadAccess({ roomId: params.roomId, req, res });
+    if (!access) return;
+
+    const setup = await roomSetupService.getStatus(access.room, access.authUserId);
+    sendSuccess(res, { setup }, 200);
+  } catch (error) {
+    handleError(error, res, 'getting room setup status');
+  }
+});
+
+/**
+ * POST /rooms/:roomId/setup-run
+ *
+ * Manually (re-)run the room's setup processing (e.g. re-import GitHub repos).
+ * Starship owner / instance-admin only. Fails if required connectors are missing.
+ */
+router.post('/rooms/:roomId/setup-run', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const params = validateData(z.object({ roomId: IdSchema }), req.params, res, 'room parameter');
+    if (!params) return;
+
+    const access = await requireRoomReadAccess({ roomId: params.roomId, req, res });
+    if (!access) return;
+    if (!(await verifyStarshipOwnerAccess(access.room.starshipId, access.authUserId, res))) return;
+
+    const setup = await roomSetupService.runSetup(access.room, access.authUserId);
+    sendSuccess(res, { setup }, 200);
+  } catch (error) {
+    handleError(error, res, 'running room setup');
+  }
+});
 
 // ============================================================================
 // Invite approvals API (Slack-like "add on mention")

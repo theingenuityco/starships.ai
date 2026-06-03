@@ -6,6 +6,7 @@ import { NotificationMenu } from '@/components/conversation/NotificationMenu'
 import { ConversationMessageInput } from '@/components/conversation/ConversationMessageInput'
 import type { ConversationMessageInputRef } from '@/components/conversation/ConversationMessageInput'
 import { RoomParticipantsButton } from '@/components/rooms/RoomParticipantsButton'
+import { RoomSetupGate } from '@/components/rooms/RoomSetupGate'
 import { badgeVariants } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useStarshipAgents } from '@/hooks/useAgents'
@@ -315,6 +316,8 @@ export function RoomConversationIndexView(props: {
         }
         fallbackTitle={label}
       />
+
+      <RoomSetupGate roomConversationId={props.roomConversationId} starshipId={props.starshipId} />
 
       {/* Room starter (conversation-starter style) */}
       <div className="flex-1 min-h-0 overflow-auto room-conversation-bg px-4 py-8 flex flex-col">

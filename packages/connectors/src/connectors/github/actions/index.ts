@@ -1,6 +1,7 @@
 import type { CodeAction } from '../../../framework';
 import { getUser } from './get-user';
 import { listUserRepos } from './list-user-repos';
+import { listInstallationRepos } from './list-installation-repos';
 import { getRepo } from './get-repo';
 import { getRepoContents } from './get-repo-contents';
 import { listRepoIssues } from './list-repo-issues';
@@ -22,6 +23,7 @@ import { updateIssueComment } from './update-issue-comment';
 export const githubActions: CodeAction[] = [
   getUser,
   listUserRepos,
+  listInstallationRepos,
   getRepo,
   getRepoContents,
   listRepoIssues,

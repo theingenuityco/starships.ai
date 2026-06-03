@@ -3329,6 +3329,23 @@ async function ensureBundleRoomInternal(opts: {
   label: string;
 }): Promise<{ room: Awaited<ReturnType<RoomRepository['findRoomByBundleTag']>> & {}; importSummary?: { imported: Record<string, number>; warnings?: string[] } }> {
   const { starshipId, userId, bundleId, agentSlugs, label } = opts;
+
+  // Ensure the default tool catalog (which includes the engineering tools like
+  // checkout-repo / run-tests / open-pr-with-changes) is present and starship-allowed
+  // before wiring the room. This is idempotent (hash-dedup) and backfills starships that
+  // were created before newer default tools were added — otherwise the room's tool
+  // assignments reference tools that do not exist and the crew lands with no tools.
+  // Best-effort: never block room provisioning on it.
+  try {
+    await ensureDefaultBundleForStarship({ starshipId, userId });
+  } catch (err) {
+    console.error('[room-bundle] default-tool backfill failed (continuing)', {
+      starshipId,
+      bundleId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+
   const roomRepo = new RoomRepository();
 
   const addAgentParticipants = async (conversationId: string): Promise<void> => {

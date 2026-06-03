@@ -4,37 +4,6 @@ slug: widgets/data/data-table
 category: widgets
 ---
 
-## DataTable
-
-`DataTable` renders a simple paginated table and supports CSV export.
-
-## Props
-
-Prop | Type | Required | Default | Notes
----|---|---:|---|---
-`columns` | `Array<{ key: string; label: string; format?: "text"|"number"|"currency"|"date"|"datetime"|"percentage" }>` | no | `[]` | `key` must match row field names
-`data` | `Array<Record<string, unknown>>` | no | `[]` | Rows are plain objects
-`title` | `string` | no |  | Shown above the table
-`description` | `string` | no |  | Subtext (often dataset slug)
-`pageSize` | `number` | no | `10` | Use `0` to disable pagination
-`striped` | `boolean` | no | `true` | Alternating row backgrounds
-`className` | `string` | no |  | Wrapper class
-`onRowClick` | `(payload: { row: Record<string, unknown>; rowIndex: number }) => void` | no |  | When provided, rows become clickable
-
-## Cell formatting
-
-Cells are formatted using the `format` value:
-
-- `currency`, `number`, `percentage`, `date`, `datetime`
-- For reference-shaped objects (e.g. dataset/task refs), the renderer prefers `label` when present, otherwise falls back to `key`/`cardId`.
-- For other objects/arrays, the renderer falls back to JSON stringification.
-
----
-title: DataTable Widget
-slug: widgets/data/data-table
-category: widgets
----
-
 # DataTable Widget
 
 ## Overview

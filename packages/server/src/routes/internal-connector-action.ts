@@ -14,7 +14,7 @@ import type { Request, Response } from 'express';
 import { Router } from 'express';
 import { timingSafeEqual } from 'node:crypto';
 import { connectorActionExecutor } from '@/services/ConnectorActionExecutor';
-import { sendError } from '../utils/responseHelpers';
+import { sendError, handleError } from '../utils/responseHelpers';
 
 const router: Router = Router();
 
@@ -70,10 +70,9 @@ router.post('/internal/connector-action', async (req: Request, res: Response) =>
     res.status(200).json(envelope);
     return;
   } catch (err) {
-    return sendError(res, 'INTERNAL_SERVER_ERROR', err instanceof Error ? err.message : 'connector action failed', 500, {
-      connector,
-      action,
-    });
+    // handleError maps AppError (e.g. VALIDATION_ERROR -> 400 from arg validation) to its
+    // status; anything else falls back to 500.
+    return handleError(err, res, `connector action ${connector}.${action}`);
   }
 });
 

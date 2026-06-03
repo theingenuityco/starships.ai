@@ -12,6 +12,7 @@
 
 import type { ConnectorProvider } from '@starships/protocol';
 import type { ActionContext, HttpEnvelope } from '@starships/connectors';
+import { AppError } from '@starships/errors';
 import { connectorRegistry } from '@starships/connectors';
 import { ensureConnectorRegistry } from './ConnectorRegistryClient';
 import { resolveConnectorContext } from './connectorSessionResolver';
@@ -37,7 +38,14 @@ export class ConnectorActionExecutor {
     const action = def.actions.find((a) => a.name === req.action);
     if (!action) throw new Error(`Unknown connector action "${req.action}" for connector "${req.connector}"`);
 
-    const args = action.parse ? action.parse(req.args ?? {}) : req.args ?? {};
+    // Validation failures (ZodError) are bad input, not server faults: surface as 400.
+    let args: Record<string, unknown>;
+    try {
+      args = action.parse ? action.parse(req.args ?? {}) : req.args ?? {};
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'invalid action args';
+      throw new AppError(`Invalid args for ${req.connector}.${req.action}: ${msg}`, 'VALIDATION_ERROR', 400);
+    }
 
     // Connector instance metadata + auth session (installation token, JWT, api key, ...).
     const { metadata, session } = await resolveConnectorContext(provider, req.starshipId, req.authUserId);

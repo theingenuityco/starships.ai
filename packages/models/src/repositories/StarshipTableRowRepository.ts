@@ -300,6 +300,19 @@ export class StarshipTableRowRepository extends BaseRepository {
     );
   }
 
+  /** Remove all rows from a Table (used by bundle import overwrite). */
+  async truncate(ref: TableRef): Promise<void> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const table = qualifiedTable(ref.starshipId, ref.physicalTable);
+        await this.getConnection().query(`DELETE FROM ${table}`);
+      },
+      'truncate',
+      'StarshipTableRow',
+      ref.physicalTable
+    );
+  }
+
   async deleteByRowKey(ref: TableRef, rowKey: string): Promise<{ deleted: boolean }> {
     return this.executeWithErrorHandling(
       async () => {

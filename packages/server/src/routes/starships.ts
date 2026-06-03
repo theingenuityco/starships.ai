@@ -17,7 +17,6 @@ import type {
   WidgetInstanceNodeInput,
   ViewRuntimeConfig,
   StarshipDatasetColumn,
-  CreateStarshipDatasetRequest,
 } from '@starships/protocol';
 import type { AuthUser, ImportExportContainerV1 } from '@starships/protocol';
 import type { NextFunction, Request, Response } from 'express';
@@ -35,8 +34,10 @@ import {
   RoomTaskBoardsRepository,
   RoomToolsRepository,
   RoomViewsRepository,
-  StarshipDatasetRepository,
-  StarshipDatasetRowRepository,
+  StarshipTableRepository,
+  StarshipTableRowRepository,
+  type StarshipTableRecord,
+  type TableRef,
   TaskBoardRepository,
   TaskCardRepository,
   TaskColumnRepository,
@@ -340,6 +341,11 @@ function makeTransactionConnection(client: {
   return txConn as unknown as PostgresConnection;
 }
 
+/** Build a row-repo TableRef from a Table registry record. */
+function tableRefOf(t: StarshipTableRecord): TableRef {
+  return { starshipId: t.starshipId, physicalTable: t.physicalTable, columns: t.columns, primaryKey: t.primaryKey };
+}
+
 async function applyRoomBundleToStarship(opts: {
   starshipId: string;
   userId: string;
@@ -367,8 +373,10 @@ async function applyRoomBundleToStarship(opts: {
     const agentService = new AgentService(txConn);
     const svc = new ImportExportService(txConn);
     const viewRepo = new ViewRepository(txConn);
-    const datasetRepo = new StarshipDatasetRepository(txConn);
-    const datasetRowRepo = new StarshipDatasetRowRepository(txConn);
+    // New Table repos manage their own (DDL) transactions, so they cannot use
+    // the outer txConn (its .transaction() throws). They run independently.
+    const datasetRepo = new StarshipTableRepository();
+    const datasetRowRepo = new StarshipTableRowRepository();
     const taskBoardRepo = new TaskBoardRepository(txConn);
     const taskColumnRepo = new TaskColumnRepository(txConn);
     const taskCardRepo = new TaskCardRepository(txConn);
@@ -821,9 +829,9 @@ async function applyRoomBundleToStarship(opts: {
           archived: false,
         });
         if (updated) {
-          await txConn.query(`DELETE FROM starship_dataset_rows WHERE dataset_id = $1`, [updated.id]);
+          await datasetRowRepo.truncate(tableRefOf(updated));
           if (rows.length > 0) {
-            await datasetRowRepo.appendMany(updated.id, rows);
+            await datasetRowRepo.appendMany(tableRefOf(updated), rows);
           }
           imported.datasets += 1;
           if (sourceSlug) datasetSlugMap.set(sourceSlug, updated.slug);
@@ -831,9 +839,9 @@ async function applyRoomBundleToStarship(opts: {
         continue;
       }
 
-      const created = await datasetRepo.create(normalizedCreate as CreateStarshipDatasetRequest);
+      const created = await datasetRepo.create(normalizedCreate);
       if (rows.length > 0) {
-        await datasetRowRepo.appendMany(created.id, rows);
+        await datasetRowRepo.appendMany(tableRefOf(created), rows);
       }
       imported.datasets += 1;
       if (sourceSlug) datasetSlugMap.set(sourceSlug, created.slug);
@@ -2708,7 +2716,7 @@ router.post(
 
       // Existing views/datasets/task boards/rooms (conflicts by hash + name where feasible).
       const viewRepo = new ViewRepository();
-      const datasetRepo = new StarshipDatasetRepository();
+      const datasetRepo = new StarshipTableRepository();
       const taskBoardRepo = new TaskBoardRepository();
       const roomRepo = new RoomRepository();
 
@@ -3598,8 +3606,8 @@ router.post(
         const agentService = new AgentService(txConn);
         const svc = new ImportExportService(txConn);
         const viewRepo = new ViewRepository(txConn);
-        const datasetRepo = new StarshipDatasetRepository(txConn);
-        const datasetRowRepo = new StarshipDatasetRowRepository(txConn);
+        const datasetRepo = new StarshipTableRepository();
+        const datasetRowRepo = new StarshipTableRowRepository();
         const taskBoardRepo = new TaskBoardRepository(txConn);
         const taskColumnRepo = new TaskColumnRepository(txConn);
         const taskCardRepo = new TaskCardRepository(txConn);
@@ -4015,9 +4023,9 @@ router.post(
               archived: false,
             });
             if (updated) {
-              await txConn.query(`DELETE FROM starship_dataset_rows WHERE dataset_id = $1`, [updated.id]);
+              await datasetRowRepo.truncate(tableRefOf(updated));
               if (rows.length > 0) {
-                await datasetRowRepo.appendMany(updated.id, rows);
+                await datasetRowRepo.appendMany(tableRefOf(updated), rows);
               }
               imported.datasets += 1;
               if (sourceSlug) datasetSlugMap.set(sourceSlug, updated.slug);
@@ -4025,9 +4033,9 @@ router.post(
             continue;
           }
 
-          const created = await datasetRepo.create(normalizedCreate as CreateStarshipDatasetRequest);
+          const created = await datasetRepo.create(normalizedCreate);
           if (rows.length > 0) {
-            await datasetRowRepo.appendMany(created.id, rows);
+            await datasetRowRepo.appendMany(tableRefOf(created), rows);
           }
           imported.datasets += 1;
           if (sourceSlug) datasetSlugMap.set(sourceSlug, created.slug);

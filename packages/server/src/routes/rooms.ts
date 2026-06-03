@@ -21,7 +21,7 @@ import {
   RoomToolsRepository,
   RoomViewsRepository,
   RoomRepository,
-  StarshipDatasetRepository,
+  StarshipTableRepository,
   StarshipDocRepository,
   StarshipMemberRepository,
   TaskBoardRepository,
@@ -2446,7 +2446,7 @@ router.post('/rooms/:roomId/pins/datasets', jwtAuthMiddleware, async (req: Reque
     }
     if (!(await verifyStarshipOwnerAccess(room.starshipId, authUserId, res))) return;
 
-    const datasetRepo = new StarshipDatasetRepository();
+    const datasetRepo = new StarshipTableRepository();
     const dataset = await datasetRepo.findById(body.datasetId);
     if (!dataset) {
       sendError(res, 'VALIDATION_ERROR', 'Dataset not found', 400, { datasetId: body.datasetId });

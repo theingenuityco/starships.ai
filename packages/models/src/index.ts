@@ -37,8 +37,6 @@ export { ScheduleEntity } from './entities/ScheduleEntity';
 export { TaskBoardEntity } from './entities/TaskBoardEntity';
 export { TaskColumnEntity } from './entities/TaskColumnEntity';
 export { TaskCardEntity } from './entities/TaskCardEntity';
-export { StarshipDatasetEntity } from './entities/StarshipDatasetEntity';
-export { StarshipDatasetRowEntity } from './entities/StarshipDatasetRowEntity';
 export { StarshipDocEntity } from './entities/StarshipDocEntity';
 export { ToolCallApprovalEntity } from './entities/ToolCallApprovalEntity';
 export { MarketingContentEntity } from './entities/MarketingContentEntity';
@@ -90,11 +88,8 @@ export { ScheduleRepository } from './repositories/ScheduleRepository';
 export { TaskBoardRepository } from './repositories/TaskBoardRepository';
 export { TaskColumnRepository } from './repositories/TaskColumnRepository';
 export { TaskCardRepository } from './repositories/TaskCardRepository';
-export { StarshipDatasetRepository } from './repositories/StarshipDatasetRepository';
-export { StarshipDatasetRowRepository } from './repositories/StarshipDatasetRowRepository';
 export { StarshipDocRepository } from './repositories/StarshipDocRepository';
-export type { DatasetRowFilter, DatasetRowFilterOp } from './repositories/StarshipDatasetRowRepository';
-// New per-starship Database of Tables (replaces the JSONB dataset repos above; old ones removed in route migration).
+// Per-starship Database of Tables (replaces the removed JSONB dataset repos).
 export { StarshipTableRepository } from './repositories/StarshipTableRepository';
 export type { StarshipTableRecord, CreateStarshipTableInput, UpdateStarshipTableInput } from './repositories/StarshipTableRepository';
 export { StarshipTableRowRepository } from './repositories/StarshipTableRowRepository';

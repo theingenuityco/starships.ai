@@ -6,6 +6,7 @@
  */
 
 import type { AgentToolPermission } from './agent';
+import type { ConnectorProvider } from './connector';
 
 export interface Room {
   slug: string;
@@ -34,6 +35,30 @@ export interface RoomModel extends Room {
   provisionedByBundle?: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+/** Connection state of one connector a room's setup requires. */
+export interface RoomSetupConnectorStatus {
+  provider: ConnectorProvider;
+  connected: boolean;
+}
+
+/**
+ * Setup state for a room that has a server-side setup handler (keyed by the room's
+ * `provisionedByBundle` tag, e.g. "engineering"). Returned by GET /rooms/:id/setup-status
+ * and POST /rooms/:id/setup-run. Rooms with no setup handler return null instead.
+ */
+export interface RoomSetupStatus {
+  bundleTag: string;
+  /** Required connectors and whether each is currently connected. */
+  connectors: RoomSetupConnectorStatus[];
+  /** All required connectors connected. */
+  ready: boolean;
+  /** Whether the room's data has been populated (handler-defined meaning). */
+  seeded: boolean;
+  /** Short human summary, e.g. "12 repositories imported". */
+  summary?: string;
+  details?: Record<string, unknown>;
 }
 
 export type RoomPinnedResourceKind = 'view' | 'table' | 'task_board' | 'doc';

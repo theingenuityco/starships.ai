@@ -27,6 +27,7 @@ import { generateOAuthState, validateOAuthState } from '@/utils/jwt';
 import { connectorRegistry } from '@starships/connectors';
 import { connectorEnv, makeSecretResolver, isStrategyDispatchProvider } from './connectorStrategy';
 import { PlatformSecretService } from './PlatformSecretService';
+import { roomSetupService } from './RoomSetupService';
 import { AppError } from '@starships/errors';
 
 /**
@@ -225,6 +226,21 @@ export class ConnectorService {
     }
 
     const starship = await this.starshipRepository.findById(starshipId);
+
+    // Post-connect processing: a just-completed connection may unblock a room's setup
+    // (e.g. connecting GitHub seeds the Engineering room's `repos` Table). Best-effort
+    // and fire-and-forget so it never blocks or fails the connect flow.
+    if (status === 'connected') {
+      void roomSetupService
+        .onConnectorConnected({ starshipId, authUserId: userId, provider })
+        .catch((err) => {
+          console.error('[CONNECTOR] Room setup post-connect fan-out failed', {
+            provider,
+            starshipId,
+            errorMessage: err instanceof Error ? err.message : String(err),
+          });
+        });
+    }
 
     return { connector, starshipSlug: starship?.slug };
   }

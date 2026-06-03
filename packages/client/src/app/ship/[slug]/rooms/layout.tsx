@@ -960,6 +960,7 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
             starshipId={starshipData.id}
             starshipSlug={routeParams.slug}
             roomSlug={activeRoom?.slug ?? normalizedRoomSlug}
+            roomConversationId={activeConversationId}
             roomName={activeRoom?.name}
             pinnedTables={pinsData?.tables ?? []}
             pinnedTaskBoards={pinsData?.taskBoards ?? []}

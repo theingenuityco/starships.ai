@@ -1,5 +1,5 @@
 import type { GitCredentials } from '@starships/autopilot';
-import type { ConnectorSession } from '@/services/ConnectorActionSessionService';
+import type { ConnectorSessionV2 as ConnectorSession } from '@starships/protocol';
 
 /**
  * Native git (clone/push) reuses the token the `github` connector already

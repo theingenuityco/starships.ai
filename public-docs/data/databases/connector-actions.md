@@ -25,7 +25,10 @@ Key actions:
 - `upsert-table-rows`
 - `query-database-sql` (read-only SQL over the Database)
 
-> Note: deleting a row is currently only available via the HTTP API (`DELETE /api/v1/starships/:starshipId/tables/:tableIdOrSlug/rows/:rowKey`); there is no corresponding connector action.
+> Note: some operations have no dedicated connector action:
+> - **Delete a row**: HTTP only — `DELETE /api/v1/starships/:starshipId/tables/:tableIdOrSlug/rows/:rowKey`.
+> - **Archive a table**: use `update-table` with `{ "archived": true }`.
+> - **Hard-delete a table (admin)**: HTTP only — `DELETE /api/v1/starships/:starshipId/tables/:tableIdOrSlug` (requires admin, returns `204`).
 
 Room pinning actions (to surface a Table in a room):
 

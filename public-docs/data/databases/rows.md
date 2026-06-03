@@ -21,7 +21,7 @@ In the database:
 
 ## Listing rows
 
-When you list rows, the server reads from the physical table and returns row objects keyed by column `name`. Rows are ordered newest-first (`__created_at` desc).
+When you list rows, the server reads from the physical table and returns row objects keyed by column `name`. Rows are always ordered newest-first (`__created_at` desc); there is no sort parameter.
 
 Reference columns are **reconstructed** into reference objects on read (see below). Listing does not hydrate human labels; use the [`refs:resolve` endpoint](./api.md#batch-resolve-references) when you need labels.
 

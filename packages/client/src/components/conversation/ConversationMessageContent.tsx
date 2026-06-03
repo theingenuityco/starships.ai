@@ -393,6 +393,10 @@ function extractToolResultSuccess(toolResultMessage: any): boolean | undefined {
     const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null
     if (!isRecord(parsed)) return undefined
 
+    // Code-native CLI agent tool results use the `{ ok, data | error }` envelope.
+    const ok = parsed['ok']
+    if (typeof ok === 'boolean') return ok
+
     const s = parsed['success']
     if (typeof s === 'boolean') return s
 

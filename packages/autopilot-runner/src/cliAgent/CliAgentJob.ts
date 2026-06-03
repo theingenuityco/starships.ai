@@ -33,7 +33,10 @@ export interface RunCliAgentJobOptions {
 export async function runCliAgentJob(spec: CliAgentJobSpec, opts: RunCliAgentJobOptions = {}): Promise<CliAgentResult> {
   // Provision (clone) on the first job; reuse the existing checkout otherwise.
   // The directory is a persistent, host-managed mount, so we never tear it down here.
-  let cwd = spec.workspace?.root ?? process.cwd();
+  // Fall back to the launcher-injected mount root (WORKSPACE_BASE_DIR=/workspace)
+  // before process.cwd(): a scratch run has no spec.workspace.root, and the agent
+  // should operate on the mounted workspace, not the container's working directory.
+  let cwd = spec.workspace?.root ?? process.env.WORKSPACE_BASE_DIR ?? process.cwd();
   if (spec.workspace?.spec) {
     const provider = new LocalWorkspaceProvider();
     const provisioned = await provider.provision(

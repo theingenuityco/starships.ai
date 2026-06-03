@@ -54,7 +54,8 @@ export function httpConnectorActionRunner(opts: HttpConnectorActionRunnerOptions
         });
 
         if (resp.status < 200 || resp.status >= 300) {
-          throw new Error(`connector-action callback failed (${resp.status})`);
+          const body = await resp.text().catch(() => '');
+          throw new Error(`connector-action callback failed (${resp.status})${body ? ': ' + body.slice(0, 200) : ''}`);
         }
 
         // The transport always returns 200; the action's own HTTP status is inside the envelope.

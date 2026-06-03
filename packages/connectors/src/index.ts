@@ -5,15 +5,15 @@
  * - listRuntimeTemplates() / runtimeTemplate(provider) for runtime template fields
  * - catalog() for the connect UI
  * - get(provider).auth.{begin,complete,buildSession} for the connect + session lifecycle
+ * - get(provider).actions for server-side action execution (see ConnectorActionExecutor)
  *
- * Declarative connectors are registered from JSON via registerContainers(); hand-written
- * connectors (e.g. GitHub App) are registered as code and take precedence.
+ * Every connector is code: it registers via registerCode() and owns its actions as plain
+ * functions (no template DSL). The declarative bundle-template path has been retired.
  */
 
+export * from './framework';
 export * from './types';
 export { ConnectorRegistry, connectorRegistry, toRuntimeTemplate } from './registry';
-export { fromTemplate, type ConnectorTemplateContainer } from './adapter/fromTemplate';
-export { loadTemplateContainersFromDir } from './loaders';
 
 export { OAuth2Strategy } from './strategies/OAuth2Strategy';
 export { ApiKeyStrategy } from './strategies/ApiKeyStrategy';
@@ -23,3 +23,4 @@ export { NoneStrategy } from './strategies/NoneStrategy';
 export { GitHubAppStrategy } from './strategies/GitHubAppStrategy';
 export { githubConnector } from './connectors/github';
 export { starshipsConnector } from './connectors/starships';
+export { systemConnector } from './connectors/system';

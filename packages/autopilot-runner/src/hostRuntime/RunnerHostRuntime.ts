@@ -1,31 +1,10 @@
 import type { HostRuntime, LlmHostRequest } from '@starships/autopilot';
-import type {
-  ConnectorEndpointV2,
-  ConnectorHttpEndpointV2,
-  ConnectorSqlEndpointV2,
-  ConnectorSessionV2,
-  ConnectorDbSessionV2,
-  ConnectorTemplateRuntimeFieldsV2,
-  ConnectorQueryParamMapping,
-  ExprString,
-  HttpMethod,
-  QueryParamEncoding,
-} from '@starships/protocol/src/domains/connector';
+import type { ConnectorSessionV2, ConnectorTemplateRuntimeFieldsV2 } from '@starships/protocol/src/domains/connector';
 import { CancelledError } from '@starships/autopilot';
 import { BedrockRuntimeClient } from '@aws-sdk/client-bedrock-runtime';
 import { invokeBedrock } from './bedrock';
 import { invokeOpenRouter } from './openrouter';
 import { invokeAzureAiFoundry } from './azure-ai-foundry';
-import { Pool } from 'pg';
-import type { FieldDef, PoolClient } from 'pg';
-import { lookup } from 'node:dns/promises';
-import { STATUS_CODES } from 'node:http';
-import { Socket } from 'node:net';
-import { ensureSingleStatement, hostMatchesAllowlist, isPrivateIp, isReadOnlyStatement } from './sqlGuards';
-
-function isSqlEndpoint(endpoint: ConnectorEndpointV2): endpoint is ConnectorSqlEndpointV2 {
-  return (endpoint as { kind?: unknown }).kind === 'sql';
-}
 
 const SENSITIVE_HEADER_KEYS = new Set([
   'authorization',
@@ -107,58 +86,6 @@ function summarizeFetchError(err: unknown): Record<string, unknown> {
   };
 }
 
-function getHeaderValue(h: Record<string, unknown> | undefined, name: string): string | undefined {
-  if (!h) return undefined;
-  const direct = h[name];
-  if (typeof direct === 'string') return direct;
-  const alt = h[name.toLowerCase()];
-  if (typeof alt === 'string') return alt;
-  const alt2 = h[name.toUpperCase()];
-  if (typeof alt2 === 'string') return alt2;
-  const target = name.toLowerCase();
-  for (const [k, v] of Object.entries(h)) {
-    if (k.toLowerCase() === target && typeof v === 'string') return v;
-  }
-  return undefined;
-}
-
-function normalizeHeadersToStrings(h: Record<string, unknown>): Record<string, string> {
-  const out: Record<string, string> = {};
-  for (const [k, v] of Object.entries(h || {})) {
-    if (!k) continue;
-    if (v === undefined || v === null) continue;
-    if (typeof v === 'string') out[k] = v;
-    else if (typeof v === 'number' || typeof v === 'boolean') out[k] = String(v);
-    else if (Array.isArray(v)) out[k] = v.map((x) => (x === undefined || x === null ? '' : String(x))).filter(Boolean).join(',');
-    else out[k] = String(v);
-  }
-  return out;
-}
-
-function looksLikeJson(s: string): boolean {
-  const t = s.trim();
-  if (!t) return false;
-  return t.startsWith('{') || t.startsWith('[');
-}
-
-function coerceHttpStatusCode(v: unknown): number | null {
-  if (typeof v === 'number' && Number.isFinite(v)) {
-    const n = Math.floor(v);
-    return n >= 100 && n <= 599 ? n : null;
-  }
-  if (typeof v === 'string' && v.trim()) {
-    const n = Number(v);
-    if (Number.isFinite(n)) {
-      const m = Math.floor(n);
-      return m >= 100 && m <= 599 ? m : null;
-    }
-  }
-  return null;
-}
-
-function statusTextFromCode(code: number): string {
-  return STATUS_CODES[code] ?? String(code);
-}
 
 /**
  * Connector sessions passed from the embedding host (API server) to the runner.
@@ -250,6 +177,19 @@ export interface RunnerHostRuntimeOptions {
    * (HTTP + LLM) should be cancelled promptly.
    */
   signal?: AbortSignal;
+
+  /**
+   * Server callback for connector action execution. When provided, connectorAction()
+   * delegates to the embedding host (which owns the connector definitions + secrets)
+   * over HTTP instead of resolving/executing connectors locally. This is how the runner
+   * runs connector actions without ever receiving connector templates or credentials.
+   */
+  connectorActionCallback?: {
+    url: string;
+    secret?: string;
+    starshipId?: string;
+    authUserId?: string;
+  };
 }
 
 /**
@@ -265,126 +205,11 @@ export interface RunnerHostRuntimeOptions {
  * headers or URLs used here.
  */
 export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}): HostRuntime {
-  const connectorTemplates = options.connectorTemplates ?? {};
+  // connectorSessions still carries the internal "starships" session used by llm() for
+  // attachment preview URLs. Connector action execution is delegated to the host via
+  // connectorActionCallback, so connector templates/metadata are no longer used here.
   const connectorSessions = options.connectorSessions ?? {};
-  const connectorMetadata = options.connectorMetadata ?? {};
   const runtimeEnv = options.runtimeEnv ?? {};
-
-  const tcpProbe = async (
-    host: string,
-    port: number,
-    timeoutMs: number = 1500
-  ): Promise<{ outcome: 'connected' | 'timeout' | 'error'; elapsedMs: number; error: string | null }> => {
-    const startedAt = Date.now();
-    const socket = new Socket();
-    let finished = false;
-
-    return await new Promise((resolve) => {
-      const finish = (outcome: 'connected' | 'timeout' | 'error', err?: unknown) => {
-      if (finished) return;
-      finished = true;
-      try {
-        socket.destroy();
-      } catch {
-        // ignore
-      }
-      const payload = {
-        outcome,
-        elapsedMs: Date.now() - startedAt,
-        error: err instanceof Error ? err.message : err ? String(err) : null,
-      };
-      resolve(payload);
-    };
-
-    socket.setTimeout(timeoutMs);
-    socket.once('connect', () => finish('connected'));
-    socket.once('timeout', () => finish('timeout'));
-    socket.once('error', (e) => finish('error', e));
-    socket.connect({ host, port });
-    });
-  };
-
-  // Best-effort DB pool cache (per-process).
-  const pgPools = new Map<string, Pool>();
-  const getPgPool = (db: ConnectorDbSessionV2): Pool => {
-    const key = JSON.stringify({
-      driver: db.driver,
-      host: db.host,
-      port: db.port,
-      database: db.database,
-      user: db.user,
-      password: db.password ?? '',
-      ssl: Boolean(db.ssl),
-    });
-    const existing = pgPools.get(key);
-    if (existing) return existing;
-
-    const ssl =
-      db.ssl === true
-        ? {
-            rejectUnauthorized: true,
-          }
-        : db.ssl === false
-          ? false
-          : undefined;
-
-    const pool = new Pool({
-      host: db.host,
-      port: db.port,
-      database: db.database,
-      user: db.user,
-      password: db.password,
-      ssl,
-      max: 3,
-      idleTimeoutMillis: 30_000,
-      connectionTimeoutMillis: 10_000,
-    });
-    pgPools.set(key, pool);
-    return pool;
-  };
-
-  const assertDbHostAllowed = async (host: string): Promise<void> => {
-    const h = host.trim();
-    if (!h) throw new Error('DB host is required');
-    if (h.toLowerCase() === 'localhost' || h.toLowerCase().endsWith('.localhost')) {
-      throw new Error('DB host is not allowed');
-    }
-
-    const allowPrivate = process.env.CONNECTOR_DB_ALLOW_PRIVATE_NETWORKS === 'true' || process.env.CONNECTOR_DB_ALLOW_PRIVATE_NETWORKS === '1';
-    const allowlistRaw = process.env.CONNECTOR_DB_ALLOWED_HOSTS ?? '';
-    const allowlist = allowlistRaw.split(',').map((s) => s.trim()).filter(Boolean);
-    if (allowlist.length > 0 && !hostMatchesAllowlist(h, allowlist)) {
-      throw new Error('DB host is not in allowlist');
-    }
-
-    // If host is a literal IP, enforce private checks directly.
-    if (isPrivateIp(h)) {
-      if (!allowPrivate) throw new Error('DB host resolves to a private network and is blocked by policy');
-      return;
-    }
-
-    // Best-effort DNS resolution to catch private endpoints behind hostnames.
-    try {
-      const dnsStartedAt = Date.now();
-      const records = await lookup(h, { all: true });
-      const dnsElapsedMs = Date.now() - dnsStartedAt;
-      const privateAddrs = records.filter((r) => isPrivateIp(r.address)).map((r) => r.address);
-      const resolved = records.slice(0, 3).map((r) => ({ address: r.address, family: r.family ?? null }));
-      void dnsElapsedMs;
-      void resolved;
-      void privateAddrs;
-      for (const r of records) {
-        if (isPrivateIp(r.address) && !allowPrivate) {
-          throw new Error('DB host resolves to a private network and is blocked by policy');
-        }
-      }
-    } catch (e) {
-      // If DNS lookup fails, fall back to the allowlist result (if configured),
-      // otherwise let the connection attempt fail with a clearer error.
-      if (allowlist.length > 0) throw e;
-    }
-  };
-
 
   // Initialize clients lazily or once
   let _bedrockClient: BedrockRuntimeClient | null = null;
@@ -558,88 +383,6 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
     }
   };
 
-  const unwrapBrightDataEnvelope = (
-    resp: Awaited<ReturnType<HostRuntime['http']>>
-  ): Awaited<ReturnType<HostRuntime['http']>> => {
-    const body = resp?.body as unknown;
-    if (!body || typeof body !== 'object' || Array.isArray(body)) return resp;
-    const obj = body as Record<string, unknown>;
-    const status =
-      coerceHttpStatusCode(obj.status_code) ?? coerceHttpStatusCode(obj.statusCode) ?? coerceHttpStatusCode(obj.status) ?? null;
-    if (status === null) return resp;
-
-    const headersRaw = obj.headers && typeof obj.headers === 'object' && !Array.isArray(obj.headers) ? (obj.headers as Record<string, unknown>) : null;
-    const headers = headersRaw ? normalizeHeadersToStrings(headersRaw) : (resp.headers as Record<string, string>);
-    const url = typeof obj.url === 'string' && obj.url.trim().length > 0 ? obj.url.trim() : resp.url;
-
-    const payloadBody = obj.body ?? obj.result;
-    const contentType = (getHeaderValue(headersRaw ?? (headers as unknown as Record<string, unknown>), 'content-type') ?? '').toLowerCase();
-
-    let outBody: unknown = payloadBody;
-    if (typeof payloadBody === 'string') {
-      const t = payloadBody;
-      if (contentType.includes('application/json') || looksLikeJson(t)) {
-        try {
-          outBody = t.trim().length ? JSON.parse(t) : t;
-        } catch {
-          outBody = t;
-        }
-      } else {
-        outBody = t;
-      }
-    }
-
-    return {
-      status,
-      statusText: statusTextFromCode(status),
-      headers,
-      body: outBody,
-      url,
-    };
-  };
-
-  const evalTemplate = (
-    value: unknown,
-    ctx: {
-      args: Record<string, unknown>;
-      runtimeEnv: Record<string, unknown>;
-      metadata: Record<string, unknown>;
-      vars: Record<string, unknown>;
-    }
-  ): unknown => {
-    if (typeof value !== 'string') return value;
-
-    const raw = value;
-    const fullOnly = /^\s*\{\{\s*[\s\S]*?\s*\}\}\s*$/.test(raw);
-    const re = /\{\{\s*([\s\S]*?)\s*\}\}/g;
-
-    const evalExpr = (expr: string): unknown => {
-      // Provide a merged scope so templates can reference:
-      // - args / runtimeEnv / metadata (explicit objects)
-      // - connector variables directly by name (e.g. {{ shop }})
-      const scope = {
-        args: ctx.args,
-        runtimeEnv: ctx.runtimeEnv,
-        metadata: ctx.metadata,
-        vars: ctx.vars,
-        ...ctx.vars,
-      };
-
-      const fn = new Function('scope', `with (scope) { return (${expr}); }`);
-      return fn(scope);
-    };
-
-    if (fullOnly) {
-      const m = raw.match(/^\s*\{\{\s*([\s\S]*?)\s*\}\}\s*$/);
-      if (!m) return raw;
-      return evalExpr(m[1]);
-    }
-
-    return raw.replace(re, (_m, expr) => {
-      const out = evalExpr(String(expr));
-      return out === null || out === undefined ? '' : String(out);
-    });
-  };
 
   const connectorAction: HostRuntime['connectorAction'] = async ({ connector, action, args = {}, timeoutMs }) => {
     const c = String(connector || '').trim();
@@ -647,282 +390,43 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
     if (!c) throw new Error('connectorAction.connector is required');
     if (!a) throw new Error('connectorAction.action is required');
 
-    const tpl = connectorTemplates[c];
-    if (!tpl) {
-      throw new Error(`Unknown connector "${c}" (template not provided to runner)`);
-    }
-
-    const endpoint = tpl.endpoints.find((e: ConnectorEndpointV2) => e.name === a);
-    if (!endpoint) {
-      throw new Error(`Unknown connector action "${a}" for connector "${c}"`);
-    }
-
-    const metadata = (connectorMetadata[c] ?? {}) as Record<string, unknown>;
-
-    // Resolve connector variables (declared in template) into a flat scope.
-    // These are also spread into the template scope to support {{ varName }}.
-    const vars: Record<string, unknown> = {};
-    for (const v of tpl.variables ?? []) {
-      if (!v || typeof v.name !== 'string' || !v.name.trim()) continue;
-      const name = v.name.trim();
-      const source = v.source;
-      const key = typeof v.key === 'string' ? v.key : '';
-      let rawValue: unknown;
-
-      if (source === 'args') rawValue = (args as Record<string, unknown>)[key];
-      else if (source === 'runtimeEnv') rawValue = (runtimeEnv as Record<string, unknown>)[key];
-      else if (source === 'metadata') rawValue = (metadata as Record<string, unknown>)[key];
-
-      if (v.transform && typeof v.transform === 'string' && v.transform.trim()) {
-        // Provide `value` to transforms (in addition to args/runtimeEnv/metadata/vars).
-        const transformCtx = {
+    // Server-authority path: delegate to the embedding host, which resolves the code
+    // connector and executes the action with its own secrets. The runner never sees
+    // connector templates or credentials in this mode.
+    const cb = options.connectorActionCallback;
+    if (cb?.url) {
+      const transport = await http({
+        method: 'POST',
+        url: cb.url,
+        headers: {
+          'content-type': 'application/json',
+          ...(cb.secret ? { 'x-runner-secret': cb.secret } : {}),
+        },
+        body: {
+          connector: c,
+          action: a,
           args,
+          timeoutMs,
+          starshipId: cb.starshipId,
+          authUserId: cb.authUserId,
           runtimeEnv,
-          metadata,
-          vars: { ...vars, value: rawValue },
-        };
-        rawValue = evalTemplate(v.transform, transformCtx);
+        },
+        timeoutMs: typeof timeoutMs === 'number' && timeoutMs > 0 ? timeoutMs + 5000 : 65000,
+      });
+      if (transport.status < 200 || transport.status >= 300) {
+        const detail =
+          transport.body && typeof transport.body === 'object'
+            ? JSON.stringify(transport.body)
+            : String(transport.body ?? '');
+        throw new Error(`connector-action callback failed (${transport.status}) for ${c}.${a}: ${detail}`);
       }
-
-      vars[name] = rawValue;
+      return transport.body as Awaited<ReturnType<HostRuntime['connectorAction']>>;
     }
 
-    const ctx = { args, runtimeEnv, metadata, vars };
-
-    // SQL endpoints (native DB transport)
-    if (isSqlEndpoint(endpoint)) {
-      const e = endpoint;
-      if (String(e.driver || '').trim().toLowerCase() !== 'postgres') {
-        throw new Error(`Unsupported SQL driver for connector "${c}": ${String(e.driver || '')}`);
-      }
-
-      const session = connectorSessions[c] as ConnectorSession | undefined;
-      const db = session?.db;
-      if (!db) {
-        throw new Error(`Connector "${c}" does not have a DB session (not connected or missing db config)`);
-      }
-
-      await assertDbHostAllowed(db.host);
-
-      const sqlRaw = evalTemplate(e.sql, ctx);
-      const sql = ensureSingleStatement(String(sqlRaw ?? ''));
-      if (!sql.trim()) throw new Error(`Empty SQL for connector "${c}" action "${a}"`);
-
-      const readOnly = e.readOnly !== false;
-      if (readOnly && !isReadOnlyStatement(sql)) {
-        throw new Error('SQL statement is not allowed (read-only policy)');
-      }
-
-      const mode: 'query' | 'execute' = e.mode === 'execute' ? 'execute' : 'query';
-      const rowLimitHint = typeof e.rowLimit === 'number' && Number.isFinite(e.rowLimit) ? Math.max(1, Math.floor(e.rowLimit)) : null;
-      const maxRows = Math.min(rowLimitHint ?? 1000, 5000);
-
-      const argsRec = args as Record<string, unknown>;
-      const paramsRaw = argsRec.params;
-      const params: unknown[] = paramsRaw === undefined ? [] : Array.isArray(paramsRaw) ? paramsRaw : (() => { throw new Error('args.params must be an array when provided'); })();
-
-      const hostLower = String(db.host).toLowerCase();
-      const isSupabaseHost = hostLower.endsWith('.supabase.co');
-      const isDefaultPgPort = Number(db.port) === 5432;
-
-      // Fast preflight: if we can't open a TCP connection, the query will never succeed.
-      const preflightMain = await tcpProbe(db.host, db.port, 1500);
-      const preflightPooler = isSupabaseHost && isDefaultPgPort ? await tcpProbe(db.host, 6543, 1500) : null;
-
-      if (preflightMain.outcome !== 'connected' && (preflightPooler?.outcome ?? 'timeout') !== 'connected') {
-        let resolvedIp: string | null = null;
-        try {
-          const r = await lookup(String(db.host), { family: 4 });
-          resolvedIp = r?.address ?? null;
-        } catch {
-          // ignore
-        }
-        const extra =
-          isSupabaseHost && isDefaultPgPort
-            ? ' For Supabase, also verify your project Network Restrictions / IP allowlist and consider using the pooler port (6543) if required.'
-            : '';
-        throw new Error(
-          `Cannot reach Postgres host "${db.host}" on port ${db.port} (TCP ${preflightMain.outcome}${resolvedIp ? `; resolved IPv4 ${resolvedIp}` : ''}). This looks like a network/firewall/egress restriction: the runner must be able to open outbound TCP to your database port.${extra}`
-        );
-      }
-
-      const pool = getPgPool(db);
-
-      // Ensure timeouts are bounded and safe.
-      const effectiveTimeoutMs =
-        typeof timeoutMs === 'number' && Number.isFinite(timeoutMs) && timeoutMs > 0
-          ? Math.min(120_000, Math.floor(timeoutMs))
-          : typeof e.timeoutMs === 'number' && Number.isFinite(e.timeoutMs) && e.timeoutMs > 0
-            ? Math.min(120_000, Math.floor(e.timeoutMs))
-            : 30_000;
-
-      const safeUrl = `sql:postgres://${encodeURIComponent(db.host)}:${encodeURIComponent(String(db.port))}/${encodeURIComponent(db.database)}`;
-
-      const connectStartedAt = Date.now();
-      let client: PoolClient;
-      try {
-        client = await pool.connect();
-      } catch (err) {
-        const code = (err as { code?: unknown } | null)?.code;
-        if (
-          code === 'SELF_SIGNED_CERT_IN_CHAIN' ||
-          code === 'DEPTH_ZERO_SELF_SIGNED_CERT' ||
-          code === 'UNABLE_TO_VERIFY_LEAF_SIGNATURE'
-        ) {
-          throw new Error(
-            [
-              `Postgres SSL verification failed while connecting to "${db.host}:${db.port}" (${String(code)}).`,
-              `This usually means the server (or a network proxy) presented a certificate chain that isn't trusted by the runner.`,
-              `Fix options:`,
-              `- Ensure your DB endpoint presents a publicly trusted TLS certificate chain (no MITM/proxy inserting a self-signed cert).`,
-              `- If you're using a pooler/proxy, ensure it is configured with a trusted certificate chain.`,
-            ].join(' ')
-          );
-        }
-        throw err;
-      }
-      try {
-        void connectStartedAt;
-
-        // Apply statement timeout for this session.
-        // Note: statement_timeout is per-connection; we reset defensively for every call.
-        await client.query(`SET statement_timeout = ${effectiveTimeoutMs}`);
-
-        // Best-effort: cap query result size by truncating rows array (does not stop the server from producing more).
-        // For strict limits, prefer writing templates with LIMIT, or add a gateway in front.
-        const startedAt = Date.now();
-        const result =
-          mode === 'execute'
-            ? await client.query({ text: sql, values: params })
-            : await client.query({ text: sql, values: params });
-        const elapsedMs = Date.now() - startedAt;
-        void elapsedMs;
-
-        const fields = Array.isArray(result.fields)
-          ? (result.fields as FieldDef[]).map((f: FieldDef) => ({ name: f.name, dataTypeId: f.dataTypeID }))
-          : [];
-        const rows = Array.isArray(result.rows) ? result.rows.slice(0, maxRows) : [];
-
-        return {
-          status: 200,
-          statusText: 'OK',
-          headers: {},
-          body: {
-            driver: 'postgres',
-            command: result.command,
-            rowCount: typeof result.rowCount === 'number' ? result.rowCount : null,
-            fields,
-            rows,
-            truncated: Array.isArray(result.rows) ? result.rows.length > rows.length : false,
-          },
-          url: safeUrl,
-        };
-      } finally {
-        client.release();
-      }
-    }
-
-    // HTTP endpoints (existing behavior)
-    const httpEndpoint: ConnectorHttpEndpointV2 = endpoint;
-    const baseUrlRaw = httpEndpoint.baseUrlOverride || tpl.baseUrl;
-    const baseUrlEvaluated = String(evalTemplate(baseUrlRaw, ctx) ?? '').trim();
-    if (!/^https?:\/\//i.test(baseUrlEvaluated)) {
-      throw new Error(`Invalid baseUrl for connector "${c}": must be absolute http(s) URL`);
-    }
-
-    // Resolve path variables
-    const pathVars: Record<string, ExprString> = httpEndpoint.mapping?.path ?? {};
-    const resolvedPath = String(httpEndpoint.path || '').replace(/\{([^}]+)\}/g, (_m, name) => {
-      const key = String(name);
-      const expr = pathVars[key];
-      const val = expr !== undefined ? evalTemplate(expr, ctx) : args[key];
-      if (val === undefined || val === null || String(val) === '') {
-        throw new Error(`Missing path variable "${key}" for connector "${c}" action "${a}"`);
-      }
-      return encodeURIComponent(String(val));
-    });
-
-    const url = `${baseUrlEvaluated.replace(/\/+$/, '')}${resolvedPath.startsWith('/') ? '' : '/'}${resolvedPath}`;
-
-    // Build headers (sessions first, then mapping overrides)
-    const sessionHeaders = connectorSessions[c]?.headers ?? {};
-    const headers: Record<string, unknown> = { ...sessionHeaders };
-    if (httpEndpoint.mapping?.headers) {
-      for (const [k, v] of Object.entries(httpEndpoint.mapping.headers)) {
-        const out = evalTemplate(v, ctx);
-        headers[k] = out;
-      }
-    }
-
-    // Build query/body based on mapping or requestStyle
-    const method: HttpMethod = httpEndpoint.method;
-    let finalUrl = url;
-    let body: unknown = undefined;
-
-    const mapping = httpEndpoint.mapping;
-    if (mapping?.query) {
-      const defaultEncoding: QueryParamEncoding = mapping.queryEncoding ?? 'standard';
-      const parts: string[] = [];
-
-      for (const [k, v] of Object.entries(mapping.query as Record<string, ConnectorQueryParamMapping>)) {
-        let expr: unknown = v;
-        let encoding: QueryParamEncoding = defaultEncoding;
-
-        if (typeof v === 'object' && v !== null && 'value' in v) {
-          const vv = v as { value: unknown; encoding?: unknown };
-          expr = vv.value;
-          if (vv.encoding === 'none' || vv.encoding === 'standard') {
-            encoding = vv.encoding;
-          }
-        }
-
-        const out = evalTemplate(expr, ctx);
-        if (out === undefined || out === null) continue;
-        const valueStr = String(out);
-
-        if (encoding === 'none') {
-          // Preserve value exactly; still encode the key for safety.
-          parts.push(`${encodeURIComponent(k)}=${valueStr}`);
-        } else {
-          // Backwards-compatible encoding behavior.
-          const qs = new URLSearchParams();
-          qs.set(k, valueStr);
-          const s = qs.toString();
-          if (s) parts.push(s);
-        }
-      }
-
-      const q = parts.filter(Boolean).join('&');
-      if (q) finalUrl = `${finalUrl}${finalUrl.includes('?') ? '&' : '?'}${q}`;
-    }
-
-    if (method !== 'GET' && method !== 'HEAD') {
-      if (mapping?.rawBody !== undefined) {
-        body = evalTemplate(mapping.rawBody, ctx);
-      } else if (mapping?.body) {
-        const obj: Record<string, unknown> = {};
-        for (const [k, v] of Object.entries(mapping.body)) {
-          obj[k] = evalTemplate(v, ctx);
-        }
-        body = obj;
-      } else {
-        // fallback: send args as JSON for non-GET when no explicit body mapping
-        body = args;
-      }
-    }
-
-    const resp = await http({
-      method,
-      url: finalUrl,
-      headers,
-      body,
-      timeoutMs,
-    });
-    // Reserved system connector: unwrap Bright Data /request envelopes into a normalized HTTP response.
-    if (c === 'system' && (a === 'webFetch' || a === 'webSearch')) {
-      return unwrapBrightDataEnvelope(resp);
-    }
-    return resp;
+    throw new Error(
+      `Connector action "${a}" cannot run: the runner no longer executes connectors locally. ` +
+        'Provide connectorActionCallback so execution is delegated to the server (server-authority mode).'
+    );
   };
 
   const llm = async (request: LlmHostRequest): Promise<AsyncIterable<unknown>> => {

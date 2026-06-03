@@ -1,7 +1,6 @@
 export { AgentService } from './AgentService';
 export { AttachmentService } from './AttachmentService';
 export { AvatarGenerationService } from './AvatarGenerationService';
-export { ConnectorActionSessionService } from './ConnectorActionSessionService';
 export { ConnectorSecretService } from './ConnectorSecretService';
 export { ConnectorService } from './ConnectorService';
 export { ConversationService } from './ConversationService';

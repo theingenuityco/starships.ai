@@ -30,7 +30,7 @@ import type { Blueprint, EngineConfig, ExecutionWorkspace } from '@starships/aut
 import { executionProviderRouter } from '@/execution/ExecutionProviderRouter';
 import { workspaceSessionManager, type WorkspaceSession } from '@/execution/WorkspaceSessionManager';
 import { resolveGitCredentials } from '@/execution/gitCredentials';
-import type { ConnectorSession } from '@/services/ConnectorActionSessionService';
+import { buildConnectorSession } from '@/services/connectorSessionResolver';
 import { AppError } from '@starships/errors';
 import { StarshipService } from '@/services/StarshipService';
 import { UserService } from '@/services/UserService';
@@ -279,7 +279,8 @@ async function resolveToolWorkspace(args: {
   toolSlug?: string;
   toolArgs: Record<string, unknown>;
   conversationId?: string;
-  connectorSessions?: Record<string, ConnectorSession | undefined>;
+  starshipId?: string;
+  authUserId?: string;
 }): Promise<ExecutionWorkspace | undefined> {
   const { toolSlug, conversationId } = args;
   if (!toolSlug || !conversationId) return undefined;
@@ -303,7 +304,10 @@ async function resolveToolWorkspace(args: {
       return { hostDir: existing.hostDir };
     }
 
-    const git = resolveGitCredentials(args.connectorSessions);
+    // Resolve the GitHub installation token on demand (the server no longer ships
+    // connector sessions to the runner). Native git uses it as the HTTPS password.
+    const githubSession = args.starshipId ? await buildConnectorSession('github', args.starshipId, args.authUserId ?? '') : null;
+    const git = resolveGitCredentials(githubSession ? { github: githubSession } : undefined);
     const session = await workspaceSessionManager.bind({ key: conversationId, repoUrl, ref, branch });
     return {
       hostDir: session.hostDir,
@@ -338,13 +342,14 @@ async function executeToolBlueprint(args: {
   const initial = ExecutionItemUtils.wrapSingle({ ...args.toolArgs, config: args.toolConfig });
   execution.results.push({ nodeRef: '__initial__', items: initial });
 
-  const connectorSessions = (args.runnerConfig as { connectorSessions?: Record<string, ConnectorSession | undefined> })
-    .connectorSessions;
+  const runtimeEnv = (args.runnerConfig as { runtimeEnv?: Record<string, unknown> }).runtimeEnv ?? {};
+  const authUserId = typeof runtimeEnv.AUTH_USER_ID === 'string' ? runtimeEnv.AUTH_USER_ID : '';
   const workspace = await resolveToolWorkspace({
     toolSlug: args.toolSlug,
     toolArgs: args.toolArgs,
     conversationId: args.conversationId,
-    connectorSessions,
+    starshipId: args.starshipId,
+    authUserId,
   });
 
   const provider = await executionProviderRouter.getProvider({

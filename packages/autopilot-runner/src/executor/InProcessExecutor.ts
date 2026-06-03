@@ -70,6 +70,12 @@ export class InProcessExecutor implements Executor {
        */
       modelRoutes?: Record<string, ProviderRoute[] | undefined>;
       /**
+       * Server callback for connector action execution (server-authority mode). When
+       * present, the runner delegates connector actions to the host instead of receiving
+       * connector templates/sessions.
+       */
+      connectorActionCallback?: { url: string; secret?: string; starshipId?: string; authUserId?: string };
+      /**
        * Workspace-backed (native code) run. `root` is the absolute checkout path
        * inside the sandbox (a persistent, mounted per-conversation dir). On the
        * first (provisioning) job `spec`+`git` are present so we clone into `root`;
@@ -88,6 +94,7 @@ export class InProcessExecutor implements Executor {
       connectorTemplates,
       connectorSessions,
       connectorMetadata,
+      connectorActionCallback,
       llm,
       aws,
       azureAiFoundry,
@@ -115,6 +122,7 @@ export class InProcessExecutor implements Executor {
       connectorTemplates: connectorTemplates ?? {},
       connectorSessions: connectorSessions ?? {},
       connectorMetadata: connectorMetadata ?? {},
+      connectorActionCallback,
       runtimeEnv: runtimeEnv ?? {},
       llm,
       aws,

@@ -1,7 +1,5 @@
 import { getEnvConfig } from '@starships/env';
 import type { EngineConfig } from '@starships/autopilot';
-import type { ConnectorTemplateRuntimeFieldsV2 } from '@starships/protocol';
-import type { ConnectorSession } from '@/services/ConnectorActionSessionService';
 
 export function buildAutopilotRuntimeEnv(args: {
   starshipId: string;
@@ -36,20 +34,16 @@ export interface AutopilotRunnerExecuteConfig extends EngineConfig {
    */
   [key: string]: unknown;
   /**
-   * Connector templates (safe) passed from embedding host.
-   * Keyed by provider/slug.
+   * Server callback for connector action execution (server-authority mode). The runner
+   * delegates every connector action to the host via this endpoint; connector templates,
+   * sessions, and credentials are NOT shipped to the runner.
    */
-  connectorTemplates: Record<string, ConnectorTemplateRuntimeFieldsV2 | undefined>;
-  /**
-   * Connector sessions (auth headers) passed from embedding host.
-   * Keyed by provider/slug.
-   */
-  connectorSessions: Record<string, ConnectorSession | undefined>;
-  /**
-   * Connector instance metadata (non-secret) passed from embedding host.
-   * Keyed by provider/slug.
-   */
-  connectorMetadata: Record<string, Record<string, unknown> | undefined>;
+  connectorActionCallback?: {
+    url: string;
+    secret?: string;
+    starshipId?: string;
+    authUserId?: string;
+  };
   /**
    * Optional LLM runtime configuration used by runner HostRuntime.llm.
    */
@@ -97,9 +91,6 @@ export async function buildAutopilotExecutionBundle(args: {
     // best-effort only
   }
 
-  const sessionSvc = new (await import('@/services/ConnectorActionSessionService')).ConnectorActionSessionService();
-  const { connectorTemplates, connectorSessions, connectorMetadata } = await sessionSvc.build(args.starshipId, args.authUserId);
-
   const { LlmModelRepository } = await import('@starships/models');
   const llmModelRepo = new LlmModelRepository();
   const providers = await llmModelRepo.getAllModelProviders({ enabledOnly: true });
@@ -140,11 +131,19 @@ export async function buildAutopilotExecutionBundle(args: {
         }
       : undefined;
 
+  const serverUrl = String(env.SERVER_URL ?? '').replace(/\/+$/, '');
+  const connectorActionCallback = serverUrl
+    ? {
+        url: `${serverUrl}/api/v1/internal/connector-action`,
+        secret: process.env.RUNNER_INTERNAL_SECRET,
+        starshipId: args.starshipId,
+        authUserId: args.authUserId,
+      }
+    : undefined;
+
   const engineConfig: AutopilotRunnerExecuteConfig = {
     runtimeEnv: args.runtimeEnv,
-    connectorTemplates: connectorTemplates as Record<string, ConnectorTemplateRuntimeFieldsV2 | undefined>,
-    connectorSessions: connectorSessions as Record<string, ConnectorSession | undefined>,
-    connectorMetadata: connectorMetadata as Record<string, Record<string, unknown> | undefined>,
+    connectorActionCallback,
     llm,
     aws,
     azureAiFoundry,

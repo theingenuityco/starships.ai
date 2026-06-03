@@ -14,7 +14,6 @@
  * managed) and falls back to env vars of the same name for local development.
  */
 
-import { SignJWT, importPKCS8 } from 'jose';
 import type { ConnectorAuthV2, ConnectorSessionV2 } from '@starships/protocol';
 import type {
   AuthStrategy,
@@ -29,7 +28,7 @@ import type {
   SecretResolver,
   SessionCtx,
 } from '../types';
-import { sanitizeForLog } from './shared';
+import { dynamicImport, sanitizeForLog } from './shared';
 
 /** Minimal context needed to resolve GitHub App configuration. */
 type ConfigCtx = { env: ConnectorEnv; secrets: SecretResolver };
@@ -169,6 +168,10 @@ export class GitHubAppStrategy implements AuthStrategy {
     const privateKeyRaw = await this.resolveConfig(ctx, 'GITHUB_APP_PRIVATE_KEY');
     if (!appId) throw new Error('GITHUB_APP_ID is not configured (set it as a platform secret or env var)');
     if (!privateKeyRaw) throw new Error('GITHUB_APP_PRIVATE_KEY is not configured (set it as a platform secret or env var)');
+
+    // jose@6 is ESM-only; load it via a real dynamic import so it works from a
+    // CommonJS build / Jest environment (a top-level import compiles to require()).
+    const { SignJWT, importPKCS8 } = await dynamicImport<typeof import('jose')>('jose');
 
     const pem = this.normalizePem(privateKeyRaw);
     const key = await importPKCS8(pem, 'RS256');

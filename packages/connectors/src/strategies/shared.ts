@@ -73,6 +73,16 @@ export function buildPostgresDbSession(args: {
 }
 
 /**
+ * Dynamic import that stays a real `import()` even when TypeScript compiles to
+ * CommonJS (avoids TS rewriting it to require()), so ESM-only deps like jose can
+ * be loaded from a CJS build / CJS Jest environment.
+ */
+export function dynamicImport<T = unknown>(modulePath: string): Promise<T> {
+  const importer = new Function('m', 'return import(m)') as (m: string) => Promise<T>;
+  return importer(modulePath);
+}
+
+/**
  * Sanitize an untrusted value (e.g. an OAuth callback query parameter) before
  * embedding it in a log line or error message. Strips CR/LF to prevent log
  * injection / forged log entries and caps the length.

@@ -9,7 +9,7 @@ category: conversations
 Rooms are **conversation-backed containers (forum-style)** inside a starship.
 
 - **Room ID**: the backing **`conversationId`** (references `conversations.id`)
-- **Purpose**: start **threads** (child conversations), pin **resources** (views, datasets, task boards), and **assign tools** to rooms
+- **Purpose**: start **threads** (child conversations), pin **resources** (views, tables, task boards, docs), and **assign tools** to rooms
 - **UI location**: `/ship/:starshipSlug/rooms` and `/ship/:starshipSlug/rooms/:roomSlug`
 
 Stable terms used below:
@@ -27,7 +27,7 @@ Stable terms used below:
 - **Repositories (DB access)**:
   - `packages/models/src/repositories/RoomRepository.ts` (`rooms`)
   - `packages/models/src/repositories/RoomViewsRepository.ts` (`room_views`)
-  - `packages/models/src/repositories/RoomDatasetsRepository.ts` (`room_datasets`)
+  - `packages/models/src/repositories/RoomTablesRepository.ts` (`room_tables`)
   - `packages/models/src/repositories/RoomTaskBoardsRepository.ts` (`room_task_boards`)
   - `packages/models/src/repositories/RoomToolsRepository.ts` (`room_tools`)
 
@@ -54,15 +54,15 @@ When using `connector_action` with `connector: "starships"`, the following room-
 - `get-room-pins`
 - `get-room-resources` (combined resolved resources + assigned tools)
 - `get-room-pins-views`
-- `get-room-pins-datasets`
+- `get-room-pins-tables`
 - `get-room-pins-task-boards`
 - `get-room-tools`
 - `assign-room-tool` / `unassign-room-tool`
 - `pin-room-view` / `unpin-room-view`
-- `pin-room-dataset` / `unpin-room-dataset`
+- `pin-room-table` / `unpin-room-table`
 - `pin-room-task-board` / `unpin-room-task-board`
 - `reorder-room-pins-views`
-- `reorder-room-pins-datasets`
+- `reorder-room-pins-tables`
 - `reorder-room-pins-task-boards`
 
 ## Room vs channel (theory)
@@ -82,13 +82,14 @@ Channels are best when you want:
 ## Pins (theory)
 
 Pins are **per-kind ordered lists** attached to a room.
-Each pin kind has its own ordered list (so “views position 0” and “datasets position 0” are different lists).
+Each pin kind has its own ordered list (so “views position 0” and “tables position 0” are different lists).
 
 Pin kinds:
 
 - `view`
-- `dataset`
+- `table`
 - `task_board`
+- `doc`
 
 ## Room tool assignments (theory)
 
@@ -100,7 +101,7 @@ Room tools are **assigned** (not pinned). This means:
 ## Tips for agents
 
 - **Prefer Starships connector actions when available**: rooms, pins, resolved resources, and room tool assignments are available via `connector_action` on the `starships` connector template.
-- **Prefer pinning to teach context**: pins are the intended way to make “room context” discoverable (dashboards, datasets, task boards, etc.).
+- **Prefer pinning to teach context**: pins are the intended way to make “room context” discoverable (dashboards, tables, task boards, etc.).
 - **Thread notification level**: thread notification-level endpoints are currently channel-thread only; do not rely on them for room threads.
 
 ## Privacy & access control
@@ -188,7 +189,7 @@ Pins are stored per-kind and ordered by `position` within that kind.
 Response:
 
 ```json
-{ "views": [], "datasets": [], "taskBoards": [] }
+{ "views": [], "tables": [], "taskBoards": [], "docs": [] }
 ```
 
 ### View room resources (resolved objects)
@@ -197,14 +198,14 @@ To avoid fetching “all starship resources” just to render room resources, yo
 
 - `GET /api/v1/rooms/:roomId/resources` (combined; returns pinned resources + assigned tools)
 - `GET /api/v1/rooms/:roomId/pins/views`
-- `GET /api/v1/rooms/:roomId/pins/datasets`
+- `GET /api/v1/rooms/:roomId/pins/tables`
 - `GET /api/v1/rooms/:roomId/pins/task-boards`
 - `GET /api/v1/rooms/:roomId/tools`
 
 Combined response shape:
 
 ```json
-{ "views": [], "datasets": [], "taskBoards": [], "tools": [], "participants": { "users": [], "agents": [] } }
+{ "views": [], "tables": [], "taskBoards": [], "tools": [], "participants": { "users": [], "agents": [] } }
 ```
 
 Pinned-kind endpoints return an `items` array of `{ pin, <resource> }` objects (e.g. `{ pin, view }`).\n\nRoom tools are returned as `{ assignment, tool }` objects.
@@ -217,9 +218,9 @@ Participants are returned as:
 
 `GET /api/v1/rooms/:roomId/resources` supports query params:
 
-- `kinds`: optional kind filter (comma-separated or repeated). Accepted: `views`, `datasets`, `taskBoards` (`task-boards`), `tools`, `all`.
+- `kinds`: optional kind filter (comma-separated or repeated). Accepted: `views`, `tables`, `taskBoards` (`task-boards`), `tools`, `all`.
 - `q`: optional case-insensitive search across `name` / `slug` / `description` (where applicable)
-- `includeArchived`: optional boolean (default `false`). When `true`, includes archived datasets/task boards.
+- `includeArchived`: optional boolean (default `false`). When `true`, includes archived tables/task boards.
 - `limitPerKind`: optional number (0–200). Caps results per kind after filtering.
 
 ### Pin / unpin (owner/admin only, MVP policy)
@@ -227,9 +228,9 @@ Participants are returned as:
 - Views:
   - `POST /api/v1/rooms/:roomId/pins/views` body: `{ "viewId": "...", "position"?: 0 }`
   - `DELETE /api/v1/rooms/:roomId/pins/views/:viewId`
-- Datasets:
-  - `POST /api/v1/rooms/:roomId/pins/datasets` body: `{ "datasetId": "...", "position"?: 0 }`
-  - `DELETE /api/v1/rooms/:roomId/pins/datasets/:datasetId`
+- Tables:
+  - `POST /api/v1/rooms/:roomId/pins/tables` body: `{ "tableId": "...", "position"?: 0 }`
+  - `DELETE /api/v1/rooms/:roomId/pins/tables/:tableId`
 - Task boards:
   - `POST /api/v1/rooms/:roomId/pins/task-boards` body: `{ "boardId": "...", "position"?: 0 }`
   - `DELETE /api/v1/rooms/:roomId/pins/task-boards/:boardId`
@@ -259,7 +260,7 @@ Tools are assigned to rooms (unordered, no reordering):
 Reorder endpoints require providing exactly the currently pinned ids for that kind:
 
 - `POST /api/v1/rooms/:roomId/pins/views/reorder` body: `{ "viewIds": ["..."] }`
-- `POST /api/v1/rooms/:roomId/pins/datasets/reorder` body: `{ "datasetIds": ["..."] }`
+- `POST /api/v1/rooms/:roomId/pins/tables/reorder` body: `{ "tableIds": ["..."] }`
 - `POST /api/v1/rooms/:roomId/pins/task-boards/reorder` body: `{ "boardIds": ["..."] }`
 
 ## Threads in rooms

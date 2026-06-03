@@ -15,7 +15,7 @@ Prop | Type | Required | Default | Notes
 `columns` | `Array<{ key: string; label: string; format?: "text"|"number"|"currency"|"date"|"datetime"|"percentage" }>` | no | `[]` | `key` must match row field names
 `data` | `Array<Record<string, unknown>>` | no | `[]` | Rows are plain objects
 `title` | `string` | no |  | Shown above the table
-`description` | `string` | no |  | Subtext (often dataset slug)
+`description` | `string` | no |  | Subtext (often a table slug)
 `pageSize` | `number` | no | `10` | Use `0` to disable pagination
 `striped` | `boolean` | no | `true` | Alternating row backgrounds
 `className` | `string` | no |  | Wrapper class
@@ -26,7 +26,7 @@ Prop | Type | Required | Default | Notes
 Cells are formatted using the `format` value:
 
 - `currency`, `number`, `percentage`, `date`, `datetime`
-- For reference-shaped objects (e.g. dataset/task refs), the renderer prefers `label` when present, otherwise falls back to `key`/`cardId`.
+- For reference-shaped objects (e.g. table/task refs), the renderer prefers `label` when present, otherwise falls back to `key`/`cardId`.
 - For other objects/arrays, the renderer falls back to JSON stringification.
 
 ---

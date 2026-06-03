@@ -18,7 +18,7 @@
     "dev": "tsx watch src/index.ts",
     "type-check": "tsc --noEmit",
     "lint": "eslint src --ext .ts",
-    "test": "jest"
+    "test": "jest --passWithNoTests"
   },
   "dependencies": {
     "@starships/connectors": "workspace:*",

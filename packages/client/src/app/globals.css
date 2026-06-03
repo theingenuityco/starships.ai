@@ -1,8 +1,17 @@
-@import '@xyflow/react/dist/style.css';
+@import 'tailwindcss';
+@config '../../tailwind.config.js';
+@import '@xyflow/react/dist/style.css' layer(base);
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@layer base {
+  /* v4 compat: restore v3 default border color so bare `border` stays neutral */
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentColor);
+  }
+}
 
 /* ============================================================================
  * Conversation: message enter animations

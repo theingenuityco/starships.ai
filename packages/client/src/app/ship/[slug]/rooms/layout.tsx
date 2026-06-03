@@ -6,6 +6,7 @@ import { PageHeader } from '@/components/ui/PageHeader'
 import { ViewPane } from '@/components/views/ViewPane'
 import { RoomConversationIndexView } from '@/components/rooms/RoomConversationIndexView'
 import { LeadgenDashboard } from '@/components/rooms/LeadgenDashboard'
+import { EngineeringDashboard } from '@/components/rooms/EngineeringDashboard'
 import { RoomHistoryPane } from '@/components/rooms/RoomHistoryPane'
 import { RoomResourcesPane } from '@/components/rooms/RoomResourcesPane'
 import { RoomParticipantsButton } from '@/components/rooms/RoomParticipantsButton'
@@ -257,6 +258,10 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
   const isLeadGenRoom =
     String((activeRoom as any)?.provisionedByBundle || '').trim() === 'lead-generation' ||
     String(activeRoom?.slug || '').trim().toLowerCase() === 'leadgen'
+
+  const isEngineeringRoom =
+    String((activeRoom as any)?.provisionedByBundle || '').trim() === 'engineering' ||
+    String(activeRoom?.slug || '').trim().toLowerCase() === 'engineering'
 
   // Lead-gen flow guardrail:
   // If we somehow land in the Lobby while there is still a pending lead-gen prompt in sessionStorage
@@ -899,6 +904,15 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
           />
         ) : activeConversationId && isDashboardRoute && isLeadGenRoom ? (
           <LeadgenDashboard
+            starshipId={starshipData.id}
+            starshipSlug={routeParams.slug}
+            roomSlug={activeRoom?.slug ?? normalizedRoomSlug}
+            roomName={activeRoom?.name}
+            pinnedDatasets={pinsData?.datasets ?? []}
+            pinnedTaskBoards={pinsData?.taskBoards ?? []}
+          />
+        ) : activeConversationId && isDashboardRoute && isEngineeringRoom ? (
+          <EngineeringDashboard
             starshipId={starshipData.id}
             starshipSlug={routeParams.slug}
             roomSlug={activeRoom?.slug ?? normalizedRoomSlug}

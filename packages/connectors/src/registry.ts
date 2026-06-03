@@ -55,10 +55,14 @@ export class ConnectorRegistry {
   }
 }
 
+// Code connectors have no meaningful creation date. Use a stable sentinel so repeated
+// toRuntimeTemplate() calls are byte-identical (safe for caching/ETag/change detection).
+const CODE_CONNECTOR_TIMESTAMP = '1970-01-01T00:00:00.000Z';
+
 /** Convert a ConnectorDefinition into the ConnectorRuntimeTemplate the runner/host consume. */
 export function toRuntimeTemplate(def: ConnectorDefinition): ConnectorRuntimeTemplate {
   const authJson = def.auth.runtimeAuth();
-  const now = new Date().toISOString();
+  const now = CODE_CONNECTOR_TIMESTAMP;
   return {
     id: def.id,
     slug: def.id,

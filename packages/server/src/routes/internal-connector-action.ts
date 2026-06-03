@@ -48,6 +48,11 @@ router.post('/internal/connector-action', async (req: Request, res: Response) =>
   if (!connector || !action || !starshipId) {
     return sendError(res, 'VALIDATION_ERROR', 'connector, action and starshipId are required', 400);
   }
+  // The starships connector mints a platform JWT from authUserId; without it buildSession
+  // returns no auth header and every request 401s. Fail fast with a clear 400 instead.
+  if (connector === 'starships' && !authUserId) {
+    return sendError(res, 'VALIDATION_ERROR', 'authUserId is required for the starships connector', 400);
+  }
 
   try {
     const envelope = await connectorActionExecutor.execute({

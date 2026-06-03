@@ -90,7 +90,7 @@ Supported constraint keys:
 - `autoincrement?: boolean`
 - `default?: unknown`
 - `min?: number`, `max?: number`
-- `minLength?: number`, `maxLength?: number` (`maxLength` is capped at 63 because it backs `varchar(N)`)
+- `minLength?: number`, `maxLength?: number` (the server validates `maxLength` in the range 0-63; when set it also makes the column `varchar(maxLength)` instead of `text`)
 - `pattern?: string` (JS regex string; validated server-side)
 
 Important server rules:
@@ -122,6 +122,8 @@ Example:
   ]
 }
 ```
+
+Here `id` is also the `primaryKey`, which is the only reason `unique: true` (and `autoincrement`) is allowed on it; both constraints are rejected on non-primaryKey columns.
 
 ## Enum columns
 

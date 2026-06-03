@@ -79,10 +79,22 @@ Response body (`data`), status `201`:
 {
   "success": true,
   "data": {
-    "table": { "id": "...", "slug": "leads", "columns": [], "primaryKey": "email", "physicalTable": "leads", "archived": false }
+    "table": {
+      "id": "...",
+      "slug": "leads",
+      "columns": [
+        { "name": "email", "type": "string", "description": "Primary contact email" },
+        { "name": "status", "type": "enum", "enum": { "options": ["new", "qualified"] } }
+      ],
+      "primaryKey": "email",
+      "physicalTable": "leads",
+      "archived": false
+    }
   }
 }
 ```
+
+The returned `columns` echo the schema you submitted (shown empty only when the Table has no columns).
 
 ### Get table details
 
@@ -93,7 +105,18 @@ Response body (`data`):
 ```json
 {
   "success": true,
-  "data": { "table": { "id": "...", "name": "...", "slug": "...", "columns": [], "physicalTable": "leads" } }
+  "data": {
+    "table": {
+      "id": "...",
+      "name": "Leads",
+      "slug": "leads",
+      "columns": [
+        { "name": "email", "type": "string" },
+        { "name": "status", "type": "enum", "enum": { "options": ["new", "qualified"] } }
+      ],
+      "physicalTable": "leads"
+    }
+  }
 }
 ```
 
@@ -172,6 +195,7 @@ Response body (`data`):
 
 Notes:
 
+- The double nesting is intentional: the outer envelope key `data` holds the payload, and `data.data` is the rows array (so in code it is `response.data.data`). `data.columns` is the Table schema and `data.pagination` is the page info.
 - Returned rows are reconstructed (reference columns become reference objects).
 - Labels are not hydrated inline; use the resolve endpoint below.
 

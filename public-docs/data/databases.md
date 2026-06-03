@@ -46,7 +46,7 @@ If you need to confirm behavior, these files define the canonical shapes and rul
 Each starship maps to one Postgres schema, and each Table maps to one real Postgres table inside it:
 
 - **Database schema**: `db_<starshipId>`
-- **Physical table name**: derived from the Table slug (lowercase, `[a-z0-9_]`, max 63 bytes), unique within the schema, and surfaced as `physicalTable` so agents can write SQL against it.
+- **Physical table name**: derived from the Table slug (lowercase, `[a-z0-9_]`, max 63 bytes), unique within the schema, and surfaced as `physicalTable` so agents can reference it in read-only SQL queries.
 
 Every physical table carries four hidden bookkeeping columns alongside your author-defined columns:
 

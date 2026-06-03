@@ -89,7 +89,7 @@ Pin kinds:
 - `view`
 - `table`
 - `task_board`
-- `doc`
+- `doc` — pin/unpin/reorder over the HTTP API only; `doc` pins are not yet exposed via connector actions, the combined `/resources` endpoint, or a resolved `GET .../pins/docs` endpoint.
 
 ## Room tool assignments (theory)
 
@@ -234,6 +234,9 @@ Participants are returned as:
 - Task boards:
   - `POST /api/v1/rooms/:roomId/pins/task-boards` body: `{ "boardId": "...", "position"?: 0 }`
   - `DELETE /api/v1/rooms/:roomId/pins/task-boards/:boardId`
+- Docs:
+  - `POST /api/v1/rooms/:roomId/pins/docs` body: `{ "docId": "...", "position"?: 0 }`
+  - `DELETE /api/v1/rooms/:roomId/pins/docs/:docId`
 
 Validation / invariants:
 
@@ -262,6 +265,7 @@ Reorder endpoints require providing exactly the currently pinned ids for that ki
 - `POST /api/v1/rooms/:roomId/pins/views/reorder` body: `{ "viewIds": ["..."] }`
 - `POST /api/v1/rooms/:roomId/pins/tables/reorder` body: `{ "tableIds": ["..."] }`
 - `POST /api/v1/rooms/:roomId/pins/task-boards/reorder` body: `{ "boardIds": ["..."] }`
+- `POST /api/v1/rooms/:roomId/pins/docs/reorder` body: `{ "docIds": ["..."] }`
 
 ## Threads in rooms
 

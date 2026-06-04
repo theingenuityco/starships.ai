@@ -3137,6 +3137,11 @@ export class ConversationService {
 
       const cfg = agentModel as unknown as Record<string, unknown>;
       const turnRoomId = typeof runtimeEnv?.ROOM_ID === 'string' ? runtimeEnv.ROOM_ID : undefined;
+
+      // Replace the placeholder cancel handle so a stop request during the resume turn aborts
+      // the in-process loop, mirroring the primary turn path.
+      const resumeAbort = new AbortController();
+      ConversationService.activeCancellations.set(conversationId, () => resumeAbort.abort());
       await runAgentTurn(
         {
           messageService: this.messageService,
@@ -3165,6 +3170,7 @@ export class ConversationService {
           ...(turnRoomId ? { roomId: turnRoomId } : {}),
           ...(plugins !== undefined ? { plugins } : {}),
           approvals,
+          signal: resumeAbort.signal,
         }
       );
     } finally {

@@ -125,7 +125,6 @@ describe('Serialization Helper', () => {
         updatedAt: '2024-01-01T00:00:00.000Z',
         systemPrompt: 'Test agent',
         state: '{"messages":[], "tools":[]}',
-        blueprint: '{"nodes":[], "edges":[]}',
       };
 
       const agent = fromDatabase(AgentEntity, agentRecord);
@@ -135,7 +134,6 @@ describe('Serialization Helper', () => {
       expect(agent.systemPrompt).toBe('Test agent');
       // With exposeAll strategy, JSONB strings remain as strings and need explicit parsing if needed
       expect(agent.state).toBeDefined();
-      expect(agent.blueprint).toBeDefined();
     });
 
     it('should throw error for null or undefined data', () => {

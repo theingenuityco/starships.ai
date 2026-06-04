@@ -5,7 +5,7 @@
  * Follows the layered architecture pattern established by ConversationEntity and MessageEntity.
  */
 
-import type { AgentState, Blueprint } from '@starships/protocol';
+import type { AgentState } from '@starships/protocol';
 import type { AgentModel } from '@starships/protocol';
 import { Expose } from 'class-transformer';
 import {
@@ -156,11 +156,6 @@ export class AgentEntity implements AgentModel {
   @IsObject()
   state?: AgentState; // Runtime state with messages and tools
 
-  @Expose()
-  @IsOptional()
-  @IsObject()
-  blueprint?: Blueprint; // Blueprint - keeping flexible for now
-
   // Optional example prompts surfaced on agents (usually inherited from template)
   @Expose()
   @IsOptional()
@@ -203,7 +198,6 @@ export class AgentEntity implements AgentModel {
         timeout: dataRecord.timeout ?? DEFAULT_AGENT_TIMEOUT_MS,
         systemPrompt: dataRecord.systemPrompt,
         state: dataRecord.state || { messages: [], tools: [] },
-        blueprint: dataRecord.blueprint || { nodes: [], edges: [] },
         version: dataRecord.version || '1.0.0',
         ...dataRecord,
       });

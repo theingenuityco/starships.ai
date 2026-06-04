@@ -7,6 +7,7 @@
  * image-generation calls.
  */
 import type { Blueprint } from '@starships/protocol';
+import { AppError } from '@starships/errors';
 
 export type AvatarGenerationResult = {
   /** data URL from OpenRouter: data:image/png;base64,... */
@@ -46,11 +47,11 @@ export class AvatarGenerationService {
     runtimeEnv?: Record<string, unknown>;
     engineConfigFromHost?: Record<string, unknown>;
   }): Promise<{ description: string; model: string }> {
-    throw new Error(DISABLED);
+    throw new AppError(DISABLED, 'NOT_IMPLEMENTED', 501);
   }
 
   async generateAvatar(_options: GenerateAvatarOptions): Promise<AvatarGenerationResult> {
-    throw new Error(DISABLED);
+    throw new AppError(DISABLED, 'NOT_IMPLEMENTED', 501);
   }
 
   async generateAvatar3DFromReference(_options: {
@@ -61,6 +62,6 @@ export class AvatarGenerationService {
     runtimeEnv?: Record<string, unknown>;
     engineConfigFromHost?: Record<string, unknown>;
   }): Promise<AvatarGenerationResult> {
-    throw new Error(DISABLED);
+    throw new AppError(DISABLED, 'NOT_IMPLEMENTED', 501);
   }
 }

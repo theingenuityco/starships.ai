@@ -50,7 +50,8 @@ export function computeToolContentHash(input: {
   name: unknown;
   description: unknown;
   parameters: unknown;
-  blueprint: unknown;
+  /** @deprecated DAG removed; accepted but ignored for backward-compat with legacy callers. */
+  blueprint?: unknown;
   transforms: unknown;
   mutations: unknown;
   condition: unknown;
@@ -62,7 +63,6 @@ export function computeToolContentHash(input: {
       name: input.name ?? '',
       description: input.description ?? '',
       parameters: input.parameters ?? null,
-      blueprint: input.blueprint ?? null,
       transforms: input.transforms ?? null,
       mutations: input.mutations ?? null,
       condition: input.condition ?? null,
@@ -83,7 +83,8 @@ export function computeAgentContentHash(input: {
   reasoning: unknown;
   systemPrompt: unknown;
   state: unknown;
-  blueprint: unknown;
+  /** @deprecated DAG removed; accepted but ignored for backward-compat with legacy callers. */
+  blueprint?: unknown;
   category: unknown;
   previewPrompts: unknown;
   assignedToolSlugs: unknown;
@@ -106,7 +107,6 @@ export function computeAgentContentHash(input: {
       reasoning: input.reasoning ?? null,
       systemPrompt: input.systemPrompt ?? null,
       state: input.state ?? null,
-      blueprint: input.blueprint ?? null,
       category: input.category ?? null,
       previewPrompts: input.previewPrompts ?? null,
       assignedToolSlugs: normalizedSlugs,

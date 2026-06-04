@@ -36,7 +36,6 @@ describe('ToolEntity', () => {
         },
         required: ['input'],
       };
-      tool.blueprint = { nodes: [], edges: [] };
       tool.isEnabled = true;
       tool.createdAt = '2024-01-01T00:00:00.000Z';
       tool.updatedAt = '2024-01-02T12:00:00.000Z';
@@ -59,7 +58,6 @@ describe('ToolEntity', () => {
       tool.name = 'Test Tool';
       tool.description = 'A test tool';
       tool.parameters = { type: 'object', properties: {} };
-      tool.blueprint = { nodes: [], edges: [] };
       tool.createdAt = '2024-01-01T00:00:00.000Z';
       tool.updatedAt = '2024-01-02T12:00:00.000Z';
       tool.transforms = [{ path: 'input', operation: 'replace', value: 'transformed' }];

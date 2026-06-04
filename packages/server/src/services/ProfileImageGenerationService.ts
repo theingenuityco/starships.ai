@@ -6,6 +6,7 @@
  * disabled and throws. Reimplement as a direct OpenRouter image-generation call.
  */
 import type { AgentModel } from '@starships/protocol';
+import { AppError } from '@starships/errors';
 
 export type ProfileImageType = 'problem_statements' | 'capabilities' | 'try_these_prompts';
 
@@ -33,6 +34,6 @@ export class ProfileImageGenerationService {
       engineConfigFromHost?: Record<string, unknown>;
     }
   ): Promise<ProfileImageGenerationResult> {
-    throw new Error(DISABLED);
+    throw new AppError(DISABLED, 'NOT_IMPLEMENTED', 501);
   }
 }

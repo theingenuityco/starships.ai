@@ -27,7 +27,6 @@ describe('AgentEntity', () => {
       agent.maxTokens = 4000;
       agent.timeout = 30000;
       agent.state = { messages: [], tools: [] };
-      agent.blueprint = { nodes: [], edges: [] };
       agent.createdAt = '2024-01-01T00:00:00.000Z';
       agent.updatedAt = '2024-01-02T12:00:00.000Z';
 
@@ -41,7 +40,6 @@ describe('AgentEntity', () => {
         max_tokens: 4000,
         timeout: 30000,
         state: { messages: [], tools: [] },
-        blueprint: { nodes: [], edges: [] },
         created_at: '2024-01-01T00:00:00.000Z',
         updated_at: '2024-01-02T12:00:00.000Z',
       });
@@ -54,7 +52,6 @@ describe('AgentEntity', () => {
       agent.model = 'gpt-4';
       agent.timeout = 30000;
       agent.state = { messages: [], tools: [] };
-      agent.blueprint = { nodes: [], edges: [] };
       agent.createdAt = '2024-01-01T00:00:00.000Z';
       agent.updatedAt = '2024-01-02T12:00:00.000Z';
       agent.starshipId = 'starship-123';

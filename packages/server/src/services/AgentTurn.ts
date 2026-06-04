@@ -24,7 +24,8 @@ import type {
   PermissionTable,
 } from '@starships/autopilot-cli';
 import type { TurnRepository, ConversationRepository } from '@starships/models';
-import { ConnectorRepository } from '@starships/models';
+import { ConnectorRepository, StarshipDefinitionReconciler } from '@starships/models';
+import { getEnvConfig } from '@starships/env';
 import type { MessageService } from '@/services/MessageService';
 import type { ConversationStreamBus } from '@/services/ConversationStreamBus';
 import { cliAgentContainerLauncher } from '@/execution/CliAgentContainerLauncher';
@@ -243,6 +244,16 @@ export async function runAgentTurn(deps: AgentTurnDeps, args: AgentTurnArgs): Pr
         ...(extras ? { extras } : {}),
       };
       result = await cliAgentContainerLauncher.launch({ spec, hostDir: ws.hostDir, starshipId, onEvent, ...(args.signal ? { signal: args.signal } : {}) });
+
+      // Self-edit mode: the agent may have edited its own .starship/ files in the
+      // writable mount; fold those edits back into the index. Best-effort.
+      if (getEnvConfig().STARSHIP_FS_VERIFY_ON_READ === true) {
+        try {
+          await new StarshipDefinitionReconciler().reconcile(starshipId);
+        } catch (error) {
+          console.warn(`[AgentTurn] post-turn definition reconcile failed for starship ${starshipId}:`, error instanceof Error ? error.message : error);
+        }
+      }
     } else {
       result = await runInProcessAgentTurn({
         modelId,

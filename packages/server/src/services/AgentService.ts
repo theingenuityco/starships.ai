@@ -239,10 +239,24 @@ export class AgentService {
   }
 
   /**
-   * Get agent by ID as AgentModel
+   * Get agent by ID as AgentModel.
+   *
+   * With STARSHIP_FS_VERIFY_ON_READ on (self-edit mode), verify the index against
+   * the agent's definition file and reconcile on drift before returning — the
+   * "files win" safety net for out-of-band edits (e.g. an agent editing its own
+   * `.starship/agents/*.md`). Off by default to keep the hot path index-backed.
    */
   async getAgent(agentId: string): Promise<AgentModel | null> {
-    return await this.agentRepository.findById(agentId);
+    const agent = await this.agentRepository.findById(agentId);
+    if (agent && getEnvConfig().STARSHIP_FS_VERIFY_ON_READ === true) {
+      try {
+        await this.reconciler.reconcile(agent.starshipId, { entity: 'agents', filename: agentFilename(agent.slug) });
+        return await this.agentRepository.findById(agentId);
+      } catch (error) {
+        console.warn(`[AgentService] verify-on-read reconcile failed for agent ${agentId}:`, error instanceof Error ? error.message : error);
+      }
+    }
+    return agent;
   }
 
   /**

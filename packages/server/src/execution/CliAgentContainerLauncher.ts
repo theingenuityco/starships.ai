@@ -148,8 +148,12 @@ export class CliAgentContainerLauncher {
       `${jobFile}:/job/job.json:ro`,
       '-v',
       `${hostWorkspaceDir}:/workspace:rw`,
-      // Read-only definition volume (Stage 4); writable self-edit is Stage 5.
-      ...(starshipDefHostDir ? ['-v', `${starshipDefHostDir}:${CONTAINER_STARSHIP_DIR}:ro`] : []),
+      // Definition volume: read-only by default; read-write in self-edit mode
+      // (STARSHIP_FS_VERIFY_ON_READ) so an agent can edit its own .starship/ and
+      // have the changes folded back into the index by a post-turn reconcile.
+      ...(starshipDefHostDir
+        ? ['-v', `${starshipDefHostDir}:${CONTAINER_STARSHIP_DIR}:${getEnvConfig().STARSHIP_FS_VERIFY_ON_READ === true ? 'rw' : 'ro'}`]
+        : []),
       image,
       // Override the image's default CMD (jobAgent) to run the CLI agent entrypoint.
       'node',

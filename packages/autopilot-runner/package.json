@@ -28,6 +28,7 @@
     "@connectrpc/connect": "^2.0.0",
     "@connectrpc/connect-node": "^2.0.0",
     "@starships/autopilot": "workspace:*",
+    "@starships/autopilot-cli": "workspace:*",
     "@starships/protocol": "workspace:*",
     "openai": "^6.10.0",
     "pg": "^8.16.3"

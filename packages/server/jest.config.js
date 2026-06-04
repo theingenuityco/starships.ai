@@ -43,6 +43,11 @@ module.exports = {
     // @starships/models depends on autopilot; map it to dist to avoid pulling autopilot src into server tests.
     '^@starships/autopilot$': '<rootDir>/../autopilot/dist/index.js',
     '^@starships/autopilot/(.*)$': '<rootDir>/../autopilot/dist/$1',
+    // autopilot-cli's source uses internal "@/" aliases; map to dist so they're already rewritten
+    // (its dist is built by the type-check step's build deps before tests run). Its connectors
+    // dep uses only relative imports, so the catch-all -> src below loads it fine.
+    '^@starships/autopilot-cli$': '<rootDir>/../autopilot-cli/dist/index.js',
+    '^@starships/autopilot-cli/(.*)$': '<rootDir>/../autopilot-cli/dist/$1',
     '^@starships/(.*)$': '<rootDir>/../$1/src',
     '^@/(.*)$': '<rootDir>/src/$1',
   },

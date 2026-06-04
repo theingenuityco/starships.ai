@@ -360,6 +360,20 @@ type ToolResultLike = {
 // Keyed by `${starshipId}:${toolSlug}` -> tool display name.
 const TOOL_NAME_CACHE = new Map<string, string>()
 
+// Built-in code-native CLI agent tools have no `tools` table row, so their display
+// names are resolved locally rather than via a (404-ing) getBySlug lookup.
+const CLI_TOOL_DISPLAY_NAMES: Record<string, string> = {
+  bash: 'Terminal',
+  read: 'Read file',
+  write: 'Write file',
+  edit: 'Edit file',
+  ls: 'List directory',
+  glob: 'Find files',
+  grep: 'Search',
+  search_actions: 'Search actions',
+  run_action: 'Run action',
+}
+
 // Helper to safely parse JSON
 function tryParseJSON(value: any): any {
   if (typeof value === 'string') {
@@ -378,6 +392,10 @@ function extractToolResultSuccess(toolResultMessage: any): boolean | undefined {
     const parsed = tryParseJSON(raw)
     const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null
     if (!isRecord(parsed)) return undefined
+
+    // Code-native CLI agent tool results use the `{ ok, data | error }` envelope.
+    const ok = parsed['ok']
+    if (typeof ok === 'boolean') return ok
 
     const s = parsed['success']
     if (typeof s === 'boolean') return s
@@ -688,6 +706,8 @@ export function ConversationMessageContent({
       const cached = TOOL_NAME_CACHE.get(`${starshipId}:${slug}`)
       if (cached) {
         hydrated[slug] = cached
+      } else if (CLI_TOOL_DISPLAY_NAMES[slug]) {
+        hydrated[slug] = CLI_TOOL_DISPLAY_NAMES[slug]
       }
     }
     if (Object.keys(hydrated).length > 0) {
@@ -705,6 +725,8 @@ export function ConversationMessageContent({
 
     const missing = slugs.filter(slug => {
       if (TOOL_NAME_CACHE.has(`${starshipId}:${slug}`)) return false
+      // Built-in CLI tools are resolved locally; never hit the API for them.
+      if (CLI_TOOL_DISPLAY_NAMES[slug]) return false
       return true
     })
     if (missing.length === 0) return

@@ -89,6 +89,12 @@ export interface EnvironmentConfig {
    * Defaults to false when not set (safe-by-default).
    */
   ENABLE_EMAILS: boolean;
+  /**
+   * When true, repo-backed agent turns run via the code-native CLI agent
+   * (@starships/autopilot-cli) instead of the DAG blueprint. Experimental;
+   * defaults to false. See packages/server/src/services/CliAgentTurn.ts.
+   */
+  USE_CLI_AGENT_PATH: boolean;
   EMAIL_FROM_ADDRESS?: string;
   EMAIL_FROM_NAME?: string;
   AWS_SES_REGION?: string;

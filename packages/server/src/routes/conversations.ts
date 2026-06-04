@@ -1405,7 +1405,7 @@ router.post(
           }
 
           // status === 'approved' → execute tool using the approved tool_id + args_json
-          const toolById = await toolRepo.findById(existing.toolId);
+          const toolById = await toolRepo.findById(existing.toolId ?? '');
           if (!toolById || toolById.starshipId !== conversation.starshipId) {
             sendError(res, 'RESOURCE_NOT_FOUND', 'Tool not found', 200, { toolSlug, toolCallId, toolId: existing.toolId });
             return;
@@ -1660,7 +1660,7 @@ async function executeOneToolCallForBatch(params: {
         return { kind: 'error', toolCallId, code: 'TOOL_APPROVAL_DENIED', message: 'Tool approval denied' };
       }
       // status === 'approved' — execute using the approved tool + args
-      const toolById = await toolRepo.findById(existing.toolId);
+      const toolById = await toolRepo.findById(existing.toolId ?? '');
       if (!toolById || toolById.starshipId !== starshipId || toolById.status === 'draft' || !toolById.blueprint) {
         return { kind: 'error', toolCallId, code: 'VALIDATION_ERROR', message: 'Tool is not ready for execution' };
       }
@@ -2117,7 +2117,7 @@ router.get(
       const agentService = new AgentService();
 
       const toolIds = Array.from(
-        new Set((approvals || []).map((a) => a.toolId).filter((x) => typeof x === 'string' && x.trim().length > 0))
+        new Set((approvals || []).map((a) => a.toolId).filter((x): x is string => typeof x === 'string' && x.trim().length > 0))
       );
       const agentIds = Array.from(
         new Set((approvals || []).map((a) => a.agentId).filter((x) => typeof x === 'string' && x.trim().length > 0))
@@ -2147,7 +2147,7 @@ router.get(
       const payload = (approvals || [])
         .filter((a) => a.status === 'pending' && a.starshipId === conversation.starshipId)
         .map((a) => {
-          const tool = toolById.get(a.toolId) ?? null;
+          const tool = toolById.get(a.toolId ?? '') ?? null;
           return {
             ...a,
             toolSlug: tool?.slug ?? '',

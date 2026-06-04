@@ -11,7 +11,10 @@ export interface ToolCallApprovalModel {
   starshipId: string;
   conversationId: string;
   agentId: string;
-  toolId: string;
+  /** Tools-table id for blueprint approvals; null for CLI-agent (system tool / connector action) approvals. */
+  toolId?: string | null;
+  /** Human-readable tool/action name. Set for CLI-agent approvals that have no tool_id. */
+  toolName?: string | null;
   toolCallId: string;
   argsJson: Record<string, unknown>;
   status: ToolCallApprovalStatus;

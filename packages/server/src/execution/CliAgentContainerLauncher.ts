@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { mkdtemp, writeFile, rm } from 'node:fs/promises';
+import { mkdtemp, writeFile, rm, chown } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { CliAgentJobSpec, CliAgentEvent, CliAgentResult, CliWorkspaceSpec, CliGitCredentials } from '@starships/autopilot-cli';
@@ -54,8 +54,26 @@ export class CliAgentContainerLauncher {
     const hostJobDir = await mkdtemp(join(baseDir, 'cjob-'));
     const jobFile = join(hostJobDir, 'job.json');
     // 0o600: the job file holds the LLM API key and the connector-action callback
-    // secret, so it must be readable only by the owner.
+    // secret, so it must stay readable only by its owner — not world-readable on the
+    // host. The sandbox runs as a non-root UID (Dockerfile USER 1000:1000) that may
+    // differ from the server's UID, so chown the file to the sandbox user: it stays
+    // secret-safe (0o600) while the bind-mounted, read-only file is still readable
+    // inside the container. Secrets via `-e`/`--env-file` would instead leak to `ps`
+    // / `docker inspect`, and a world-readable mode would leak to other host users.
     await writeFile(jobFile, JSON.stringify(jobSpec), { mode: 0o600 });
+    const sandboxUid = Number(process.env.RUNNER_SANDBOX_UID ?? 1000);
+    const sandboxGid = Number(process.env.RUNNER_SANDBOX_GID ?? 1000);
+    try {
+      await chown(jobFile, sandboxUid, sandboxGid);
+    } catch (err) {
+      // chown needs privilege (server running as root — the common container case).
+      // If it fails and the server's UID differs from the sandbox's, the container
+      // would get EACCES reading /job/job.json; surface a clear hint up front.
+      console.warn(
+        `[CliAgentContainerLauncher] could not chown job file to ${sandboxUid}:${sandboxGid} ` +
+          `(${err instanceof Error ? err.message : String(err)}); the sandbox can read it only if it shares the server's UID.`
+      );
+    }
 
     try {
       return await this.runContainer(jobFile, hostDir, onEvent);

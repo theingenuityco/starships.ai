@@ -269,7 +269,8 @@ async function walk(root: string, onFile: (relPath: string) => boolean): Promise
 
 const glob: AgentTool = {
   name: 'glob',
-  description: 'Find files in the workspace matching a glob pattern (supports * and **). Skips vcs/build directories.',
+  description:
+    'Find files in the workspace matching a glob pattern. Supports *, **, {a,b} brace expansion, and [abc] bracket expressions. Skips vcs/build directories.',
   parameters: {
     type: 'object',
     required: ['pattern'],

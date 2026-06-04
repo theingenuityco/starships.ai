@@ -200,6 +200,10 @@ export async function executeCliAgentTurn(deps: CliAgentTurnDeps, args: CliAgent
 
   type CreateMessageReq = Parameters<MessageService['createMessage']>[0];
 
+  // NOTE: the agent also emits 'tool_started' before each tool runs. We intentionally
+  // don't surface it: there is no client stream consumer for it and the blueprint
+  // path's handler is a no-op too, so a "tool X running..." skeleton is a known UX
+  // gap for both paths. Wire a stream event here (and a client consumer) when added.
   const onEvent = async (event: CliAgentEvent): Promise<void> => {
     if (event.type === 'assistant_message') {
       const m = event.message;

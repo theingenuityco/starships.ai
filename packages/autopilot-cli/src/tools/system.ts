@@ -202,7 +202,21 @@ function globToRegExp(glob: string): RegExp {
       }
     } else if (c === '?') {
       re += '[^/]';
-    } else if ('.+^${}()|[]\\'.includes(c)) {
+    } else if (c === '{') {
+      // Brace expansion: {a,b} -> (a|b), e.g. src/**/*.{ts,tsx}. Alternatives are
+      // matched literally (no nested glob metachars). Unclosed '{' is a literal.
+      const close = glob.indexOf('}', i + 1);
+      if (close !== -1) {
+        const alts = glob
+          .slice(i + 1, close)
+          .split(',')
+          .map((alt) => alt.replace(/[.+^${}()|[\]\\]/g, '\\$&'));
+        re += '(' + alts.join('|') + ')';
+        i = close;
+      } else {
+        re += '\\{';
+      }
+    } else if ('.+^$()|[]\\'.includes(c)) {
       re += '\\' + c;
     } else {
       re += c;
@@ -220,7 +234,9 @@ async function walk(root: string, onFile: (relPath: string) => boolean): Promise
     const rel = stack.pop() as string;
     const abs = rel === '.' ? root : path.join(root, rel);
     try {
-      const entries = await fs.readdir(abs, { withFileTypes: true });
+      // Sort by name for deterministic traversal so "first N results" (e.g. grep's
+      // candidate cap) are stable across runs rather than inode/readdir order.
+      const entries = (await fs.readdir(abs, { withFileTypes: true })).sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
       for (const e of entries) {
         const childRel = rel === '.' ? e.name : `${rel}/${e.name}`;
         if (e.isDirectory()) {

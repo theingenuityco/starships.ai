@@ -119,6 +119,10 @@ function toWireMessages(messages: ChatMessage[]): Array<Record<string, unknown>>
       return wire;
     }
     if (m.role === 'tool') {
+      // tool_call_id must match an id from the preceding assistant tool_calls; an
+      // empty string is rejected by most providers. Practically unreachable (all
+      // tool messages are built with call.id), but warn if a malformed history slips in.
+      if (!m.toolCallId) console.warn('[OpenRouterClient] tool message without toolCallId — provider may reject this turn');
       return { role: 'tool', tool_call_id: m.toolCallId ?? '', content: typeof m.content === 'string' ? m.content : JSON.stringify(m.content) };
     }
     const base: Record<string, unknown> = { role: m.role, content: m.content };

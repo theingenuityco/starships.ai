@@ -21,6 +21,7 @@ import {
   TurnRepository,
   LlmModelRepository,
   UserRepository,
+  ToolCallApprovalRepository,
   getConnection,
 } from '@starships/models';
 import {
@@ -35,6 +36,8 @@ import {
 import type { ContentBlock, MessageContent } from '@starships/protocol';
 import { isTextFile, MAX_TEXT_FILE_SIZE } from '@starships/protocol';
 import { getEnvConfig } from '@starships/env';
+import { workspaceSessionManager } from '@/execution/WorkspaceSessionManager';
+import { executeCliAgentTurn } from '@/services/CliAgentTurn';
 import { buildAutopilotExecutionBundle } from '@/services/autopilot-execution-bundle';
 import OpenAI from 'openai';
 import type { Runner } from '@starships/autopilot';
@@ -2839,20 +2842,82 @@ export class ConversationService {
           (agentWithTools.state as AgentState & { imageConfig?: Record<string, unknown> }).imageConfig = data.imageConfig;
         }
 
-        const agent = new Agent(agentWithTools, {
-          eventCallback: (event: AutopilotEvent) => this.eventCallback(data.conversationId, event),
-          runtimeEnv,
-          // Ensure ConversationService can still choose isolation strategy (child vs remote) and support cancellation.
-          runner: this.defaultRunner,
-          runnerConfig: engineConfig as unknown as Record<string, unknown>,
-          onCancel: (cancel: () => void) => {
-            ConversationService.activeCancellations.set(data.conversationId, cancel);
-          },
-        });
+        // Flag-gated cutover: agent turns can run via the code-native CLI agent.
+        // A provisioned repo workspace (engineering room) gives a real checkout;
+        // otherwise the agent gets a no-repo scratch cwd. A repo session that has
+        // not been checked out yet stays on the blueprint path so checkout-repo can
+        // provision it. Defaults OFF.
+        //
+        // KNOWN LIMITATION (blocks enabling the flag for repo-backed rooms): there is
+        // no CLI-native repo provisioning yet. A brand-new conversation has no existing
+        // workspace session, so it takes the scratch path (cwd = mount root) and nothing
+        // registers a checkout in workspaceSessionManager. The engineering room therefore
+        // needs a CLI-side `checkout_repo` equivalent that binds + provisions the session
+        // before the CLI path can share the blueprint's checkout. Safe while OFF.
+        const cliTurnId = this.currentTurnId.get(data.conversationId);
+        let cliHandled = false;
+        const cliExistingWs = cliTurnId ? workspaceSessionManager.get(data.conversationId) : undefined;
+        const cliUnprovisionedRepo = Boolean(
+          cliExistingWs && !cliExistingWs.scratch && !workspaceSessionManager.isProvisioned(cliExistingWs)
+        );
+        if (env.USE_CLI_AGENT_PATH && cliTurnId && !cliUnprovisionedRepo) {
+          const cliRepoProvisioned = Boolean(
+            cliExistingWs && !cliExistingWs.scratch && workspaceSessionManager.isProvisioned(cliExistingWs)
+          );
+          const cliWorkspace = cliExistingWs ?? (await workspaceSessionManager.bindScratch(data.conversationId));
+          const cfg = agentModel as unknown as Record<string, unknown>;
+          const authUserId = typeof runtimeEnv?.AUTH_USER_ID === 'string' ? runtimeEnv.AUTH_USER_ID : '';
+          const roomId = typeof runtimeEnv?.ROOM_ID === 'string' ? runtimeEnv.ROOM_ID : undefined;
+          cliHandled = await executeCliAgentTurn(
+            {
+              messageService: this.messageService,
+              streamBus: this.streamBus,
+              turnRepository: this.turnRepository,
+              conversationRepository: this.conversationRepository,
+            },
+            {
+              conversationId: data.conversationId,
+              turnId: cliTurnId,
+              agentModel: {
+                id: agentModel.id,
+                name: agentModel.name,
+                model: String(cfg.model ?? ''),
+                ...(typeof cfg.temperature === 'number' ? { temperature: cfg.temperature } : {}),
+                ...(typeof cfg.maxTokens === 'number' ? { maxTokens: cfg.maxTokens } : {}),
+                ...(typeof cfg.timeout === 'number' ? { timeout: cfg.timeout } : {}),
+                ...(cfg.reasoning && typeof cfg.reasoning === 'object'
+                  ? { reasoning: cfg.reasoning as { effort?: 'low' | 'medium' | 'high'; max_tokens?: number; exclude?: boolean; enabled?: boolean } }
+                  : {}),
+              },
+              systemPrompt: combinedSystemPrompt,
+              llmMessages,
+              starshipId: starship.id,
+              authUserId,
+              ...(roomId ? { roomId } : {}),
+              hostDir: cliWorkspace.hostDir,
+              ...(cliRepoProvisioned ? {} : { scratch: true }),
+              ...(Array.isArray(data.modalities) && data.modalities.length > 0 ? { modalities: data.modalities } : {}),
+              ...(data.imageConfig && typeof data.imageConfig === 'object' ? { imageConfig: data.imageConfig } : {}),
+            }
+          );
+        }
 
-        // Execute the agent. Provide the full conversation snapshot as input so Agent.execute can
-        // construct the correct ordered message list (systemPrompt -> memory -> conversation).
-        await agent.execute(ExecutionItemUtils.wrapSingle(llmMessages));
+        if (!cliHandled) {
+          const agent = new Agent(agentWithTools, {
+            eventCallback: (event: AutopilotEvent) => this.eventCallback(data.conversationId, event),
+            runtimeEnv,
+            // Ensure ConversationService can still choose isolation strategy (child vs remote) and support cancellation.
+            runner: this.defaultRunner,
+            runnerConfig: engineConfig as unknown as Record<string, unknown>,
+            onCancel: (cancel: () => void) => {
+              ConversationService.activeCancellations.set(data.conversationId, cancel);
+            },
+          });
+
+          // Execute the agent. Provide the full conversation snapshot as input so Agent.execute can
+          // construct the correct ordered message list (systemPrompt -> memory -> conversation).
+          await agent.execute(ExecutionItemUtils.wrapSingle(llmMessages));
+        }
 
         // Clear cancellation handle after completion
         ConversationService.activeCancellations.delete(data.conversationId);
@@ -3312,17 +3377,89 @@ export class ConversationService {
 
       this.currentAgentForConversation.set(conversationId, { id: agentModel.id, name: agentModel.name });
 
-      const agent = new Agent(agentWithTools, {
-        eventCallback: (event: AutopilotEvent) => this.eventCallback(conversationId, event),
-        runtimeEnv,
-        runner: this.defaultRunner,
-        runnerConfig: engineConfig as unknown as Record<string, unknown>,
-        onCancel: (cancel: () => void) => {
-          ConversationService.activeCancellations.set(conversationId, cancel);
-        },
-      });
+      // Flag-gated resume into the code-native CLI agent (mirrors addConversationMessage).
+      // Gathers approval decisions for the pending tool calls and re-enters the loop,
+      // which finishes the approved/denied calls without re-calling the LLM.
+      //
+      // KNOWN LIMITATION (blocks enabling the flag by default): cliResumeTurnId comes from
+      // the in-memory currentTurnId map, which is empty after a server restart. A turn that
+      // was waiting_for_tools when the process restarted will skip the CLI resume path and
+      // fall through to the blueprint path (which can't resume a CLI approval), leaving the
+      // conversation stuck. Resolving this needs a DB lookup for the active turn id
+      // (e.g. turnRepository.findActiveTurnId) as the fallback. Safe while OFF.
+      const cliResumeTurnId = this.currentTurnId.get(conversationId);
+      const cliResumeWs = cliResumeTurnId ? workspaceSessionManager.get(conversationId) : undefined;
+      const cliResumeUnprovisionedRepo = Boolean(
+        cliResumeWs && !cliResumeWs.scratch && !workspaceSessionManager.isProvisioned(cliResumeWs)
+      );
+      let cliResumeHandled = false;
+      if (getEnvConfig().USE_CLI_AGENT_PATH && cliResumeTurnId && !cliResumeUnprovisionedRepo) {
+        const cliResumeRepoProvisioned = Boolean(
+          cliResumeWs && !cliResumeWs.scratch && workspaceSessionManager.isProvisioned(cliResumeWs)
+        );
+        const ws = cliResumeWs ?? (await workspaceSessionManager.bindScratch(conversationId));
 
-      await agent.execute(ExecutionItemUtils.wrapSingle(llmMessages));
+        const pendingRaw = Array.isArray((conversationState as Record<string, unknown>)?.pendingToolCalls)
+          ? ((conversationState as Record<string, unknown>).pendingToolCalls as Array<Record<string, unknown>>)
+          : [];
+        const approvalRepo = new ToolCallApprovalRepository();
+        const approvals: Record<string, 'approved' | 'denied'> = {};
+        for (const p of pendingRaw) {
+          const tcId = typeof p?.id === 'string' ? p.id : '';
+          if (!tcId) continue;
+          const rec = await approvalRepo.findByConversationAndToolCallId(conversationId, tcId).catch(() => null);
+          if (rec?.status === 'approved') approvals[tcId] = 'approved';
+          else if (rec?.status === 'denied' || rec?.status === 'expired') approvals[tcId] = 'denied';
+        }
+
+        const cfg = agentModel as unknown as Record<string, unknown>;
+        const roomId = typeof runtimeEnv?.ROOM_ID === 'string' ? runtimeEnv.ROOM_ID : undefined;
+        cliResumeHandled = await executeCliAgentTurn(
+          {
+            messageService: this.messageService,
+            streamBus: this.streamBus,
+            turnRepository: this.turnRepository,
+            conversationRepository: this.conversationRepository,
+          },
+          {
+            conversationId,
+            turnId: cliResumeTurnId,
+            agentModel: {
+              id: agentModel.id,
+              name: agentModel.name,
+              model: String(cfg.model ?? ''),
+              ...(typeof cfg.temperature === 'number' ? { temperature: cfg.temperature } : {}),
+              ...(typeof cfg.maxTokens === 'number' ? { maxTokens: cfg.maxTokens } : {}),
+              ...(typeof cfg.timeout === 'number' ? { timeout: cfg.timeout } : {}),
+              ...(cfg.reasoning && typeof cfg.reasoning === 'object'
+                ? { reasoning: cfg.reasoning as { effort?: 'low' | 'medium' | 'high'; max_tokens?: number; exclude?: boolean; enabled?: boolean } }
+                : {}),
+            },
+            systemPrompt: combinedSystemPrompt,
+            llmMessages,
+            starshipId: starship.id,
+            authUserId,
+            ...(roomId ? { roomId } : {}),
+            hostDir: ws.hostDir,
+            ...(cliResumeRepoProvisioned ? {} : { scratch: true }),
+            approvals,
+          }
+        );
+      }
+
+      if (!cliResumeHandled) {
+        const agent = new Agent(agentWithTools, {
+          eventCallback: (event: AutopilotEvent) => this.eventCallback(conversationId, event),
+          runtimeEnv,
+          runner: this.defaultRunner,
+          runnerConfig: engineConfig as unknown as Record<string, unknown>,
+          onCancel: (cancel: () => void) => {
+            ConversationService.activeCancellations.set(conversationId, cancel);
+          },
+        });
+
+        await agent.execute(ExecutionItemUtils.wrapSingle(llmMessages));
+      }
     } finally {
       ConversationService.activeCancellations.delete(conversationId);
       if (turnLeaseId) {

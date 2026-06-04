@@ -14,6 +14,7 @@
 export * from './framework';
 export * from './types';
 export { ConnectorRegistry, connectorRegistry, toRuntimeTemplate } from './registry';
+export { bootstrapCodeConnectors, resetCodeConnectorBootstrap } from './bootstrap';
 
 export { OAuth2Strategy } from './strategies/OAuth2Strategy';
 export { ApiKeyStrategy } from './strategies/ApiKeyStrategy';

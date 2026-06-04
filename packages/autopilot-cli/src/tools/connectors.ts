@@ -11,12 +11,16 @@
  * secrets live). The agent never sees credentials.
  */
 
-import { connectorRegistry } from '@starships/connectors';
+import { bootstrapCodeConnectors, connectorRegistry } from '@starships/connectors';
 import type { ActionCatalog, ActionDescriptor, AgentTool } from '@/types';
 
 const DEFAULT_SEARCH_LIMIT = 10;
 
 function descriptorsFromRegistry(connectors?: string[]): ActionDescriptor[] {
+  // The registry singleton is empty until a host bootstraps it, and importing
+  // @starships/connectors does not self-register. The agent may run in a process
+  // (runner sandbox) that never touches the server's bootstrap, so do it here.
+  bootstrapCodeConnectors();
   const allow = connectors && connectors.length > 0 ? new Set(connectors) : null;
   const out: ActionDescriptor[] = [];
   for (const def of connectorRegistry.list()) {

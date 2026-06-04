@@ -38,6 +38,7 @@
     "class-validator": "^0.14.2",
     "fs-extra": "^11.3.0",
     "googleapis": "^161.0.0",
+    "js-yaml": "^4.2.0",
     "nanoid": "^5.1.5",
     "pg": "^8.16.3",
     "reflect-metadata": "^0.2.2"
@@ -45,6 +46,7 @@
   "devDependencies": {
     "@types/fs-extra": "^11.0.4",
     "@types/jest": "^30.0.0",
+    "@types/js-yaml": "^4.0.9",
     "@types/node": "^24.0.10",
     "@types/node-fetch": "^2.6.12",
     "@types/pg": "^8.15.5",

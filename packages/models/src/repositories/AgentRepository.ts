@@ -13,6 +13,7 @@ import {
 } from '@/constants/agentDefaults';
 import type { AgentModel, CreateAgentRequest, UpdateAgentRequest } from '@starships/protocol';
 import { computeAgentContentHash } from '@/utils/contentHash';
+import type { AgentDefinition } from '@/services/definition/types';
 import type { PostgresConnection } from '@/helpers/database';
 
 export class AgentRepository extends BaseRepository {
@@ -323,6 +324,88 @@ export class AgentRepository extends BaseRepository {
       'delete',
       'Agent',
       id
+    );
+  }
+
+  /**
+   * Upsert the agents INDEX row from a filesystem-authoritative definition.
+   *
+   * This is the reconciler's write primitive when STARSHIP_FS_AUTHORITY is on:
+   * the `.starship/agents/<slug>.md` file is the source of truth, and this folds
+   * its authored fields into the Postgres index keyed by the file's explicit
+   * `id` (NOT a freshly generated one — messages/schedules FK to it).
+   *
+   * Index-only fields are preserved on conflict (existing `state`, `created_at`,
+   * `deployed_at`, and S3 attachment ids are never overwritten). On insert the
+   * caller supplies the initial `state`; `content_hash` is supplied by the
+   * reconciler so it stays consistent with the preserved state.
+   */
+  async upsertIndexFromDefinition(input: {
+    def: AgentDefinition;
+    starshipId: string;
+    /** Initial agent state used only when inserting a new row. */
+    state: Record<string, unknown>;
+    /** Hash computed by the reconciler over authored fields + preserved state. */
+    contentHash: string;
+  }): Promise<AgentModel> {
+    const { def, starshipId, state, contentHash } = input;
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        const now = new Date().toISOString();
+
+        // Authored columns kept in sync from the file on every reconcile.
+        const authored: Record<string, unknown> = {
+          slug: def.slug,
+          name: def.name,
+          role: def.role || 'Assistant',
+          description: def.description ?? null,
+          model: def.model,
+          category: def.category ?? 'general',
+          temperature: def.temperature ?? null,
+          max_tokens: def.maxTokens ?? null,
+          reasoning: def.reasoning ? JSON.stringify(def.reasoning) : null,
+          timeout: def.timeout ?? DEFAULT_AGENT_TIMEOUT_MS,
+          system_prompt: def.systemPrompt ?? null,
+          preview_prompts: def.previewPrompts ?? null,
+          content_hash: contentHash,
+          version: def.version || '1.0.0',
+        };
+
+        // Full row for INSERT: authored columns + index-owned fields set once.
+        const insertRow: Record<string, unknown> = {
+          id: def.id,
+          ...authored,
+          state: JSON.stringify(state ?? { messages: [], tools: [] }),
+          starship_id: starshipId,
+          deployed_at: now,
+          created_at: now,
+          updated_at: now,
+        };
+
+        const insertCols = Object.keys(insertRow);
+        const placeholders = insertCols.map((_, i) => `$${i + 1}`);
+        const values = Object.values(insertRow);
+
+        // On conflict, refresh only authored columns + updated_at; preserve
+        // state/created_at/deployed_at/starship_id and any attachment ids.
+        const conflictAssignments = [...Object.keys(authored), 'updated_at']
+          .map((col) => `${col} = EXCLUDED.${col}`)
+          .join(', ');
+        // updated_at must be in EXCLUDED, so include it in the insert row already (it is).
+
+        const result = await connection.query<Record<string, unknown>>(
+          `INSERT INTO agents (${insertCols.join(', ')})
+           VALUES (${placeholders.join(', ')})
+           ON CONFLICT (id) DO UPDATE SET ${conflictAssignments}
+           RETURNING *`,
+          values
+        );
+        return fromDatabase(AgentEntity, result[0]);
+      },
+      'upsertIndexFromDefinition',
+      'Agent',
+      def.id
     );
   }
 

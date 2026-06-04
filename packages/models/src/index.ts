@@ -110,6 +110,30 @@ export { migrationRunner } from './scripts/migration-runner';
 
 /* Starship Database (per-starship schema of Tables) */
 export { StarshipDatabaseProvisioner } from './services/StarshipDatabaseProvisioner';
+
+/* Starship Definition Volume (filesystem-authoritative definition plane) */
+export {
+  StarshipVolumeProvisioner,
+  DEFINITION_ENTITY_DIRS,
+  starshipHomeRoot,
+  starshipVolumeRoot,
+  starshipDefinitionDir,
+  type DefinitionEntityDir,
+} from './services/StarshipVolumeProvisioner';
+export { StarshipDefinitionStore, type DefinitionFileRef } from './services/StarshipDefinitionStore';
+export {
+  StarshipDefinitionReconciler,
+  type ReconcileResult,
+  type ReconcileTarget,
+  type AgentReconcileResult,
+} from './services/StarshipDefinitionReconciler';
+export {
+  serializeAgent,
+  parseAgent,
+  agentFilename,
+  agentSlugFromFilename,
+} from './services/definition/agentCodec';
+export type { AgentDefinition, AgentReasoningConfig } from './services/definition/types';
 export {
   schemaName as starshipSchemaName,
   roleName as starshipRoleName,

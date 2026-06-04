@@ -1,5 +1,5 @@
 import type { ConnectorProvider } from '@starships/protocol';
-import { connectorRegistry, githubConnector, starshipsConnector, systemConnector } from '@starships/connectors';
+import { bootstrapCodeConnectors, connectorRegistry, resetCodeConnectorBootstrap } from '@starships/connectors';
 import type { ConnectorTemplateEntityLike } from './ConnectorTemplateRegistryClient';
 
 /**
@@ -14,23 +14,15 @@ import type { ConnectorTemplateEntityLike } from './ConnectorTemplateRegistryCli
  * structurally identical), so all existing consumers work unchanged.
  */
 
-let registered = false;
-
-/** Register hand-written code connectors. */
-function registerCodeConnectors(): void {
-  connectorRegistry.registerCode(githubConnector);
-  connectorRegistry.registerCode(starshipsConnector);
-  connectorRegistry.registerCode(systemConnector);
-}
-
 /**
  * Idempotently bootstrap the in-process connector registry. Safe to call from anywhere
  * that needs the registry populated (clients, strategy dispatch, action execution).
+ *
+ * Delegates to the connectors package so the registered set has a single source of
+ * truth shared with the agent's catalog builder (see @starships/connectors/bootstrap).
  */
 export function ensureConnectorRegistry(): void {
-  if (registered) return;
-  registerCodeConnectors();
-  registered = true;
+  bootstrapCodeConnectors();
 }
 
 export class ConnectorRegistryClient {
@@ -51,6 +43,6 @@ export class ConnectorRegistryClient {
 
   /** Re-scan on next access. */
   invalidate(): void {
-    registered = false;
+    resetCodeConnectorBootstrap();
   }
 }

@@ -4,6 +4,7 @@ import type { Room, RoomModel } from '@starships/protocol';
 import { RoomEntity } from '@/entities/RoomEntity';
 import { generateUniqueSlugIncremental } from '@/utils/slugGenerator';
 import type { PostgresConnection } from '@/helpers/database';
+import type { RoomDefinition } from '@/services/definition/types';
 
 export class RoomRepository extends BaseRepository {
   constructor(connection?: PostgresConnection) {
@@ -36,6 +37,42 @@ export class RoomRepository extends BaseRepository {
       'findByConversationId',
       'Room',
       conversationId
+    );
+  }
+
+  /**
+   * Update a room's authored metadata from a filesystem definition (reconcile
+   * target). Updates only authored fields (slug, name, is_private, topic,
+   * manager_agent_id, provisioned_by_bundle); preserves the backing conversation,
+   * manager heartbeat, and created_at. Returns null if the room does not exist —
+   * reconcile does NOT create rooms (the backing conversation must exist first).
+   */
+  async updateMetadataFromDefinition(def: RoomDefinition): Promise<RoomModel | null> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        const result = await connection.query<Record<string, unknown>>(
+          `UPDATE rooms
+             SET slug = $2, name = $3, is_private = $4, topic = $5, manager_agent_id = $6,
+                 provisioned_by_bundle = $7, updated_at = $8
+           WHERE conversation_id = $1
+           RETURNING *`,
+          [
+            def.conversationId,
+            def.slug,
+            def.name,
+            def.isPrivate,
+            def.topic ?? null,
+            def.managerAgentId ?? null,
+            def.provisionedByBundle ?? null,
+            new Date().toISOString(),
+          ]
+        );
+        return result.length > 0 ? fromDatabase(RoomEntity, result[0]) : null;
+      },
+      'updateMetadataFromDefinition',
+      'Room',
+      def.conversationId
     );
   }
 

@@ -5,6 +5,12 @@ import { AgentRepository } from '@/repositories/AgentRepository';
 import { ScheduleRepository } from '@/repositories/ScheduleRepository';
 import { ConnectorRepository } from '@/repositories/ConnectorRepository';
 import { StarshipTableRepository } from '@/repositories/StarshipTableRepository';
+import { RoomRepository } from '@/repositories/RoomRepository';
+import { ConversationParticipantRepository } from '@/repositories/ConversationParticipantRepository';
+import { RoomTablesRepository } from '@/repositories/RoomTablesRepository';
+import { RoomViewsRepository } from '@/repositories/RoomViewsRepository';
+import { RoomTaskBoardsRepository } from '@/repositories/RoomTaskBoardsRepository';
+import { RoomDocsRepository } from '@/repositories/RoomDocsRepository';
 import { computeAgentContentHash, sha256Hex, stableStringify } from '@/utils/contentHash';
 import { StarshipDefinitionStore } from '@/services/StarshipDefinitionStore';
 import { StarshipVolumeProvisioner } from '@/services/StarshipVolumeProvisioner';
@@ -12,7 +18,10 @@ import { agentSlugFromFilename, parseAgent } from '@/services/definition/agentCo
 import { parseSchedule, scheduleModelToDefinition } from '@/services/definition/scheduleCodec';
 import { parseConnector, connectorModelToDefinition } from '@/services/definition/connectorCodec';
 import { parseTable, tableRecordToDefinition } from '@/services/definition/tableCodec';
-import type { AgentDefinition, ScheduleDefinition, ConnectorDefinition, TableDefinition } from '@/services/definition/types';
+import { parseRoom } from '@/services/definition/roomCodec';
+import { assembleRoomDefinition } from '@/services/definition/roomAssembler';
+import { RoomEntity } from '@/entities/RoomEntity';
+import type { AgentDefinition, ScheduleDefinition, ConnectorDefinition, TableDefinition, RoomDefinition } from '@/services/definition/types';
 import type { DefinitionEntityDir } from '@/services/StarshipVolumeProvisioner';
 import type { AgentModel, ConnectorProvider } from '@starships/protocol';
 
@@ -46,6 +55,7 @@ export interface ReconcileResult {
   connectors: EntityReconcileResult;
   tables: EntityReconcileResult;
   schedules: EntityReconcileResult;
+  rooms: EntityReconcileResult;
 }
 
 function emptyEntityResult(): EntityReconcileResult {
@@ -71,6 +81,12 @@ export class StarshipDefinitionReconciler {
   private readonly scheduleRepository: ScheduleRepository;
   private readonly connectorRepository: ConnectorRepository;
   private readonly tableRepository: StarshipTableRepository;
+  private readonly roomRepository: RoomRepository;
+  private readonly participantRepository: ConversationParticipantRepository;
+  private readonly roomTablesRepository: RoomTablesRepository;
+  private readonly roomViewsRepository: RoomViewsRepository;
+  private readonly roomTaskBoardsRepository: RoomTaskBoardsRepository;
+  private readonly roomDocsRepository: RoomDocsRepository;
 
   constructor(opts?: {
     store?: StarshipDefinitionStore;
@@ -86,6 +102,12 @@ export class StarshipDefinitionReconciler {
     this.scheduleRepository = opts?.scheduleRepository ?? new ScheduleRepository();
     this.connectorRepository = opts?.connectorRepository ?? new ConnectorRepository();
     this.tableRepository = opts?.tableRepository ?? new StarshipTableRepository();
+    this.roomRepository = new RoomRepository();
+    this.participantRepository = new ConversationParticipantRepository();
+    this.roomTablesRepository = new RoomTablesRepository();
+    this.roomViewsRepository = new RoomViewsRepository();
+    this.roomTaskBoardsRepository = new RoomTaskBoardsRepository();
+    this.roomDocsRepository = new RoomDocsRepository();
   }
 
   /** Stable hash of an authored object, for in-memory drift detection. */
@@ -248,6 +270,133 @@ export class StarshipDefinitionReconciler {
     return result;
   }
 
+  /** The authored hash for a room definition (drift detection). Agents are a set; pins are ordered. */
+  private roomHash(def: RoomDefinition): string {
+    return this.authoredHash({
+      slug: def.slug,
+      name: def.name,
+      isPrivate: def.isPrivate,
+      topic: def.topic ?? null,
+      managerAgentId: def.managerAgentId ?? null,
+      provisionedByBundle: def.provisionedByBundle ?? null,
+      agents: [...def.agents].sort(),
+      tables: def.tables,
+      views: def.views,
+      taskBoards: def.taskBoards,
+      docs: def.docs,
+    });
+  }
+
+  /** Add ids present in `desired` but not `current`; remove ids present in `current` but not `desired`. */
+  private async reconcileMembership(
+    current: string[],
+    desired: string[],
+    add: (id: string) => Promise<unknown>,
+    remove: (id: string) => Promise<unknown>
+  ): Promise<void> {
+    const currentSet = new Set(current);
+    const desiredSet = new Set(desired);
+    for (const id of current) if (!desiredSet.has(id)) await remove(id);
+    for (const id of desired) if (!currentSet.has(id)) await add(id);
+  }
+
+  /**
+   * Reconcile one room file into the index. Updates metadata + composition
+   * (agents/tables/views/task-boards/docs) by membership. Reordering is not
+   * strictly re-applied (membership only); the room's backing conversation must
+   * already exist — reconcile does NOT create rooms. Returns null if no file or
+   * the room is missing.
+   */
+  async reconcileRoomFile(starshipId: string, filename: string): Promise<{ changed: boolean; id: string } | null> {
+    const raw = await this.store.read(starshipId, 'rooms', filename);
+    if (raw === null) return null;
+    const def = parseRoom(raw);
+
+    const current = await assembleRoomDefinition(def.conversationId, {
+      rooms: this.roomRepository,
+      participants: this.participantRepository,
+      tables: this.roomTablesRepository,
+      views: this.roomViewsRepository,
+      taskBoards: this.roomTaskBoardsRepository,
+      docs: this.roomDocsRepository,
+    });
+    if (!current) {
+      // The backing conversation/room does not exist; rooms are created via the
+      // API (which creates the conversation), not materialized from a file.
+      console.warn(`[reconcile] room ${def.conversationId} has a file but no index row; skipping (create the room via API first)`);
+      return { changed: false, id: def.conversationId };
+    }
+
+    await RoomEntity.validate(
+      {
+        slug: def.slug,
+        name: def.name,
+        isPrivate: def.isPrivate,
+        topic: def.topic,
+        managerAgentId: def.managerAgentId,
+        provisionedByBundle: def.provisionedByBundle,
+      },
+      'update'
+    );
+
+    if (this.roomHash(current) === this.roomHash(def)) {
+      return { changed: false, id: def.conversationId };
+    }
+
+    await this.roomRepository.updateMetadataFromDefinition(def);
+
+    const cid = def.conversationId;
+    await this.reconcileMembership(
+      current.agents,
+      def.agents,
+      (id) => this.participantRepository.addAgentParticipant({ conversationId: cid, agentId: id }),
+      (id) => this.participantRepository.removeAgentParticipant(cid, id)
+    );
+    await this.reconcileMembership(
+      current.tables,
+      def.tables,
+      (id) => this.roomTablesRepository.upsert({ roomConversationId: cid, tableId: id }),
+      (id) => this.roomTablesRepository.remove(cid, id)
+    );
+    await this.reconcileMembership(
+      current.views,
+      def.views,
+      (id) => this.roomViewsRepository.upsert({ roomConversationId: cid, viewId: id }),
+      (id) => this.roomViewsRepository.remove(cid, id)
+    );
+    await this.reconcileMembership(
+      current.taskBoards,
+      def.taskBoards,
+      (id) => this.roomTaskBoardsRepository.upsert({ roomConversationId: cid, boardId: id }),
+      (id) => this.roomTaskBoardsRepository.remove(cid, id)
+    );
+    await this.reconcileMembership(
+      current.docs,
+      def.docs,
+      (id) => this.roomDocsRepository.upsert({ roomConversationId: cid, docId: id }),
+      (id) => this.roomDocsRepository.remove(cid, id)
+    );
+
+    return { changed: true, id: def.conversationId };
+  }
+
+  /**
+   * Reconcile every room file for a starship. Room orphans are NOT pruned —
+   * deleting a room cascades to its conversation + message history, which a
+   * stale/missing file must never trigger.
+   */
+  async reconcileRooms(starshipId: string): Promise<EntityReconcileResult> {
+    const filenames = await this.store.list(starshipId, 'rooms', '.yaml');
+    const result = emptyEntityResult();
+    for (const filename of filenames) {
+      const outcome = await this.reconcileRoomFile(starshipId, filename);
+      if (!outcome) continue;
+      if (outcome.changed) result.upserted += 1;
+      else result.unchanged += 1;
+    }
+    return result;
+  }
+
   /** The authored hash for a table definition (drift detection). */
   private tableHash(def: TableDefinition): string {
     return this.authoredHash({
@@ -378,6 +527,7 @@ export class StarshipDefinitionReconciler {
       connectors: emptyEntityResult(),
       tables: emptyEntityResult(),
       schedules: emptyEntityResult(),
+      rooms: emptyEntityResult(),
     };
 
     const wants = (entity: DefinitionEntityDir) => !target?.entity || target.entity === entity;
@@ -422,7 +572,16 @@ export class StarshipDefinitionReconciler {
       }
     }
 
-    // NOTE: rooms reconcile lands in Stage 3.
+    if (wants('rooms')) {
+      if (target?.entity === 'rooms' && target.filename) {
+        const outcome = await this.reconcileRoomFile(starshipId, target.filename);
+        if (outcome?.changed) result.rooms.upserted += 1;
+        else if (outcome) result.rooms.unchanged += 1;
+      } else {
+        result.rooms = await this.reconcileRooms(starshipId);
+      }
+    }
+
     return result;
   }
 }

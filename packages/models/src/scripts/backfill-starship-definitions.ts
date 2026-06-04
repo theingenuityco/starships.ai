@@ -25,11 +25,14 @@ import { AgentRepository } from '@/repositories/AgentRepository';
 import { ScheduleRepository } from '@/repositories/ScheduleRepository';
 import { ConnectorRepository } from '@/repositories/ConnectorRepository';
 import { StarshipTableRepository } from '@/repositories/StarshipTableRepository';
+import { RoomRepository } from '@/repositories/RoomRepository';
 import { StarshipDefinitionStore } from '@/services/StarshipDefinitionStore';
 import { agentFilename, agentModelToDefinition, parseAgent, serializeAgentDefinition } from '@/services/definition/agentCodec';
 import { parseSchedule, scheduleFilename, serializeSchedule, serializeScheduleDefinition } from '@/services/definition/scheduleCodec';
 import { connectorFilename, parseConnector, serializeConnector, serializeConnectorDefinition } from '@/services/definition/connectorCodec';
 import { parseTable, serializeTable, serializeTableDefinition, tableFilename } from '@/services/definition/tableCodec';
+import { parseRoom, roomFilename, serializeRoomDefinition } from '@/services/definition/roomCodec';
+import { assembleRoomDefinition } from '@/services/definition/roomAssembler';
 import { computeAgentContentHash } from '@/utils/contentHash';
 import type { AgentDefinition } from '@/services/definition/types';
 import type { AgentModel } from '@starships/protocol';
@@ -87,6 +90,7 @@ async function main(): Promise<void> {
   const scheduleRepo = new ScheduleRepository();
   const connectorRepo = new ConnectorRepository();
   const tableRepo = new StarshipTableRepository();
+  const roomRepo = new RoomRepository();
 
   const starships = args.starshipId
     ? [await starshipRepo.findById(args.starshipId)].filter(Boolean)
@@ -105,6 +109,8 @@ async function main(): Promise<void> {
   let connectorsWritten = 0;
   let tablesTotal = 0;
   let tablesWritten = 0;
+  let roomsTotal = 0;
+  let roomsWritten = 0;
 
   for (const starship of starships) {
     if (!starship) continue;
@@ -183,10 +189,26 @@ async function main(): Promise<void> {
         console.error(`[ROUND-TRIP FAIL] ${starship.id}/table:${table.slug}: table codec is lossy`);
       }
     }
+
+    const rooms = await roomRepo.listByStarship(starship.id);
+    for (const room of rooms) {
+      const def = await assembleRoomDefinition(room.conversationId);
+      if (!def) continue;
+      roomsTotal += 1;
+      const file = serializeRoomDefinition(def);
+      if (!args.verifyOnly) {
+        await store.write(starship.id, 'rooms', roomFilename(room.slug), file);
+        roomsWritten += 1;
+      }
+      if (serializeRoomDefinition(parseRoom(file)) !== file) {
+        roundTripFailures += 1;
+        console.error(`[ROUND-TRIP FAIL] ${starship.id}/room:${room.slug}: room codec is lossy`);
+      }
+    }
   }
 
   console.log(
-    `[backfill] done — agents: ${agentsTotal}/${agentsWritten}, schedules: ${schedulesTotal}/${schedulesWritten}, connectors: ${connectorsTotal}/${connectorsWritten}, tables: ${tablesTotal}/${tablesWritten} (total/written), round-trip failures: ${roundTripFailures}, index-hash diffs: ${indexHashDiffs}`
+    `[backfill] done — agents: ${agentsTotal}/${agentsWritten}, schedules: ${schedulesTotal}/${schedulesWritten}, connectors: ${connectorsTotal}/${connectorsWritten}, tables: ${tablesTotal}/${tablesWritten}, rooms: ${roomsTotal}/${roomsWritten} (total/written), round-trip failures: ${roundTripFailures}, index-hash diffs: ${indexHashDiffs}`
   );
 
   // Fail only on a real codec correctness problem.

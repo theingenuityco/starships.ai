@@ -79,6 +79,29 @@ export interface TableDefinition {
 }
 
 /**
+ * A room as authored in `.starship/rooms/<slug>.yaml`: metadata + composition
+ * (pinned agents/tables/views/task-boards/docs, ordered by array index) +
+ * manager. The backing conversation, message history, and manager heartbeat are
+ * index-only. `id` is the room's conversationId (rooms are conversation-backed).
+ */
+export interface RoomDefinition {
+  conversationId: string;
+  slug: string;
+  name: string;
+  isPrivate: boolean;
+  topic?: string;
+  managerAgentId?: string;
+  provisionedByBundle?: string;
+  /** Agent participant ids (the room's "pinned agents"). */
+  agents: string[];
+  /** Pinned resource ids, in render order. */
+  tables: string[];
+  views: string[];
+  taskBoards: string[];
+  docs: string[];
+}
+
+/**
  * A schedule as authored in `.starship/schedules/<id>.yaml`. Execution state
  * (nextRunAt/runCount/lastRun*) and ownerUserId are index-only.
  */

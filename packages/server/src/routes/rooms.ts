@@ -35,8 +35,28 @@ import { StarshipTurnLeaseService } from '@/services/StarshipTurnLeaseService';
 import archiver from 'archiver';
 import crypto from 'crypto';
 import { rateLimiters } from '@/middleware/rateLimiter';
+import { mirrorRoomToFile } from '@/services/RoomDefinitionMirror';
 
 const router: Router = Router();
+
+/**
+ * Mirror a room's definition to its `.starship/rooms/<slug>.yaml` file after any
+ * successful mutating request that targets a room (`:roomId` = conversationId).
+ * Best-effort and flag-gated (see RoomDefinitionMirror); room CREATE is mirrored
+ * explicitly in its handler since it has no `:roomId` param. This keeps files
+ * fresh across all ~17 room/composition endpoints without touching each handler.
+ */
+router.use((req: Request, res: Response, next) => {
+  if (req.method !== 'GET' && req.method !== 'HEAD') {
+    res.on('finish', () => {
+      const roomId = (req.params as Record<string, string | undefined>)?.roomId;
+      if (roomId && res.statusCode >= 200 && res.statusCode < 300) {
+        void mirrorRoomToFile(String(roomId));
+      }
+    });
+  }
+  next();
+});
 
 const RoomNotificationLevelSchema = z.enum(['all', 'mentions', 'mute']);
 const InviteApprovalIdSchema = z.union([IdSchema, z.string().uuid()]);
@@ -1079,6 +1099,7 @@ router.post('/starships/:starshipId/rooms', jwtAuthMiddleware, async (req: Reque
         createdBy: authUserId,
       });
 
+      void mirrorRoomToFile(room.conversationId);
       sendSuccess(res, { room, conversationId: conversation.id }, 201);
     } catch (e) {
       try {

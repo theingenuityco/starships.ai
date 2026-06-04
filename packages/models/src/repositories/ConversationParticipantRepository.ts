@@ -126,4 +126,21 @@ export class ConversationParticipantRepository extends BaseRepository {
       'conversation_participants'
     );
   }
+
+  /** Remove an agent participant from a conversation (room reconcile set-semantics). */
+  async removeAgentParticipant(conversationId: string, agentId: string): Promise<boolean> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        const result = await connection.query(`DELETE FROM conversation_participants WHERE conversation_id = $1 AND agent_id = $2`, [
+          conversationId,
+          agentId,
+        ]);
+        const rowCount = (result as unknown as { rowCount?: number }).rowCount ?? 0;
+        return rowCount > 0;
+      },
+      'removeAgentParticipant',
+      'conversation_participants'
+    );
+  }
 }

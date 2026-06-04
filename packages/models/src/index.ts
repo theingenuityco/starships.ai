@@ -160,6 +160,9 @@ export {
   tableFilename,
   tableSlugFromFilename,
 } from './services/definition/tableCodec';
+export { serializeRoomDefinition, parseRoom, roomFilename, roomSlugFromFilename } from './services/definition/roomCodec';
+export { assembleRoomDefinition, type RoomAssemblerRepos } from './services/definition/roomAssembler';
+export type { RoomDefinition } from './services/definition/types';
 export type {
   AgentDefinition,
   AgentReasoningConfig,

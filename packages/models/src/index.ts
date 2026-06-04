@@ -152,6 +152,14 @@ export {
   connectorFilename,
   connectorProviderFromFilename,
 } from './services/definition/connectorCodec';
+export {
+  serializeTable,
+  serializeTableDefinition,
+  tableRecordToDefinition,
+  parseTable,
+  tableFilename,
+  tableSlugFromFilename,
+} from './services/definition/tableCodec';
 export type {
   AgentDefinition,
   AgentReasoningConfig,

@@ -24,10 +24,12 @@ import { StarshipRepository } from '@/repositories/StarshipRepository';
 import { AgentRepository } from '@/repositories/AgentRepository';
 import { ScheduleRepository } from '@/repositories/ScheduleRepository';
 import { ConnectorRepository } from '@/repositories/ConnectorRepository';
+import { StarshipTableRepository } from '@/repositories/StarshipTableRepository';
 import { StarshipDefinitionStore } from '@/services/StarshipDefinitionStore';
 import { agentFilename, agentModelToDefinition, parseAgent, serializeAgentDefinition } from '@/services/definition/agentCodec';
 import { parseSchedule, scheduleFilename, serializeSchedule, serializeScheduleDefinition } from '@/services/definition/scheduleCodec';
 import { connectorFilename, parseConnector, serializeConnector, serializeConnectorDefinition } from '@/services/definition/connectorCodec';
+import { parseTable, serializeTable, serializeTableDefinition, tableFilename } from '@/services/definition/tableCodec';
 import { computeAgentContentHash } from '@/utils/contentHash';
 import type { AgentDefinition } from '@/services/definition/types';
 import type { AgentModel } from '@starships/protocol';
@@ -84,6 +86,7 @@ async function main(): Promise<void> {
   const agentRepo = new AgentRepository();
   const scheduleRepo = new ScheduleRepository();
   const connectorRepo = new ConnectorRepository();
+  const tableRepo = new StarshipTableRepository();
 
   const starships = args.starshipId
     ? [await starshipRepo.findById(args.starshipId)].filter(Boolean)
@@ -100,6 +103,8 @@ async function main(): Promise<void> {
   let schedulesWritten = 0;
   let connectorsTotal = 0;
   let connectorsWritten = 0;
+  let tablesTotal = 0;
+  let tablesWritten = 0;
 
   for (const starship of starships) {
     if (!starship) continue;
@@ -164,10 +169,24 @@ async function main(): Promise<void> {
         console.error(`[ROUND-TRIP FAIL] ${starship.id}/connector:${connector.provider}: connector codec is lossy`);
       }
     }
+
+    const tables = await tableRepo.listByStarship(starship.id, { includeArchived: true });
+    for (const table of tables) {
+      tablesTotal += 1;
+      const file = serializeTable(table);
+      if (!args.verifyOnly) {
+        await store.write(starship.id, 'tables', tableFilename(table.slug), file);
+        tablesWritten += 1;
+      }
+      if (serializeTableDefinition(parseTable(file)) !== file) {
+        roundTripFailures += 1;
+        console.error(`[ROUND-TRIP FAIL] ${starship.id}/table:${table.slug}: table codec is lossy`);
+      }
+    }
   }
 
   console.log(
-    `[backfill] done — agents: ${agentsTotal}, written: ${agentsWritten}, schedules: ${schedulesTotal}, written: ${schedulesWritten}, connectors: ${connectorsTotal}, written: ${connectorsWritten}, round-trip failures: ${roundTripFailures}, index-hash diffs: ${indexHashDiffs}`
+    `[backfill] done — agents: ${agentsTotal}/${agentsWritten}, schedules: ${schedulesTotal}/${schedulesWritten}, connectors: ${connectorsTotal}/${connectorsWritten}, tables: ${tablesTotal}/${tablesWritten} (total/written), round-trip failures: ${roundTripFailures}, index-hash diffs: ${indexHashDiffs}`
   );
 
   // Fail only on a real codec correctness problem.

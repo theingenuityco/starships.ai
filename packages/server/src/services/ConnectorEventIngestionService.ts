@@ -3,8 +3,6 @@ import type { Request } from 'express';
 import type { ConnectorProvider, SecretRef } from '@starships/protocol';
 import { AppError, AuthError, NotFoundError, ValidationError } from '@starships/errors';
 import {
-  AutopilotAwaitFiringRepository,
-  AutopilotAwaitRepository,
   ConnectorEventRepository,
   ConnectorRepository,
   ConnectorSecretRepository,
@@ -12,7 +10,6 @@ import {
 } from '@starships/models';
 import { ConnectorRegistryClient } from './ConnectorRegistryClient';
 import { PlatformSecretService } from '@/services/PlatformSecretService';
-import { getAutopilotAutomationQueue } from '@/queues/autopilotAutomationQueue';
 import { logger } from '@/utils/logger';
 
 type WebhookVerificationConfig =
@@ -189,8 +186,6 @@ export class ConnectorEventIngestionService {
   private connectorRepo = new ConnectorRepository();
   private templateRegistry = new ConnectorRegistryClient();
   private connectorEventRepo = new ConnectorEventRepository();
-  private awaitRepo = new AutopilotAwaitRepository();
-  private awaitFiringRepo = new AutopilotAwaitFiringRepository();
   private bindingRepo = new ConnectorWebhookBindingRepository();
   private platformSecrets = new PlatformSecretService();
   private connectorSecrets = new ConnectorSecretRepository();
@@ -311,7 +306,6 @@ export class ConnectorEventIngestionService {
 
     const headersJson = redactHeaders(isRecord(reqAny.headers) ? (reqAny.headers as Record<string, unknown>) : {});
 
-    const queue = getAutopilotAutomationQueue();
     const connectorEventIds: string[] = [];
     const matchedAwaitIds: string[] = [];
     const enqueuedFiringIds: string[] = [];
@@ -342,33 +336,6 @@ export class ConnectorEventIngestionService {
         receivedAt: new Date().toISOString(),
       });
       connectorEventIds.push(event.id);
-
-      // Match awaits and enqueue resume jobs (per connector)
-      const awaits = await this.awaitRepo.findWaitingMatches({
-        starshipId: connector.starshipId,
-        provider: String(connector.provider),
-        connectorId: connector.id,
-        eventType,
-        limit: 200,
-      });
-
-      for (const a of awaits) {
-        matchedAwaitIds.push(a.id);
-        const firing = await this.awaitFiringRepo.createOrIgnore({ awaitId: a.id, connectorEventId: event.id });
-        if (!firing) continue; // already exists
-
-        enqueuedFiringIds.push(firing.id);
-        await queue.add(
-          'resume-await',
-          { kind: 'resume', awaitFiringId: firing.id },
-          {
-            attempts: 5,
-            backoff: { type: 'exponential', delay: 30_000 },
-            removeOnComplete: true,
-            removeOnFail: false,
-          }
-        );
-      }
     }
 
     try {

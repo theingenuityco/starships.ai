@@ -3,17 +3,7 @@ import { ConversationStreamBus } from '@/services/ConversationStreamBus';
 import { ConnectorSecretService } from '@/services/ConnectorSecretService';
 import { UsageService } from '@/services/UsageService';
 import { AttachmentService } from '@/services/AttachmentService';
-import { Agent, AutopilotEvent, ExecutionItemUtils, ChildProcessRunner, RunnerFactory } from '@starships/autopilot';
-import type {
-  ToolParams,
-  AgentParams,
-  ExecutionEvent,
-  LLMEvent,
-  Execution,
-  LlmToolCall,
-  LlmMessage,
-  EngineConfig,
-} from '@starships/autopilot';
+import type { LlmMessage, LlmToolCall } from '@starships/protocol';
 import { NotFoundError, ConflictError, ValidationError } from '@starships/errors';
 import {
   ConversationRepository,
@@ -36,16 +26,13 @@ import {
 import type { ContentBlock, MessageContent } from '@starships/protocol';
 import { isTextFile, MAX_TEXT_FILE_SIZE } from '@starships/protocol';
 import { getEnvConfig } from '@starships/env';
-import { workspaceSessionManager } from '@/execution/WorkspaceSessionManager';
-import { executeCliAgentTurn } from '@/services/CliAgentTurn';
+import { runAgentTurn } from '@/services/AgentTurn';
 import { buildAutopilotExecutionBundle } from '@/services/autopilot-execution-bundle';
 import OpenAI from 'openai';
-import type { Runner } from '@starships/autopilot';
 import { StarshipTurnLeaseService } from '@/services/StarshipTurnLeaseService';
 import { UIActionService } from '@/services/UIActionService';
 import { NotificationService } from '@/services/NotificationService';
 import { parse, Allow } from 'partial-json-parser';
-import { parsePartialJSONObject } from '../utils/PartialJson';
 import { fetchTextFromS3 } from '@/utils/s3-helper';
 import { buildStarshipSystemPromptContext } from '@/utils/starship-system-prompt-context';
 import { composeCanonicalSystemPrompt, type ThreadContextState } from '@/utils/SystemPromptComposer';
@@ -59,15 +46,6 @@ import {
 } from '@/utils/conversation-state';
 import type { ConversationState, AgentState } from '@starships/protocol';
 import { resolveRoomConversationContext } from '@/utils/conversation-membership';
-
-/**
- * Autopilot child process configuration
- */
-interface AutopilotConfig {
-  memoryLimitMB: number;
-  timeoutMs: number;
-  killGraceMs: number;
-}
 
 type StreamingToolCallAccum = {
   id?: string;
@@ -233,17 +211,7 @@ export class ConversationService {
     string,
     { promptPerToken?: number; completionPerToken?: number; request?: number; expiresAt: number }
   > = new Map();
-  // Default runner for non-streaming paths (child process)
-  private defaultRunner!: Runner;
-
   // connector_action bundles are built per-request (requires authUserId)
-
-  // Autopilot configuration
-  private static readonly AUTOPILOT_CONFIG: AutopilotConfig = {
-    memoryLimitMB: 256, // 256MB memory limit
-    timeoutMs: 30 * 60 * 1000, // 30 minute timeout
-    killGraceMs: 5000, // 5 second grace period
-  };
 
   constructor() {
     // Enforce singleton to share in-memory streaming buffers across routes/requests
@@ -261,16 +229,6 @@ export class ConversationService {
     this.connectorSecretService = new ConnectorSecretService();
     this.usageService = new UsageService();
     this.notifications = new NotificationService();
-
-    // Choose default runner based on whether a remote runner is configured.
-    // When RUNNER_URL is set, server startup configures autopilot.setRunnerConfig({ url, token })
-    // and RunnerFactory will return a RemoteRunner. Otherwise we use a child process
-    // runner with local isolation and limits.
-    if (process.env.RUNNER_URL) {
-      this.defaultRunner = RunnerFactory.getTopLevelRunner(0);
-    } else {
-      this.defaultRunner = new ChildProcessRunner(ConversationService.AUTOPILOT_CONFIG);
-    }
 
     ConversationService.instance = this;
     return this;
@@ -1857,55 +1815,6 @@ export class ConversationService {
 
 
   /**
-   * Get deployed tool instances with their actual blueprints for the agent
-   * Uses relationship-based tool resolution for accurate results
-   */
-  private async getAgentTools(agentId: string, starshipId: string, conversationId: string): Promise<ToolParams[]> {
-    try {
-      const redactedBlueprint = {
-        nodes: [
-          { ref: 'start', type: 'start', name: 'Start', description: 'Redacted tool blueprint start', parameters: {} },
-          { ref: 'end', type: 'end', name: 'End', description: 'Redacted tool blueprint end', parameters: {} },
-        ],
-        edges: [{ ref: 'edge-1', from: 'start', to: 'end' }],
-        metadata: { generatedBy: 'Tool.blueprintRedacted' },
-      };
-
-      // Effective tools at runtime:
-      // - agent-assigned tools (agent_tools) OR starship-level tools (starship_tools)
-      // - with effective permission != 'deny'
-      // - precedence: agent_tools.permission overrides starship_tools.permission
-      const roomCtx = await resolveRoomConversationContext({ conversationId }).catch(() => null);
-      const deployedTools = roomCtx
-        ? await this.agentRepository.getEffectiveAgentToolsForRoomConversation(agentId, starshipId, roomCtx.roomConversationId)
-        : await this.agentRepository.getEffectiveAgentTools(agentId, starshipId);
-
-      if (deployedTools.length === 0) {
-        return [];
-      }
-
-      // Convert ToolModel instances to ToolParams with their actual blueprints
-      // Filter out draft tools (status='draft') as they don't have complete parameters/blueprint
-      const toolParams: ToolParams[] = deployedTools
-        .filter((tool) => tool.status !== 'draft' && tool.parameters)
-        .map((tool) => ({
-          name: tool.name,
-          slug: tool.slug,
-          description: tool.description,
-          parameters: tool.parameters!,
-          // IMPORTANT: Tools are executed server-side; do not embed tool blueprints/transforms/mutations/condition in agent state.
-          // Provide a minimal placeholder blueprint for ToolParams compatibility.
-          blueprint: redactedBlueprint as ToolParams['blueprint'],
-        }));
-
-      return toolParams;
-    } catch (error) {
-      console.error(`[CONVERSATION-SERVICE] Error getting agent tools via relationships:`, error);
-      return [];
-    }
-  }
-
-  /**
    * Resolve plugins from conversation state only (agent plugins are ignored)
    * @param conversationState - Conversation-level state
    * @param agentState - Agent-level state (ignored, kept for backwards compatibility)
@@ -1914,7 +1823,7 @@ export class ConversationService {
   private resolvePlugins(
     conversationState: ConversationState | Record<string, unknown> | undefined,
     agentState: AgentState | Record<string, unknown> | undefined
-  ): unknown[] | undefined {
+  ): Array<{ id: string; max_results?: number }> | undefined {
     return resolvePlugins(conversationState, agentState);
   }
 
@@ -2639,14 +2548,17 @@ export class ConversationService {
         SERVER_URL: env.SERVER_URL,
       };
 
-      // Build connector/LLM runtime config ONCE for this turn (reused across agent hops).
       const authUserId = ctx?.authContext?.userId ?? (conversation as { userId?: string }).userId;
       if (!authUserId) {
         throw new Error('Missing authUserId for connector_action session build');
       }
-      // Expose end-user id to the LLM host runtime for provider-side attribution (abuse detection / caching).
+      // Expose end-user id for provider-side attribution (abuse detection / caching).
       runtimeEnv.AUTH_USER_ID = authUserId;
-      const { engineConfig: baseEngineConfig } = await buildAutopilotExecutionBundle({
+
+      // Build the execution bundle once for the whole hop loop. The fields runAgentTurn reads
+      // (llm, modelRoutes, connectorActionCallback) are stable across hops, so building per-hop
+      // would re-run the getAllModelProviders DB query for every agent in the chain.
+      const { engineConfig: turnEngineConfig } = await buildAutopilotExecutionBundle({
         starshipId: starship.id,
         authUserId,
         runtimeEnv,
@@ -2662,7 +2574,7 @@ export class ConversationService {
         hops += 1;
 
         // Expose current agent id to the blueprint via env("AGENT_ID")
-        (runtimeEnv as EngineConfig & { AGENT_ID?: string }).AGENT_ID = agentModel.id;
+        (runtimeEnv as Record<string, unknown>).AGENT_ID = agentModel.id;
 
         // Best-effort: update room manager heartbeat when the manager agent runs.
         // Do not bump rooms.updated_at; this is operational metadata only.
@@ -2686,48 +2598,11 @@ export class ConversationService {
         // Guard against NULL/undefined persisted JSONB state
         const baseState = agentModel.state && typeof agentModel.state === 'object' ? agentModel.state : { messages: [], tools: [] };
 
-        // Get deployed tools for this agent (always redacted; server executes tools)
-        const resolvedTools = await this.getAgentTools(agentModel.id, starship.id, data.conversationId);
-
-        // Resolve plugins from conversation state only (agent plugins ignored)
+        // Resolve OpenRouter LLM plugins (e.g. web search) from conversation state only (agent plugins ignored).
         const plugins = this.resolvePlugins(
           conversationState as Record<string, unknown> | undefined,
           baseState as Record<string, unknown> | undefined
         );
-
-        // Exclude plugins and LLM runtime config from baseState and conversationState.
-        // Plugins are set explicitly from resolvePlugins (conversation-level only).
-        // LLM runtime config must be per-agent (agentModel fields), not inherited from conversation state.
-        const {
-          plugins: _agentPlugins,
-          model: _agentStateModel,
-          temperature: _agentStateTemperature,
-          maxTokens: _agentStateMaxTokens,
-          timeout: _agentStateTimeout,
-          reasoning: _agentStateReasoning,
-          ...baseStateWithoutPlugins
-        } = baseState as Record<string, unknown>;
-        void _agentPlugins;
-        void _agentStateModel;
-        void _agentStateTemperature;
-        void _agentStateMaxTokens;
-        void _agentStateTimeout;
-        void _agentStateReasoning;
-        const {
-          plugins: _conversationPlugins,
-          model: _conversationStateModel,
-          temperature: _conversationStateTemperature,
-          maxTokens: _conversationStateMaxTokens,
-          timeout: _conversationStateTimeout,
-          reasoning: _conversationStateReasoning,
-          ...conversationStateWithoutPlugins
-        } = conversationState as Record<string, unknown>;
-        void _conversationPlugins;
-        void _conversationStateModel;
-        void _conversationStateTemperature;
-        void _conversationStateMaxTokens;
-        void _conversationStateTimeout;
-        void _conversationStateReasoning;
 
         // Fetch fresh starship details for each agent execution so prompt context reflects the latest updates.
         const freshStarship = (await this.getConversationStarship(data.conversationId).catch(() => null)) || starship;
@@ -2739,33 +2614,6 @@ export class ConversationService {
           historyTruncated: Boolean(hasMoreBefore),
           historyLimit: llmHistoryLimit,
         });
-
-        const agentWithTools: AgentParams = {
-          ...agentModel,
-          systemPrompt: combinedSystemPrompt,
-          // Always use the server-tools blueprint (no legacy tool-node execution).
-          blueprint: Agent.defaultAgentBlueprintServerTools(),
-          state: {
-            ...baseStateWithoutPlugins,
-            ...conversationStateWithoutPlugins,
-            tools: resolvedTools,
-            starshipId: starship.id,
-            // Explicitly set plugins from resolvePlugins (conversation-level only)
-            // If plugins is undefined, omit it (no plugins enabled)
-            ...(plugins !== undefined ? { plugins } : {}),
-            // Ensure per-agent LLM config wins over any persisted state.
-            ...((): Record<string, unknown> => {
-              const cfg = agentModel as unknown as Record<string, unknown>;
-              const out: Record<string, unknown> = {};
-              if (typeof cfg.model === 'string' && cfg.model.trim().length > 0) out.model = cfg.model.trim();
-              if (typeof cfg.temperature === 'number') out.temperature = cfg.temperature;
-              if (typeof cfg.maxTokens === 'number') out.maxTokens = cfg.maxTokens;
-              if (typeof cfg.timeout === 'number') out.timeout = cfg.timeout;
-              if (cfg.reasoning && typeof cfg.reasoning === 'object') out.reasoning = cfg.reasoning;
-              return out;
-            })(),
-          },
-        };
 
         // Prepare input messages snapshot for this agent (with multimodal content support)
         const mentionRefs = ConversationService.collectMentionRefsFromMessages(messages);
@@ -2828,96 +2676,55 @@ export class ConversationService {
         // Attribute streamed content to the current agent
         this.currentAgentForConversation.set(data.conversationId, { id: agentModel.id, name: agentModel.name });
 
-        const engineConfig = {
-          ...(baseEngineConfig as object),
-          eventCallback: (event: AutopilotEvent) => this.eventCallback(data.conversationId, event),
-        } as EngineConfig & Record<string, unknown>;
-
-        // Optional per-turn multimodal output configuration (OpenRouter image generation):
-        // Agent.execute merges params.state into execution.state, so attach to agent params.state BEFORE construction.
-        if (Array.isArray(data.modalities) && data.modalities.length > 0) {
-          (agentWithTools.state as AgentState & { modalities?: unknown[] }).modalities = data.modalities;
+        // Run the turn via the single converged path: a provisioned repo workspace
+        // (engineering room) runs in the Docker sandbox with full system tools; everything
+        // else runs in-process with connector tools only. Streaming + persistence are
+        // identical across both transports (agentTurnEventMapper).
+        const turnId = this.currentTurnId.get(data.conversationId);
+        if (!turnId) {
+          throw new Error('Missing turnId for agent execution');
         }
-        if (data.imageConfig && typeof data.imageConfig === 'object') {
-          (agentWithTools.state as AgentState & { imageConfig?: Record<string, unknown> }).imageConfig = data.imageConfig;
-        }
+        const cfg = agentModel as unknown as Record<string, unknown>;
+        const turnAuthUserId = typeof runtimeEnv?.AUTH_USER_ID === 'string' ? runtimeEnv.AUTH_USER_ID : authUserId;
+        const turnRoomId = typeof runtimeEnv?.ROOM_ID === 'string' ? runtimeEnv.ROOM_ID : undefined;
 
-        // Flag-gated cutover: agent turns can run via the code-native CLI agent.
-        // A provisioned repo workspace (engineering room) gives a real checkout;
-        // otherwise the agent gets a no-repo scratch cwd. A repo session that has
-        // not been checked out yet stays on the blueprint path so checkout-repo can
-        // provision it. Defaults OFF.
-        //
-        // KNOWN LIMITATION (blocks enabling the flag for repo-backed rooms): there is
-        // no CLI-native repo provisioning yet. A brand-new conversation has no existing
-        // workspace session, so it takes the scratch path (cwd = mount root) and nothing
-        // registers a checkout in workspaceSessionManager. The engineering room therefore
-        // needs a CLI-side `checkout_repo` equivalent that binds + provisions the session
-        // before the CLI path can share the blueprint's checkout. Safe while OFF.
-        const cliTurnId = this.currentTurnId.get(data.conversationId);
-        let cliHandled = false;
-        const cliExistingWs = cliTurnId ? workspaceSessionManager.get(data.conversationId) : undefined;
-        const cliUnprovisionedRepo = Boolean(
-          cliExistingWs && !cliExistingWs.scratch && !workspaceSessionManager.isProvisioned(cliExistingWs)
+        // Replace the placeholder cancel handle with one that aborts the in-process loop, so a
+        // stop request (cancelTurn -> activeCancellations) propagates into this turn end-to-end.
+        const turnAbort = new AbortController();
+        ConversationService.activeCancellations.set(data.conversationId, () => turnAbort.abort());
+        await runAgentTurn(
+          {
+            messageService: this.messageService,
+            streamBus: this.streamBus,
+            turnRepository: this.turnRepository,
+            conversationRepository: this.conversationRepository,
+          },
+          {
+            conversationId: data.conversationId,
+            turnId,
+            agentModel: {
+              id: agentModel.id,
+              name: agentModel.name,
+              model: String(cfg.model ?? ''),
+              ...(typeof cfg.temperature === 'number' ? { temperature: cfg.temperature } : {}),
+              ...(typeof cfg.maxTokens === 'number' ? { maxTokens: cfg.maxTokens } : {}),
+              ...(typeof cfg.timeout === 'number' ? { timeout: cfg.timeout } : {}),
+              ...(cfg.reasoning && typeof cfg.reasoning === 'object'
+                ? { reasoning: cfg.reasoning as { effort?: 'low' | 'medium' | 'high'; max_tokens?: number; exclude?: boolean; enabled?: boolean } }
+                : {}),
+            },
+            systemPrompt: combinedSystemPrompt,
+            llmMessages,
+            starshipId: starship.id,
+            authUserId: turnAuthUserId,
+            ...(turnRoomId ? { roomId: turnRoomId } : {}),
+            ...(Array.isArray(data.modalities) && data.modalities.length > 0 ? { modalities: data.modalities } : {}),
+            ...(data.imageConfig && typeof data.imageConfig === 'object' ? { imageConfig: data.imageConfig } : {}),
+            ...(plugins !== undefined ? { plugins } : {}),
+            engineConfig: turnEngineConfig,
+            signal: turnAbort.signal,
+          }
         );
-        if (env.USE_CLI_AGENT_PATH && cliTurnId && !cliUnprovisionedRepo) {
-          const cliRepoProvisioned = Boolean(
-            cliExistingWs && !cliExistingWs.scratch && workspaceSessionManager.isProvisioned(cliExistingWs)
-          );
-          const cliWorkspace = cliExistingWs ?? (await workspaceSessionManager.bindScratch(data.conversationId));
-          const cfg = agentModel as unknown as Record<string, unknown>;
-          const authUserId = typeof runtimeEnv?.AUTH_USER_ID === 'string' ? runtimeEnv.AUTH_USER_ID : '';
-          const roomId = typeof runtimeEnv?.ROOM_ID === 'string' ? runtimeEnv.ROOM_ID : undefined;
-          cliHandled = await executeCliAgentTurn(
-            {
-              messageService: this.messageService,
-              streamBus: this.streamBus,
-              turnRepository: this.turnRepository,
-              conversationRepository: this.conversationRepository,
-            },
-            {
-              conversationId: data.conversationId,
-              turnId: cliTurnId,
-              agentModel: {
-                id: agentModel.id,
-                name: agentModel.name,
-                model: String(cfg.model ?? ''),
-                ...(typeof cfg.temperature === 'number' ? { temperature: cfg.temperature } : {}),
-                ...(typeof cfg.maxTokens === 'number' ? { maxTokens: cfg.maxTokens } : {}),
-                ...(typeof cfg.timeout === 'number' ? { timeout: cfg.timeout } : {}),
-                ...(cfg.reasoning && typeof cfg.reasoning === 'object'
-                  ? { reasoning: cfg.reasoning as { effort?: 'low' | 'medium' | 'high'; max_tokens?: number; exclude?: boolean; enabled?: boolean } }
-                  : {}),
-              },
-              systemPrompt: combinedSystemPrompt,
-              llmMessages,
-              starshipId: starship.id,
-              authUserId,
-              ...(roomId ? { roomId } : {}),
-              hostDir: cliWorkspace.hostDir,
-              ...(cliRepoProvisioned ? {} : { scratch: true }),
-              ...(Array.isArray(data.modalities) && data.modalities.length > 0 ? { modalities: data.modalities } : {}),
-              ...(data.imageConfig && typeof data.imageConfig === 'object' ? { imageConfig: data.imageConfig } : {}),
-            }
-          );
-        }
-
-        if (!cliHandled) {
-          const agent = new Agent(agentWithTools, {
-            eventCallback: (event: AutopilotEvent) => this.eventCallback(data.conversationId, event),
-            runtimeEnv,
-            // Ensure ConversationService can still choose isolation strategy (child vs remote) and support cancellation.
-            runner: this.defaultRunner,
-            runnerConfig: engineConfig as unknown as Record<string, unknown>,
-            onCancel: (cancel: () => void) => {
-              ConversationService.activeCancellations.set(data.conversationId, cancel);
-            },
-          });
-
-          // Execute the agent. Provide the full conversation snapshot as input so Agent.execute can
-          // construct the correct ordered message list (systemPrompt -> memory -> conversation).
-          await agent.execute(ExecutionItemUtils.wrapSingle(llmMessages));
-        }
 
         // Clear cancellation handle after completion
         ConversationService.activeCancellations.delete(data.conversationId);
@@ -3275,51 +3082,14 @@ export class ConversationService {
       if (conversation.parentConversationId) {
         conversationState = await this.ensureThreadContextFromLegacySeed({ conversationId, conversationState });
       }
-      // Resolve tools for this agent (always redacted; server executes tools)
-      const resolvedTools = await this.getAgentTools(agentModel.id, starship.id, conversationId);
-
       // Guard against NULL/undefined persisted JSONB state
       const baseState =
         agentModel.state && typeof agentModel.state === 'object'
           ? (agentModel.state as Record<string, unknown>)
           : ({ messages: [], tools: [] } as AgentState);
 
-      // Resolve plugins from conversation state only (agent plugins ignored)
+      // Resolve OpenRouter LLM plugins (e.g. web search) from conversation state only.
       const plugins = this.resolvePlugins(conversationState as ConversationState | undefined, baseState as AgentState | undefined);
-
-      // Exclude plugins and LLM runtime config from baseState and conversationState.
-      // Plugins are set explicitly from resolvePlugins (conversation-level only).
-      // LLM runtime config must be per-agent (agentModel fields), not inherited from conversation state.
-      const {
-        plugins: _agentPluginsContinue,
-        model: _agentStateModelContinue,
-        temperature: _agentStateTemperatureContinue,
-        maxTokens: _agentStateMaxTokensContinue,
-        timeout: _agentStateTimeoutContinue,
-        reasoning: _agentStateReasoningContinue,
-        ...baseStateWithoutPlugins
-      } = baseState as Record<string, unknown>;
-      void _agentPluginsContinue;
-      void _agentStateModelContinue;
-      void _agentStateTemperatureContinue;
-      void _agentStateMaxTokensContinue;
-      void _agentStateTimeoutContinue;
-      void _agentStateReasoningContinue;
-      const {
-        plugins: _conversationPluginsContinue,
-        model: _conversationStateModelContinue,
-        temperature: _conversationStateTemperatureContinue,
-        maxTokens: _conversationStateMaxTokensContinue,
-        timeout: _conversationStateTimeoutContinue,
-        reasoning: _conversationStateReasoningContinue,
-        ...conversationStateWithoutPlugins
-      } = conversationState as Record<string, unknown>;
-      void _conversationPluginsContinue;
-      void _conversationStateModelContinue;
-      void _conversationStateTemperatureContinue;
-      void _conversationStateMaxTokensContinue;
-      void _conversationStateTimeoutContinue;
-      void _conversationStateReasoningContinue;
 
       // Fetch fresh starship details so prompt context reflects the latest updates.
       const freshStarship = (await this.getConversationStarship(conversationId).catch(() => null)) || starship;
@@ -3332,134 +3102,86 @@ export class ConversationService {
         historyLimit: llmHistoryLimit,
       });
 
-      const agentWithTools: AgentParams = {
-        ...agentModel,
-        systemPrompt: combinedSystemPrompt,
-        // Always use the server-tools blueprint (no legacy tool-node execution).
-        blueprint: Agent.defaultAgentBlueprintServerTools(),
-        state: {
-          ...baseStateWithoutPlugins,
-          ...conversationStateWithoutPlugins,
-          tools: resolvedTools,
-          starshipId: starship.id,
-          // Explicitly set plugins from resolvePlugins (conversation-level only)
-          // If plugins is undefined, omit it (no plugins enabled)
-          ...(plugins !== undefined ? { plugins } : {}),
-          // Ensure per-agent LLM config wins over any persisted state.
-          ...((): Record<string, unknown> => {
-            const cfg = agentModel as unknown as Record<string, unknown>;
-            const out: Record<string, unknown> = {};
-            if (typeof cfg.model === 'string' && cfg.model.trim().length > 0) out.model = cfg.model.trim();
-            if (typeof cfg.temperature === 'number') out.temperature = cfg.temperature;
-            if (typeof cfg.maxTokens === 'number') out.maxTokens = cfg.maxTokens;
-            if (typeof cfg.timeout === 'number') out.timeout = cfg.timeout;
-            if (cfg.reasoning && typeof cfg.reasoning === 'object') out.reasoning = cfg.reasoning;
-            return out;
-          })(),
-        },
-      };
-
-      // Build connector/LLM runtime config (same bundle as normal agent execution)
       const authUserId = ctx?.authContext?.userId ?? (conversation as { userId?: string }).userId;
       if (!authUserId) {
         throw new Error('Missing authUserId for connector_action session build');
       }
-      const { engineConfig: baseEngineConfig } = await buildAutopilotExecutionBundle({
+
+      this.currentAgentForConversation.set(conversationId, { id: agentModel.id, name: agentModel.name });
+
+      // Resume the turn via the converged path: gather approval decisions for the pending
+      // tool calls, then re-enter the loop (which finishes approved/denied calls without
+      // re-calling the LLM). Transport (sandbox vs in-process) is chosen inside runAgentTurn.
+      //
+      // KNOWN LIMITATION: the turn id comes from the in-memory currentTurnId map, which is
+      // empty after a server restart. A turn that was waiting_for_tools when the process
+      // restarted has no in-memory turn id and cannot resume here yet; resolving this needs
+      // a DB lookup for the active turn id (e.g. turnRepository.findActiveTurnId).
+      const turnId = this.currentTurnId.get(conversationId);
+      if (!turnId) {
+        throw new Error('Missing turnId for agent resume');
+      }
+
+      const pendingRaw = Array.isArray((conversationState as Record<string, unknown>)?.pendingToolCalls)
+        ? ((conversationState as Record<string, unknown>).pendingToolCalls as Array<Record<string, unknown>>)
+        : [];
+      const approvalRepo = new ToolCallApprovalRepository();
+      const approvals: Record<string, 'approved' | 'denied'> = {};
+      for (const p of pendingRaw) {
+        const tcId = typeof p?.id === 'string' ? p.id : '';
+        if (!tcId) continue;
+        const rec = await approvalRepo.findByConversationAndToolCallId(conversationId, tcId).catch(() => null);
+        if (rec?.status === 'approved') approvals[tcId] = 'approved';
+        else if (rec?.status === 'denied' || rec?.status === 'expired') approvals[tcId] = 'denied';
+      }
+
+      const cfg = agentModel as unknown as Record<string, unknown>;
+      const turnRoomId = typeof runtimeEnv?.ROOM_ID === 'string' ? runtimeEnv.ROOM_ID : undefined;
+
+      // Build the execution bundle once (mirrors the primary path) so the resume doesn't
+      // re-run the getAllModelProviders query inside runAgentTurn.
+      const { engineConfig: resumeEngineConfig } = await buildAutopilotExecutionBundle({
         starshipId: starship.id,
         authUserId,
         runtimeEnv,
       });
 
-      const engineConfig = {
-        ...(baseEngineConfig as object),
-        eventCallback: (event: AutopilotEvent) => this.eventCallback(conversationId, event),
-      } as EngineConfig & Record<string, unknown>;
-
-      this.currentAgentForConversation.set(conversationId, { id: agentModel.id, name: agentModel.name });
-
-      // Flag-gated resume into the code-native CLI agent (mirrors addConversationMessage).
-      // Gathers approval decisions for the pending tool calls and re-enters the loop,
-      // which finishes the approved/denied calls without re-calling the LLM.
-      //
-      // KNOWN LIMITATION (blocks enabling the flag by default): cliResumeTurnId comes from
-      // the in-memory currentTurnId map, which is empty after a server restart. A turn that
-      // was waiting_for_tools when the process restarted will skip the CLI resume path and
-      // fall through to the blueprint path (which can't resume a CLI approval), leaving the
-      // conversation stuck. Resolving this needs a DB lookup for the active turn id
-      // (e.g. turnRepository.findActiveTurnId) as the fallback. Safe while OFF.
-      const cliResumeTurnId = this.currentTurnId.get(conversationId);
-      const cliResumeWs = cliResumeTurnId ? workspaceSessionManager.get(conversationId) : undefined;
-      const cliResumeUnprovisionedRepo = Boolean(
-        cliResumeWs && !cliResumeWs.scratch && !workspaceSessionManager.isProvisioned(cliResumeWs)
-      );
-      let cliResumeHandled = false;
-      if (getEnvConfig().USE_CLI_AGENT_PATH && cliResumeTurnId && !cliResumeUnprovisionedRepo) {
-        const cliResumeRepoProvisioned = Boolean(
-          cliResumeWs && !cliResumeWs.scratch && workspaceSessionManager.isProvisioned(cliResumeWs)
-        );
-        const ws = cliResumeWs ?? (await workspaceSessionManager.bindScratch(conversationId));
-
-        const pendingRaw = Array.isArray((conversationState as Record<string, unknown>)?.pendingToolCalls)
-          ? ((conversationState as Record<string, unknown>).pendingToolCalls as Array<Record<string, unknown>>)
-          : [];
-        const approvalRepo = new ToolCallApprovalRepository();
-        const approvals: Record<string, 'approved' | 'denied'> = {};
-        for (const p of pendingRaw) {
-          const tcId = typeof p?.id === 'string' ? p.id : '';
-          if (!tcId) continue;
-          const rec = await approvalRepo.findByConversationAndToolCallId(conversationId, tcId).catch(() => null);
-          if (rec?.status === 'approved') approvals[tcId] = 'approved';
-          else if (rec?.status === 'denied' || rec?.status === 'expired') approvals[tcId] = 'denied';
+      // Replace the placeholder cancel handle so a stop request during the resume turn aborts
+      // the in-process loop, mirroring the primary turn path.
+      const resumeAbort = new AbortController();
+      ConversationService.activeCancellations.set(conversationId, () => resumeAbort.abort());
+      await runAgentTurn(
+        {
+          messageService: this.messageService,
+          streamBus: this.streamBus,
+          turnRepository: this.turnRepository,
+          conversationRepository: this.conversationRepository,
+        },
+        {
+          conversationId,
+          turnId,
+          agentModel: {
+            id: agentModel.id,
+            name: agentModel.name,
+            model: String(cfg.model ?? ''),
+            ...(typeof cfg.temperature === 'number' ? { temperature: cfg.temperature } : {}),
+            ...(typeof cfg.maxTokens === 'number' ? { maxTokens: cfg.maxTokens } : {}),
+            ...(typeof cfg.timeout === 'number' ? { timeout: cfg.timeout } : {}),
+            ...(cfg.reasoning && typeof cfg.reasoning === 'object'
+              ? { reasoning: cfg.reasoning as { effort?: 'low' | 'medium' | 'high'; max_tokens?: number; exclude?: boolean; enabled?: boolean } }
+              : {}),
+          },
+          systemPrompt: combinedSystemPrompt,
+          llmMessages,
+          starshipId: starship.id,
+          authUserId,
+          ...(turnRoomId ? { roomId: turnRoomId } : {}),
+          ...(plugins !== undefined ? { plugins } : {}),
+          approvals,
+          engineConfig: resumeEngineConfig,
+          signal: resumeAbort.signal,
         }
-
-        const cfg = agentModel as unknown as Record<string, unknown>;
-        const roomId = typeof runtimeEnv?.ROOM_ID === 'string' ? runtimeEnv.ROOM_ID : undefined;
-        cliResumeHandled = await executeCliAgentTurn(
-          {
-            messageService: this.messageService,
-            streamBus: this.streamBus,
-            turnRepository: this.turnRepository,
-            conversationRepository: this.conversationRepository,
-          },
-          {
-            conversationId,
-            turnId: cliResumeTurnId,
-            agentModel: {
-              id: agentModel.id,
-              name: agentModel.name,
-              model: String(cfg.model ?? ''),
-              ...(typeof cfg.temperature === 'number' ? { temperature: cfg.temperature } : {}),
-              ...(typeof cfg.maxTokens === 'number' ? { maxTokens: cfg.maxTokens } : {}),
-              ...(typeof cfg.timeout === 'number' ? { timeout: cfg.timeout } : {}),
-              ...(cfg.reasoning && typeof cfg.reasoning === 'object'
-                ? { reasoning: cfg.reasoning as { effort?: 'low' | 'medium' | 'high'; max_tokens?: number; exclude?: boolean; enabled?: boolean } }
-                : {}),
-            },
-            systemPrompt: combinedSystemPrompt,
-            llmMessages,
-            starshipId: starship.id,
-            authUserId,
-            ...(roomId ? { roomId } : {}),
-            hostDir: ws.hostDir,
-            ...(cliResumeRepoProvisioned ? {} : { scratch: true }),
-            approvals,
-          }
-        );
-      }
-
-      if (!cliResumeHandled) {
-        const agent = new Agent(agentWithTools, {
-          eventCallback: (event: AutopilotEvent) => this.eventCallback(conversationId, event),
-          runtimeEnv,
-          runner: this.defaultRunner,
-          runnerConfig: engineConfig as unknown as Record<string, unknown>,
-          onCancel: (cancel: () => void) => {
-            ConversationService.activeCancellations.set(conversationId, cancel);
-          },
-        });
-
-        await agent.execute(ExecutionItemUtils.wrapSingle(llmMessages));
-      }
+      );
     } finally {
       ConversationService.activeCancellations.delete(conversationId);
       if (turnLeaseId) {
@@ -3907,1363 +3629,4 @@ export class ConversationService {
     }
   }
 
-  async eventCallback(conversationId: string, event: AutopilotEvent): Promise<void> {
-    // Skip workflow/node control events from nested executions (depth>0) to avoid duplicates
-    if (
-      event.type === 'workflow_started' ||
-      event.type === 'workflow_completed' ||
-      event.type === 'workflow_failed' ||
-      event.type === 'workflow_paused' ||
-      event.type === 'workflow_resumed' ||
-      event.type === 'await_requested' ||
-      event.type === 'node_started' ||
-      event.type === 'node_completed' ||
-      event.type === 'node_failed'
-    ) {
-      const depthRoot = event.executionDepth ?? 0;
-      if (depthRoot > 0) {
-        // Skip these events from nested workflows (depth > 0) to prevent duplication
-        return;
-      }
-    }
-
-    switch (event.type) {
-      case 'await_requested': {
-        try {
-          const anyEvt = event as unknown as { data?: { nodeRef?: unknown; kind?: unknown; spec?: unknown } };
-          const nodeRef = typeof anyEvt?.data?.nodeRef === 'string' ? anyEvt.data.nodeRef.trim() : '';
-          const kind = typeof anyEvt?.data?.kind === 'string' ? anyEvt.data.kind.trim() : '';
-          const spec =
-            anyEvt?.data?.spec && typeof anyEvt.data.spec === 'object' && !Array.isArray(anyEvt.data.spec)
-              ? (anyEvt.data.spec as Record<string, unknown>)
-              : null;
-
-          if (!nodeRef || kind !== 'connector_event' || !spec) {
-            break;
-          }
-
-          const turnId = this.currentTurnId.get(conversationId) || this.generationId.get(conversationId) || conversationId;
-          const at = new Date().toISOString();
-          await this.streamBus.publish(conversationId, {
-            type: 'await_requested',
-            data: {
-              conversationId,
-              turnId,
-              at,
-              nodeRef,
-              kind: 'connector_event',
-              spec,
-            },
-          });
-        } catch {
-          // best-effort only
-        }
-        break;
-      }
-      case 'ui_action': {
-        try {
-          const anyEvt = event as unknown as { data?: { action?: unknown; payload?: unknown } };
-          const action = typeof anyEvt?.data?.action === 'string' ? anyEvt.data.action : '';
-          const payload =
-            anyEvt?.data?.payload && typeof anyEvt.data.payload === 'object' && !Array.isArray(anyEvt.data.payload)
-              ? (anyEvt.data.payload as Record<string, unknown>)
-              : undefined;
-          if (action && action.trim()) {
-            await this.uiActions.publish(conversationId, { action: action.trim(), ...(payload ? { payload } : null) });
-          }
-        } catch {
-          // best-effort only
-        }
-        break;
-      }
-      case 'workflow_started': {
-        // Defer placeholder creation until first content_chunk to avoid empty duplicate assistant messages.
-        // streamingContent accumulator will be initialized on first chunk if needed.
-        this.streamingContent.delete(conversationId);
-        // Use the DB-backed turn id as the stable generation id for resume/idempotency.
-        const turnId = this.currentTurnId.get(conversationId) || `turn_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-        this.generationId.set(conversationId, turnId);
-        this.accumulatedLength.set(conversationId, 0);
-        this.placeholderEmitted.set(conversationId, false);
-        this.ringBuffer.set(conversationId, []);
-        this.snapshotPreferred.delete(conversationId);
-        this.toolCallSeq.delete(conversationId);
-        // CRITICAL FIX: Reset position counter at start of new turn
-        this.nextChunkPosition.set(conversationId, 0);
-        // Reset cached usage for the new turn
-        this.latestStreamingUsage.delete(conversationId);
-        this.streamingToolCalls.delete(conversationId);
-        this.streamingReasoning.delete(conversationId);
-        this.streamingGeneratedAttachmentIds.delete(conversationId);
-        this.streamingGeneratedImageUrlSeen.delete(conversationId);
-        // Reset per-stream sequence when a new turn begins (will be set on first placeholder)
-        this.streamSeq.delete(conversationId);
-        // Clear assistant-persisted flag at the start of a new top-level turn
-        this.assistantPersistedThisTurn.delete(conversationId);
-        // Reset active stream persisted guard for this new turn
-        this.activeStreamPersisted.delete(conversationId);
-        // New turn: clear any prior user-stop guard so toolCalls can persist normally.
-        this.stopRequestedForConversation.delete(conversationId);
-        // Seed message index tracking to the current baseline so prior history isn't re-persisted
-        const execEvent = event as ExecutionEvent;
-        const execution: Execution | undefined = execEvent.data?.execution;
-        const state = execution?.state as { messages?: unknown[] } | undefined;
-        const msgs = Array.isArray(state?.messages) ? state.messages : undefined;
-
-        if (msgs) {
-          const baselineIndex = msgs.length - 1;
-          const offset = this.resumeTurnSeqOffset.get(conversationId) ?? 0;
-          // For normal turns offset=0 (first new message → turnSeq=1).
-          // For resumed turns offset=maxTurnSeq, so first new message → turnSeq=maxTurnSeq+1.
-          this.currentTurnBaseIndex.set(conversationId, baselineIndex - Math.max(0, offset));
-          this.lastPersistedIndex.set(conversationId, baselineIndex);
-        }
-
-        // One-shot: consume resume offset if present.
-        this.resumeTurnSeqOffset.delete(conversationId);
-
-        // Reset streaming assistant message id for the new turn
-        this.streamingAssistantMessageId.delete(conversationId);
-
-        // Persist turn_started state (best-effort). Stream events are published when the turn is created.
-        try {
-          const convo = await this.getConversationById(conversationId);
-          const prev = (convo?.state as ConversationState | undefined) || {};
-          await this.conversationRepository.update(conversationId, {
-            state: { ...prev, turnActive: true },
-            updatedAt: new Date().toISOString(),
-          });
-        } catch (err) {
-          console.warn('[STREAMING] Failed to persist turn_started state', err);
-        }
-
-        // Do not clear pending finalization here; previous turn must finish to preserve event ordering
-        break;
-      }
-
-      case 'workflow_paused': {
-        // Persist the current partial assistant message so that reloads include it while paused
-        try {
-          const persisted = await this.persistActivePartial(conversationId);
-          const turnId = this.currentTurnId.get(conversationId) || this.generationId.get(conversationId) || conversationId;
-          const at = new Date().toISOString();
-          await this.streamBus.publish(conversationId, {
-            type: 'turn.status',
-            data: { conversationId, turnId, status: 'waiting_for_tools', at },
-          });
-          if (persisted) {
-            await this.streamBus.publish(conversationId, { type: 'message.append', data: { conversationId, message: persisted } });
-            try {
-              void this.notifications.handleMessageAppend({ conversationId, message: persisted });
-            } catch {
-              /* best-effort */
-            }
-          }
-        } catch (e) {
-          console.warn('[STREAMING] Failed to persist partial on workflow_paused:', e);
-        }
-        break;
-      }
-
-      case 'content_chunk': {
-        // Drop nested LLM content streams (depth>0) from conversation timeline
-        if ((event.executionDepth ?? 0) > 0) {
-          break;
-        }
-
-        // CRITICAL FIX: Serialize chunk processing using a lock pattern
-        // Wait for previous chunk to complete before starting this one
-        const processThisChunk = async () => {
-          // Stream content chunks in real-time (supports both delta.* and message.* providers)
-          const chunkContent = (event as LLMEvent).data?.chunk;
-
-          if (chunkContent && Array.isArray(chunkContent.choices) && chunkContent.choices.length > 0) {
-            type ChoiceNode = {
-              delta?: { content?: unknown; toolCalls?: unknown[]; reasoning?: unknown; thinking?: unknown };
-              message?: {
-                content?: unknown;
-                toolCalls?: unknown[];
-                reasoning?: unknown;
-                reasoning_details?: unknown;
-              };
-            };
-            const choice0 = (chunkContent.choices[0] || {}) as ChoiceNode;
-            const delta = choice0.delta ?? {};
-            const messageNode = choice0.message ?? {};
-            // Capture provider usage from chunk if present for mid-stream accounting
-            try {
-              const rawUsage = (chunkContent as { usage?: unknown }).usage as
-                | { promptTokens?: unknown; completionTokens?: unknown; totalTokens?: unknown; cost?: unknown }
-                | undefined;
-              if (rawUsage && typeof rawUsage === 'object') {
-                const uRec = rawUsage as Record<string, unknown>;
-                const promptTokens = typeof uRec.promptTokens === 'number' ? uRec.promptTokens : 0;
-                const completionTokens = typeof uRec.completionTokens === 'number' ? uRec.completionTokens : 0;
-                const totalTokens =
-                  typeof uRec.totalTokens === 'number' ? uRec.totalTokens : Number(promptTokens) + Number(completionTokens);
-                const cost = typeof uRec.cost === 'number' ? uRec.cost : 0;
-                const model =
-                  typeof (chunkContent as { model?: unknown }).model === 'string'
-                    ? ((chunkContent as { model?: string }).model as string)
-                    : undefined;
-                if (totalTokens > 0 || promptTokens > 0 || completionTokens > 0 || cost > 0) {
-                  this.latestStreamingUsage.set(conversationId, {
-                    promptTokens: Number(promptTokens || 0),
-                    completionTokens: Number(completionTokens || 0),
-                    totalTokens: Number(totalTokens || 0),
-                    cost: Number(cost || 0),
-                    ...(model ? { model } : {}),
-                  });
-                }
-              }
-            } catch (err) {
-              console.warn('[STREAMING] Failed to capture usage from chunk', {
-                conversationId,
-                error: err instanceof Error ? err.message : String(err),
-              });
-            }
-
-            const contentFromDelta =
-              typeof (delta as { content?: unknown }).content === 'string' ? ((delta as { content?: unknown }).content as string) : '';
-            const contentFromMessage =
-              typeof (messageNode as { content?: unknown }).content === 'string'
-                ? ((messageNode as { content?: unknown }).content as string)
-                : '';
-            const hasContent = (contentFromDelta && contentFromDelta.length > 0) || (contentFromMessage && contentFromMessage.length > 0);
-
-            const toolCallsFromDelta: unknown[] = Array.isArray((delta as { toolCalls?: unknown[] }).toolCalls)
-              ? ((delta as { toolCalls?: unknown[] }).toolCalls as unknown[])
-              : [];
-            const toolCallsFromMessage: unknown[] = Array.isArray((messageNode as { toolCalls?: unknown[] }).toolCalls)
-              ? ((messageNode as { toolCalls?: unknown[] }).toolCalls as unknown[])
-              : [];
-            const hasToolCalls = toolCallsFromDelta.length > 0 || toolCallsFromMessage.length > 0;
-
-            // OpenRouter image generation output: delta.images / message.images
-            const imagesFromDelta: unknown[] = Array.isArray((delta as { images?: unknown[] }).images)
-              ? (delta as { images: unknown[] }).images
-              : [];
-            const imagesFromMessage: unknown[] = Array.isArray((messageNode as { images?: unknown[] }).images)
-              ? (messageNode as { images: unknown[] }).images
-              : [];
-            const hasImages = imagesFromDelta.length > 0 || imagesFromMessage.length > 0;
-
-            // Extract reasoning from OpenRouter unified fields (reasoning and reasoning_details)
-            // IMPORTANT: Many providers send BOTH a cumulative snapshot (reasoning.content) AND token deltas (reasoning.tokens).
-            // Concatenating both will double the text. Prefer a single source in priority order:
-            // 1) reasoning_details (structured), else 2) reasoning.tokens (incremental), else 3) reasoning.content/text/string.
-            const extractReasoning = (node: unknown): string => {
-              try {
-                if (!node || typeof node !== 'object') return '';
-                const rec = node as Record<string, unknown>;
-
-                // 1) Prefer structured reasoning_details if present
-                const details = rec.reasoning_details as unknown;
-                if (Array.isArray(details) && details.length > 0) {
-                  const parts: string[] = [];
-                  for (const d of details as unknown[]) {
-                    if (d && typeof d === 'object') {
-                      const det = d as Record<string, unknown>;
-                      if (det.type === 'reasoning.text' && typeof det.text === 'string' && det.text.length > 0) {
-                        parts.push(det.text);
-                      }
-                    }
-                  }
-                  if (parts.length > 0) return parts.join('');
-                }
-
-                const raw = rec.reasoning as unknown;
-                if (!raw) return '';
-
-                const pickText = (obj: unknown): string => {
-                  if (!obj) return '';
-                  if (typeof obj === 'string') return obj;
-                  if (typeof obj !== 'object') return '';
-                  const r = obj as Record<string, unknown>;
-                  if (typeof r.text === 'string' && r.text.length > 0) return r.text;
-                  if (typeof r.content === 'string' && r.content.length > 0) return r.content;
-                  return '';
-                };
-
-                // 2) If reasoning is an object with tokens, prefer tokens (incremental) and ignore obj.content to avoid duplication
-                if (typeof raw === 'object' && raw !== null && !Array.isArray(raw)) {
-                  const obj = raw as Record<string, unknown>;
-                  const tokens = obj.tokens as unknown;
-                  if (Array.isArray(tokens) && tokens.length > 0) {
-                    return (tokens as unknown[]).map(pickText).join('');
-                  }
-                  // Otherwise, use content/text on the object
-                  return pickText(obj);
-                }
-
-                // 3) If reasoning is an array, join by text/content
-                if (Array.isArray(raw)) {
-                  return (raw as unknown[]).map(pickText).join('');
-                }
-
-                // 4) If reasoning is a string, return as-is
-                if (typeof raw === 'string') return raw;
-
-                return '';
-              } catch (err) {
-                console.error('[ConversationService] Failed to process image URL', {
-                  error: err instanceof Error ? err.message : String(err),
-                  conversationId,
-                });
-                return '';
-              }
-            };
-            const reasoningFromDelta = extractReasoning(delta);
-            const reasoningFromMessage = extractReasoning(messageNode);
-            const hasReasoning =
-              (reasoningFromDelta && reasoningFromDelta.length > 0) || (reasoningFromMessage && reasoningFromMessage.length > 0);
-
-            // Initialize per-turn streaming accumulators on first observed content/tool/reasoning/images.
-            // We no longer broadcast JSON-Patch placeholders; the client constructs the streaming assistant message
-            // from typed delta events.
-            if ((hasContent || hasToolCalls || hasReasoning || hasImages) && !this.streamingContent.has(conversationId)) {
-              this.streamingContent.set(conversationId, '');
-              this.placeholderEmitted.set(conversationId, true);
-              this.streamingToolCalls.delete(conversationId);
-              this.streamingGeneratedAttachmentIds.set(conversationId, []);
-              this.streamingGeneratedImageUrlSeen.set(conversationId, new Set());
-              if (!this.ringBuffer.has(conversationId)) this.ringBuffer.set(conversationId, []);
-              // Streaming assistant message id is deterministic per turn for client-side reconciliation.
-              const turnId = this.currentTurnId.get(conversationId) || this.generationId.get(conversationId) || conversationId;
-              this.streamingAssistantMessageId.set(conversationId, `stream-${turnId}`);
-            }
-
-            // Process generated images (OpenRouter: images[].image_url.url is a data URL)
-            if (hasImages) {
-              const all = [...imagesFromDelta, ...imagesFromMessage];
-              const urls: string[] = [];
-              const allUrls: string[] = [];
-              for (const raw of all) {
-                if (!raw || typeof raw !== 'object') continue;
-                const rec = raw as Record<string, unknown>;
-                // Support both snake_case and camelCase
-                const imageUrlNode =
-                  (rec.image_url && typeof rec.image_url === 'object' ? (rec.image_url as Record<string, unknown>) : null) ||
-                  (rec.imageUrl && typeof rec.imageUrl === 'object' ? (rec.imageUrl as Record<string, unknown>) : null);
-                const u = imageUrlNode && typeof imageUrlNode.url === 'string' ? imageUrlNode.url : '';
-                if (u) allUrls.push(u);
-                if (u && u.startsWith('data:image/')) urls.push(u);
-              }
-
-              if (urls.length > 0) {
-                // Ensure tracking containers exist (covers edge case where images arrive before placeholder init)
-                if (!this.streamingGeneratedAttachmentIds.has(conversationId)) this.streamingGeneratedAttachmentIds.set(conversationId, []);
-                if (!this.streamingGeneratedImageUrlSeen.has(conversationId))
-                  this.streamingGeneratedImageUrlSeen.set(conversationId, new Set());
-
-                const seen = this.streamingGeneratedImageUrlSeen.get(conversationId)!;
-                const acc = this.streamingGeneratedAttachmentIds.get(conversationId)!;
-
-                // Resolve starship once for uploads
-                const starship = await this.getConversationStarship(conversationId);
-                if (starship) {
-                  const attachmentService = new AttachmentService();
-
-                  for (let idx = 0; idx < urls.length; idx++) {
-                    const url = urls[idx];
-                    if (seen.has(url)) continue;
-                    seen.add(url);
-
-                    const parsed = ConversationService.parseBase64ImageDataUrl(url);
-                    if (!parsed) continue;
-
-                    try {
-                      const filenameBase = `generated_${Date.now()}_${idx}`;
-                      const attachment = await attachmentService.createGeneratedImageAttachment({
-                        starshipId: starship.id,
-                        conversationId,
-                        mimeType: parsed.mimeType,
-                        buffer: parsed.buffer,
-                        filenameBase,
-                      });
-
-                      acc.push(attachment.id);
-                      this.streamingGeneratedAttachmentIds.set(conversationId, acc);
-                      // Attachment IDs will be included on the persisted assistant message and delivered via message.append.
-                    } catch (err) {
-                      console.warn('[STREAMING] Failed to persist generated image attachment', {
-                        conversationId,
-                        error: err instanceof Error ? err.message : String(err),
-                      });
-                    }
-                  }
-                }
-              }
-            }
-
-            // Process content if present (prefer delta token chunks; fall back to full message content snapshot with diffing)
-            if (hasContent) {
-              const incremental = contentFromDelta || '';
-              const snapshot = contentFromMessage || '';
-
-              // Compute the append text:
-              // - If incremental tokens exist, append them directly.
-              // - Else if we only have snapshot, append the new suffix beyond what we've already accumulated.
-              let append = '';
-              if (incremental) {
-                append = incremental;
-              } else if (snapshot) {
-                // Prefer using the whole snapshot with non-overlap normalization
-                const baseForSnapshot = this.streamingContent.get(conversationId) || '';
-                append = ConversationService.computeNonOverlappingAppend(baseForSnapshot, snapshot);
-              }
-
-              if (append) {
-                // CRITICAL FIX: Normalize content FIRST to know the chunk length
-                const latestBase = this.streamingContent.get(conversationId) || '';
-                const normalized = ConversationService.computeNonOverlappingAppend(latestBase, append);
-
-                if (normalized.length === 0) {
-                  // Nothing new to append - skip broadcasting
-                } else {
-                  // CRITICAL FIX: Read and increment position in ONE line to ensure atomicity
-                  const chunkPosition = this.nextChunkPosition.get(conversationId) || 0;
-                  this.nextChunkPosition.set(conversationId, chunkPosition + normalized.length);
-
-                  // Update content
-                  const newContent = latestBase + normalized;
-                  this.streamingContent.set(conversationId, newContent);
-
-                  const newLen = (this.accumulatedLength.get(conversationId) || 0) + normalized.length;
-                  this.accumulatedLength.set(conversationId, newLen);
-
-                  const rb = this.ringBuffer.get(conversationId) || [];
-                  rb.push({ position: chunkPosition, content: normalized, ts: Date.now() });
-                  if (rb.length > 200) rb.splice(0, rb.length - 200);
-                  this.ringBuffer.set(conversationId, rb);
-
-                  // Publish typed assistant delta (Redis Streams)
-                  this.enqueueDelta('content', conversationId, normalized);
-                }
-              }
-            }
-
-            // Process reasoning if present (stream as delta chunks; persist final reasoning on completion)
-            if (hasReasoning) {
-              const incrementalR = reasoningFromDelta || '';
-              const snapshotR = reasoningFromMessage || '';
-
-              const currentR = this.streamingReasoning.get(conversationId) || '';
-
-              let appendR = '';
-              if (incrementalR) {
-                appendR = incrementalR;
-              } else if (snapshotR) {
-                appendR = ConversationService.computeNonOverlappingAppend(currentR, snapshotR);
-              }
-
-              if (appendR) {
-                const normalizedR = ConversationService.computeNonOverlappingAppend(currentR, appendR);
-                if (normalizedR.length > 0) {
-                  const newR = currentR + normalizedR;
-                  this.streamingReasoning.set(conversationId, newR);
-
-                  // Publish typed reasoning delta (Redis Streams)
-                  this.enqueueDelta('reasoning', conversationId, normalizedR);
-                }
-              }
-            }
-
-            // Process toolCalls if present (prefer true delta updates; otherwise, broadcast snapshot from message)
-            if (hasToolCalls) {
-              try {
-                if (toolCallsFromDelta.length > 0) {
-                  const acc: StreamingToolCallAccum[] = this.streamingToolCalls.get(conversationId) || [];
-
-                  for (const raw of toolCallsFromDelta) {
-                    const rawTc = (raw ?? {}) as { index?: number; id?: string; function?: { name?: string; arguments?: unknown } };
-                    const idx = typeof rawTc?.index === 'number' ? rawTc.index : 0;
-
-                    // Ensure slot only for the referenced index; do not pre-fill earlier indices
-                    if (!acc[idx]) {
-                      acc[idx] = { id: undefined, type: 'function', function: { name: undefined, arguments: '' } };
-                    }
-
-                    const target = acc[idx];
-                    if (rawTc?.id) target.id = rawTc.id;
-                    if (rawTc?.function?.name) target.function.name = rawTc.function.name;
-
-                    // Accumulate arguments as string, parse later when complete.
-                    // Use non-overlapping append because some providers send cumulative snapshots.
-                    if (typeof rawTc?.function?.arguments === 'string') {
-                      const base = typeof target.function.arguments === 'string' ? (target.function.arguments as string) : '';
-                      const incoming = rawTc.function.arguments as string;
-                      const append = ConversationService.computeNonOverlappingAppend(base, incoming);
-                      target.function.arguments = base + append;
-                    }
-                  }
-
-                  this.streamingToolCalls.set(conversationId, acc);
-
-                  // Tool calls are persisted via state/message persistence (node_completed) and published as message.append.
-                  // We intentionally do not stream toolCalls as incremental UI deltas in the new protocol.
-                  // Note: We parse tool call arguments here but don't use them for streaming (they're persisted on completion).
-                } else if (toolCallsFromMessage.length > 0) {
-                  // Snapshot toolCalls from message node (no incremental indices)
-                  // Parse arguments using partial-json for robustness
-                  const normalized: LlmToolCall[] = toolCallsFromMessage.map((raw): LlmToolCall => {
-                    const tc = (raw ?? {}) as { id?: string; function?: { name?: string; arguments?: unknown } };
-                    const argsStr = typeof tc?.function?.arguments === 'string' ? (tc.function!.arguments as string) : '';
-                    let argsObj: unknown = {};
-                    if (argsStr) {
-                      try {
-                        argsObj = parsePartialJSONObject(argsStr);
-                      } catch (err) {
-                        console.error('[ConversationService] Failed to parse partial JSON for tool call arguments', {
-                          error: err instanceof Error ? err.message : String(err),
-                          conversationId,
-                          argsStr: argsStr?.substring(0, 100),
-                        });
-                        argsObj = {};
-                      }
-                    }
-                    return {
-                      id: tc?.id,
-                      type: 'function' as const,
-                      function: {
-                        name: typeof tc?.function?.name === 'string' ? (tc.function!.name as string) : '',
-                        arguments: argsObj, // Store as parsed object for UI
-                      },
-                    } as LlmToolCall;
-                  });
-
-                  // Maintain streaming accumulator with string arguments form
-                  const accumFromSnapshot: StreamingToolCallAccum[] = normalized.map((tc) => ({
-                    id: tc.id,
-                    type: 'function',
-                    function: {
-                      name: tc.function.name,
-                      arguments: (() => {
-                        try {
-                          return JSON.stringify(tc.function.arguments ?? {});
-                        } catch (err) {
-                          console.error('[ConversationService] Failed to stringify tool call arguments', {
-                            error: err instanceof Error ? err.message : String(err),
-                            conversationId,
-                          });
-                          return '{}';
-                        }
-                      })(),
-                    },
-                  }));
-                  this.streamingToolCalls.set(conversationId, accumFromSnapshot);
-
-                  // Tool calls are persisted and will be delivered via message.append; no incremental streaming here.
-                }
-              } catch (err) {
-                console.error('[ConversationService] Failed to parse tool calls', {
-                  error: err instanceof Error ? err.message : String(err),
-                  conversationId,
-                });
-              }
-            }
-          }
-        };
-
-        // CRITICAL FIX: Chain this chunk after the previous one completes
-        const previousLock = this.chunkProcessingLock.get(conversationId) || Promise.resolve();
-        const currentLock = previousLock
-          .then(() => processThisChunk())
-          .catch((err) => {
-            console.error('[STREAMING] Chunk processing error:', err);
-          });
-        this.chunkProcessingLock.set(conversationId, currentLock);
-
-        // Wait for this chunk to complete
-        await currentLock;
-        break;
-      }
-
-      case 'content_complete': {
-        // Assistant messages are now persisted via state in node_completed
-        // Just track usage here
-        if ((event.executionDepth ?? 0) > 0) {
-          break;
-        }
-
-        // Extract and persist usage
-        const llmEvent = event as LLMEvent;
-        const llmUsage = llmEvent.data?.usage;
-        const model = llmEvent.data?.model;
-
-        const usagePayload = llmUsage
-          ? {
-              promptTokens: typeof llmUsage.promptTokens === 'number' ? llmUsage.promptTokens : 0,
-              completionTokens: typeof llmUsage.completionTokens === 'number' ? llmUsage.completionTokens : 0,
-              totalTokens:
-                typeof llmUsage.totalTokens === 'number'
-                  ? llmUsage.totalTokens
-                  : (typeof llmUsage.promptTokens === 'number' ? llmUsage.promptTokens : 0) +
-                    (typeof llmUsage.completionTokens === 'number' ? llmUsage.completionTokens : 0),
-              cost: this.extractProviderCost(llmUsage),
-              ...(typeof model === 'string' ? { model } : {}),
-            }
-          : (() => {
-              const latest = this.latestStreamingUsage.get(conversationId);
-              return latest
-                ? {
-                    promptTokens: Number(latest.promptTokens || 0),
-                    completionTokens: Number(latest.completionTokens || 0),
-                    totalTokens: Number(latest.totalTokens || 0),
-                    cost: typeof latest.cost === 'number' && Number.isFinite(latest.cost) ? latest.cost : undefined,
-                    ...(latest.model ? { model: latest.model } : {}),
-                  }
-                : undefined;
-            })();
-
-        if (usagePayload) {
-          try {
-            const starship = await this.getConversationStarship(conversationId);
-            if (starship) {
-              const computedCost =
-                typeof usagePayload.cost === 'number' && Number.isFinite(usagePayload.cost)
-                  ? usagePayload.cost
-                  : await this.computeCostFromCatalog({
-                      model: typeof usagePayload.model === 'string' ? usagePayload.model : undefined,
-                      promptTokens: usagePayload.promptTokens,
-                      completionTokens: usagePayload.completionTokens,
-                    });
-
-              // Emit a UX-only per-turn usage event so clients can show context utilization
-              // around the agent avatar for this turn.
-              try {
-                const turnId = this.currentTurnId.get(conversationId) || this.generationId.get(conversationId) || conversationId;
-                const agent = this.currentAgentForConversation.get(conversationId);
-                await this.streamBus.publish(conversationId, {
-                  type: 'turn.usage',
-                  data: {
-                    conversationId,
-                    turnId,
-                    at: new Date().toISOString(),
-                    ...(agent?.id ? { agentId: agent.id } : {}),
-                    ...(agent?.name ? { agentName: agent.name } : {}),
-                    ...(typeof usagePayload.model === 'string' ? { model: usagePayload.model } : {}),
-                    usage: {
-                      promptTokens: usagePayload.promptTokens,
-                      completionTokens: usagePayload.completionTokens,
-                      totalTokens: usagePayload.totalTokens,
-                      ...(typeof computedCost === 'number' && Number.isFinite(computedCost) ? { cost: Number(computedCost) } : {}),
-                    },
-                  },
-                });
-              } catch {
-                // best-effort only; UX hint
-              }
-
-              await this.usageService.createUsageForTurn({
-                starshipId: starship.id,
-                conversationId,
-                promptTokens: usagePayload.promptTokens,
-                completionTokens: usagePayload.completionTokens,
-                totalTokens: usagePayload.totalTokens,
-                cost: Number(computedCost ?? 0),
-                model: usagePayload.model,
-              });
-              this.usagePersistedThisTurn.add(conversationId);
-
-              // Credits system: usage rows are analytics only; do not debit wallet based on token usage.
-              this.latestStreamingUsage.delete(conversationId);
-            }
-          } catch (e) {
-            console.error('[STREAMING] Failed to persist usage record:', e);
-          }
-        }
-
-        // Do not clear streaming trackers here. We keep accumulators until persistence in
-        // node_completed or finalization in workflow_completed, so that stopConversation
-        // can persist partials if a cancel happens between content_complete and persistence.
-
-        break;
-      }
-
-      case 'node_started': {
-        // Node started
-        break;
-      }
-
-      case 'node_failed': {
-        const execEvent = event as ExecutionEvent;
-        const execution: Execution | undefined = execEvent?.data?.execution;
-        const nodeRef = execution?.currentNodeRef;
-        const results = execution?.results ?? [];
-        // Find the last result for the failed node to surface its error message.
-        const failedResult = results.slice().reverse().find((r) => r?.nodeRef === nodeRef);
-        const failedItem = failedResult?.items?.[0];
-        console.error('[STREAMING] Node failed', {
-          nodeRef,
-          depth: execEvent.executionDepth,
-          error: failedItem?.error ?? failedItem?.json,
-        });
-        break;
-      }
-
-      case 'node_completed': {
-        // Handle tool node completion - persist tool result messages
-        // NOTE: Legacy UI action inference removed. UI actions must be emitted explicitly via AutopilotEvent 'ui_action'.
-
-        // Detect and persist new messages added to state via mutations
-        try {
-          const execEvent = event as ExecutionEvent;
-          const execution: Execution | undefined = execEvent?.data?.execution;
-
-          if (execution?.state) {
-            const stateObj = execution.state as { messages?: LlmMessage[] };
-            const stateMessages = Array.isArray(stateObj.messages) ? stateObj.messages : [];
-
-            // Get last persisted index for this conversation
-            const lastIndex = this.lastPersistedIndex.get(conversationId) ?? -1;
-
-            // Type guard for state messages coming from Autopilot mutations
-            // Content can be string (text only) or array (multimodal ContentBlock[] for images, PDFs, etc.)
-            const isStateMsg = (m: unknown): m is LlmMessage => {
-              if (!m || typeof m !== 'object') return false;
-              const rec = m as Record<string, unknown>;
-              return typeof rec.role === 'string' && (typeof rec.content === 'string' || Array.isArray(rec.content));
-            };
-
-            // Only process messages added since last persistence
-            for (let i = lastIndex + 1; i < stateMessages.length; i++) {
-              const raw = stateMessages[i];
-
-              // Update index immediately to prevent re-processing if node_completed fires again
-              this.lastPersistedIndex.set(conversationId, i);
-
-              // Validate message shape
-              if (!isStateMsg(raw)) {
-                continue;
-              }
-
-              const role = raw.role as 'system' | 'user' | 'assistant' | 'tool';
-
-              // Skip system messages (ephemeral, not persisted)
-              if (role === 'system') {
-                continue;
-              }
-
-              try {
-                // Treat as canonical LlmMessage after type guard
-                const lm = raw as LlmMessage;
-                const stopRequested = this.stopRequestedForConversation.has(conversationId);
-
-                // Read optional toolCallId (canonical only)
-                const toolCallId = typeof lm.toolCallId === 'string' ? lm.toolCallId : undefined;
-
-                // For assistant messages, persist toolCalls if present (already canonical from Agent/LLM)
-                let toolCalls: LlmToolCall[] | undefined = undefined;
-                if (role === 'assistant' && Array.isArray(lm.toolCalls) && lm.toolCalls.length > 0) {
-                  toolCalls = lm.toolCalls as LlmToolCall[];
-                }
-
-                // Persist the message (assistant or tool)
-                const messageType = role === 'tool' ? 'tool_result' : 'agent_response';
-                // For assistant messages, include agent attribution
-                const agent = role === 'assistant' ? this.currentAgentForConversation.get(conversationId) : undefined;
-                const pendingAttachmentIds =
-                  role === 'assistant' ? this.streamingGeneratedAttachmentIds.get(conversationId) || [] : ([] as string[]);
-                let starship = pendingAttachmentIds.length > 0 ? await this.getConversationStarship(conversationId) : null;
-
-                // Extract string content (LLM responses are always string, not ContentBlock[])
-                const contentString =
-                  typeof lm.content === 'string' ? lm.content : lm.content[0]?.type === 'text' ? lm.content[0].text : '';
-                let contentToPersist = contentString;
-                let attachmentIdsToPersist = pendingAttachmentIds;
-
-                // If the user pressed Stop during/around tool calling, do NOT persist toolCalls.
-                // This prevents dangling tool calls without tool results, which breaks future provider calls.
-                if (role === 'assistant' && stopRequested) {
-                  toolCalls = undefined;
-                  // If this assistant message is tool-call-only (blank content + no reasoning + no attachments),
-                  // skip persisting it entirely.
-                  const hasText = typeof contentToPersist === 'string' && contentToPersist.trim().length > 0;
-                  const hasReasoning = typeof lm.reasoning === 'string' && lm.reasoning.trim().length > 0;
-                  const hasAttachments = Array.isArray(pendingAttachmentIds) && pendingAttachmentIds.length > 0;
-                  if (!hasText && !hasReasoning && !hasAttachments) {
-                    continue;
-                  }
-                }
-
-                // If tool results already include attachment ids (server-tools fast-path),
-                // persist them so the UI can render images/files the same way as uploads.
-                if (role === 'tool' && typeof contentToPersist === 'string' && contentToPersist.trim().length > 0) {
-                  try {
-                    const parsed = JSON.parse(contentToPersist) as unknown;
-                    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-                      const rec = parsed as Record<string, unknown>;
-                      const atts = Array.isArray(rec.attachments) ? rec.attachments : [];
-                      const ids: string[] = [];
-                      for (const a of atts) {
-                        if (!a || typeof a !== 'object') continue;
-                        const id = (a as Record<string, unknown>).id;
-                        if (typeof id === 'string' && id.trim().length > 0) ids.push(id.trim());
-                      }
-                      if (ids.length > 0) {
-                        const seen = new Set<string>();
-                        const uniq: string[] = [];
-                        for (const id of ids) {
-                          if (seen.has(id)) continue;
-                          seen.add(id);
-                          uniq.push(id);
-                        }
-                        attachmentIdsToPersist = uniq;
-                        if (!starship) {
-                          starship = await this.getConversationStarship(conversationId);
-                        }
-
-                        // Keep persisted tool_result content lean:
-                        // replace `attachments: [{...}]` with `attachments: [{ id }]` so we don't store presigned URLs
-                        // or other large metadata blobs in message.content.
-                        try {
-                          rec.attachments = uniq.map((id) => ({ id }));
-                          contentToPersist = JSON.stringify(rec);
-                        } catch {
-                          // ignore stringify failures; keep original
-                        }
-                      }
-                    }
-                  } catch {
-                    // ignore: not JSON or no attachments list
-                  }
-                }
-
-                // Option A: do NOT persist base64 image blobs in messages.content for tool_result messages.
-                // Instead, convert base64 data URLs to optimized attachments and replace the embedded URLs with
-                // lightweight references. The UI renders images from attachmentIds.
-                if (role === 'tool' && typeof contentToPersist === 'string' && contentToPersist.includes('data:image/')) {
-                  const urls = ConversationService.extractBase64ImageDataUrlsFromText(contentToPersist, { maxUrls: 8 });
-                  if (urls.length > 0) {
-                    if (!starship) {
-                      starship = await this.getConversationStarship(conversationId);
-                    }
-                    if (starship) {
-                      const attachmentService = new AttachmentService();
-                      const createdIds: string[] = [];
-
-                      for (let idx = 0; idx < urls.length; idx++) {
-                        const url = urls[idx];
-                        const parsed = ConversationService.parseBase64ImageDataUrl(url);
-                        if (!parsed) continue;
-                        try {
-                          const filenameBase = `generated_tool_${Date.now()}_${idx}`;
-                          const attachment = await attachmentService.createGeneratedImageAttachment({
-                            starshipId: starship.id,
-                            conversationId,
-                            mimeType: parsed.mimeType,
-                            buffer: parsed.buffer,
-                            filenameBase,
-                          });
-                          createdIds.push(attachment.id);
-                        } catch (err) {
-                          console.warn('[STREAMING] Failed to persist tool-generated image attachment', {
-                            conversationId,
-                            error: err instanceof Error ? err.message : String(err),
-                          });
-                        }
-                      }
-
-                      if (createdIds.length > 0) {
-                        // Replace each embedded data URL with a stable attachment reference.
-                        // Keep it JSON-safe (still a string inside quotes).
-                        let replaced = contentToPersist;
-                        for (let idx = 0; idx < urls.length && idx < createdIds.length; idx++) {
-                          const url = urls[idx];
-                          const id = createdIds[idx];
-                          const placeholder = `attachment://${id}`;
-                          replaced = replaced.split(url).join(placeholder);
-                        }
-                        contentToPersist = replaced;
-                        // Merge with any existing ids (e.g. server-tools provided attachments).
-                        const combined = [...attachmentIdsToPersist, ...createdIds].filter(
-                          (x): x is string => typeof x === 'string' && x.length > 0
-                        );
-                        const seen = new Set<string>();
-                        const uniq: string[] = [];
-                        for (const id of combined) {
-                          if (seen.has(id)) continue;
-                          seen.add(id);
-                          uniq.push(id);
-                        }
-                        attachmentIdsToPersist = uniq;
-                      }
-                    }
-                  }
-                }
-
-                const turnId = this.currentTurnId.get(conversationId) || this.generationId.get(conversationId) || 'turn';
-                const baseIdx = this.currentTurnBaseIndex.get(conversationId) ?? this.lastPersistedIndex.get(conversationId) ?? -1;
-                const turnSeq = Math.max(0, i - baseIdx);
-
-                const persistedMsg = await this.messageService.upsertMessageByTurnSlot({
-                  conversationId,
-                  turnId,
-                  turnSeq,
-                  role,
-                  content: contentToPersist,
-                  messageType,
-                  ...(toolCallId ? { toolCallId } : {}),
-                  ...(toolCalls && toolCalls.length > 0 ? { toolCalls } : {}),
-                  ...(typeof lm.reasoning === 'string' && lm.reasoning.length > 0 ? { reasoning: lm.reasoning } : {}),
-                  ...(agent ? { agentId: agent.id, agentName: agent.name } : {}),
-                  ...(attachmentIdsToPersist.length > 0 ? { attachmentIds: attachmentIdsToPersist } : {}),
-                });
-
-                // Link generated attachments to the persisted assistant message (best-effort)
-                if (role === 'assistant' && pendingAttachmentIds.length > 0 && starship) {
-                  try {
-                    const attachmentService = new AttachmentService();
-                    await Promise.all(
-                      pendingAttachmentIds.map((id) => attachmentService.linkToMessage(id, persistedMsg.id, starship.id).catch(() => false))
-                    );
-                  } catch (err) {
-                    console.error('[ConversationService] Failed to link attachments to message', {
-                      error: err instanceof Error ? err.message : String(err),
-                      conversationId,
-                      messageId: persistedMsg.id,
-                    });
-                  }
-                }
-
-                // Link tool attachments to the persisted tool_result message (best-effort).
-                if (role === 'tool' && attachmentIdsToPersist.length > 0 && starship) {
-                  try {
-                    const attachmentService = new AttachmentService();
-                    await Promise.all(
-                      attachmentIdsToPersist.map((id) =>
-                        attachmentService.linkToMessage(id, persistedMsg.id, starship.id).catch(() => false)
-                      )
-                    );
-                  } catch {
-                    // ignore best-effort linking failures
-                  }
-                }
-
-                // Mark that an assistant message has been persisted for this turn
-                if (role === 'assistant') {
-                  // Snapshot toolCallId -> function.name mapping for later tool_result interpretation.
-                  // IMPORTANT: we clear streaming tool call accumulators for subsequent assistant outputs, so keep
-                  // a separate, best-effort mapping.
-                  try {
-                    if (Array.isArray(toolCalls) && toolCalls.length > 0) {
-                      const m = new Map<string, string>();
-                      for (const tc of toolCalls) {
-                        const id = typeof tc.id === 'string' ? tc.id : '';
-                        const name = typeof tc.function?.name === 'string' ? tc.function.name : '';
-                        if (id && name.trim().length > 0) {
-                          m.set(id, name.trim());
-                        }
-                      }
-                      if (m.size > 0) {
-                        this.lastToolCallNameByConversation.set(conversationId, m);
-                      }
-                    }
-                  } catch {
-                    // ignore best-effort mapping failures
-                  }
-
-                  // ROOT CAUSE FIX:
-                  // We buffer deltas (timer-based) to avoid XADD per token. Without forcing a flush here,
-                  // the last buffered assistant.delta can land AFTER this message.append (which already
-                  // includes the final content), causing the UI to render the last chunk twice.
-                  try {
-                    await this.flushPendingDeltas(conversationId);
-                  } catch (e) {
-                    console.warn('[STREAM] Failed to flush pending deltas before message.append (node_completed)', {
-                      conversationId,
-                      error: e instanceof Error ? e.message : String(e),
-                    });
-                  }
-
-                  this.assistantPersistedThisTurn.add(conversationId);
-                  // Reset streaming accumulators so subsequent assistant responses in the same turn
-                  // get their own placeholder and can be persisted independently
-                  this.streamingContent.delete(conversationId);
-                  this.streamingReasoning.delete(conversationId);
-                  this.streamingToolCalls.delete(conversationId);
-                  this.ringBuffer.delete(conversationId);
-                  this.streamSeq.delete(conversationId);
-                  this.activeStreamPersisted.delete(conversationId);
-                  this.streamingGeneratedAttachmentIds.delete(conversationId);
-                  this.streamingGeneratedImageUrlSeen.delete(conversationId);
-                  // Clear streaming message id so future deltas start a new stream message for subsequent assistant outputs
-                  this.streamingAssistantMessageId.delete(conversationId);
-                }
-
-                // Publish persisted messages to the shared stream.
-                try {
-                  await this.streamBus.publish(conversationId, { type: 'message.append', data: { conversationId, message: persistedMsg } });
-                  try {
-                    void this.notifications.handleMessageAppend({ conversationId, message: persistedMsg });
-                  } catch {
-                    /* best-effort */
-                  }
-                } catch (e) {
-                  console.warn('[STREAM] Failed to publish message.append', e);
-                }
-
-                // NOTE: We intentionally do NOT infer UI actions from tool_result payloads.
-              } catch (persistError) {
-                console.error('[STREAMING] Failed to persist state message:', persistError);
-              }
-            }
-          }
-        } catch (e) {
-          console.warn('[STREAMING] State message persistence failed on node_completed:', e);
-        }
-
-        // Persist evolved state back to conversation when node completes
-        // IMPORTANT: Merge with existing state to preserve plugins (plugins are conversation-level only, not from execution state)
-        try {
-          const execEvent = event as ExecutionEvent;
-          const execution: Execution | undefined = execEvent?.data?.execution;
-          if (execution?.state) {
-            const evolvedState = this.extractPersistableState(execution.state);
-            if (evolvedState) {
-              // Atomically merge state patch in DB to avoid clobbering concurrent writers
-              // (e.g. multiple processes persisting state concurrently).
-              // Plugins are never in evolvedState due to blacklist; this preserves conversation-level plugins.
-              await this.conversationRepository.mergeState(conversationId, evolvedState);
-            }
-          }
-        } catch (e) {
-          console.warn('[STREAMING] State persistence failed on node_completed:', e);
-        }
-
-        // Other persistence is handled on 'content_complete' to ensure final content is available and avoid race conditions.
-        break;
-      }
-
-      case 'workflow_completed': {
-        // If the workflow ended because a tool approval is required, we must NOT mark the turn as completed.
-        // Otherwise, the client will drop "responding" UI during the approval flow and any subsequent resume
-        // can be overwritten by a late 'completed' status event.
-        try {
-          const execEvent = event as ExecutionEvent;
-          const execution: Execution | undefined = execEvent?.data?.execution;
-          const results = Array.isArray(execution?.results) ? execution!.results : [];
-
-          const isApprovalRequired = (() => {
-            for (let i = results.length - 1; i >= 0; i--) {
-              const items = Array.isArray(results[i]?.items) ? results[i].items : [];
-              for (let j = items.length - 1; j >= 0; j--) {
-                const json = items[j]?.json && typeof items[j].json === 'object' ? (items[j].json as Record<string, unknown>) : null;
-                if (!json) continue;
-                const body = (json['body'] && typeof json['body'] === 'object' ? (json['body'] as Record<string, unknown>) : null) || null;
-                const err = body && typeof body['error'] === 'object' ? (body['error'] as Record<string, unknown>) : null;
-                const code = err && typeof err['code'] === 'string' ? String(err['code']) : '';
-                if (code === 'TOOL_APPROVAL_REQUIRED') return true;
-              }
-            }
-            return false;
-          })();
-
-          if (isApprovalRequired) {
-            // Persist any in-flight partial so reload shows the latest assistant content (best-effort).
-            try {
-              const persisted = await this.persistActivePartial(conversationId);
-              if (persisted) {
-                await this.streamBus.publish(conversationId, { type: 'message.append', data: { conversationId, message: persisted } });
-              }
-            } catch {
-              /* ignore */
-            }
-
-            // Publish waiting_for_tools (Redis Streams)
-            try {
-              const turnId = this.currentTurnId.get(conversationId) || this.generationId.get(conversationId) || conversationId;
-              await this.streamBus.publish(conversationId, {
-                type: 'turn.status',
-                data: { conversationId, turnId, status: 'waiting_for_tools', at: new Date().toISOString() },
-              });
-            } catch {
-              /* ignore */
-            }
-
-            // Persist waiting_for_tools to DB so SSE snapshot reflects the paused state on refresh.
-            // Without this, snapshots see 'active' and can inject synthetic `stream-${turnId}` messages.
-            try {
-              const turnId = this.currentTurnId.get(conversationId);
-              if (turnId) {
-                await this.turnRepository.updateTurn(turnId, { status: 'waiting_for_tools', completedAt: null });
-              }
-            } catch {
-              /* ignore */
-            }
-
-            // CRITICAL: clear streaming message id so resumed deltas don't attach to a stale placeholder id.
-            this.streamingAssistantMessageId.delete(conversationId);
-
-            // Mark the turn as NOT actively running while awaiting approval.
-            // IMPORTANT: continueAfterToolApproval() must be able to resume from this state.
-            try {
-              await this.conversationRepository.mergeState(conversationId, { turnActive: false });
-            } catch {
-              /* ignore */
-            }
-
-            // IMPORTANT:
-            // When a workflow pauses for ask-first tool approval, there is no active turn executing anymore.
-            // Ensure the in-memory guard is cleared so continueAfterToolApproval() can resume immediately.
-            ConversationService.activeCancellations.delete(conversationId);
-
-            break;
-          }
-        } catch {
-          // Best-effort detection only; fall through to normal completion behavior.
-        }
-
-        // Flush buffered deltas so clients see the final output immediately.
-        try {
-          await this.flushPendingDeltas(conversationId);
-        } catch (e) {
-          console.warn('[STREAM] Failed to flush pending deltas on workflow_completed', {
-            conversationId,
-            error: e instanceof Error ? e.message : String(e),
-          });
-        }
-
-        // Persist any streamed assistant content (content/reasoning/attachments) if the normal
-        // state-based persistence path did not produce an assistant message.
-        try {
-          const persisted = await this.persistActivePartial(conversationId);
-          if (persisted) {
-            await this.streamBus.publish(conversationId, { type: 'message.append', data: { conversationId, message: persisted } });
-          }
-        } catch (e) {
-          console.warn('[STREAM] Failed to persist/publish final streamed assistant message on workflow_completed', {
-            conversationId,
-            error: e instanceof Error ? e.message : String(e),
-          });
-        }
-
-        // Mark turn completed (best-effort)
-        try {
-          const turnId = this.currentTurnId.get(conversationId);
-          if (turnId) {
-            await this.turnRepository.updateTurn(turnId, { status: 'completed', completedAt: new Date().toISOString() });
-          }
-        } catch (err) {
-          const turnId = this.currentTurnId.get(conversationId);
-          console.error('[ConversationService] Failed to update turn status to completed', {
-            error: err instanceof Error ? err.message : String(err),
-            conversationId,
-            turnId: turnId || 'unknown',
-          });
-        }
-
-        // Publish terminal turn status (Redis Streams)
-        try {
-          const turnId = this.currentTurnId.get(conversationId) || this.generationId.get(conversationId) || conversationId;
-          await this.streamBus.publish(conversationId, {
-            type: 'turn.status',
-            data: { conversationId, turnId, status: 'completed', at: new Date().toISOString() },
-          });
-        } catch (err) {
-          console.warn('[STREAM] Failed to publish completed turn status', err);
-        }
-
-        // Persist turn_completed state and notify clients
-        try {
-          await this.conversationRepository.mergeState(conversationId, {
-            turnActive: false,
-            lastCompleteAt: new Date().toISOString(),
-          });
-        } catch (err) {
-          console.warn('[STREAMING] Failed to persist turn_completed state', err);
-        }
-
-        // Best-effort: if providers never emitted usage (no content_complete), estimate and persist now so totals update.
-        try {
-          if (!this.usagePersistedThisTurn.has(conversationId)) {
-            const turnId = this.currentTurnId.get(conversationId) || this.generationId.get(conversationId) || conversationId;
-            const starship = await this.getConversationStarship(conversationId);
-            if (starship) {
-              // Resolve model from active agent (best-effort) for cost estimation.
-              let model: string | undefined;
-              try {
-                const agent = this.currentAgentForConversation.get(conversationId);
-                if (agent?.id) {
-                  const agentService = new AgentService();
-                  const agentModel = await agentService.getAgent(agent.id).catch(() => null);
-                  const cfg = agentModel && typeof agentModel === 'object' ? (agentModel as unknown as Record<string, unknown>) : null;
-                  if (cfg && typeof cfg.model === 'string') {
-                    const m = cfg.model.trim();
-                    if (m) model = m;
-                  }
-                }
-              } catch {
-                /* best-effort */
-              }
-
-              // Use persisted messages (DB) for heuristic token estimates.
-              const page = await this.getConversationMessagesPage({ conversationId, limit: 30 }).catch(() => null);
-              const msgsRaw = page && typeof page === 'object' ? (page as Record<string, unknown>)['messages'] : undefined;
-              const msgs: Array<{ role?: unknown; content?: unknown }> = Array.isArray(msgsRaw)
-                ? (msgsRaw as Array<{ role?: unknown; content?: unknown }>)
-                : [];
-              const joined = msgs.map((m) => String(m?.content ?? '')).join('\n');
-              const promptTokens = ConversationService.estimateTokensFromText(joined);
-
-              let lastAssistantText = '';
-              for (let i = msgs.length - 1; i >= 0; i--) {
-                const r = msgs[i]?.role;
-                if (r === 'assistant') {
-                  lastAssistantText = String(msgs[i]?.content ?? '');
-                  break;
-                }
-              }
-              const completionTokens = ConversationService.estimateTokensFromText(lastAssistantText);
-              const totalTokens = promptTokens + completionTokens;
-
-              const computedCost = await this.computeCostFromCatalog({ model, promptTokens, completionTokens });
-              await this.usageService.createUsageForTurn({
-                starshipId: starship.id,
-                conversationId,
-                promptTokens,
-                completionTokens,
-                totalTokens,
-                cost: Number(computedCost ?? 0),
-                ...(model ? { model } : {}),
-              });
-              this.usagePersistedThisTurn.add(conversationId);
-
-              // Publish turn.usage for UI (best-effort).
-              try {
-                const agent = this.currentAgentForConversation.get(conversationId);
-                await this.streamBus.publish(conversationId, {
-                  type: 'turn.usage',
-                  data: {
-                    conversationId,
-                    turnId,
-                    at: new Date().toISOString(),
-                    ...(agent?.id ? { agentId: agent.id } : {}),
-                    ...(agent?.name ? { agentName: agent.name } : {}),
-                    ...(model ? { model } : {}),
-                    usage: {
-                      promptTokens,
-                      completionTokens,
-                      totalTokens,
-                      ...(typeof computedCost === 'number' && Number.isFinite(computedCost) ? { cost: Number(computedCost) } : {}),
-                    },
-                  },
-                });
-              } catch {
-                /* best-effort */
-              }
-            }
-          }
-        } catch (e) {
-          console.warn('[USAGE] workflow_completed usage fallback failed', {
-            conversationId,
-            error: e instanceof Error ? e.message : String(e),
-          });
-        }
-
-        // Final cleanup now that the workflow turn has fully completed
-        this.cleanupConversation(conversationId);
-        break;
-      }
-
-      case 'workflow_failed': {
-        const execEvent = event as ExecutionEvent;
-        const execution: Execution | undefined = execEvent.data?.execution;
-        console.error('[STREAMING] Workflow failed:', execution?.results);
-
-        try {
-          await this.flushPendingDeltas(conversationId);
-        } catch (e) {
-          console.warn('[STREAM] Failed to flush pending deltas on workflow_failed', {
-            conversationId,
-            error: e instanceof Error ? e.message : String(e),
-          });
-        }
-
-        // Persist any streamed assistant content even on failure (helps explain partial progress on reload).
-        try {
-          const persisted = await this.persistActivePartial(conversationId);
-          if (persisted) {
-            await this.streamBus.publish(conversationId, { type: 'message.append', data: { conversationId, message: persisted } });
-          }
-        } catch (e) {
-          console.warn('[STREAM] Failed to persist/publish streamed assistant message on workflow_failed', {
-            conversationId,
-            error: e instanceof Error ? e.message : String(e),
-          });
-        }
-
-        // Create error message
-        const errorMessage = await this.messageService.createMessage({
-          conversationId,
-          role: 'system',
-          content: `❌ Workflow failed: ${execEvent.data?.execution?.error || 'Unknown error'}`,
-          messageType: 'error',
-        });
-
-        // Persist turn failed (best-effort)
-        try {
-          const turnId = this.currentTurnId.get(conversationId);
-          if (turnId) {
-            await this.turnRepository.updateTurn(turnId, { status: 'failed', completedAt: new Date().toISOString() });
-          }
-        } catch (err) {
-          const turnId = this.currentTurnId.get(conversationId);
-          console.error('[ConversationService] Failed to update turn status to failed', {
-            error: err instanceof Error ? err.message : String(err),
-            conversationId,
-            turnId: turnId || 'unknown',
-          });
-        }
-
-        // Publish error message + terminal turn status
-        try {
-          const turnId = this.currentTurnId.get(conversationId) || this.generationId.get(conversationId) || conversationId;
-          const at = new Date().toISOString();
-          await this.streamBus.publish(conversationId, { type: 'message.append', data: { conversationId, message: errorMessage } });
-          await this.streamBus.publish(conversationId, {
-            type: 'turn.status',
-            data: { conversationId, turnId, status: 'failed', at, error: { message: 'Workflow failed' } },
-          });
-        } catch {
-          /* ignore */
-        }
-
-        // Persist server-authoritative end-of-turn state (best-effort)
-        try {
-          await this.conversationRepository.mergeState(conversationId, {
-            turnActive: false,
-            lastCompleteAt: new Date().toISOString(),
-          });
-        } catch {
-          /* ignore */
-        }
-
-        // Final cleanup after a failed workflow
-        this.cleanupConversation(conversationId);
-        break;
-      }
-
-      case 'tool_call_detected': {
-        // Intentionally no-op:
-        // The client conversation UI no longer auto-navigates to builders based on tool calls.
-        // Balance enforcement is handled at 'tool_started' (and other execution boundaries).
-        break;
-      }
-
-      case 'tool_started': {
-        break;
-      }
-
-      case 'tool_complete': {
-        // Tool completion is now handled via state-based message persistence in node_completed
-        // No persistence needed here - messages are added to state via mutations and persisted automatically
-        break;
-      }
-
-      default:
-        break;
-    }
-  }
 }

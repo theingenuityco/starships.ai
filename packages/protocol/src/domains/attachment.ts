@@ -5,9 +5,6 @@
  * Supports images, PDFs, text files, and other document types.
  */
 
-// Re-export multimodal content types from autopilot (source of truth for LLM types)
-export type { ContentBlock, MessageContent } from '@starships/autopilot';
-
 /**
  * Attachment metadata returned to clients
  * SECURITY: Includes time-limited presigned URLs for client display

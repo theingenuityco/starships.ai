@@ -24,7 +24,7 @@ import {
 import type { ReactFlowInstance } from '@xyflow/react'
 import ELK from 'elkjs/lib/elk.bundled.js'
 
-import type { Blueprint, Edge as BlueprintEdge, Node as BlueprintNode } from '@starships/autopilot'
+import type { Blueprint, Edge as BlueprintEdge, Node as BlueprintNode } from '@starships/protocol'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'

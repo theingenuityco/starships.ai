@@ -5,8 +5,7 @@
  * Follows the layered architecture pattern established by ConversationEntity.
  */
 
-import type { MessageModel, MessageType } from '@starships/protocol';
-import type { LlmToolCall } from '@starships/autopilot';
+import type { MessageModel, MessageType, LlmToolCall } from '@starships/protocol';
 import { Expose } from 'class-transformer';
 import {
   IsArray,

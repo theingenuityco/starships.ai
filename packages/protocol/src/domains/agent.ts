@@ -5,8 +5,8 @@
  * Imports workflow and memory types from @starships/autopilot to avoid duplication.
  */
 
-// Import autopilot types at the top level
-import type { AgentParams } from '@starships/autopilot';
+import type { AgentParams } from './llm';
+import type { Blueprint } from './workflow';
 
 // ============================================================================
 // DATABASE AGENT INTERFACE
@@ -38,6 +38,9 @@ export interface AgentModel extends AgentParamsWithoutMetadata {
   previewPrompts?: string[];
   // Versioning fields
   version: string; // Semantic version (e.g., '1.0.2')
+
+  /** Inert legacy agent blueprint (DAG engine removed; column dropped separately). */
+  blueprint?: Blueprint;
 
   /**
    * Optional denormalized view of tool assignments for this agent.
@@ -117,6 +120,8 @@ export type CreateAgentRequest = AgentParamsWithoutMetadata & {
   previewPrompts?: string[];
   // Versioning fields
   version?: string;
+  /** Inert legacy agent blueprint (DAG engine removed). */
+  blueprint?: Blueprint;
 };
 
 /**
@@ -140,6 +145,8 @@ export interface UpdateAgentRequest extends Partial<Omit<AgentParamsWithoutMetad
    */
   reasoning?: AgentParamsWithoutMetadata['reasoning'] | null;
   version?: string;
+  /** Inert legacy agent blueprint (DAG engine removed). */
+  blueprint?: Blueprint;
 
   /**
    * Optional avatar image for the agent, stored as an Attachment (S3-backed).

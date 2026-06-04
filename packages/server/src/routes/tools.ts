@@ -34,29 +34,10 @@ const CreateToolSchema = z
         required: z.array(z.string()).optional(),
       })
       .optional(),
-    blueprint: z
-      .object({
-        nodes: z.array(z.unknown()),
-        edges: z.array(z.unknown()),
-      })
-      .optional(),
     configuration: z.record(z.string(), z.unknown()).optional(),
     isEnabled: z.boolean().optional().default(true),
     status: z.enum(['draft', 'active']).optional().default('active'),
-  })
-  .refine(
-    (data) => {
-      // If either parameters or blueprint is provided, the other must also be provided
-      if ((!!data.parameters && !data.blueprint) || (!data.parameters && !!data.blueprint)) {
-        return false;
-      }
-      return true;
-    },
-    {
-      message: 'Parameters and blueprint must both be provided together when setting either one',
-      path: ['parameters'],
-    }
-  );
+  });
 
 // Separate schema for updates without defaults to avoid overwriting unspecified fields
 const UpdateToolSchema = z.object({
@@ -72,12 +53,6 @@ const UpdateToolSchema = z.object({
       type: z.literal('object'),
       properties: z.record(z.string(), z.unknown()),
       required: z.array(z.string()).optional(),
-    })
-    .optional(),
-  blueprint: z
-    .object({
-      nodes: z.array(z.unknown()),
-      edges: z.array(z.unknown()),
     })
     .optional(),
   configuration: z.record(z.string(), z.unknown()).optional(),

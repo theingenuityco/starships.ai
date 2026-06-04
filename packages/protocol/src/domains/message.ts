@@ -6,7 +6,7 @@
  */
 
 // Import autopilot types at the top level
-import type { LlmMessage } from '@starships/autopilot';
+import type { LlmMessage } from './llm';
 
 // ============================================================================
 // DATABASE MESSAGE INTERFACE

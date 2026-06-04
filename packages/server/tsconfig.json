@@ -12,7 +12,6 @@
   "include": ["src/**/*"],
   "exclude": ["dist"],
   "references": [
-    { "path": "../autopilot" },
     { "path": "../env" },
     { "path": "../protocol" },
     { "path": "../errors" },

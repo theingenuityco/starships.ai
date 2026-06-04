@@ -6,14 +6,12 @@
  * stateless execution engine (autopilot Agent).
  */
 
-import { Agent, AgentParams } from '@starships/autopilot';
 import { NotFoundError, ValidationError } from '@starships/errors';
 import {
   AgentRepository,
   StarshipMemberRepository,
   StarshipRepository,
   UserRepository,
-  ToolRepository,
   DEFAULT_AGENT_TIMEOUT_MS,
   getConnection,
   PostgresConnection,
@@ -113,24 +111,7 @@ export class AgentService {
     // Validate agent limit before creating
     await this.validateAgentLimit(data.starshipId);
 
-    // Create agent parameters for the Agent class
-    const agentParams: AgentParams = {
-      name: data.name,
-      description: data.description,
-      model: data.model,
-      temperature: data.temperature,
-      maxTokens: data.maxTokens,
-      timeout: data.timeout || DEFAULT_AGENT_TIMEOUT_MS,
-      systemPrompt: data.systemPrompt,
-      state: data.state, // Let Agent class handle state initialization
-      blueprint: data.blueprint, // This will be null/undefined to trigger default blueprint generation
-    };
-
-    // Instantiate Agent class to generate default blueprint if needed
-    const agent = new Agent(agentParams);
-    const generatedBlueprint = agent.getCurrentBlueprint();
-
-    // Initialize state with default if not provided (same logic as Agent class)
+    // Initialize state with default if not provided.
     const agentState = data.state || { tools: [], messages: [] };
 
     const agentData: CreateAgentRequest = {
@@ -141,7 +122,6 @@ export class AgentService {
       temperature: data.temperature,
       maxTokens: data.maxTokens,
       timeout: data.timeout || DEFAULT_AGENT_TIMEOUT_MS,
-      blueprint: generatedBlueprint, // Use the blueprint from Agent class (default or provided)
       systemPrompt: data.systemPrompt,
       state: agentState, // Use provided state or default initialization
       previewPrompts: data.previewPrompts,
@@ -557,28 +537,5 @@ export class AgentService {
   // ============================================================================
   // MODEL ↔ INSTANCE CONVERSION METHODS
   // ============================================================================
-
-  /**
-   * Convert AgentModel to Agent instance, storing model ID in instance metadata
-   */
-  async toInstance(agentModel: AgentModel): Promise<Agent> {
-    const agentParams = {
-      name: agentModel.name,
-      description: agentModel.description,
-      model: agentModel.model,
-      temperature: agentModel.temperature,
-      maxTokens: agentModel.maxTokens,
-      timeout: agentModel.timeout,
-      systemPrompt: agentModel.systemPrompt,
-      state: agentModel.state,
-      blueprint: agentModel.blueprint,
-      metadata: {
-        id: agentModel.id,
-      },
-    } as AgentParams;
-    const agentInstance = new Agent(agentParams);
-
-    return agentInstance;
-  }
 
 }

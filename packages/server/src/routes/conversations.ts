@@ -25,12 +25,6 @@ import {
   ToolRepository,
   TurnRepository,
 } from '@starships/models';
-import { ExecutionItemUtils } from '@starships/autopilot';
-import type { Blueprint, EngineConfig, ExecutionWorkspace } from '@starships/autopilot';
-import { executionProviderRouter } from '@/execution/ExecutionProviderRouter';
-import { workspaceSessionManager, type WorkspaceSession } from '@/execution/WorkspaceSessionManager';
-import { resolveGitCredentials } from '@/execution/gitCredentials';
-import { buildConnectorSession } from '@/services/connectorSessionResolver';
 import { AppError } from '@starships/errors';
 import { StarshipService } from '@/services/StarshipService';
 import { UserService } from '@/services/UserService';
@@ -271,102 +265,21 @@ function optionalString(value: unknown): string | undefined {
 }
 
 /**
- * Decide whether a tool call runs inside a native-code workspace and, if so,
- * return the mount + (for checkout-repo) the clone spec. `checkout-repo` binds
- * and provisions the per-conversation session; other workspace tools reuse it.
+ * Workflow-tool execution removed with the DAG engine. Agents now run tools in their
+ * own loop (sandbox or in-process connector actions), not via server-side blueprint
+ * execution. Retained as a throwing stub so legacy tool-approval call sites compile.
  */
-async function resolveToolWorkspace(args: {
-  toolSlug?: string;
-  toolArgs: Record<string, unknown>;
-  conversationId?: string;
-  starshipId?: string;
-  authUserId?: string;
-}): Promise<ExecutionWorkspace | undefined> {
-  const { toolSlug, conversationId } = args;
-  if (!toolSlug || !conversationId) return undefined;
-
-  if (toolSlug === WORKSPACE_CHECKOUT_TOOL_SLUG) {
-    const owner = optionalString(args.toolArgs.owner);
-    const repo = optionalString(args.toolArgs.repo);
-    if (!owner || !repo) {
-      throw new AppError('checkout-repo requires "owner" and "repo"', 'VALIDATION_ERROR', 400);
-    }
-    const ref = optionalString(args.toolArgs.base) ?? optionalString(args.toolArgs.ref);
-    // A dedicated working branch keeps commits off the base; generate one when
-    // the caller doesn't specify it. The tool reports the actual branch back.
-    const branch = optionalString(args.toolArgs.branch) ?? `starships/work-${Date.now().toString(36)}`;
-    const repoUrl = `https://github.com/${owner}/${repo}.git`;
-
-    // If this conversation already has this repo cloned, reuse it (re-cloning
-    // into a non-empty checkout would fail).
-    const existing = workspaceSessionManager.get(conversationId);
-    if (existing && existing.repoUrl === repoUrl && workspaceSessionManager.isProvisioned(existing)) {
-      return { hostDir: existing.hostDir };
-    }
-
-    // Resolve the GitHub installation token on demand (the server no longer ships
-    // connector sessions to the runner). Native git uses it as the HTTPS password.
-    const githubSession = args.starshipId ? await buildConnectorSession('github', args.starshipId, args.authUserId ?? '') : null;
-    const git = resolveGitCredentials(githubSession ? { github: githubSession } : undefined);
-    const session = await workspaceSessionManager.bind({ key: conversationId, repoUrl, ref, branch });
-    return {
-      hostDir: session.hostDir,
-      spec: { repoUrl, ...(ref ? { ref } : {}), branch },
-      ...(git ? { git } : {}),
-    };
-  }
-
-  if (WORKSPACE_CONFINED_TOOL_SLUGS.has(toolSlug)) {
-    const session: WorkspaceSession | undefined = workspaceSessionManager.get(conversationId);
-    if (!session) return undefined; // no active workspace -> legacy (server cwd) behavior
-    if (!workspaceSessionManager.isProvisioned(session)) {
-      throw new AppError(`Workspace is not ready. Call '${WORKSPACE_CHECKOUT_TOOL_SLUG}' first.`, 'VALIDATION_ERROR', 400);
-    }
-    return { hostDir: session.hostDir };
-  }
-
-  return undefined;
-}
-
-async function executeToolBlueprint(args: {
-  blueprint: Blueprint;
+async function executeToolBlueprint(_args: {
+  blueprint: unknown;
   toolConfig: Record<string, unknown>;
   toolArgs: Record<string, unknown>;
   runnerConfig: Record<string, unknown>;
-  eventCallback?: EngineConfig['eventCallback'];
+  eventCallback?: (evt: unknown) => void | Promise<void>;
   starshipId?: string;
   toolSlug?: string;
   conversationId?: string;
 }): Promise<unknown> {
-  const execution = ExecutionItemUtils.createExecution();
-  const initial = ExecutionItemUtils.wrapSingle({ ...args.toolArgs, config: args.toolConfig });
-  execution.results.push({ nodeRef: '__initial__', items: initial });
-
-  const runtimeEnv = (args.runnerConfig as { runtimeEnv?: Record<string, unknown> }).runtimeEnv ?? {};
-  const authUserId = typeof runtimeEnv.AUTH_USER_ID === 'string' ? runtimeEnv.AUTH_USER_ID : '';
-  const workspace = await resolveToolWorkspace({
-    toolSlug: args.toolSlug,
-    toolArgs: args.toolArgs,
-    conversationId: args.conversationId,
-    starshipId: args.starshipId,
-    authUserId,
-  });
-
-  const provider = await executionProviderRouter.getProvider({
-    starshipId: args.starshipId ?? '',
-    requiresWorkspace: Boolean(workspace),
-  });
-  const { items } = await provider.runJob({
-    blueprint: args.blueprint,
-    execution,
-    config: {
-      failOnNodeError: true,
-      eventCallback: args.eventCallback,
-      ...(args.runnerConfig as unknown as EngineConfig),
-    },
-    ...(workspace ? { workspace } : {}),
-  });
-  return ExecutionItemUtils.unwrapSingle(items);
+  throw new AppError('Workflow tool execution has been removed.', 'NOT_IMPLEMENTED', 501);
 }
 
 type ToolResultAttachment = {
@@ -1410,7 +1323,7 @@ router.post(
             sendError(res, 'RESOURCE_NOT_FOUND', 'Tool not found', 200, { toolSlug, toolCallId, toolId: existing.toolId });
             return;
           }
-          if (toolById.status === 'draft' || !toolById.blueprint) {
+          if (toolById.status === 'draft') {
             sendError(res, 'VALIDATION_ERROR', 'Tool is not ready for execution', 200, { toolSlug, toolCallId, toolId: existing.toolId });
             return;
           }
@@ -1495,7 +1408,7 @@ router.post(
       if (cachedTool === undefined) {
         setCachedTool(toolCacheKey, tool);
       }
-      if (!tool || tool.status === 'draft' || !tool.blueprint) {
+      if (!tool || tool.status === 'draft') {
         sendError(res, 'VALIDATION_ERROR', 'Tool is not ready for execution', 200, { toolSlug, toolCallId });
         return;
       }
@@ -1661,7 +1574,7 @@ async function executeOneToolCallForBatch(params: {
       }
       // status === 'approved' — execute using the approved tool + args
       const toolById = await toolRepo.findById(existing.toolId ?? '');
-      if (!toolById || toolById.starshipId !== starshipId || toolById.status === 'draft' || !toolById.blueprint) {
+      if (!toolById || toolById.starshipId !== starshipId || toolById.status === 'draft') {
         return { kind: 'error', toolCallId, code: 'VALIDATION_ERROR', message: 'Tool is not ready for execution' };
       }
       const runtimeEnv = {
@@ -1720,7 +1633,7 @@ async function executeOneToolCallForBatch(params: {
   if (cachedTool === undefined) {
     setCachedTool(toolCacheKey, tool);
   }
-  if (!tool || tool.status === 'draft' || !tool.blueprint) {
+  if (!tool || tool.status === 'draft') {
     return { kind: 'error', toolCallId, code: 'VALIDATION_ERROR', message: 'Tool is not ready for execution' };
   }
 

@@ -778,10 +778,6 @@ router.post('/agents/:id/avatar/generate', jwtAuthMiddleware, async (req: Reques
     // Ensure we have an agent-authored "mirror" description saved for this agent.
     let avatarPrompt = agent.avatarPrompt;
     if (mode === 'full_chain' || !avatarPrompt || avatarPrompt.trim().length === 0) {
-      if (!agent.blueprint) {
-        sendError(res, 'VALIDATION_ERROR', 'Agent blueprint is missing; cannot regenerate avatar prompt', 400);
-        return;
-      }
       if (!agent.model || typeof agent.model !== 'string' || agent.model.trim().length === 0) {
         sendError(res, 'VALIDATION_ERROR', 'Agent model is missing; cannot regenerate avatar prompt', 400);
         return;

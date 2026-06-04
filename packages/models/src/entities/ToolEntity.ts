@@ -6,7 +6,7 @@
  */
 
 import type { ToolModel } from '@starships/protocol';
-import type { ToolParameterSchema, TransformOperation, Blueprint } from '@starships/autopilot';
+import type { ToolParameterSchema, TransformOperation } from '@starships/protocol';
 import { Expose } from 'class-transformer';
 import { IsISO8601, IsObject, IsOptional, IsString, Length, validate, ValidationError as ClassValidatorValidationError, IsBoolean, IsArray } from 'class-validator';
 import { TOOL_DESCRIPTION_MAX_LENGTH } from '@/constants/toolValidation';
@@ -64,11 +64,6 @@ export class ToolEntity implements ToolModel {
     properties: Record<string, ToolParameterSchema>;
     required?: string[];
   };
-
-  @Expose()
-  @IsOptional()
-  @IsObject()
-  blueprint?: Blueprint;
 
   // BaseParams fields
   @Expose()
@@ -130,13 +125,6 @@ export class ToolEntity implements ToolModel {
     if (operation === 'create') {
       const status = (dataRecord.status as 'draft' | 'active' | undefined) || 'active';
 
-      // If either parameters or blueprint is provided, the other must also be provided
-      const hasParams = !!dataRecord.parameters;
-      const hasBlueprint = !!dataRecord.blueprint;
-      if ((hasParams && !hasBlueprint) || (!hasParams && hasBlueprint)) {
-        throw new ValidationError('Parameters and blueprint must both be provided together when setting either one', 'parameters');
-      }
-
       Object.assign(entity, {
         id: dataRecord.id || 'temp-id', // Will be replaced by auto-generated ID
         slug: dataRecord.slug || '',
@@ -146,7 +134,6 @@ export class ToolEntity implements ToolModel {
         name: dataRecord.name || '',
         description: dataRecord.description || '',
         parameters: dataRecord.parameters,
-        blueprint: dataRecord.blueprint,
         transforms: dataRecord.transforms,
         mutations: dataRecord.mutations,
         condition: dataRecord.condition,

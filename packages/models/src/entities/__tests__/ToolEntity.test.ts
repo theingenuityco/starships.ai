@@ -36,7 +36,6 @@ describe('ToolEntity', () => {
         },
         required: ['input'],
       };
-      tool.blueprint = { nodes: [], edges: [] };
       tool.isEnabled = true;
       tool.createdAt = '2024-01-01T00:00:00.000Z';
       tool.updatedAt = '2024-01-02T12:00:00.000Z';
@@ -59,7 +58,6 @@ describe('ToolEntity', () => {
       tool.name = 'Test Tool';
       tool.description = 'A test tool';
       tool.parameters = { type: 'object', properties: {} };
-      tool.blueprint = { nodes: [], edges: [] };
       tool.createdAt = '2024-01-01T00:00:00.000Z';
       tool.updatedAt = '2024-01-02T12:00:00.000Z';
       tool.transforms = [{ path: 'input', operation: 'replace', value: 'transformed' }];
@@ -93,7 +91,6 @@ describe('ToolEntity', () => {
             },
           },
         },
-        blueprint: { nodes: [], edges: [] },
         isEnabled: true,
         createdAt: '2024-01-01T00:00:00.000Z',
         updatedAt: '2024-01-02T12:00:00.000Z',
@@ -117,7 +114,6 @@ describe('ToolEntity', () => {
         name: 'Complex Tool',
         description: 'A complex tool',
         parameters: { type: 'object', properties: {} },
-        blueprint: { nodes: [], edges: [] },
         transforms: [{ path: 'input', operation: 'replace', value: 'transformed' }],
         mutations: [{ path: 'output', operation: 'replace', value: 'mutated' }],
         condition: 'state.ready === true',
@@ -144,7 +140,6 @@ describe('ToolEntity', () => {
           name: 'Tool 1',
           description: 'First tool',
           parameters: { type: 'object', properties: {} },
-          blueprint: { nodes: [], edges: [] },
           isEnabled: true,
           createdAt: '2024-01-01T00:00:00.000Z',
           updatedAt: '2024-01-01T12:00:00.000Z',
@@ -156,7 +151,6 @@ describe('ToolEntity', () => {
           name: 'Tool 2',
           description: 'Second tool',
           parameters: { type: 'object', properties: {} },
-          blueprint: { nodes: [], edges: [] },
           isEnabled: false,
           createdAt: '2024-01-02T00:00:00.000Z',
           updatedAt: '2024-01-02T12:00:00.000Z',
@@ -181,7 +175,6 @@ describe('ToolEntity', () => {
         name: 'Test Tool',
         description: 'A test tool',
         parameters: { type: 'object', properties: {} },
-        blueprint: { nodes: [], edges: [] },
       };
 
       await expect(ToolEntity.validate(validData, 'create')).resolves.not.toThrow();
@@ -206,7 +199,6 @@ describe('ToolEntity', () => {
           name: '',
           description: 'A test tool',
           parameters: { type: 'object', properties: {} },
-          blueprint: { nodes: [], edges: [] },
         })
       ).rejects.toThrow();
 
@@ -217,7 +209,6 @@ describe('ToolEntity', () => {
           name: 'a'.repeat(101),
           description: 'A test tool',
           parameters: { type: 'object', properties: {} },
-          blueprint: { nodes: [], edges: [] },
         })
       ).rejects.toThrow();
 
@@ -228,7 +219,6 @@ describe('ToolEntity', () => {
           name: 'Valid Tool Name',
           description: 'A test tool',
           parameters: { type: 'object', properties: {} },
-          blueprint: { nodes: [], edges: [] },
         })
       ).resolves.not.toThrow();
     });
@@ -241,7 +231,6 @@ describe('ToolEntity', () => {
           name: 'Test Tool',
           description: 'a'.repeat(TOOL_DESCRIPTION_MAX_LENGTH + 1),
           parameters: { type: 'object', properties: {} },
-          blueprint: { nodes: [], edges: [] },
         })
       ).rejects.toThrow();
 
@@ -252,7 +241,6 @@ describe('ToolEntity', () => {
           name: 'Test Tool',
           description: 'Valid description',
           parameters: { type: 'object', properties: {} },
-          blueprint: { nodes: [], edges: [] },
         })
       ).resolves.not.toThrow();
     });
@@ -265,7 +253,6 @@ describe('ToolEntity', () => {
           name: 'Test Tool',
           description: 'A test tool',
           parameters: 'not-an-object',
-          blueprint: { nodes: [], edges: [] },
         })
       ).rejects.toThrow();
 
@@ -276,31 +263,6 @@ describe('ToolEntity', () => {
           name: 'Test Tool',
           description: 'A test tool',
           parameters: { type: 'object', properties: {} },
-          blueprint: { nodes: [], edges: [] },
-        })
-      ).resolves.not.toThrow();
-    });
-
-    it('should validate blueprint is an object', async () => {
-      await expect(
-        ToolEntity.validate({
-          slug: 'test-tool',
-          starshipId: 'starship-456',
-          name: 'Test Tool',
-          description: 'A test tool',
-          parameters: { type: 'object', properties: {} },
-          blueprint: 'not-an-object',
-        })
-      ).rejects.toThrow();
-
-      await expect(
-        ToolEntity.validate({
-          slug: 'test-tool',
-          starshipId: 'starship-456',
-          name: 'Test Tool',
-          description: 'A test tool',
-          parameters: { type: 'object', properties: {} },
-          blueprint: { nodes: [], edges: [] },
         })
       ).resolves.not.toThrow();
     });
@@ -337,7 +299,6 @@ describe('ToolEntity', () => {
           },
           required: ['input'],
         },
-        blueprint: { nodes: [{ id: 'node1', type: 'start' }], edges: [] },
         transforms: [{ path: 'input', operation: 'replace', value: 'transformed' }],
         mutations: [{ path: 'output', operation: 'replace', value: 'mutated' }],
         condition: 'state.ready === true',
@@ -365,7 +326,6 @@ describe('ToolEntity', () => {
         name: 'Simple Tool',
         description: 'A simple tool',
         parameters: { type: 'object', properties: {} },
-        blueprint: { nodes: [], edges: [] },
         createdAt: '2024-01-01T00:00:00.000Z',
         updatedAt: '2024-01-02T12:00:00.000Z',
       };
@@ -424,7 +384,6 @@ describe('ToolEntity', () => {
         name: 'Complex Tool',
         description: 'A tool with complex parameters',
         parameters: complexParameters,
-        blueprint: { nodes: [], edges: [] },
         createdAt: '2024-01-01T00:00:00.000Z',
         updatedAt: '2024-01-02T12:00:00.000Z',
       };
@@ -454,7 +413,6 @@ describe('ToolEntity', () => {
           name: 'Test Tool',
           description,
           parameters: { type: 'object', properties: {} },
-          blueprint: { nodes: [], edges: [] },
           createdAt: '2024-01-01T00:00:00.000Z',
           updatedAt: '2024-01-02T12:00:00.000Z',
         };
@@ -480,7 +438,6 @@ describe('ToolEntity', () => {
           name: 'Test Tool',
           description: 'A test tool',
           parameters: { type: 'object', properties: {} },
-          blueprint: { nodes: [], edges: [] },
           configuration,
           createdAt: '2024-01-01T00:00:00.000Z',
           updatedAt: '2024-01-02T12:00:00.000Z',
@@ -499,7 +456,6 @@ describe('ToolEntity', () => {
         name: 'Transform Tool',
         description: 'A tool with transforms',
         parameters: { type: 'object', properties: {} },
-        blueprint: { nodes: [], edges: [] },
         transforms: [
           { path: 'input.name', operation: 'replace', value: 'transformed' },
           { path: 'input.email', operation: 'add', value: 'test@example.com' },

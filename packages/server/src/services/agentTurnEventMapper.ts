@@ -117,17 +117,18 @@ export function createAgentTurnEventMapper(deps: AgentTurnEventMapperDeps, ctx: 
           type: 'function' as const,
           function: { name: tc.name, arguments: JSON.stringify(tc.args ?? {}) },
         }));
-        const req = {
+        const req: UpsertReq = {
           conversationId: ctx.conversationId,
           turnId: ctx.turnId,
           turnSeq: await nextTurnSeq(),
           role: 'assistant',
           content: m.content,
+          messageType: 'agent_response',
           agentId: ctx.agentId,
           agentName: ctx.agentName,
           ...(m.reasoning ? { reasoning: m.reasoning } : {}),
           ...(toolCalls.length > 0 ? { toolCalls } : {}),
-        } as unknown as UpsertReq;
+        };
         const persisted = await deps.messageService.upsertMessageByTurnSlot(req);
         await deps.streamBus.publish(ctx.conversationId, {
           type: 'message.append',
@@ -144,7 +145,7 @@ export function createAgentTurnEventMapper(deps: AgentTurnEventMapperDeps, ctx: 
         return;
 
       case 'tool_result': {
-        const req = {
+        const req: UpsertReq = {
           conversationId: ctx.conversationId,
           turnId: ctx.turnId,
           turnSeq: await nextTurnSeq(),
@@ -154,7 +155,7 @@ export function createAgentTurnEventMapper(deps: AgentTurnEventMapperDeps, ctx: 
           messageType: 'tool_result',
           agentId: ctx.agentId,
           agentName: ctx.agentName,
-        } as unknown as UpsertReq;
+        };
         const persisted = await deps.messageService.upsertMessageByTurnSlot(req);
         await deps.streamBus.publish(ctx.conversationId, {
           type: 'message.append',

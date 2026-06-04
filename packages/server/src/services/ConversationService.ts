@@ -3138,6 +3138,14 @@ export class ConversationService {
       const cfg = agentModel as unknown as Record<string, unknown>;
       const turnRoomId = typeof runtimeEnv?.ROOM_ID === 'string' ? runtimeEnv.ROOM_ID : undefined;
 
+      // Build the execution bundle once (mirrors the primary path) so the resume doesn't
+      // re-run the getAllModelProviders query inside runAgentTurn.
+      const { engineConfig: resumeEngineConfig } = await buildAutopilotExecutionBundle({
+        starshipId: starship.id,
+        authUserId,
+        runtimeEnv,
+      });
+
       // Replace the placeholder cancel handle so a stop request during the resume turn aborts
       // the in-process loop, mirroring the primary turn path.
       const resumeAbort = new AbortController();
@@ -3170,6 +3178,7 @@ export class ConversationService {
           ...(turnRoomId ? { roomId: turnRoomId } : {}),
           ...(plugins !== undefined ? { plugins } : {}),
           approvals,
+          engineConfig: resumeEngineConfig,
           signal: resumeAbort.signal,
         }
       );

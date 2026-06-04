@@ -135,6 +135,9 @@ function toChatMessages(messages: LlmMessage[]): ChatMessage[] {
       ...(Array.isArray(rec.reasoningDetails) ? { reasoningDetails: rec.reasoningDetails as unknown[] } : {}),
       ...(toolCalls.length > 0 ? { toolCalls } : {}),
       ...(toolCallId ? { toolCallId } : {}),
+      // Preserve image references on resume so vision/image-gen models (modalities:
+      // ['image']) can reference them in follow-up turns.
+      ...(Array.isArray(rec.images) && rec.images.length > 0 ? { images: rec.images as unknown[] } : {}),
     };
   });
 }

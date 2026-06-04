@@ -194,6 +194,9 @@ export class CliAgent {
 
         // Execute everything that has a decision now (allow -> run, deny -> error result),
         // so their tool results are appended even when other calls still await approval.
+        // NOTE: decided calls run fully in parallel (no concurrency cap). A step is
+        // normally 1-5 calls; a model going wide (e.g. 10 bash calls) is backstopped by
+        // the sandbox --pids-limit/--cpus rather than throttled here.
         const decided = gated.filter((g) => g.perm !== 'ask');
         const toolMessages = await Promise.all(
           decided.map((g) => (g.perm === 'deny' ? this.denyToolCall(g.call) : this.runToolCall(g.call, toolCtx)))

@@ -247,15 +247,20 @@ async function walk(root: string, onFile: (relPath: string) => boolean): Promise
       // Sort by name for deterministic traversal so "first N results" (e.g. grep's
       // candidate cap) are stable across runs rather than inode/readdir order.
       const entries = (await fs.readdir(abs, { withFileTypes: true })).sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+      // Process files inline (already alphabetical), collect dirs, then push them in
+      // reverse so the first-alphabetical dir is popped first despite the LIFO stack —
+      // keeps cross-directory traversal alphabetical for grep's first-N candidate cap.
+      const dirs: string[] = [];
       for (const e of entries) {
         const childRel = rel === '.' ? e.name : `${rel}/${e.name}`;
         if (e.isDirectory()) {
           if (IGNORED_DIRS.has(e.name)) continue;
-          stack.push(childRel);
+          dirs.push(childRel);
         } else if (e.isFile()) {
           if (!onFile(childRel)) return;
         }
       }
+      for (let k = dirs.length - 1; k >= 0; k--) stack.push(dirs[k]);
     } catch {
       continue;
     }

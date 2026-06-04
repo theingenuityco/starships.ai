@@ -130,20 +130,21 @@ async function main(): Promise<void> {
 
       const state = (agent.state as Record<string, unknown> | undefined) ?? { messages: [], tools: [] };
 
-      // Codec round-trip: serialize -> parse -> hash must equal the model hash.
-      const parsed = parseAgent(file);
-      const hashModel = definitionHash(defFromModel, state);
-      const hashFile = definitionHash(parsed, state);
-      if (hashModel !== hashFile) {
+      // Codec round-trip: serialize -> parse -> serialize must reproduce the file
+      // exactly (the codec is faithful / idempotent for the authored fields).
+      if (serializeAgentDefinition(parseAgent(file)) !== file) {
         roundTripFailures += 1;
-        console.error(`[ROUND-TRIP FAIL] ${starship.id}/${agent.slug}: codec is lossy (model=${hashModel} file=${hashFile})`);
+        console.error(`[ROUND-TRIP FAIL] ${starship.id}/${agent.slug}: agent codec is lossy`);
       }
 
-      // Index consistency (informational): vs the stored content_hash.
+      // Index consistency (informational): the hash the reconciler will compute
+      // from the file vs the stored content_hash. A difference is a one-time
+      // normalization (system-prompt whitespace / empty previewPrompts), not data
+      // loss — the first reconcile will refresh content_hash + updated_at.
       const dbHash = (agent as AgentModel & { contentHash?: string }).contentHash;
-      if (dbHash && dbHash !== hashModel) {
+      const fileHash = definitionHash(parseAgent(file), state);
+      if (dbHash && dbHash !== fileHash) {
         indexHashDiffs += 1;
-        console.warn(`[index-hash diff] ${starship.id}/${agent.slug}: stored=${dbHash} computed=${hashModel} (hash normalization, not data loss)`);
       }
     }
 

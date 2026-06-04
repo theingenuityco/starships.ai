@@ -133,7 +133,10 @@ export function parseAgent(raw: string): AgentDefinition {
     return v as string[];
   };
 
-  const systemPrompt = body.trim() === '' ? undefined : body.replace(/\n+$/, '');
+  // Symmetric with serialize, which writes the trimmed prompt as the body after a
+  // blank separator line. Trim both ends so serialize(parse(x)) === serialize(x).
+  const trimmedBody = body.trim();
+  const systemPrompt = trimmedBody === '' ? undefined : trimmedBody;
 
   return compact({
     id: requireString('id'),

@@ -23,9 +23,11 @@ import { createConnection } from '@/helpers/database';
 import { StarshipRepository } from '@/repositories/StarshipRepository';
 import { AgentRepository } from '@/repositories/AgentRepository';
 import { ScheduleRepository } from '@/repositories/ScheduleRepository';
+import { ConnectorRepository } from '@/repositories/ConnectorRepository';
 import { StarshipDefinitionStore } from '@/services/StarshipDefinitionStore';
 import { agentFilename, agentModelToDefinition, parseAgent, serializeAgentDefinition } from '@/services/definition/agentCodec';
 import { parseSchedule, scheduleFilename, serializeSchedule, serializeScheduleDefinition } from '@/services/definition/scheduleCodec';
+import { connectorFilename, parseConnector, serializeConnector, serializeConnectorDefinition } from '@/services/definition/connectorCodec';
 import { computeAgentContentHash } from '@/utils/contentHash';
 import type { AgentDefinition } from '@/services/definition/types';
 import type { AgentModel } from '@starships/protocol';
@@ -81,6 +83,7 @@ async function main(): Promise<void> {
   const starshipRepo = new StarshipRepository();
   const agentRepo = new AgentRepository();
   const scheduleRepo = new ScheduleRepository();
+  const connectorRepo = new ConnectorRepository();
 
   const starships = args.starshipId
     ? [await starshipRepo.findById(args.starshipId)].filter(Boolean)
@@ -95,6 +98,8 @@ async function main(): Promise<void> {
   let indexHashDiffs = 0;
   let schedulesTotal = 0;
   let schedulesWritten = 0;
+  let connectorsTotal = 0;
+  let connectorsWritten = 0;
 
   for (const starship of starships) {
     if (!starship) continue;
@@ -145,10 +150,24 @@ async function main(): Promise<void> {
         console.error(`[ROUND-TRIP FAIL] ${starship.id}/schedule:${schedule.id}: schedule codec is lossy`);
       }
     }
+
+    const connectors = await connectorRepo.findByStarship(starship.id);
+    for (const connector of connectors) {
+      connectorsTotal += 1;
+      const file = serializeConnector(connector);
+      if (!args.verifyOnly) {
+        await store.write(starship.id, 'connectors', connectorFilename(connector.provider), file);
+        connectorsWritten += 1;
+      }
+      if (serializeConnectorDefinition(parseConnector(file)) !== file) {
+        roundTripFailures += 1;
+        console.error(`[ROUND-TRIP FAIL] ${starship.id}/connector:${connector.provider}: connector codec is lossy`);
+      }
+    }
   }
 
   console.log(
-    `[backfill] done — agents: ${agentsTotal}, written: ${agentsWritten}, schedules: ${schedulesTotal}, written: ${schedulesWritten}, round-trip failures: ${roundTripFailures}, index-hash diffs: ${indexHashDiffs}`
+    `[backfill] done — agents: ${agentsTotal}, written: ${agentsWritten}, schedules: ${schedulesTotal}, written: ${schedulesWritten}, connectors: ${connectorsTotal}, written: ${connectorsWritten}, round-trip failures: ${roundTripFailures}, index-hash diffs: ${indexHashDiffs}`
   );
 
   // Fail only on a real codec correctness problem.

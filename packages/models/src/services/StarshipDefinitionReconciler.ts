@@ -1,15 +1,18 @@
 import { AgentEntity } from '@/entities/AgentEntity';
 import { ScheduleEntity } from '@/entities/ScheduleEntity';
+import { ConnectorEntity } from '@/entities/ConnectorEntity';
 import { AgentRepository } from '@/repositories/AgentRepository';
 import { ScheduleRepository } from '@/repositories/ScheduleRepository';
+import { ConnectorRepository } from '@/repositories/ConnectorRepository';
 import { computeAgentContentHash, sha256Hex, stableStringify } from '@/utils/contentHash';
 import { StarshipDefinitionStore } from '@/services/StarshipDefinitionStore';
 import { StarshipVolumeProvisioner } from '@/services/StarshipVolumeProvisioner';
 import { agentSlugFromFilename, parseAgent } from '@/services/definition/agentCodec';
 import { parseSchedule, scheduleModelToDefinition } from '@/services/definition/scheduleCodec';
-import type { AgentDefinition, ScheduleDefinition } from '@/services/definition/types';
+import { parseConnector, connectorModelToDefinition } from '@/services/definition/connectorCodec';
+import type { AgentDefinition, ScheduleDefinition, ConnectorDefinition } from '@/services/definition/types';
 import type { DefinitionEntityDir } from '@/services/StarshipVolumeProvisioner';
-import type { AgentModel } from '@starships/protocol';
+import type { AgentModel, ConnectorProvider } from '@starships/protocol';
 
 /**
  * Folds the filesystem-authoritative definition plane into the Postgres index.
@@ -64,17 +67,20 @@ export class StarshipDefinitionReconciler {
   private readonly provisioner: StarshipVolumeProvisioner;
   private readonly agentRepository: AgentRepository;
   private readonly scheduleRepository: ScheduleRepository;
+  private readonly connectorRepository: ConnectorRepository;
 
   constructor(opts?: {
     store?: StarshipDefinitionStore;
     agentRepository?: AgentRepository;
     scheduleRepository?: ScheduleRepository;
+    connectorRepository?: ConnectorRepository;
     home?: string;
   }) {
     this.store = opts?.store ?? new StarshipDefinitionStore(opts?.home);
     this.provisioner = new StarshipVolumeProvisioner(opts?.home);
     this.agentRepository = opts?.agentRepository ?? new AgentRepository();
     this.scheduleRepository = opts?.scheduleRepository ?? new ScheduleRepository();
+    this.connectorRepository = opts?.connectorRepository ?? new ConnectorRepository();
   }
 
   /** Stable hash of an authored object, for in-memory drift detection. */
@@ -180,6 +186,63 @@ export class StarshipDefinitionReconciler {
     return result;
   }
 
+  /** The authored hash for a connector definition (drift detection). */
+  private connectorHash(def: ConnectorDefinition): string {
+    return this.authoredHash({
+      provider: def.provider,
+      templateId: def.templateId ?? null,
+      version: def.version ?? null,
+      metadata: def.metadata ?? {},
+    });
+  }
+
+  /** Reconcile one connector file into the index. */
+  async reconcileConnectorFile(starshipId: string, filename: string): Promise<{ changed: boolean; id: string } | null> {
+    const raw = await this.store.read(starshipId, 'connectors', filename);
+    if (raw === null) return null;
+    const def = parseConnector(raw);
+
+    await ConnectorEntity.validate(
+      { provider: def.provider, metadata: def.metadata, templateId: def.templateId, version: def.version },
+      'update'
+    );
+
+    const existing = await this.connectorRepository.findByStarshipAndProvider(starshipId, def.provider as ConnectorProvider);
+    if (existing && this.connectorHash(connectorModelToDefinition(existing)) === this.connectorHash(def)) {
+      return { changed: false, id: existing.id };
+    }
+    // Keep the file id aligned with the existing row's id (provider is unique per starship).
+    const upserted = await this.connectorRepository.upsertIndexFromDefinition({
+      def: { ...def, id: existing?.id ?? def.id },
+      starshipId,
+    });
+    return { changed: true, id: upserted.id };
+  }
+
+  /** Reconcile every connector file for a starship; optionally prune orphans. */
+  async reconcileConnectors(starshipId: string, opts?: { pruneOrphans?: boolean }): Promise<EntityReconcileResult> {
+    const filenames = await this.store.list(starshipId, 'connectors', '.yaml');
+    const result = emptyEntityResult();
+    const fileIds = new Set<string>();
+    for (const filename of filenames) {
+      const outcome = await this.reconcileConnectorFile(starshipId, filename);
+      if (!outcome) continue;
+      fileIds.add(outcome.id);
+      if (outcome.changed) result.upserted += 1;
+      else result.unchanged += 1;
+    }
+    if (opts?.pruneOrphans) {
+      const indexed = await this.connectorRepository.findByStarship(starshipId);
+      for (const row of indexed) {
+        if (!fileIds.has(row.id)) {
+          await this.connectorRepository.delete(row.id);
+          result.pruned += 1;
+        }
+      }
+    }
+    return result;
+  }
+
   /** The authored hash for a schedule definition (drift detection). */
   private scheduleHash(def: ScheduleDefinition): string {
     return this.authoredHash({
@@ -273,6 +336,16 @@ export class StarshipDefinitionReconciler {
       }
     }
 
+    if (wants('connectors')) {
+      if (target?.entity === 'connectors' && target.filename) {
+        const outcome = await this.reconcileConnectorFile(starshipId, target.filename);
+        if (outcome?.changed) result.connectors.upserted += 1;
+        else if (outcome) result.connectors.unchanged += 1;
+      } else {
+        result.connectors = await this.reconcileConnectors(starshipId, { pruneOrphans: target?.pruneOrphans });
+      }
+    }
+
     if (wants('schedules')) {
       if (target?.entity === 'schedules' && target.filename) {
         const outcome = await this.reconcileScheduleFile(starshipId, target.filename);
@@ -283,7 +356,7 @@ export class StarshipDefinitionReconciler {
       }
     }
 
-    // NOTE: connectors/tables/rooms reconcile lands in their stages.
+    // NOTE: tables/rooms reconcile lands in their stages.
     return result;
   }
 }

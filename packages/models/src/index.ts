@@ -144,6 +144,14 @@ export {
   scheduleFilename,
   scheduleIdFromFilename,
 } from './services/definition/scheduleCodec';
+export {
+  serializeConnector,
+  serializeConnectorDefinition,
+  connectorModelToDefinition,
+  parseConnector,
+  connectorFilename,
+  connectorProviderFromFilename,
+} from './services/definition/connectorCodec';
 export type {
   AgentDefinition,
   AgentReasoningConfig,

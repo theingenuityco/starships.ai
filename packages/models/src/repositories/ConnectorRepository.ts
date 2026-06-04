@@ -1,11 +1,45 @@
 import { ConnectorEntity } from '@/entities/ConnectorEntity';
 import { fromDatabase, toDatabase, toEntityInstance } from '@/helpers/serialization-helper';
 import { BaseRepository } from '@/repositories/BaseRepository';
+import { getEnvConfig } from '@starships/env';
+import { StarshipDefinitionStore } from '@/services/StarshipDefinitionStore';
+import { connectorFilename, serializeConnector } from '@/services/definition/connectorCodec';
+import type { ConnectorDefinition } from '@/services/definition/types';
 import type { ConnectorModel, ConnectorProvider, ConnectorStatus } from '@starships/protocol';
 
 export class ConnectorRepository extends BaseRepository {
+  private _definitionStore?: StarshipDefinitionStore;
+
   constructor() {
     super('ConnectorRepository');
+  }
+
+  /**
+   * Connectors mirror to the definition file at the repository layer because
+   * connector rows are written from many flows (configure/start/OAuth/disconnect)
+   * with no single service seam. DB-first-mirror: the row is the canonical write,
+   * its authored fields (provider/metadata/templateId/version) are mirrored to
+   * `.starship/connectors/<provider>.yaml`. Secrets stay in connector_secrets;
+   * status/lastError are index-only. Gated by STARSHIP_FS_AUTHORITY.
+   */
+  private get definitionStore(): StarshipDefinitionStore {
+    if (!this._definitionStore) this._definitionStore = new StarshipDefinitionStore();
+    return this._definitionStore;
+  }
+
+  private fsAuthority(): boolean {
+    return getEnvConfig().STARSHIP_FS_AUTHORITY === true;
+  }
+
+  private async mirrorToFile(connector: ConnectorModel | null): Promise<void> {
+    if (!connector || !this.fsAuthority()) return;
+    await this.definitionStore.ensureProvisioned(connector.starshipId);
+    await this.definitionStore.write(connector.starshipId, 'connectors', connectorFilename(connector.provider), serializeConnector(connector));
+  }
+
+  private async removeFile(connector: ConnectorModel | null): Promise<void> {
+    if (!connector || !this.fsAuthority()) return;
+    await this.definitionStore.delete(connector.starshipId, 'connectors', connectorFilename(connector.provider));
   }
 
   async findById(id: string): Promise<ConnectorModel | null> {
@@ -118,7 +152,9 @@ export class ConnectorRepository extends BaseRepository {
         const databaseFormat = toDatabase(connectorEntity);
         const result = await this.createEntity<Record<string, unknown>>('connectors', databaseFormat);
 
-        return fromDatabase(ConnectorEntity, result);
+        const connector = fromDatabase(ConnectorEntity, result);
+        await this.mirrorToFile(connector);
+        return connector;
       },
       'create',
       'Connector'
@@ -176,7 +212,9 @@ export class ConnectorRepository extends BaseRepository {
         }
 
         const result = await this.updateEntity<Record<string, unknown>>('connectors', id, filteredUpdateData);
-        return result ? fromDatabase(ConnectorEntity, result) : null;
+        const connector = result ? fromDatabase(ConnectorEntity, result) : null;
+        await this.mirrorToFile(connector);
+        return connector;
       },
       'update',
       'Connector',
@@ -191,11 +229,64 @@ export class ConnectorRepository extends BaseRepository {
           throw new Error('ID is required for delete operation');
         }
 
-        return await this.deleteEntity('connectors', id);
+        // Capture the row before deletion so we can remove its definition file.
+        const existing = this.fsAuthority() ? await this.findById(id) : null;
+        const deleted = await this.deleteEntity('connectors', id);
+        if (deleted) await this.removeFile(existing);
+        return deleted;
       },
       'delete',
       'Connector',
       id
+    );
+  }
+
+  /**
+   * Upsert the connectors INDEX row from a filesystem-authoritative definition.
+   * Refreshes authored fields (provider, metadata, templateId, version);
+   * preserves runtime fields (status, lastError, createdAt) on conflict. This is
+   * the reconcile target (file -> index) and does NOT mirror back to a file.
+   */
+  async upsertIndexFromDefinition(input: { def: ConnectorDefinition; starshipId: string }): Promise<ConnectorModel> {
+    const { def, starshipId } = input;
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        const now = new Date().toISOString();
+
+        const authored: Record<string, unknown> = {
+          provider: def.provider,
+          metadata: JSON.stringify(def.metadata ?? {}),
+          template_id: def.templateId ?? null,
+          version: def.version ?? null,
+        };
+
+        const insertRow: Record<string, unknown> = {
+          id: def.id,
+          ...authored,
+          status: 'disconnected',
+          last_error: null,
+          starship_id: starshipId,
+          created_at: now,
+          updated_at: now,
+        };
+
+        const cols = Object.keys(insertRow);
+        const placeholders = cols.map((_, i) => `$${i + 1}`);
+        const conflict = [...Object.keys(authored), 'updated_at'].map((c) => `${c} = EXCLUDED.${c}`).join(', ');
+
+        const result = await connection.query<Record<string, unknown>>(
+          `INSERT INTO connectors (${cols.join(', ')})
+           VALUES (${placeholders.join(', ')})
+           ON CONFLICT (id) DO UPDATE SET ${conflict}
+           RETURNING *`,
+          Object.values(insertRow)
+        );
+        return fromDatabase(ConnectorEntity, result[0]);
+      },
+      'upsertIndexFromDefinition',
+      'Connector',
+      def.id
     );
   }
 

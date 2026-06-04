@@ -131,6 +131,7 @@ export class CliAgent {
 
     const toolCtx: ToolContext = {
       cwd: this.config.cwd,
+      ...(this.config.readRoots && this.config.readRoots.length > 0 ? { readRoots: this.config.readRoots } : {}),
       connectors: this.config.connectors,
       catalog: this.config.catalog,
       ...(this.config.signal ? { signal: this.config.signal } : {}),

@@ -34,6 +34,15 @@ function assertSafeFilename(filename: string): string {
 
 let tmpCounter = 0;
 
+/**
+ * Per-path write serialization (in-process). Atomic tmp+rename already prevents
+ * torn files; this additionally chains concurrent writes to the SAME path so
+ * they apply in call order (deterministic last-write-wins) rather than racing
+ * their tmp files. Cross-process/multi-host serialization (DB advisory locks)
+ * is a deferred follow-up — see project notes.
+ */
+const writeChains = new Map<string, Promise<unknown>>();
+
 export class StarshipDefinitionStore {
   private readonly home: string;
   private readonly provisioner: StarshipVolumeProvisioner;
@@ -67,6 +76,18 @@ export class StarshipDefinitionStore {
   /** Atomically write a definition file (creating the entity dir if needed). */
   async write(starshipId: string, entity: DefinitionEntityDir, filename: string, content: string): Promise<void> {
     const target = this.resolveFile(starshipId, entity, filename);
+    // Serialize concurrent writers to the same path (see writeChains).
+    const prev = writeChains.get(target) ?? Promise.resolve();
+    const next = prev.catch(() => undefined).then(() => this.doWrite(target, content));
+    writeChains.set(target, next);
+    try {
+      await next;
+    } finally {
+      if (writeChains.get(target) === next) writeChains.delete(target);
+    }
+  }
+
+  private async doWrite(target: string, content: string): Promise<void> {
     await fs.ensureDir(path.dirname(target));
     // Same-directory temp file so rename() is atomic on the same filesystem.
     const tmp = `${target}.tmp-${process.pid}-${tmpCounter++}`;

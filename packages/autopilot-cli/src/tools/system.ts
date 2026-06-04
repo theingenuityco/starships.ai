@@ -32,6 +32,26 @@ function resolveInside(cwd: string, p: string): string {
   return resolved;
 }
 
+function isUnder(root: string, resolved: string): boolean {
+  const base = path.resolve(root);
+  return resolved === base || resolved.startsWith(base + path.sep);
+}
+
+/**
+ * Resolve a path for READING. An absolute path that falls under one of
+ * `readRoots` (e.g. the `/starship` definition mount) is allowed as-is; anything
+ * else is resolved workspace-relative and confined to `cwd` (see resolveInside).
+ * This preserves the leading-"/" = workspace-root convention for paths that are
+ * not under a read root.
+ */
+function resolveForRead(cwd: string, readRoots: string[] | undefined, p: string): string {
+  if (path.isAbsolute(p) && readRoots && readRoots.length > 0) {
+    const resolved = path.resolve(p);
+    if (readRoots.some((root) => isUnder(root, resolved))) return resolved;
+  }
+  return resolveInside(cwd, p);
+}
+
 function ok(content: unknown): ToolResult {
   return { content };
 }
@@ -91,7 +111,7 @@ const read: AgentTool = {
   },
   async run(args, ctx) {
     try {
-      const filePath = resolveInside(ctx.cwd, String(args.path ?? ''));
+      const filePath = resolveForRead(ctx.cwd, ctx.readRoots, String(args.path ?? ''));
       const raw = await fs.readFile(filePath, 'utf-8');
       const offset = typeof args.offset === 'number' ? args.offset : undefined;
       const limit = typeof args.limit === 'number' ? args.limit : undefined;
@@ -176,7 +196,7 @@ const ls: AgentTool = {
   },
   async run(args, ctx) {
     try {
-      const dir = resolveInside(ctx.cwd, String(args.path ?? '.'));
+      const dir = resolveForRead(ctx.cwd, ctx.readRoots, String(args.path ?? '.'));
       const entries = await fs.readdir(dir, { withFileTypes: true });
       return ok({
         entries: entries.map((e) => ({ name: e.name, type: e.isDirectory() ? 'dir' : e.isFile() ? 'file' : 'other' })),

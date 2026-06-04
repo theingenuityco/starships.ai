@@ -12,6 +12,7 @@
  * via the connector-action callback (so credentials never enter the sandbox).
  */
 
+import { existsSync } from 'node:fs';
 import type { WorkspaceSpec, GitCredentials } from '@starships/protocol';
 import {
   runCliAgent,
@@ -24,6 +25,9 @@ import {
 import { LocalWorkspaceProvider } from '@/workspace/LocalWorkspaceProvider';
 
 export type { CliAgentJobSpec };
+
+/** Container path where the launcher bind-mounts the starship's `.starship/` volume. */
+const STARSHIP_MOUNT_DIR = '/starship';
 
 export interface RunCliAgentJobOptions {
   onEvent?: (event: CliAgentEvent) => void | Promise<void>;
@@ -55,6 +59,11 @@ export async function runCliAgentJob(spec: CliAgentJobSpec, opts: RunCliAgentJob
     ...(spec.runtimeEnv ? { runtimeEnv: spec.runtimeEnv } : {}),
   });
 
+  // When the launcher bind-mounts the starship's definition volume (Stage 4+),
+  // expose it as a read root so the agent's read/ls tools can read its own
+  // `.starship/` definitions, not just via bash.
+  const readRoots = existsSync(STARSHIP_MOUNT_DIR) ? [STARSHIP_MOUNT_DIR] : undefined;
+
   return runCliAgent({
     model: spec.model,
     modelClient: {
@@ -65,6 +74,7 @@ export async function runCliAgentJob(spec: CliAgentJobSpec, opts: RunCliAgentJob
     systemPrompt: spec.systemPrompt,
     messages: spec.messages,
     cwd,
+    ...(readRoots ? { readRoots } : {}),
     connectors,
     ...(spec.discoverConnectors ? { discoverConnectors: spec.discoverConnectors } : {}),
     ...(spec.permissions ? { permission: buildPermissionPolicy(spec.permissions) } : {}),

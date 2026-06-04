@@ -566,7 +566,6 @@ export function ConversationMessageContent({
   const resolvedContentClass = contentTextClass ?? 'text-sm leading-normal prose prose-sm font-sans'
   const { theme } = useTheme()
   const [copiedStates, setCopiedStates] = useState<Record<string, boolean>>({})
-  const [toolNameBySlug, setToolNameBySlug] = useState<Record<string, string>>({})
 
   const { isTurnHovered, mobileActionsOpen } = useTurnHover()
   const contentChunkRef = useRef<HTMLDivElement | null>(null)
@@ -681,42 +680,16 @@ export function ConversationMessageContent({
 
   // Resolve tool display names for tool slugs (function.name) so the UI can show human-friendly names.
   // Tool calls need to keep using the slug for execution, but the conversation header should show the tool's name.
-  useEffect(() => {
-    if (!starshipId) return
-    if (!Array.isArray(normalizedToolCalls) || normalizedToolCalls.length === 0) return
-
-    const slugs = Array.from(
-      new Set(
-        normalizedToolCalls
-          .map(tc => tc.function?.name)
-          .filter((n): n is string => typeof n === 'string' && n.trim().length > 0)
-          .map(s => s.trim())
-      )
-    )
-    if (slugs.length === 0) return
-
-    // Resolve display names from the local CLI map (no state update if unchanged)
-    const hydrated: Record<string, string> = {}
-    for (const slug of slugs) {
-      if (CLI_TOOL_DISPLAY_NAMES[slug]) {
-        hydrated[slug] = CLI_TOOL_DISPLAY_NAMES[slug]
-      }
+  // Tool calls are connector actions / built-in CLI tools; display names come from
+  // the local CLI map or fall back to the slug. No remote tool lookup, so this is a
+  // pure derivation from the (static) CLI map — no state/effect needed.
+  const toolNameBySlug = useMemo<Record<string, string>>(() => {
+    const out: Record<string, string> = {}
+    for (const tc of normalizedToolCalls) {
+      const slug = tc.function?.name?.trim() ?? ''
+      if (slug && CLI_TOOL_DISPLAY_NAMES[slug]) out[slug] = CLI_TOOL_DISPLAY_NAMES[slug]
     }
-    if (Object.keys(hydrated).length > 0) {
-      setToolNameBySlug(prev => {
-        let changed = false
-        for (const [slug, name] of Object.entries(hydrated)) {
-          if (prev[slug] !== name) {
-            changed = true
-            break
-          }
-        }
-        return changed ? { ...prev, ...hydrated } : prev
-      })
-    }
-
-    // Tool calls are connector actions / built-in CLI tools; display names come from
-    // the local CLI map (above) or fall back to the slug. No remote tool lookup.
+    return out
   }, [normalizedToolCalls])
 
   const [showCompletionTick, setShowCompletionTick] = useState(false)

@@ -5,8 +5,8 @@
  * Builds upon ToolParams from @starships/autopilot for tool definitions.
  */
 
-// Import autopilot types
-import type { ToolParams } from '@starships/autopilot';
+import type { ToolParams } from './llm';
+import type { Blueprint, TransformOperation } from './workflow';
 
 // ============================================================================
 // TOOL TYPES (Deployed Instances)
@@ -21,7 +21,7 @@ export type ToolStatus = 'draft' | 'active';
  * Database Tool interface - user's configured tool instances
  * For draft tools, parameters and blueprint are optional and can be completed later
  */
-export interface ToolModel extends Omit<ToolParams, 'parameters' | 'blueprint'> {
+export interface ToolModel extends Omit<ToolParams, 'parameters'> {
   // Core database fields
   id: string;
   createdAt: string;
@@ -32,7 +32,12 @@ export interface ToolModel extends Omit<ToolParams, 'parameters' | 'blueprint'> 
 
   // ToolParams fields (made optional for draft support)
   parameters?: ToolParams['parameters'];
-  blueprint?: ToolParams['blueprint'];
+
+  // Inert legacy workflow fields (DAG engine removed; columns dropped separately).
+  blueprint?: Blueprint;
+  transforms?: TransformOperation[];
+  mutations?: TransformOperation[];
+  condition?: string;
 
   // User configuration
   configuration?: Record<string, unknown>; // API keys, custom parameters, etc.
@@ -54,9 +59,13 @@ export interface ToolModel extends Omit<ToolParams, 'parameters' | 'blueprint'> 
  * Request to create a new tool instance
  * For draft tools (status='draft'), only name and slug are required
  */
-export interface CreateToolRequest extends Omit<ToolParams, 'slug' | 'parameters' | 'blueprint'> {
+export interface CreateToolRequest extends Omit<ToolParams, 'slug' | 'parameters'> {
   parameters?: ToolParams['parameters']; // Optional for draft tools
-  blueprint?: ToolParams['blueprint']; // Optional for draft tools
+  // Inert legacy workflow fields (DAG engine removed; columns dropped separately).
+  blueprint?: Blueprint;
+  transforms?: TransformOperation[];
+  mutations?: TransformOperation[];
+  condition?: string;
   configuration?: Record<string, unknown>;
   isEnabled?: boolean;
   status?: ToolStatus; // Tool status: 'draft' or 'active'

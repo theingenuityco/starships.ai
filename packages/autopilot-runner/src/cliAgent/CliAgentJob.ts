@@ -12,7 +12,7 @@
  * via the connector-action callback (so credentials never enter the sandbox).
  */
 
-import type { WorkspaceSpec, GitCredentials } from '@starships/autopilot';
+import type { WorkspaceSpec, GitCredentials } from '@starships/protocol';
 import {
   runCliAgent,
   httpConnectorActionRunner,

@@ -11,8 +11,6 @@ import { ViewStreamBus } from '@/services/ViewStreamBus';
 import { buildAutopilotExecutionBundle } from '@/services/autopilot-execution-bundle';
 import { connectorActionExecutor } from '@/services/ConnectorActionExecutor';
 import { getEnvConfig } from '@starships/env';
-import type { Node } from '@starships/autopilot';
-import { ExecutionItemUtils, RunnerFactory, type Blueprint, type EngineConfig } from '@starships/autopilot';
 import { ToolRepository, ViewWidgetRepository } from '@starships/models';
 import { applyPatch } from 'fast-json-patch';
 import type { ViewPatchOp, ViewRuntimeConfig } from '@starships/protocol';
@@ -192,23 +190,16 @@ function templateDeep(input: unknown, state: Record<string, unknown>): unknown {
   return input;
 }
 
-async function executeToolBlueprint(args: {
-  blueprint: Blueprint;
+// Workflow-tool / view-action execution removed with the DAG engine. Retained as a
+// throwing stub so the view-action route compiles; these actions are no longer supported.
+async function executeToolBlueprint(_args: {
+  blueprint: unknown;
   toolConfig: Record<string, unknown>;
   toolArgs: Record<string, unknown>;
   runnerConfig: Record<string, unknown>;
-  eventCallback?: EngineConfig['eventCallback'];
+  eventCallback?: (evt: unknown) => void | Promise<void>;
 }): Promise<unknown> {
-  const execution = ExecutionItemUtils.createExecution();
-  const initial = ExecutionItemUtils.wrapSingle({ ...args.toolArgs, config: args.toolConfig });
-  execution.results.push({ nodeRef: '__initial__', items: initial });
-  const runner = RunnerFactory.getTopLevelRunner(execution.depth ?? 0);
-  const items = await runner.run(args.blueprint, execution, {
-    failOnNodeError: true,
-    eventCallback: args.eventCallback,
-    ...(args.runnerConfig as unknown as EngineConfig),
-  });
-  return ExecutionItemUtils.unwrapSingle(items);
+  throw new Error('Workflow tool / view-action execution has been removed.');
 }
 
 /**
@@ -756,7 +747,7 @@ router.post('/views/:id/actions', jwtAuthMiddleware, async (req: Request, res: R
       });
 
       // Stream autopilot ui_action events into the view stream.
-      const eventCallback: EngineConfig['eventCallback'] = async (evt: unknown) => {
+      const eventCallback = async (evt: unknown): Promise<void> => {
         try {
           if (!evt || typeof evt !== 'object') return;
           if (!('type' in evt) || !('data' in evt)) return;
@@ -807,7 +798,7 @@ router.post('/views/:id/actions', jwtAuthMiddleware, async (req: Request, res: R
       await bus.publish(viewId, { type: 'toast', data: { viewId, at, level: 'info', message: `Running workflow: ${workflowSlug}` } });
 
       const result = await executeToolBlueprint({
-        blueprint: tool.blueprint as Blueprint,
+        blueprint: tool.blueprint,
         toolConfig: (tool.configuration || {}) as Record<string, unknown>,
         toolArgs: (body.args || {}) as Record<string, unknown>,
         runnerConfig: engineConfig,

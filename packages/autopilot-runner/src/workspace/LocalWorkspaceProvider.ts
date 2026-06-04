@@ -19,14 +19,22 @@ import { promisify } from 'node:util';
 import { mkdtemp, rm, writeFile, chmod } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
-import type { WorkspaceSpec, ProvisionedWorkspace, WorkspaceProvider, GitCredentials } from '@starships/autopilot';
+import type { WorkspaceSpec, GitCredentials } from '@starships/protocol';
 
 const execFileAsync = promisify(execFile);
 
 const DEFAULT_COMMIT_NAME = 'Starships Bot';
 const DEFAULT_COMMIT_EMAIL = 'bot@starships.ai';
 
-export class LocalWorkspaceProvider implements WorkspaceProvider {
+/** A provisioned workspace ready for execution. */
+interface ProvisionedWorkspace {
+  /** Absolute checkout path. */
+  root: string;
+  /** Remove the workspace and scrub transient credentials. */
+  cleanup(): Promise<void>;
+}
+
+export class LocalWorkspaceProvider {
   /**
    * @param targetRoot Absolute path the checkout should be created at. When
    *        provided (persistent per-conversation workspace) the parent dir is

@@ -5,8 +5,7 @@
  * Follows the layered architecture pattern established by ConversationEntity and MessageEntity.
  */
 
-import { AgentState } from '@starships/autopilot';
-import type { Blueprint } from '@starships/autopilot';
+import type { AgentState, Blueprint } from '@starships/protocol';
 import type { AgentModel } from '@starships/protocol';
 import { Expose } from 'class-transformer';
 import {

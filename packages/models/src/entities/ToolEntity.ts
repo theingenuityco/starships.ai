@@ -6,7 +6,7 @@
  */
 
 import type { ToolModel } from '@starships/protocol';
-import type { ToolParameterSchema, TransformOperation, Blueprint } from '@starships/autopilot';
+import type { ToolParameterSchema, TransformOperation, Blueprint } from '@starships/protocol';
 import { Expose } from 'class-transformer';
 import { IsISO8601, IsObject, IsOptional, IsString, Length, validate, ValidationError as ClassValidatorValidationError, IsBoolean, IsArray } from 'class-validator';
 import { TOOL_DESCRIPTION_MAX_LENGTH } from '@/constants/toolValidation';

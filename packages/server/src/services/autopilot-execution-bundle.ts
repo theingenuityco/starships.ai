@@ -1,5 +1,4 @@
 import { getEnvConfig } from '@starships/env';
-import type { EngineConfig } from '@starships/autopilot';
 
 export function buildAutopilotRuntimeEnv(args: {
   starshipId: string;
@@ -27,12 +26,14 @@ export function buildAutopilotRuntimeEnv(args: {
   };
 }
 
-export interface AutopilotRunnerExecuteConfig extends EngineConfig {
+export interface AutopilotRunnerExecuteConfig {
   /**
    * Make this structurally compatible with places that expect a generic JSON map.
    * (Many call sites treat runnerConfig/engineConfigFromHost as Record<string, unknown>.)
    */
   [key: string]: unknown;
+  /** Per-execution runtime context (STARSHIP_ID, CONVERSATION_ID, ...). */
+  runtimeEnv?: Record<string, unknown>;
   /**
    * Server callback for connector action execution (server-authority mode). The runner
    * delegates every connector action to the host via this endpoint; connector templates,

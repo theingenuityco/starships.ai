@@ -1,4 +1,4 @@
-import type { Blueprint } from '@starships/autopilot';
+import type { Blueprint } from '@starships/protocol';
 
 /**
  * Extract unique connector provider identifiers from a blueprint.

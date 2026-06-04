@@ -4,7 +4,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { useQueryClient } from '@tanstack/react-query'
 import type { MessageModel } from '@starships/protocol'
-import type { LlmToolCall } from '@starships/autopilot'
+import type { LlmToolCall } from '@starships/protocol'
 
 import { AgentBuilderView, AgentBuilderViewRef } from '@/components/agents/AgentBuilder'
 import AgentAvatar from '@/components/animated/AgentAvatar'

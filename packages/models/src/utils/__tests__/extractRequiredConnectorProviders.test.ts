@@ -1,5 +1,5 @@
 import { extractRequiredConnectorProviders } from '../extractRequiredConnectorProviders';
-import type { Blueprint } from '@starships/autopilot';
+import type { Blueprint } from '@starships/protocol';
 
 describe('extractRequiredConnectorProviders', () => {
   it('returns empty array for null blueprint', () => {

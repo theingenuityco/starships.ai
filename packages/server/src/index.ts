@@ -6,8 +6,6 @@
 // IMPORTANT: Import Sentry instrumentation first, before any other imports
 import './instrument';
 import * as Sentry from '@sentry/node';
-
-import { autopilot } from '@starships/autopilot';
 import { getEnvConfig } from '@starships/env';
 import {
   createConnection,
@@ -42,7 +40,6 @@ import scheduleRoutes from '@/routes/schedules';
 import taskBoardRoutes from '@/routes/task-boards';
 import tableRoutes from '@/routes/tables';
 import starshipDocsRoutes from '@/routes/starship-docs';
-import autopilotAwaitsRoutes from '@/routes/autopilot-awaits';
 import platformSecretRoutes from '@/routes/platform-secrets';
 import connectorTemplateRoutes from '@/routes/connector-templates';
 import starshipInvitesRoutes from '@/routes/starship-invites';
@@ -143,7 +140,6 @@ app.use('/api/v1', scheduleRoutes);
 app.use('/api/v1', taskBoardRoutes);
 app.use('/api/v1', tableRoutes);
 app.use('/api/v1', starshipDocsRoutes);
-app.use('/api/v1', autopilotAwaitsRoutes);
 app.use('/api/v1', platformSecretRoutes);
 app.use('/api/v1', connectorTemplateRoutes);
 app.use('/api/v1', starshipInvitesRoutes);
@@ -185,12 +181,6 @@ const httpServer = createServer(app);
 httpServer.listen(PORT, async () => {
   try {
     console.log('🚀 Starting Aether Core Server...');
-
-    // Configure remote runner (URL and optional token)
-    autopilot.setRunnerConfig({
-      url: config.RUNNER_URL,
-      token: config.RUNNER_AUTH_TOKEN,
-    });
 
     // Initialize database connection FIRST
     await dbConnection.connect();

@@ -5,7 +5,7 @@ import Icon from '@/components/primitives/Icon'
 import React, { forwardRef, useImperativeHandle, useMemo } from 'react'
 import dynamic from 'next/dynamic'
 
-import type { Blueprint } from '@starships/autopilot'
+import type { Blueprint } from '@starships/protocol'
 import type { ToolBuilderViewProps, ToolBuilderViewRef } from './types'
 import { useToolForm } from './hooks/useToolForm'
 import { ToolInfoPanel } from './components/ToolInfoPanel'

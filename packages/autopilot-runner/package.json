@@ -2,7 +2,7 @@
   "name": "@starships/autopilot-runner",
   "version": "0.0.1",
   "private": true,
-  "description": "Low-latency gRPC runner service for executing Autopilot blueprints with a local worker pool",
+  "description": "Sandbox entrypoint host for the code-native CLI agent (@starships/autopilot-cli)",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {
@@ -15,28 +15,19 @@
   },
   "scripts": {
     "build": "rm -f tsconfig.tsbuildinfo && tsc -p tsconfig.json && tsc-alias -p tsconfig.json",
-    "dev": "NODE_OPTIONS=--no-node-snapshot tsx watch src/index.ts",
-    "start": "NODE_OPTIONS=--no-node-snapshot node dist/index.js",
+    "dev": "NODE_OPTIONS=--no-node-snapshot tsx watch src/cliAgent/cliJobAgent.ts",
+    "start": "NODE_OPTIONS=--no-node-snapshot node dist/cliAgent/cliJobAgent.js",
     "type-check": "tsc --noEmit",
     "lint": "eslint src --ext .ts",
-    "test": "jest",
-    "gen": "buf generate"
+    "test": "jest"
   },
   "dependencies": {
-    "@aws-sdk/client-bedrock-runtime": "^3.971.0",
-    "@bufbuild/protobuf": "^2.2.2",
-    "@connectrpc/connect": "^2.0.0",
-    "@connectrpc/connect-node": "^2.0.0",
-    "@starships/autopilot": "workspace:*",
     "@starships/autopilot-cli": "workspace:*",
-    "@starships/protocol": "workspace:*",
-    "openai": "^6.10.0",
-    "pg": "^8.16.3"
+    "@starships/protocol": "workspace:*"
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",
     "@types/node": "^22.10.6",
-    "@types/pg": "^8.15.6",
     "jest": "^30.2.0",
     "ts-jest": "^29.4.6",
     "tsc-alias": "^1.8.16",

@@ -19,14 +19,12 @@ import {
   RoomTablesRepository,
   RoomDocsRepository,
   RoomTaskBoardsRepository,
-  RoomToolsRepository,
   RoomViewsRepository,
   RoomRepository,
   StarshipTableRepository,
   StarshipDocRepository,
   StarshipMemberRepository,
   TaskBoardRepository,
-  ToolRepository,
   ViewRepository,
   getConnection,
 } from '@starships/models';
@@ -42,22 +40,6 @@ const router: Router = Router();
 
 const RoomNotificationLevelSchema = z.enum(['all', 'mentions', 'mute']);
 const InviteApprovalIdSchema = z.union([IdSchema, z.string().uuid()]);
-const RoomToolPermissionSchema = z
-  .preprocess((value) => {
-    if (value == null) return undefined;
-    if (typeof value === 'boolean') return value ? 'allow' : 'deny';
-    if (typeof value !== 'string') return value;
-    const raw = value.trim().toLowerCase();
-    if (!raw) return undefined;
-    // Be forgiving for common synonyms coming from UI/LLM/tooling.
-    if (raw === 'ask-first' || raw === 'ask_first' || raw === 'askfirst' || raw === 'prompt' || raw === 'confirm') return 'ask';
-    if (raw === 'enabled' || raw === 'enable' || raw === 'on' || raw === 'true') return 'allow';
-    if (raw === 'disabled' || raw === 'disable' || raw === 'off' || raw === 'false') return 'deny';
-    return raw;
-  }, z.enum(['allow', 'ask', 'deny']))
-  .optional()
-  .default('allow');
-
 function safeFilenameSegment(input: string): string {
   const raw = String(input || '').trim();
   const sanitized = raw.replace(/[^\w.-]+/g, '_').replace(/^_+|_+$/g, '');
@@ -1245,7 +1227,6 @@ router.get('/rooms/:roomId/export-bundle', jwtAuthMiddleware, async (req: Reques
     const viewEntries = appendContainers(bundle.views, 'views', 'view', 'view');
     const tableEntries = appendContainers(bundle.tables, 'tables', 'table', 'table');
     const taskBoardEntries = appendContainers(bundle.taskBoards, 'task-boards', 'task-board', 'task_board');
-    const toolEntries = appendContainers(bundle.tools, 'tools', 'tool', 'tool');
 
     const manifest = {
       schemaVersion: '1',
@@ -1257,7 +1238,6 @@ router.get('/rooms/:roomId/export-bundle', jwtAuthMiddleware, async (req: Reques
         views: viewEntries,
         tables: tableEntries,
         taskBoards: taskBoardEntries,
-        tools: toolEntries,
       },
     };
 
@@ -1752,7 +1732,7 @@ router.get('/rooms/:roomId/resources', jwtAuthMiddleware, async (req: Request, r
     const requestedKindsList =
       rawKinds == null ? null : Array.isArray(rawKinds) ? rawKinds.flatMap((v) => String(v).split(',')) : String(rawKinds).split(',');
 
-    const normalizeKind = (input: string): 'views' | 'tables' | 'taskBoards' | 'tools' | null | 'INVALID' => {
+    const normalizeKind = (input: string): 'views' | 'tables' | 'taskBoards' | null | 'INVALID' => {
       const k = String(input || '')
         .trim()
         .toLowerCase();
@@ -1761,14 +1741,13 @@ router.get('/rooms/:roomId/resources', jwtAuthMiddleware, async (req: Request, r
       if (k === 'views' || k === 'view') return 'views';
       if (k === 'tables' || k === 'table') return 'tables';
       if (k === 'taskboards' || k === 'task-boards' || k === 'boards' || k === 'board' || k === 'tasks') return 'taskBoards';
-      if (k === 'tools' || k === 'tool') return 'tools';
       return 'INVALID';
     };
 
-    const allKinds: Array<'views' | 'tables' | 'taskBoards' | 'tools'> = ['views', 'tables', 'taskBoards', 'tools'];
-    const kindSet = new Set<'views' | 'tables' | 'taskBoards' | 'tools'>(allKinds);
+    const allKinds: Array<'views' | 'tables' | 'taskBoards'> = ['views', 'tables', 'taskBoards'];
+    const kindSet = new Set<'views' | 'tables' | 'taskBoards'>(allKinds);
     if (requestedKindsList && requestedKindsList.length > 0) {
-      const next = new Set<'views' | 'tables' | 'taskBoards' | 'tools'>();
+      const next = new Set<'views' | 'tables' | 'taskBoards'>();
       for (const kRaw of requestedKindsList) {
         const nk = normalizeKind(kRaw);
         if (nk === null) {
@@ -1795,13 +1774,11 @@ router.get('/rooms/:roomId/resources', jwtAuthMiddleware, async (req: Request, r
     const viewsRepo = new RoomViewsRepository();
     const tablesRepo = new RoomTablesRepository();
     const boardsRepo = new RoomTaskBoardsRepository();
-    const toolsRepo = new RoomToolsRepository();
 
-    const [viewPins, tablePins, boardPins, toolPins] = await Promise.all([
+    const [viewPins, tablePins, boardPins] = await Promise.all([
       kindSet.has('views') ? viewsRepo.list(access.room.conversationId) : Promise.resolve([]),
       kindSet.has('tables') ? tablesRepo.list(access.room.conversationId) : Promise.resolve([]),
       kindSet.has('taskBoards') ? boardsRepo.list(access.room.conversationId) : Promise.resolve([]),
-      kindSet.has('tools') ? toolsRepo.list(access.room.conversationId) : Promise.resolve([]),
     ]);
 
     const conn = getConnection();
@@ -1873,9 +1850,8 @@ router.get('/rooms/:roomId/resources', jwtAuthMiddleware, async (req: Request, r
     const viewIds = viewPins.map((p) => String(p.viewId)).filter(Boolean);
     const tableIds = tablePins.map((p) => String(p.tableId)).filter(Boolean);
     const boardIds = boardPins.map((p) => String(p.boardId)).filter(Boolean);
-    const toolIds = toolPins.map((p) => String(p.toolId)).filter(Boolean);
 
-    const [viewsRows, tableRows, boardRows, toolRows] = await Promise.all([
+    const [viewsRows, tableRows, boardRows] = await Promise.all([
       viewIds.length
         ? conn.query<{
             id: string;
@@ -1956,37 +1932,11 @@ router.get('/rooms/:roomId/resources', jwtAuthMiddleware, async (req: Request, r
             hasQ ? [boardIds, access.conversationStarshipId, qLike] : [boardIds, access.conversationStarshipId]
           )
         : Promise.resolve([]),
-      toolIds.length
-        ? conn.query<{
-            id: string;
-            name: string;
-            slug: string;
-            description: string;
-            created_at: string;
-            updated_at: string;
-          }>(
-            `SELECT id, name, slug, description, created_at, updated_at
-               FROM tools
-              WHERE id = ANY($1::text[])
-                AND starship_id = $2
-                ${
-                  hasQ
-                    ? `AND (
-                         name ILIKE $3 ESCAPE '\\'
-                      OR slug ILIKE $3 ESCAPE '\\'
-                      OR COALESCE(description, '') ILIKE $3 ESCAPE '\\'
-                    )`
-                    : ''
-                }`,
-            hasQ ? [toolIds, access.conversationStarshipId, qLike] : [toolIds, access.conversationStarshipId]
-          )
-        : Promise.resolve([]),
     ]);
 
     const viewsById = new Map(viewsRows.map((r) => [String(r.id), r]));
     const tablesById = new Map(tableRows.map((r) => [String(r.id), r]));
     const boardsById = new Map(boardRows.map((r) => [String(r.id), r]));
-    const toolsById = new Map(toolRows.map((r) => [String(r.id), r]));
 
     let views = viewPins
       .map((pin) => {
@@ -2045,39 +1995,19 @@ router.get('/rooms/:roomId/resources', jwtAuthMiddleware, async (req: Request, r
       })
       .filter(Boolean);
 
-    let tools = toolPins
-      .map((pin) => {
-        const r = toolsById.get(String(pin.toolId));
-        if (!r) return null;
-        return {
-          assignment: pin,
-          tool: {
-            id: String(r.id),
-            name: String(r.name),
-            slug: String(r.slug),
-            description: String(r.description ?? ''),
-            createdAt: String(r.created_at),
-            updatedAt: String(r.updated_at),
-          },
-        };
-      })
-      .filter(Boolean);
-
     if (limitPerKind != null) {
       if (limitPerKind === 0) {
         views = [];
         tables = [];
         taskBoards = [];
-        tools = [];
       } else {
         views = views.slice(0, limitPerKind);
         tables = tables.slice(0, limitPerKind);
         taskBoards = taskBoards.slice(0, limitPerKind);
-        tools = tools.slice(0, limitPerKind);
       }
     }
 
-    sendSuccess(res, { views, tables, taskBoards, tools, participants }, 200);
+    sendSuccess(res, { views, tables, taskBoards, participants }, 200);
   } catch (error) {
     handleError(error, res, 'listing room resources');
   }
@@ -2257,143 +2187,6 @@ router.get('/rooms/:roomId/pins/task-boards', jwtAuthMiddleware, async (req: Req
     sendSuccess(res, { items }, 200);
   } catch (error) {
     handleError(error, res, 'listing pinned task boards');
-  }
-});
-
-router.get('/rooms/:roomId/tools', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
-  try {
-    const params = validateData(z.object({ roomId: IdSchema }), req.params, res, 'room parameter');
-    if (!params) return;
-
-    const access = await requireRoomReadAccess({ roomId: params.roomId, req, res });
-    if (!access) return;
-
-    const toolsRepo = new RoomToolsRepository();
-    const assignments = await toolsRepo.list(access.room.conversationId);
-    const ids = assignments.map((p) => String(p.toolId)).filter(Boolean);
-
-    if (ids.length === 0) {
-      sendSuccess(res, { items: [] }, 200);
-      return;
-    }
-
-    const conn = getConnection();
-    const rows = await conn.query<{
-      id: string;
-      name: string;
-      slug: string;
-      description: string;
-      created_at: string;
-      updated_at: string;
-    }>(
-      `SELECT id, name, slug, description, created_at, updated_at
-         FROM tools
-        WHERE id = ANY($1::text[])
-          AND starship_id = $2`,
-      [ids, access.conversationStarshipId]
-    );
-    const byId = new Map(rows.map((r) => [String(r.id), r]));
-    const items = assignments
-      .map((assignment) => {
-        const r = byId.get(String(assignment.toolId));
-        if (!r) return null;
-        return {
-          assignment,
-          tool: {
-            id: String(r.id),
-            name: String(r.name),
-            slug: String(r.slug),
-            description: String(r.description ?? ''),
-            createdAt: String(r.created_at),
-            updatedAt: String(r.updated_at),
-          },
-        };
-      })
-      .filter(Boolean);
-
-    sendSuccess(res, { items }, 200);
-  } catch (error) {
-    handleError(error, res, 'listing room tools');
-  }
-});
-
-router.post('/rooms/:roomId/tools', jwtAuthMiddleware, rateLimiters.apiAuthenticated, async (req: Request, res: Response): Promise<void> => {
-  try {
-    const params = validateData(z.object({ roomId: IdSchema }), req.params, res, 'room parameter');
-    if (!params) return;
-    const authUserId = req.user?.id as string | undefined;
-    if (!authUserId) {
-      sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
-      return;
-    }
-    const body = validateData(
-      z.object({
-        toolId: IdSchema,
-        permission: RoomToolPermissionSchema,
-      }),
-      req.body,
-      res,
-      'assign tool'
-    );
-    if (!body) return;
-
-    const roomRepo = new RoomRepository();
-    const room = await roomRepo.findByConversationId(params.roomId);
-    if (!room) {
-      sendError(res, 'RESOURCE_NOT_FOUND', 'Room not found', 404, { roomId: params.roomId });
-      return;
-    }
-    if (!(await verifyStarshipOwnerAccess(room.starshipId, authUserId, res))) return;
-
-    const toolRepo = new ToolRepository();
-    const tool = await toolRepo.findById(body.toolId);
-    if (!tool) {
-      sendError(res, 'VALIDATION_ERROR', 'Tool not found', 400, { toolId: body.toolId });
-      return;
-    }
-    if (String(tool.starshipId) !== String(room.starshipId)) {
-      sendError(res, 'VALIDATION_ERROR', 'Assigned tool must belong to the same starship as the room', 400, {
-        toolId: body.toolId,
-        roomStarshipId: room.starshipId,
-        toolStarshipId: tool.starshipId,
-      });
-      return;
-    }
-
-    const roomToolsRepo = new RoomToolsRepository();
-    const assignment = await roomToolsRepo.upsert({
-      roomConversationId: room.conversationId,
-      toolId: body.toolId,
-      permission: body.permission,
-    });
-    sendSuccess(res, { assignment }, 200);
-  } catch (error) {
-    handleError(error, res, 'assigning tool');
-  }
-});
-
-router.delete('/rooms/:roomId/tools/:toolId', jwtAuthMiddleware, rateLimiters.apiAuthenticated, async (req: Request, res: Response): Promise<void> => {
-  try {
-    const params = validateData(z.object({ roomId: IdSchema, toolId: IdSchema }), req.params, res, 'tool assignment parameter');
-    if (!params) return;
-    const authUserId = req.user?.id as string | undefined;
-    if (!authUserId) {
-      sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
-      return;
-    }
-    const roomRepo = new RoomRepository();
-    const room = await roomRepo.findByConversationId(params.roomId);
-    if (!room) {
-      sendError(res, 'RESOURCE_NOT_FOUND', 'Room not found', 404, { roomId: params.roomId });
-      return;
-    }
-    if (!(await verifyStarshipOwnerAccess(room.starshipId, authUserId, res))) return;
-
-    const roomToolsRepo = new RoomToolsRepository();
-    const removed = await roomToolsRepo.remove(room.conversationId, params.toolId);
-    sendSuccess(res, { removed }, 200);
-  } catch (error) {
-    handleError(error, res, 'unassigning tool');
   }
 });
 

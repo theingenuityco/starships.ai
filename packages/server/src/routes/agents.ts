@@ -131,19 +131,6 @@ const StarshipAssignmentSchema = z.object({
   starshipId: z.string().min(1, 'Starship ID is required'),
 });
 
-const ToolAssignmentSchema = z.object({
-  toolSlugs: z.array(z.string().min(1)).min(1, 'At least one tool slug is required'),
-});
-
-const ToolPermissionSchema = z.object({
-  toolSlug: z.string().min(1, 'Tool slug is required'),
-  permission: z.enum(['allow', 'ask', 'deny']),
-});
-
-const ToolPermissionsUpdateSchema = z.object({
-  permissions: z.array(ToolPermissionSchema).min(1, 'At least one tool permission update is required'),
-});
-
 // PUT /agents/:id/starship - Update agent starship assignment (OpenAPI pattern)
 router.put('/agents/:id/starship', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
@@ -228,25 +215,7 @@ router.get('/starships/:starshipId/agents', jwtAuthMiddleware, async (req: Reque
   }
 });
 
-// GET /starships/:starshipId/agent-tool-permissions - Get agent↔tool permission rows for a starship
-router.get('/starships/:starshipId/agent-tool-permissions', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
-  try {
-    const paramValidation = validateData(z.object({ starshipId: IdSchema }), req.params, res, 'starship parameter');
-    if (!paramValidation) return;
-
-    const ok = await verifyStarshipAccess(paramValidation.starshipId, req.user!.id, res);
-    if (!ok) return;
-
-    const agentService = new AgentService();
-    const rows = await agentService.getStarshipAgentToolPermissions(paramValidation.starshipId, req.user!.id);
-    sendSuccess(res, rows);
-  } catch (error) {
-    console.error('[AGENTS] Error fetching starship agent tool permissions:', error);
-    sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to fetch tool permissions');
-  }
-});
-
-// GET /starships/:starshipId/agents/:slug - Get agent by slug within a starship (for tools)
+// GET /starships/:starshipId/agents/:slug - Get agent by slug within a starship
 router.get('/starships/:starshipId/agents/:slug', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     // Validate parameters
@@ -348,36 +317,12 @@ router.get('/agents/:id/export-bundle', jwtAuthMiddleware, requireInstanceAdminM
       archive.append(JSON.stringify(a, null, 2), { name: file });
     }
 
-    const usedToolNames = new Set<string>();
-    const toolEntries: Array<{ kind: 'tool'; fromSlug?: unknown; fromStarshipSlug?: unknown; file: string }> = [];
-    for (let i = 0; i < bundle.tools.length; i += 1) {
-      const t = bundle.tools[i];
-      const slug = typeof t.metadata?.fromSlug === 'string' ? t.metadata.fromSlug : `tool-${i + 1}`;
-      const base = safeFilenameSegment(slug);
-      let outName = base;
-      let n = 2;
-      while (usedToolNames.has(outName)) {
-        outName = `${base}-${n}`;
-        n += 1;
-      }
-      usedToolNames.add(outName);
-      const file = `tools/${outName}.json`;
-      toolEntries.push({
-        kind: 'tool',
-        fromSlug: t.metadata?.fromSlug,
-        fromStarshipSlug: t.metadata?.fromStarshipSlug,
-        file,
-      });
-      archive.append(JSON.stringify(t, null, 2), { name: file });
-    }
-
     const manifest = {
       schemaVersion: '1',
       kind: 'bundle',
       exportedAt: new Date().toISOString(),
       entities: {
         agents: agentEntries,
-        tools: toolEntries,
       },
     };
 
@@ -452,36 +397,12 @@ router.post('/agents/export-bundle', jwtAuthMiddleware, requireInstanceAdminMidd
       archive.append(JSON.stringify(a, null, 2), { name: file });
     }
 
-    const usedToolNames = new Set<string>();
-    const toolEntries: Array<{ kind: 'tool'; fromSlug?: unknown; fromStarshipSlug?: unknown; file: string }> = [];
-    for (let i = 0; i < bundle.tools.length; i += 1) {
-      const t = bundle.tools[i];
-      const slug = typeof t.metadata?.fromSlug === 'string' ? t.metadata.fromSlug : `tool-${i + 1}`;
-      const base = safeFilenameSegment(slug);
-      let outName = base;
-      let n = 2;
-      while (usedToolNames.has(outName)) {
-        outName = `${base}-${n}`;
-        n += 1;
-      }
-      usedToolNames.add(outName);
-      const file = `tools/${outName}.json`;
-      toolEntries.push({
-        kind: 'tool',
-        fromSlug: t.metadata?.fromSlug,
-        fromStarshipSlug: t.metadata?.fromStarshipSlug,
-        file,
-      });
-      archive.append(JSON.stringify(t, null, 2), { name: file });
-    }
-
     const manifest = {
       schemaVersion: '1',
       kind: 'bundle',
       exportedAt: new Date().toISOString(),
       entities: {
         agents: agentEntries,
-        tools: toolEntries,
       },
     };
 
@@ -1063,13 +984,9 @@ router.post('/agents/:id/profile-images/generate', jwtAuthMiddleware, async (req
       return;
     }
 
-    // Fetch tools to build core capabilities
-    const tools = await agentService.getAgentTools(agentId, agent.starshipId);
+    // Build core capabilities from role + description.
     let coreCapabilities: string;
-    if (tools.length > 0) {
-      coreCapabilities = tools.map((t) => t.name || t.slug).join(', ');
-    } else {
-      // Fallback: use role + description
+    {
       const parts: string[] = [];
       if (agent.role) parts.push(agent.role);
       if (agent.description) {
@@ -1267,9 +1184,6 @@ router.delete('/agents/:id', jwtAuthMiddleware, async (req: Request, res: Respon
     const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'agent parameter');
     if (!paramValidation) return;
 
-    const deleteToolsIfUnusedRaw = typeof req.query?.deleteToolsIfUnused === 'string' ? String(req.query.deleteToolsIfUnused) : '';
-    const deleteToolsIfUnused = deleteToolsIfUnusedRaw === 'true' || deleteToolsIfUnusedRaw === '1';
-
     // Authorization: ensure caller owns the starship that owns this agent
     const agentService = new AgentService();
     const agent = await agentService.getAgent(paramValidation.id);
@@ -1281,20 +1195,6 @@ router.delete('/agents/:id', jwtAuthMiddleware, async (req: Request, res: Respon
     const hasAccess = await verifyResourceAccess(agent.starshipId, req.user!.id, 'agent', paramValidation.id, res);
     if (!hasAccess) return;
 
-    if (deleteToolsIfUnused) {
-      const result = await agentService.deleteAgentAndUnusedTools(paramValidation.id);
-      if (!result.deleted) {
-        sendError(res, 'RESOURCE_NOT_FOUND', 'Agent not found', 404, { resource: 'agent', id: paramValidation.id });
-        return;
-      }
-      sendSuccess(
-        res,
-        { message: 'Agent deleted successfully', deletedToolIds: result.deletedToolIds },
-        200
-      );
-      return;
-    }
-
     const deleted = await agentService.deleteAgent(paramValidation.id);
     if (!deleted) {
       sendError(res, 'RESOURCE_NOT_FOUND', 'Agent not found', 404, { resource: 'agent', id: paramValidation.id });
@@ -1305,151 +1205,6 @@ router.delete('/agents/:id', jwtAuthMiddleware, async (req: Request, res: Respon
   } catch (error) {
     console.error('[AGENTS] Error deleting agent:', error);
     handleError(error, res, 'deleting agent');
-  }
-});
-
-// ============================================================================
-// TOOL ASSIGNMENT ENDPOINTS
-// ============================================================================
-
-// GET /agents/:id/tools - Get tools assigned to an agent (OpenAPI pattern)
-router.get('/agents/:id/tools', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
-  try {
-    // Validate agent ID parameter
-    const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'agent parameter');
-    if (!paramValidation) return;
-
-    const { id: agentId } = paramValidation;
-    const userId = req.user!.id;
-
-    const agentService = new AgentService();
-    const tools = await agentService.getAgentToolsForAgent(agentId, userId);
-
-    sendSuccess(res, tools);
-  } catch (error) {
-    console.error('[AGENTS] Error getting agent tools:', error);
-    sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to get agent tools');
-  }
-});
-
-// PUT /agents/:id/tool-permissions - Upsert tool permissions for an agent (by tool slug)
-router.put('/agents/:id/tool-permissions', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
-  try {
-    const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'agent parameter');
-    if (!paramValidation) return;
-
-    const bodyValidation = validateData(ToolPermissionsUpdateSchema, req.body, res, 'tool permissions update');
-    if (!bodyValidation) return;
-
-    const { id: agentId } = paramValidation;
-    const userId = req.user!.id;
-
-    // Access check: caller must have access to the agent's starship
-    const agentService = new AgentService();
-    const agent = await agentService.getAgent(agentId);
-    if (!agent) {
-      sendError(res, 'RESOURCE_NOT_FOUND', 'Agent not found', 404, { resource: 'agent', id: agentId });
-      return;
-    }
-
-    const hasAccess = await verifyResourceAccess(agent.starshipId, userId, 'agent', agentId, res);
-    if (!hasAccess) return;
-
-    await agentService.setAgentToolPermissionsDerived(agentId, userId, bodyValidation.permissions);
-    sendSuccess(res, { ok: true });
-  } catch (error) {
-    // Use shared error handler so ValidationErrors surface as 4xx (not 500).
-    handleError(error, res, 'updating agent tool permissions');
-  }
-});
-
-// PUT /agents/:id/tools - Assign tools to an agent (OpenAPI pattern)
-router.put('/agents/:id/tools', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
-  try {
-    // Validate agent ID parameter
-    const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'agent parameter');
-    if (!paramValidation) return;
-
-    // Validate request body without starshipId
-    const bodyValidation = validateData(ToolAssignmentSchema, req.body, res, 'tool assignment data');
-    if (!bodyValidation) return;
-
-    const { id: agentId } = paramValidation;
-    const { toolSlugs } = bodyValidation;
-    const userId = req.user!.id;
-
-    const agentService = new AgentService();
-    const updated = await agentService.assignToolSlugsDerived(agentId, userId, toolSlugs);
-
-    sendSuccess(res, {
-      message: 'Tools assigned to agent successfully',
-      agent: updated,
-    });
-  } catch (error) {
-    console.error('[AGENTS] Error assigning tools to agent:', error);
-    sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to assign tools to agent');
-  }
-});
-
-// POST /agents/:id/tools/:toolSlug - Assign a specific tool to agent (OpenAPI pattern)
-router.post('/agents/:id/tools/:toolSlug', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
-  try {
-    // Validate parameters
-    const paramValidation = validateData(
-      z.object({
-        id: IdSchema,
-        toolSlug: z.string().min(1, 'Tool slug is required'),
-      }),
-      req.params,
-      res,
-      'agent and tool parameters'
-    );
-    if (!paramValidation) return;
-
-    const { id: agentId, toolSlug } = paramValidation;
-    const userId = req.user!.id;
-
-    const agentService = new AgentService();
-    const updated = await agentService.addToolSlugDerived(agentId, userId, toolSlug);
-
-    sendSuccess(res, {
-      message: `Tool ${toolSlug} assigned to agent successfully`,
-      agent: updated,
-    });
-  } catch (error) {
-    console.error('[AGENTS] Error adding tool to agent:', error);
-    sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to add tool to agent');
-  }
-});
-
-// DELETE /agents/:id/tools/:toolSlug - Remove a tool from agent (OpenAPI pattern)
-router.delete('/agents/:id/tools/:toolSlug', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
-  try {
-    // Validate parameters
-    const paramValidation = validateData(
-      z.object({
-        id: IdSchema,
-        toolSlug: z.string().min(1, 'Tool slug is required'),
-      }),
-      req.params,
-      res,
-      'agent and tool parameters'
-    );
-    if (!paramValidation) return;
-
-    const { id: agentId, toolSlug } = paramValidation;
-    const userId = req.user!.id;
-
-    const agentService = new AgentService();
-    const updated = await agentService.removeToolSlugDerived(agentId, userId, toolSlug);
-
-    sendSuccess(res, {
-      message: `Tool ${toolSlug} removed from agent successfully`,
-      agent: updated,
-    });
-  } catch (error) {
-    console.error('[AGENTS] Error removing tool from agent:', error);
-    sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to remove tool from agent');
   }
 });
 

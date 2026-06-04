@@ -798,7 +798,6 @@ export function ConversationMessageList({
       const role = typeof (agent as any)?.role === 'string' ? String((agent as any).role).trim() : undefined
       const version = typeof (agent as any)?.version === 'string' ? String((agent as any).version).trim() : undefined
       const category = typeof (agent as any)?.category === 'string' ? String((agent as any).category).trim() : undefined
-      const assignedToolSlugs = Array.isArray((agent as any)?.assignedToolSlugs) ? ((agent as any).assignedToolSlugs as string[]).map(x => String(x)).filter(Boolean) : undefined
       const createdAt = typeof (agent as any)?.createdAt === 'string' ? String((agent as any).createdAt).trim() : undefined
       const updatedAt = typeof (agent as any)?.updatedAt === 'string' ? String((agent as any).updatedAt).trim() : undefined
 
@@ -811,7 +810,6 @@ export function ConversationMessageList({
         role,
         version,
         category,
-        assignedToolSlugs,
         createdAt,
         updatedAt,
       }
@@ -2275,7 +2273,6 @@ export function ConversationMessageList({
                         role: undefined,
                         version: undefined,
                         category: undefined,
-                        assignedToolSlugs: undefined,
                         createdAt: undefined,
                         updatedAt: undefined,
                       } as const)
@@ -2309,7 +2306,6 @@ export function ConversationMessageList({
                           agentRole={assistant?.role}
                           agentVersion={assistant?.version}
                           agentCategory={assistant?.category}
-                          agentAssignedToolCount={Array.isArray(assistant?.assignedToolSlugs) ? assistant?.assignedToolSlugs.length : undefined}
                           agentCreatedAt={assistant?.createdAt}
                           agentUpdatedAt={assistant?.updatedAt}
                           starshipSlug={starshipSlug}
@@ -2543,7 +2539,6 @@ interface ConversationMessageBubbleProps {
   agentRole?: string
   agentVersion?: string
   agentCategory?: string
-  agentAssignedToolCount?: number
   agentCreatedAt?: string
   agentUpdatedAt?: string
   starshipSlug?: string
@@ -2939,7 +2934,6 @@ const MemoizedMessageBubble = memo(
     agentRole,
     agentVersion,
     agentCategory,
-    agentAssignedToolCount,
     agentCreatedAt,
     agentUpdatedAt,
     starshipSlug,
@@ -3541,7 +3535,6 @@ const MemoizedMessageBubble = memo(
           roleLabel={agentRole}
           category={agentCategory}
           version={agentVersion}
-          toolsCount={agentAssignedToolCount}
           lastTurnSummary={assistantUsageSummary || undefined}
           createdAt={agentCreatedAt}
           updatedAt={agentUpdatedAt}
@@ -3839,7 +3832,6 @@ const MemoizedMessageBubble = memo(
     if ((prevProps.agentRole || '') !== (nextProps.agentRole || '')) return false
     if ((prevProps.agentVersion || '') !== (nextProps.agentVersion || '')) return false
     if ((prevProps.agentCategory || '') !== (nextProps.agentCategory || '')) return false
-    if (Number(prevProps.agentAssignedToolCount ?? 0) !== Number(nextProps.agentAssignedToolCount ?? 0)) return false
     if ((prevProps.agentCreatedAt || '') !== (nextProps.agentCreatedAt || '')) return false
     if ((prevProps.agentUpdatedAt || '') !== (nextProps.agentUpdatedAt || '')) return false
 

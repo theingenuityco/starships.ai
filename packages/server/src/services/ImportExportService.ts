@@ -6,7 +6,6 @@ import {
   RoomTablesRepository,
   RoomRepository,
   RoomTaskBoardsRepository,
-  RoomToolsRepository,
   RoomViewsRepository,
   StarshipTableRepository,
   StarshipTableRowRepository,
@@ -16,33 +15,28 @@ import {
   TaskBoardRepository,
   TaskCardRepository,
   TaskColumnRepository,
-  ToolRepository,
   ViewRepository,
 } from '@starships/models';
 import type {
   AgentExportPayloadV1,
   CreateAgentRequest,
-  CreateToolRequest,
   TableExportPayloadV1,
   ImportExportContainerV1,
   ImportExportKind,
   RoomExportPayloadV1,
   StarshipImportResponse,
   TaskBoardExportPayloadV1,
-  ToolExportPayloadV1,
   ViewExportPayloadV1,
 } from '@starships/protocol';
 
 export class ImportExportService {
   private agentRepo: AgentRepository;
-  private toolRepo: ToolRepository;
   private starshipRepo: StarshipRepository;
   private agentService: AgentService;
   private roomRepo: RoomRepository;
   private roomViewsRepo: RoomViewsRepository;
   private roomTablesRepo: RoomTablesRepository;
   private roomTaskBoardsRepo: RoomTaskBoardsRepository;
-  private roomToolsRepo: RoomToolsRepository;
   private participantRepo: ConversationParticipantRepository;
   private viewRepo: ViewRepository;
   private tableRepo: StarshipTableRepository;
@@ -53,14 +47,12 @@ export class ImportExportService {
 
   constructor(connection?: PostgresConnection) {
     this.agentRepo = new AgentRepository(connection);
-    this.toolRepo = new ToolRepository(connection);
     this.starshipRepo = new StarshipRepository(connection);
     this.agentService = new AgentService(connection);
     this.roomRepo = new RoomRepository();
     this.roomViewsRepo = new RoomViewsRepository();
     this.roomTablesRepo = new RoomTablesRepository();
     this.roomTaskBoardsRepo = new RoomTaskBoardsRepository();
-    this.roomToolsRepo = new RoomToolsRepository();
     this.participantRepo = new ConversationParticipantRepository();
     this.viewRepo = new ViewRepository();
     this.tableRepo = new StarshipTableRepository();
@@ -125,37 +117,31 @@ export class ImportExportService {
   }
 
   /**
-   * Export an agent together with all tools currently assigned to it.
-   *
-   * Notes:
-   * - Tool exports intentionally omit configuration (which may contain secrets).
-   * - The returned objects are the same JSON containers used by the single-resource export endpoints.
+   * Export an agent as a JSON container.
    */
   async exportAgentBundle(
     agentId: string
   ): Promise<{
     agent: ImportExportContainerV1<'agent'>;
-    tools: Array<ImportExportContainerV1<'tool'>>;
   }> {
     const bundle = await this.exportAgentsBundle([agentId]);
     if (bundle.agents.length !== 1) {
       throw new Error('Unexpected export result: agent bundle must contain exactly one agent');
     }
-    return { agent: bundle.agents[0], tools: bundle.tools };
+    return { agent: bundle.agents[0] };
   }
 
   /**
-   * Export multiple agents and the union of their assigned tools (deduped).
+   * Export multiple agents as JSON containers.
    */
   async exportAgentsBundle(
     agentIds: string[]
   ): Promise<{
     agents: Array<ImportExportContainerV1<'agent'>>;
-    tools: Array<ImportExportContainerV1<'tool'>>;
   }> {
     const ids = Array.isArray(agentIds) ? agentIds.map((id) => String(id || '').trim()).filter(Boolean) : [];
     if (ids.length === 0) {
-      return { agents: [], tools: [] };
+      return { agents: [] };
     }
 
     const agentModels = await Promise.all(
@@ -168,7 +154,6 @@ export class ImportExportService {
 
     const starshipSlugById = new Map<string, string | undefined>();
     const agents: Array<ImportExportContainerV1<'agent'>> = [];
-    const toolIdSet = new Set<string>();
 
     for (const agent of agentModels) {
       let fromStarshipSlug = starshipSlugById.get(agent.starshipId);
@@ -176,12 +161,6 @@ export class ImportExportService {
         fromStarshipSlug = await this.getStarshipSlug(agent.starshipId);
         starshipSlugById.set(agent.starshipId, fromStarshipSlug);
       }
-
-      const assignedTools = await this.agentRepo.getAgentTools(agent.id, agent.starshipId);
-      for (const t of assignedTools) {
-        if (t?.id) toolIdSet.add(String(t.id));
-      }
-      const assignedToolSlugs = assignedTools.map((t) => t.slug).filter((s) => typeof s === 'string' && s.trim().length > 0);
 
       const payload: AgentExportPayloadV1 = {
         agent: {
@@ -199,7 +178,6 @@ export class ImportExportService {
           category: agent.category,
           previewPrompts: agent.previewPrompts,
         },
-        assignedToolSlugs,
       };
 
       agents.push(
@@ -211,8 +189,7 @@ export class ImportExportService {
       );
     }
 
-    const tools = await Promise.all(Array.from(toolIdSet).map((toolId) => this.exportTool(toolId)));
-    return { agents, tools };
+    return { agents };
   }
 
   async exportRoomBundle(
@@ -223,34 +200,30 @@ export class ImportExportService {
     views: Array<ImportExportContainerV1<'view'>>;
     tables: Array<ImportExportContainerV1<'table'>>;
     taskBoards: Array<ImportExportContainerV1<'task_board'>>;
-    tools: Array<ImportExportContainerV1<'tool'>>;
   }> {
     const room = await this.roomRepo.findByConversationId(roomConversationId);
     if (!room) {
       throw new Error('Room not found');
     }
 
-    const [viewPins, tablePins, taskBoardPins, toolAssignments, participants] = await Promise.all([
+    const [viewPins, tablePins, taskBoardPins, participants] = await Promise.all([
       this.roomViewsRepo.list(roomConversationId),
       this.roomTablesRepo.list(roomConversationId),
       this.roomTaskBoardsRepo.list(roomConversationId),
-      this.roomToolsRepo.list(roomConversationId),
       this.participantRepo.listByConversation(roomConversationId),
     ]);
 
     const viewIds = Array.from(new Set(viewPins.map((pin) => String(pin.viewId || '')).filter(Boolean)));
     const tableIds = Array.from(new Set(tablePins.map((pin) => String(pin.tableId || '')).filter(Boolean)));
     const taskBoardIds = Array.from(new Set(taskBoardPins.map((pin) => String(pin.boardId || '')).filter(Boolean)));
-    const roomToolIds = Array.from(new Set(toolAssignments.map((assignment) => String(assignment.toolId || '')).filter(Boolean)));
     const agentParticipantIds = Array.from(
       new Set(participants.map((participant) => String(participant.agentId || '')).filter(Boolean))
     );
 
-    const [views, tables, taskBoards, roomTools, agentBundle, fromStarshipSlug] = await Promise.all([
+    const [views, tables, taskBoards, agentBundle, fromStarshipSlug] = await Promise.all([
       Promise.all(viewIds.map((id) => this.viewRepo.findById(id))),
       Promise.all(tableIds.map((id) => this.tableRepo.findById(id))),
       Promise.all(taskBoardIds.map((id) => this.taskBoardRepo.findById(id))),
-      Promise.all(roomToolIds.map((id) => this.toolRepo.findById(id))),
       this.exportAgentsBundle(agentParticipantIds),
       this.getStarshipSlug(room.starshipId),
     ]);
@@ -258,23 +231,10 @@ export class ImportExportService {
     const viewsById = new Map(views.filter(Boolean).map((view) => [String(view!.id), view!]));
     const tablesById = new Map(tables.filter(Boolean).map((table) => [String(table!.id), table!]));
     const taskBoardsById = new Map(taskBoards.filter(Boolean).map((taskBoard) => [String(taskBoard!.id), taskBoard!]));
-    const toolsById = new Map(roomTools.filter(Boolean).map((tool) => [String(tool!.id), tool!]));
 
     const exportedViews = await Promise.all(Array.from(viewsById.keys()).map((id) => this.exportView(id)));
     const exportedTables = await Promise.all(Array.from(tablesById.keys()).map((id) => this.exportTable(id)));
     const exportedTaskBoards = await Promise.all(Array.from(taskBoardsById.keys()).map((id) => this.exportTaskBoard(id)));
-
-    const toolContainerBySlug = new Map<string, ImportExportContainerV1<'tool'>>();
-    for (const tool of agentBundle.tools) {
-      const fromSlug = typeof tool.metadata?.fromSlug === 'string' ? tool.metadata.fromSlug : '';
-      if (fromSlug) toolContainerBySlug.set(fromSlug, tool);
-    }
-
-    for (const tool of toolsById.values()) {
-      if (!toolContainerBySlug.has(tool.slug)) {
-        toolContainerBySlug.set(tool.slug, await this.exportTool(tool.id));
-      }
-    }
 
     const payload: RoomExportPayloadV1 = {
       room: {
@@ -303,13 +263,6 @@ export class ImportExportService {
           return { taskBoardSlug: taskBoard.slug, position: pin.position };
         })
         .filter(Boolean) as RoomExportPayloadV1['taskBoardPins'],
-      toolAssignments: toolAssignments
-        .map((assignment) => {
-          const tool = toolsById.get(String(assignment.toolId || ''));
-          if (!tool?.slug) return null;
-          return { toolSlug: tool.slug, permission: assignment.permission };
-        })
-        .filter(Boolean) as RoomExportPayloadV1['toolAssignments'],
       agentParticipantSlugs: agentBundle.agents
         .map((agent) => (typeof agent.metadata?.fromSlug === 'string' ? agent.metadata.fromSlug : ''))
         .filter(Boolean),
@@ -325,7 +278,6 @@ export class ImportExportService {
       views: exportedViews,
       tables: exportedTables,
       taskBoards: exportedTaskBoards,
-      tools: Array.from(toolContainerBySlug.values()),
     };
   }
 
@@ -334,9 +286,6 @@ export class ImportExportService {
     if (!agent) {
       throw new Error('Agent not found');
     }
-
-    const assignedTools = await this.agentRepo.getAgentTools(agent.id, agent.starshipId);
-    const assignedToolSlugs = assignedTools.map((t) => t.slug).filter((s) => typeof s === 'string' && s.trim().length > 0);
 
     const payload: AgentExportPayloadV1 = {
       agent: {
@@ -354,7 +303,6 @@ export class ImportExportService {
         category: agent.category,
         previewPrompts: agent.previewPrompts,
       },
-      assignedToolSlugs,
     };
 
     return this.buildContainer('agent', {
@@ -468,33 +416,6 @@ export class ImportExportService {
     });
   }
 
-  async exportTool(toolId: string): Promise<ImportExportContainerV1<'tool'>> {
-    const tool = await this.toolRepo.findById(toolId);
-    if (!tool) {
-      throw new Error('Tool not found');
-    }
-
-    const payload: ToolExportPayloadV1 = {
-      tool: {
-        name: tool.name,
-        description: tool.description,
-        parameters: tool.parameters,
-        blueprint: tool.blueprint,
-        transforms: tool.transforms,
-        mutations: tool.mutations,
-        condition: tool.condition,
-        isEnabled: tool.isEnabled,
-        status: tool.status,
-      },
-    };
-
-    return this.buildContainer('tool', {
-      fromSlug: tool.slug,
-      fromStarshipSlug: await this.getStarshipSlug(tool.starshipId),
-      payload,
-    });
-  }
-
   async importToStarship(starshipId: string, container: ImportExportContainerV1): Promise<StarshipImportResponse> {
     const starship = await this.starshipRepo.findById(starshipId);
     if (!starship) {
@@ -506,54 +427,9 @@ export class ImportExportService {
     const isKind = <K extends ImportExportKind>(c: ImportExportContainerV1, expected: K): c is ImportExportContainerV1<K> =>
       c.kind === expected;
 
-    if (isKind(container, 'tool')) {
-      const toolPayload = container.payload;
-      const t = toolPayload.tool;
-
-      // IMPORTANT: On import, do not reuse the exported slug (even debug metadata).
-      // Always let the system generate a new unique slug for the destination starship.
-      const fromSlug = container.metadata?.fromSlug;
-      if (typeof fromSlug === 'string' && fromSlug.trim().length > 0) {
-        warnings.push(`Tool slug will be regenerated on import (source slug: ${fromSlug}).`);
-      }
-
-      if (typeof t?.name !== 'string' || t.name.trim().length === 0) {
-        throw new Error('Invalid import payload: tool.name is required');
-      }
-
-      const createToolData: CreateToolRequest = {
-        name: t.name,
-        // Keep description defaulting consistent with other flows
-        description: typeof t.description === 'string' ? t.description : '',
-        parameters: t.parameters,
-        blueprint: t.blueprint,
-        transforms: t.transforms,
-        mutations: t.mutations,
-        condition: t.condition,
-        isEnabled: t.isEnabled,
-        status: t.status,
-        // Intentionally ignore versioning fields (version/templateSnapshotAt) on import.
-      };
-
-      const created = await this.toolRepo.create(createToolData, starshipId);
-
-      return { kind: 'tool', tool: created, warnings: warnings.length ? warnings : undefined };
-    }
-
     if (isKind(container, 'agent')) {
       const agentPayload = container.payload;
       const a = agentPayload.agent;
-      const requestedToolSlugs = Array.isArray(agentPayload.assignedToolSlugs) ? agentPayload.assignedToolSlugs : [];
-
-      // Build warnings for missing tools (we still import agent and silently skip missing relations).
-      if (requestedToolSlugs.length > 0) {
-        const found = await this.toolRepo.findBySlugs(requestedToolSlugs, starshipId);
-        const foundSet = new Set(found.map((t) => t.slug));
-        const missing = requestedToolSlugs.filter((s) => !foundSet.has(s));
-        if (missing.length > 0) {
-          warnings.push(`Skipped ${missing.length} missing tool assignment(s): ${missing.join(', ')}`);
-        }
-      }
 
       if (typeof a?.name !== 'string' || a.name.trim().length === 0) {
         throw new Error('Invalid import payload: agent.name is required');
@@ -577,7 +453,6 @@ export class ImportExportService {
         blueprint: a.blueprint,
         category: a.category,
         previewPrompts: a.previewPrompts,
-        assignedToolSlugs: requestedToolSlugs,
       };
 
       const created = await this.agentService.createAgent(createAgentData);

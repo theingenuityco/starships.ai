@@ -16,7 +16,6 @@ export const INITIAL_FORM_DATA: AgentFormData = {
   reasoning: 'none',
   systemPrompt: '',
   previewPrompts: [],
-  assignedToolSlugs: [],
   blueprint: JSON.stringify(
     {
       nodes: [],

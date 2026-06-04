@@ -27,7 +27,6 @@ import { useStarshipMembersAndInvites, type StarshipMemberListItem } from '@/hoo
 import { useStarship } from '@/hooks/useStarships'
 import { MessageAttachment, MessageAttachmentSkeleton } from './MessageAttachment'
 import { markAnimationComplete } from '@/hooks/useMessageAnimationState'
-import { toolAPI } from '@/lib/api'
 import { useTurnHover } from './TurnHoverContext'
 import { StatusDots } from '@/components/ui/StatusDots'
 import { ChevronRight } from '@/components/primitives/lucide-compat'
@@ -356,10 +355,6 @@ type ToolResultLike = {
   result?: unknown
 }
 
-// Cache tool display names so we don't refetch per-message/per-render.
-// Keyed by `${starshipId}:${toolSlug}` -> tool display name.
-const TOOL_NAME_CACHE = new Map<string, string>()
-
 // Built-in code-native CLI agent tools have no `tools` table row, so their display
 // names are resolved locally rather than via a (404-ing) getBySlug lookup.
 const CLI_TOOL_DISPLAY_NAMES: Record<string, string> = {
@@ -571,7 +566,6 @@ export function ConversationMessageContent({
   const resolvedContentClass = contentTextClass ?? 'text-sm leading-normal prose prose-sm font-sans'
   const { theme } = useTheme()
   const [copiedStates, setCopiedStates] = useState<Record<string, boolean>>({})
-  const [toolNameBySlug, setToolNameBySlug] = useState<Record<string, string>>({})
 
   const { isTurnHovered, mobileActionsOpen } = useTurnHover()
   const contentChunkRef = useRef<HTMLDivElement | null>(null)
@@ -686,88 +680,17 @@ export function ConversationMessageContent({
 
   // Resolve tool display names for tool slugs (function.name) so the UI can show human-friendly names.
   // Tool calls need to keep using the slug for execution, but the conversation header should show the tool's name.
-  useEffect(() => {
-    if (!starshipId) return
-    if (!Array.isArray(normalizedToolCalls) || normalizedToolCalls.length === 0) return
-
-    const slugs = Array.from(
-      new Set(
-        normalizedToolCalls
-          .map(tc => tc.function?.name)
-          .filter((n): n is string => typeof n === 'string' && n.trim().length > 0)
-          .map(s => s.trim())
-      )
-    )
-    if (slugs.length === 0) return
-
-    // Hydrate from cache first (no state update if already present)
-    const hydrated: Record<string, string> = {}
-    for (const slug of slugs) {
-      const cached = TOOL_NAME_CACHE.get(`${starshipId}:${slug}`)
-      if (cached) {
-        hydrated[slug] = cached
-      } else if (CLI_TOOL_DISPLAY_NAMES[slug]) {
-        hydrated[slug] = CLI_TOOL_DISPLAY_NAMES[slug]
-      }
+  // Tool calls are connector actions / built-in CLI tools; display names come from
+  // the local CLI map or fall back to the slug. No remote tool lookup, so this is a
+  // pure derivation from the (static) CLI map — no state/effect needed.
+  const toolNameBySlug = useMemo<Record<string, string>>(() => {
+    const out: Record<string, string> = {}
+    for (const tc of normalizedToolCalls) {
+      const slug = tc.function?.name?.trim() ?? ''
+      if (slug && CLI_TOOL_DISPLAY_NAMES[slug]) out[slug] = CLI_TOOL_DISPLAY_NAMES[slug]
     }
-    if (Object.keys(hydrated).length > 0) {
-      setToolNameBySlug(prev => {
-        let changed = false
-        for (const [slug, name] of Object.entries(hydrated)) {
-          if (prev[slug] !== name) {
-            changed = true
-            break
-          }
-        }
-        return changed ? { ...prev, ...hydrated } : prev
-      })
-    }
-
-    const missing = slugs.filter(slug => {
-      if (TOOL_NAME_CACHE.has(`${starshipId}:${slug}`)) return false
-      // Built-in CLI tools are resolved locally; never hit the API for them.
-      if (CLI_TOOL_DISPLAY_NAMES[slug]) return false
-      return true
-    })
-    if (missing.length === 0) return
-
-    let cancelled = false
-    ;(async () => {
-      try {
-        const results = await Promise.all(
-          missing.map(async slug => {
-            try {
-              const tool = await toolAPI.getBySlug(starshipId, slug)
-              const name = typeof (tool as any)?.name === 'string' ? String((tool as any).name).trim() : ''
-              return { slug, name }
-            } catch {
-              return { slug, name: '' }
-            }
-          })
-        )
-
-        if (cancelled) return
-
-        const updates: Record<string, string> = {}
-        for (const r of results) {
-          if (r.name) {
-            TOOL_NAME_CACHE.set(`${starshipId}:${r.slug}`, r.name)
-            updates[r.slug] = r.name
-          }
-        }
-
-        if (Object.keys(updates).length > 0) {
-          setToolNameBySlug(prev => ({ ...prev, ...updates }))
-        }
-      } catch {
-        // ignore tool name resolution failures; we fall back to slug
-      }
-    })()
-
-    return () => {
-      cancelled = true
-    }
-  }, [normalizedToolCalls, starshipId])
+    return out
+  }, [normalizedToolCalls])
 
   const [showCompletionTick, setShowCompletionTick] = useState(false)
   const prevCompletedRef = useRef<number>(completedToolResults)

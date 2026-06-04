@@ -5,7 +5,6 @@
  * A room's identifier is its backing `conversationId` (references `conversations.id`).
  */
 
-import type { AgentToolPermission } from './agent';
 import type { ConnectorProvider } from './connector';
 
 export interface Room {
@@ -93,15 +92,3 @@ export interface RoomPinnedDoc extends RoomPinBase {
 }
 
 export type RoomPin = RoomPinnedView | RoomPinnedTable | RoomPinnedTaskBoard | RoomPinnedDoc;
-
-// ============================================================================
-// ROOM ↔ TOOL ASSIGNMENTS (unordered)
-// ============================================================================
-
-export interface RoomToolAssignment {
-  roomConversationId: string;
-  toolId: string;
-  permission: AgentToolPermission;
-  createdAt: string;
-  updatedAt: string;
-}

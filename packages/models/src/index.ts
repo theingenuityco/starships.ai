@@ -28,7 +28,6 @@ export { StarshipInviteTokenEntity } from './entities/StarshipInviteTokenEntity'
 export { ConversationParticipantEntity } from './entities/ConversationParticipantEntity';
 export { ConversationNotificationPrefEntity } from './entities/ConversationNotificationPrefEntity';
 export { StarshipEntity } from './entities/StarshipEntity';
-export { ToolEntity } from './entities/ToolEntity';
 export { UserEntity } from './entities/UserEntity';
 export { UsageEntity } from './entities/UsageEntity';
 export { WidgetEntity } from './entities/WidgetEntity';
@@ -61,7 +60,6 @@ export { RoomViewsRepository } from './repositories/RoomViewsRepository';
 export { RoomTablesRepository } from './repositories/RoomTablesRepository';
 export { RoomDocsRepository } from './repositories/RoomDocsRepository';
 export { RoomTaskBoardsRepository } from './repositories/RoomTaskBoardsRepository';
-export { RoomToolsRepository } from './repositories/RoomToolsRepository';
 export { ConversationReadStateRepository } from './repositories/ConversationReadStateRepository';
 export { DirectMessageRepository } from './repositories/DirectMessageRepository';
 export { MessageRepository } from './repositories/MessageRepository';
@@ -78,7 +76,6 @@ export { StarshipInviteTokenRepository } from './repositories/StarshipInviteToke
 export { ConversationParticipantRepository } from './repositories/ConversationParticipantRepository';
 export { ConversationNotificationPrefRepository } from './repositories/ConversationNotificationPrefRepository';
 export { StarshipRepository } from './repositories/StarshipRepository';
-export { ToolRepository } from './repositories/ToolRepository';
 export { UsageRepository } from './repositories/UsageRepository';
 export { UserRepository } from './repositories/UserRepository';
 export { WidgetRepository } from './repositories/WidgetRepository';

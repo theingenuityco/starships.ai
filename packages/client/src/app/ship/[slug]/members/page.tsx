@@ -558,7 +558,6 @@ export default function MembersPage() {
     const key = a.id || agentSlug || label.primary
     const avatarAttachmentId = typeof a.avatarAttachmentId === 'string' ? a.avatarAttachmentId.trim() : ''
     const avatarUrl = avatarAttachmentId ? (agentAvatarUrlByAttachmentId.get(avatarAttachmentId) ?? null) : null
-    const toolsCount = Array.isArray((a as any)?.assignedToolSlugs) ? ((a as any).assignedToolSlugs as unknown[]).length : undefined
     const modelIdRaw = (a as any)?.model
     const modelId = typeof modelIdRaw === 'string' ? modelIdRaw : undefined
     const agentHoverCard = (
@@ -570,7 +569,6 @@ export default function MembersPage() {
         roleLabel={typeof a.role === 'string' ? a.role : undefined}
         category={categoryMeta?.label || (typeof a.category === 'string' ? a.category : undefined)}
         version={typeof a.version === 'string' ? a.version : undefined}
-        toolsCount={typeof toolsCount === 'number' ? toolsCount : undefined}
         createdAt={typeof a.createdAt === 'string' ? a.createdAt : undefined}
         updatedAt={typeof a.updatedAt === 'string' ? a.updatedAt : undefined}
       />

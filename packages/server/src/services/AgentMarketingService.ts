@@ -88,7 +88,7 @@ export class AgentMarketingService {
         agentSystemPrompt: agent.systemPrompt,
         agentModel: agent.model,
         agentBlueprint: agent.blueprint!,
-        agentTools: await this.agentRepository.getAgentTools(agent.id, agent.starshipId),
+        agentTools: [],
         starshipId: agent.starshipId,
         runtimeEnv,
         engineConfigFromHost: executionBundle.engineConfig,
@@ -125,14 +125,12 @@ export class AgentMarketingService {
     );
 
     if (!existingStatements?.textContent) {
-      const agentTools = await this.agentRepository.getAgentTools(agent.id, agent.starshipId);
-
       const statementsResult = await this.marketingContentGenerationService.generateProblemStatements({
         agentName: agent.name,
         agentRole: agent.role,
         agentDescription: agent.description,
         agentCategory: agent.category,
-        agentTools: agentTools.map((t) => ({ name: t.name, slug: t.slug, description: t.description })),
+        agentTools: [],
         agentModel: agent.model,
         agentBlueprint: agent.blueprint!,
         starshipId: agent.starshipId,
@@ -156,11 +154,8 @@ export class AgentMarketingService {
     }
 
     // 3) Ensure profile images exist (generate if missing)
-    const agentTools = await this.agentRepository.getAgentTools(agent.id, agent.starshipId);
     let coreCapabilities = '';
-    if (agentTools.length > 0) {
-      coreCapabilities = agentTools.map((t) => t.name || t.slug).join(', ');
-    } else {
+    {
       const parts: string[] = [];
       if (agent.role) parts.push(agent.role);
       if (agent.description) {

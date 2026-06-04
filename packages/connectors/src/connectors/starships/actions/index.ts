@@ -4,12 +4,7 @@ import { adminDeleteConnectorTemplate } from './admin-delete-connector-template'
 import { adminGetConnectorTemplate } from './admin-get-connector-template';
 import { adminListConnectorTemplates } from './admin-list-connector-templates';
 import { adminUpdateConnectorTemplate } from './admin-update-connector-template';
-import { authorizeAndMaybeExecuteTool } from './authorize-and-maybe-execute-tool';
 import { listConnectors } from './list-connectors';
-import { listTools } from './list-tools';
-import { getTool } from './get-tool';
-import { createTool } from './create-tool';
-import { updateTool } from './update-tool';
 import { createDoc } from './create-doc';
 import { editDoc } from './edit-doc';
 import { listAgents } from './list-agents';
@@ -17,8 +12,6 @@ import { getAgent } from './get-agent';
 import { createAgent } from './create-agent';
 import { getAgentBySlug } from './get-agent-by-slug';
 import { updateAgent } from './update-agent';
-import { assignAgentTool } from './assign-agent-tool';
-import { unassignAgentTool } from './unassign-agent-tool';
 import { searchDocs } from './search-docs';
 import { getDoc } from './get-doc';
 import { listModels } from './list-models';
@@ -97,12 +90,8 @@ import { unpinRoomTaskBoard } from './unpin-room-task-board';
 import { reorderRoomPinsViews } from './reorder-room-pins-views';
 import { reorderRoomPinsTables } from './reorder-room-pins-tables';
 import { reorderRoomPinsTaskBoards } from './reorder-room-pins-task-boards';
-import { getRoomTools } from './get-room-tools';
-import { assignRoomTool } from './assign-room-tool';
-import { unassignRoomTool } from './unassign-room-tool';
 import { listConversationChildren } from './list-conversation-children';
 import { updateMessage } from './update-message';
-import { batchExecuteTools } from './batch-execute-tools';
 
 export const starshipsActions: CodeAction[] = [
   adminCreateConnectorTemplate,
@@ -110,12 +99,7 @@ export const starshipsActions: CodeAction[] = [
   adminGetConnectorTemplate,
   adminListConnectorTemplates,
   adminUpdateConnectorTemplate,
-  authorizeAndMaybeExecuteTool,
   listConnectors,
-  listTools,
-  getTool,
-  createTool,
-  updateTool,
   createDoc,
   editDoc,
   listAgents,
@@ -123,8 +107,6 @@ export const starshipsActions: CodeAction[] = [
   createAgent,
   getAgentBySlug,
   updateAgent,
-  assignAgentTool,
-  unassignAgentTool,
   searchDocs,
   getDoc,
   listModels,
@@ -203,10 +185,6 @@ export const starshipsActions: CodeAction[] = [
   reorderRoomPinsViews,
   reorderRoomPinsTables,
   reorderRoomPinsTaskBoards,
-  getRoomTools,
-  assignRoomTool,
-  unassignRoomTool,
   listConversationChildren,
   updateMessage,
-  batchExecuteTools,
 ];

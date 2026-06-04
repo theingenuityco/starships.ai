@@ -22,7 +22,6 @@ import {
   usePinRoomDoc,
   usePinRoomTaskBoard,
   usePinRoomView,
-  useRoomTools,
   useJoinRoom,
   useRoomPins,
   useRoomParticipants,
@@ -33,8 +32,6 @@ import {
   useUnpinRoomDoc,
   useUnpinRoomTaskBoard,
   useUnpinRoomView,
-  useAssignRoomTool,
-  useUnassignRoomTool,
 } from '@/hooks/useRooms'
 import { useStarshipViews } from '@/hooks/useViews'
 import { useStarshipTables } from '@/hooks/useTables'
@@ -46,7 +43,6 @@ import type { AgentModel, MessageModel, RoomModel } from '@starships/protocol'
 import { useParams, usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAuthContext } from '@/providers/auth-provider'
-import { useStarshipTools } from '@/hooks/useTools'
 import api from '@/lib/api'
 
 const RESOURCES_PANE_WIDTH_STORAGE_KEY = 'starships.roomResourcesPaneWidthPx'
@@ -558,12 +554,10 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
   const roomParticipants = useRoomParticipants(activeConversationId || '', Boolean(activeConversationId && isRoomParticipant) && !isDemoRoom)
 
   const { data: pinsData } = useRoomPins(activeConversationId || '', Boolean(activeConversationId && isRoomParticipant) && !isDemoRoom)
-  const { data: roomToolsData } = useRoomTools(activeConversationId || '', Boolean(activeConversationId && isRoomParticipant) && !isDemoRoom)
   const { data: starshipViews = [] } = useStarshipViews(starshipData?.id ?? '', Boolean(starshipData?.id))
   const { data: tables = [] } = useStarshipTables(starshipData?.id ?? '', Boolean(starshipData?.id))
   const { data: taskBoards = [] } = useStarshipTaskBoards(starshipData?.id ?? '', Boolean(starshipData?.id))
   const { data: docs = [] } = useStarshipDocs(starshipData?.id ?? '', Boolean(starshipData?.id))
-  const { data: tools = [] } = useStarshipTools(starshipData?.id ?? '', Boolean(starshipData?.id))
 
   const canManagePins = useMemo(() => {
     const uid = typeof user?.id === 'string' ? user.id : ''
@@ -582,9 +576,8 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
     const d = pinsData?.tables?.length ?? 0
     const b = pinsData?.taskBoards?.length ?? 0
     const doc = pinsData?.docs?.length ?? 0
-    const t = roomToolsData?.items?.length ?? 0
-    return v + d + b + doc + t > 0
-  }, [pinsData?.tables?.length, pinsData?.docs?.length, pinsData?.taskBoards?.length, pinsData?.views?.length, roomToolsData?.items?.length])
+    return v + d + b + doc > 0
+  }, [pinsData?.tables?.length, pinsData?.docs?.length, pinsData?.taskBoards?.length, pinsData?.views?.length])
 
   const pinView = usePinRoomView(activeConversationId || '', starshipData?.id ?? '')
   const unpinView = useUnpinRoomView(activeConversationId || '')
@@ -594,8 +587,6 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
   const unpinBoard = useUnpinRoomTaskBoard(activeConversationId || '')
   const pinDoc = usePinRoomDoc(activeConversationId || '')
   const unpinDoc = useUnpinRoomDoc(activeConversationId || '')
-  const assignTool = useAssignRoomTool(activeConversationId || '')
-  const unassignTool = useUnassignRoomTool(activeConversationId || '')
 
   const viewLabelById = useMemo(() => {
     const m = new Map<string, string>()
@@ -629,29 +620,6 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
     }
     return m
   }, [taskBoards])
-
-  const toolLabelById = useMemo(() => {
-    const m = new Map<string, string>()
-    for (const t of Array.isArray(tools) ? tools : []) {
-      const id = typeof (t as any)?.id === 'string' ? String((t as any).id).trim() : ''
-      if (!id) continue
-      const name = String((t as any)?.name || (t as any)?.slug || 'Tool').trim()
-      m.set(id, name)
-    }
-    return m
-  }, [tools])
-
-  const toolSlugById = useMemo(() => {
-    const m = new Map<string, string>()
-    for (const t of Array.isArray(tools) ? tools : []) {
-      const id = typeof (t as any)?.id === 'string' ? String((t as any).id).trim() : ''
-      if (!id) continue
-      const slug = String((t as any)?.slug || '').trim()
-      if (!slug) continue
-      m.set(id, slug)
-    }
-    return m
-  }, [tools])
 
   const availableViews = useMemo(() => {
     const list = Array.isArray(starshipViews) ? starshipViews : []
@@ -696,14 +664,6 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
       .filter(d => Boolean(d.id))
       .sort((a, b) => a.title.localeCompare(b.title))
   }, [docs])
-
-  const availableTools = useMemo(() => {
-    const list = Array.isArray(tools) ? tools : []
-    return list
-      .map((t: any) => ({ id: String(t?.id || '').trim(), name: String(t?.name || t?.slug || 'Tool').trim() }))
-      .filter(t => Boolean(t.id))
-      .sort((a, b) => a.name.localeCompare(b.name))
-  }, [tools])
 
   const handleThreadCreated = useCallback(
     (cid: string) => {
@@ -983,13 +943,10 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
             pinnedTables={pinsData?.tables ?? null}
             pinnedTaskBoards={pinsData?.taskBoards ?? null}
             pinnedDocs={pinsData?.docs ?? null}
-            assignedTools={(roomToolsData?.items || []).map(i => i.assignment)}
             viewLabelById={viewLabelById}
             tableLabelById={tableLabelById}
             taskBoardLabelById={taskBoardLabelById}
             docLabelById={docLabelById}
-            toolLabelById={toolLabelById}
-            toolSlugById={toolSlugById}
             onOpenPinnedView={onOpenPinnedView}
             canManagePins={canManagePins}
             onOpenHistoryPane={() => setRoomPaneInUrl('history')}
@@ -999,7 +956,6 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
             availableTables={availableTables}
             availableTaskBoards={availableTaskBoards}
             availableDocs={availableDocs}
-            availableTools={availableTools}
             onPinView={viewId => pinView.mutate({ viewId })}
             onUnpinView={viewId => unpinView.mutate(viewId)}
             onPinTable={tableId => pinTable.mutate({ tableId })}
@@ -1008,8 +964,6 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
             onUnpinTaskBoard={boardId => unpinBoard.mutate(boardId)}
             onPinDoc={docId => pinDoc.mutate({ docId })}
             onUnpinDoc={docId => unpinDoc.mutate(docId)}
-            onAssignTool={toolId => assignTool.mutate({ toolId })}
-            onUnassignTool={toolId => unassignTool.mutate(toolId)}
             onCreateDraftConversation={() => {
               setConversationKeyInUrl('draft')
             }}
@@ -1088,20 +1042,16 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
                   pinnedTables={pinsData?.tables ?? null}
                   pinnedTaskBoards={pinsData?.taskBoards ?? null}
                   pinnedDocs={pinsData?.docs ?? null}
-                  assignedTools={(roomToolsData?.items || []).map(i => i.assignment)}
                   viewLabelById={viewLabelById}
                   tableLabelById={tableLabelById}
                   taskBoardLabelById={taskBoardLabelById}
                   docLabelById={docLabelById}
-                  toolLabelById={toolLabelById}
-                  toolSlugById={toolSlugById}
                   onOpenPinnedView={onOpenPinnedView}
                   canManagePins={canManagePins}
                   availableViews={availableViews}
                   availableTables={availableTables}
                   availableTaskBoards={availableTaskBoards}
                   availableDocs={availableDocs}
-                  availableTools={availableTools}
                   onPinView={viewId => pinView.mutate({ viewId })}
                   onUnpinView={viewId => unpinView.mutate(viewId)}
                   onPinTable={tableId => pinTable.mutate({ tableId })}
@@ -1110,8 +1060,6 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
                   onUnpinTaskBoard={boardId => unpinBoard.mutate(boardId)}
                   onPinDoc={docId => pinDoc.mutate({ docId })}
                   onUnpinDoc={docId => unpinDoc.mutate(docId)}
-                  onAssignTool={toolId => assignTool.mutate({ toolId })}
-                  onUnassignTool={toolId => unassignTool.mutate(toolId)}
                   onClose={() => setRoomPaneInUrl(null)}
                 />
               ) : paneKind === 'history' ? (
@@ -1217,20 +1165,16 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
               pinnedTables={pinsData?.tables ?? null}
               pinnedTaskBoards={pinsData?.taskBoards ?? null}
               pinnedDocs={pinsData?.docs ?? null}
-              assignedTools={(roomToolsData?.items || []).map(i => i.assignment)}
               viewLabelById={viewLabelById}
               tableLabelById={tableLabelById}
               taskBoardLabelById={taskBoardLabelById}
               docLabelById={docLabelById}
-              toolLabelById={toolLabelById}
-              toolSlugById={toolSlugById}
               onOpenPinnedView={onOpenPinnedView}
               canManagePins={canManagePins}
               availableViews={availableViews}
               availableTables={availableTables}
               availableTaskBoards={availableTaskBoards}
               availableDocs={availableDocs}
-              availableTools={availableTools}
               onPinView={viewId => pinView.mutate({ viewId })}
               onUnpinView={viewId => unpinView.mutate(viewId)}
               onPinTable={tableId => pinTable.mutate({ tableId })}
@@ -1239,8 +1183,6 @@ export default function RoomsLayout({ children }: { children: React.ReactNode })
               onUnpinTaskBoard={boardId => unpinBoard.mutate(boardId)}
               onPinDoc={docId => pinDoc.mutate({ docId })}
               onUnpinDoc={docId => unpinDoc.mutate(docId)}
-              onAssignTool={toolId => assignTool.mutate({ toolId })}
-              onUnassignTool={toolId => unassignTool.mutate(toolId)}
               onClose={() => setRoomPaneInUrl(null)}
             />
           ) : paneKind === 'history' ? (

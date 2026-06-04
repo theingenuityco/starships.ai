@@ -76,7 +76,6 @@ describe('AgentEntity', () => {
         maxTokens: 4000,
         timeout: 30000,
         state: { messages: [], tools: [] },
-        blueprint: { nodes: [], edges: [] },
         createdAt: '2024-01-01T00:00:00.000Z',
         updatedAt: '2024-01-02T12:00:00.000Z',
       };
@@ -99,7 +98,6 @@ describe('AgentEntity', () => {
         model: 'gpt-4',
         timeout: 30000,
         state: { messages: [], tools: [] },
-        blueprint: { nodes: [], edges: [] },
         createdAt: '2024-01-01T00:00:00.000Z',
         updatedAt: '2024-01-02T12:00:00.000Z',
         starshipId: 'starship-123',
@@ -118,7 +116,6 @@ describe('AgentEntity', () => {
           model: 'gpt-4',
           timeout: 30000,
           state: { messages: [], tools: [] },
-          blueprint: { nodes: [], edges: [] },
           createdAt: '2024-01-01T00:00:00.000Z',
           updatedAt: '2024-01-01T12:00:00.000Z',
         },
@@ -128,7 +125,6 @@ describe('AgentEntity', () => {
           model: 'claude-3',
           timeout: 45000,
           state: { messages: [], tools: [] },
-          blueprint: { nodes: [], edges: [] },
           createdAt: '2024-01-02T00:00:00.000Z',
           updatedAt: '2024-01-02T12:00:00.000Z',
         },
@@ -154,7 +150,6 @@ describe('AgentEntity', () => {
         starshipId: 'starship-123',
         timeout: 30000,
         state: { messages: [], tools: [] },
-        blueprint: { nodes: [], edges: [] },
       };
 
       await expect(AgentEntity.validate(validData, 'create')).resolves.not.toThrow();
@@ -179,7 +174,6 @@ describe('AgentEntity', () => {
           starshipId: 'starship-123',
           timeout: 30000,
           state: { messages: [], tools: [] },
-          blueprint: { nodes: [], edges: [] },
         })
       ).rejects.toThrow();
 
@@ -192,7 +186,6 @@ describe('AgentEntity', () => {
           starshipId: 'starship-123',
           timeout: 30000,
           state: { messages: [], tools: [] },
-          blueprint: { nodes: [], edges: [] },
         })
       ).rejects.toThrow();
 
@@ -205,7 +198,6 @@ describe('AgentEntity', () => {
           starshipId: 'starship-123',
           timeout: 30000,
           state: { messages: [], tools: [] },
-          blueprint: { nodes: [], edges: [] },
         })
       ).resolves.not.toThrow();
     });
@@ -221,7 +213,6 @@ describe('AgentEntity', () => {
           starshipId: 'starship-123',
           timeout: 30000,
           state: { messages: [], tools: [] },
-          blueprint: { nodes: [], edges: [] },
         })
       ).rejects.toThrow();
 
@@ -235,7 +226,6 @@ describe('AgentEntity', () => {
           starshipId: 'starship-123',
           timeout: 30000,
           state: { messages: [], tools: [] },
-          blueprint: { nodes: [], edges: [] },
         })
       ).rejects.toThrow();
 
@@ -249,7 +239,6 @@ describe('AgentEntity', () => {
           starshipId: 'starship-123',
           timeout: 30000,
           state: { messages: [], tools: [] },
-          blueprint: { nodes: [], edges: [] },
         })
       ).resolves.not.toThrow();
     });
@@ -265,7 +254,6 @@ describe('AgentEntity', () => {
           starshipId: 'starship-123',
           timeout: 30000,
           state: { messages: [], tools: [] },
-          blueprint: { nodes: [], edges: [] },
         })
       ).rejects.toThrow();
 
@@ -279,7 +267,6 @@ describe('AgentEntity', () => {
           starshipId: 'starship-123',
           timeout: 30000,
           state: { messages: [], tools: [] },
-          blueprint: { nodes: [], edges: [] },
         })
       ).rejects.toThrow();
 
@@ -293,7 +280,6 @@ describe('AgentEntity', () => {
           starshipId: 'starship-123',
           timeout: 30000,
           state: { messages: [], tools: [] },
-          blueprint: { nodes: [], edges: [] },
         })
       ).resolves.not.toThrow();
     });
@@ -308,7 +294,6 @@ describe('AgentEntity', () => {
           timeout: 999,
           starshipId: 'starship-123',
           state: { messages: [], tools: [] },
-          blueprint: { nodes: [], edges: [] },
         })
       ).rejects.toThrow();
 
@@ -321,7 +306,6 @@ describe('AgentEntity', () => {
           timeout: 600001,
           starshipId: 'starship-123',
           state: { messages: [], tools: [] },
-          blueprint: { nodes: [], edges: [] },
         })
       ).rejects.toThrow();
 
@@ -334,7 +318,6 @@ describe('AgentEntity', () => {
           timeout: 30000,
           starshipId: 'starship-123',
           state: { messages: [], tools: [] },
-          blueprint: { nodes: [], edges: [] },
         })
       ).resolves.not.toThrow();
     });
@@ -365,7 +348,6 @@ describe('AgentEntity', () => {
         timeout: 30000,
         systemPrompt: 'You are a helpful assistant',
         state: { messages: [], tools: [] },
-        blueprint: { nodes: [], edges: [] },
         createdAt: '2024-01-01T00:00:00.000Z',
         updatedAt: '2024-01-02T12:00:00.000Z',
       };
@@ -406,7 +388,6 @@ describe('AgentEntity', () => {
         model: 'gpt-4',
         timeout: 30000,
         state: { messages: [], tools: [] },
-        blueprint: { nodes: [], edges: [] },
         createdAt: '2024-01-01T00:00:00.000Z',
         updatedAt: '2024-01-02T12:00:00.000Z',
       };
@@ -433,7 +414,6 @@ describe('AgentEntity', () => {
         model: 'gpt-4',
         timeout: 30000,
         state: { messages: [], tools: [] },
-        blueprint: { nodes: [], edges: [] },
         createdAt: '2024-01-01T00:00:00.000Z',
         updatedAt: '2024-01-02T12:00:00.000Z',
       };

@@ -247,7 +247,6 @@ describe('ToolRepository', () => {
         description: 'Tool description',
         slug: 'new-tool',
         parameters: { type: 'object' as const, properties: {} },
-        blueprint: { nodes: [], edges: [] },
         configuration: {},
       };
 
@@ -280,7 +279,6 @@ describe('ToolRepository', () => {
             name: 'Tool',
             description: 'Tool description',
             parameters: { type: 'object' as const, properties: {} },
-            blueprint: { nodes: [], edges: [] },
             configuration: {},
           },
           'starship-123'

@@ -124,7 +124,6 @@ describe('AgentRepository', () => {
         timeout: 30000,
         systemPrompt: 'Test agent',
         state: { messages: [], tools: [] },
-        blueprint: { type: 'test', nodes: [], edges: [] },
       };
 
       it('should create agent successfully', async () => {
@@ -138,7 +137,6 @@ describe('AgentRepository', () => {
           timeout: 30000,
           system_prompt: 'Test agent',
           state: '{"messages":[],"tools":[]}',
-          blueprint: '{"type":"test","nodes":[],"edges":[]}',
           starship_id: 'starship-123',
           deployed_at: '2024-01-01T00:00:00.000Z',
           created_at: '2024-01-01T00:00:00.000Z',
@@ -177,7 +175,6 @@ describe('AgentRepository', () => {
           timeout: 30000,
           system_prompt: 'Test agent',
           state: '{"messages":[],"tools":[]}',
-          blueprint: '{"type":"test","nodes":[],"edges":[]}',
           starship_id: 'starship-123',
           deployed_at: '2024-01-01T00:00:00.000Z',
           created_at: '2024-01-01T00:00:00.000Z',

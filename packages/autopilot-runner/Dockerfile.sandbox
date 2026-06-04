@@ -1,11 +1,10 @@
-# Sandbox image for native code execution (Backlog Execution Room).
-# Same build as the runner, but the runtime stage adds git + common toolchains
-# and the entrypoint runs the JobAgent (one process per workspace job).
+# Sandbox image for native code execution (the workspace/Backlog Execution Room).
+# Builds the code-native runner; the runtime stage adds git + common toolchains
+# and the entrypoint runs the CLI job-agent (one process per workspace job).
 FROM node:20-slim AS build
 WORKDIR /app
-ARG TARGETARCH
-ARG BUF_VERSION=v1.45.0
-RUN npm i -g pnpm
+# Pin pnpm to the repo's version (corepack ships with node:20) for reproducible builds.
+RUN corepack enable && corepack prepare pnpm@10.12.4 --activate
 RUN apt-get update && apt-get install -y ca-certificates curl && rm -rf /var/lib/apt/lists/*
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml* ./
 COPY tsconfig.json tsconfig.nodejs.json ./
@@ -22,17 +21,8 @@ COPY packages/autopilot-runner/ ./packages/autopilot-runner/
 RUN pnpm -C packages/protocol build
 RUN pnpm -C packages/connectors build
 RUN pnpm -C packages/autopilot-cli build
-RUN set -eux; \
-  case "${TARGETARCH}" in \
-    amd64) BUF_ARCH="x86_64" ;; \
-    arm64) BUF_ARCH="aarch64" ;; \
-    *) echo "Unsupported TARGETARCH=${TARGETARCH} (expected amd64 or arm64)"; exit 1 ;; \
-  esac; \
-  curl -fsSL -o /usr/local/bin/buf "https://github.com/bufbuild/buf/releases/download/${BUF_VERSION}/buf-Linux-${BUF_ARCH}"; \
-  chmod +x /usr/local/bin/buf; \
-  buf --version; \
-  pnpm -C packages/autopilot-runner gen; \
-  pnpm -C packages/autopilot-runner build
+# The runner is now code-native (no gRPC/protobuf); build is just tsc — no buf/gen.
+RUN pnpm -C packages/autopilot-runner build
 
 FROM node:20-slim
 WORKDIR /app/packages/autopilot-runner
@@ -57,6 +47,8 @@ COPY --from=build /app/packages/autopilot-cli/dist /app/packages/autopilot-cli/d
 COPY --from=build /app/packages/autopilot-cli/node_modules /app/packages/autopilot-cli/node_modules
 COPY --from=build /app/node_modules /app/node_modules
 # Unprivileged. The launcher passes JOB_FILE + WORKSPACE_BASE_DIR and mounts a
-# writable /workspace and a read-only /job/job.json.
+# writable /workspace and a read-only /job/job.json, overriding this CMD with the
+# CLI job-agent entrypoint. The default points at the same entrypoint (the gRPC
+# JobAgent was removed when execution went code-native).
 USER 1000:1000
-CMD ["node", "dist/jobAgent/JobAgent.js"]
+CMD ["node", "dist/cliAgent/cliJobAgent.js"]

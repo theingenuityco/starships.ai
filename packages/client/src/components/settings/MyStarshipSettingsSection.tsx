@@ -18,7 +18,6 @@ import type { ShipClass, StarshipModel, StarshipStatus, UpdateStarshipRequest } 
 import { useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
-import { StarshipToolsDefaultsSection } from '@/components/settings/StarshipToolsDefaultsSection'
 
 interface MyStarshipSettingsSectionProps {
   starship?: StarshipModel
@@ -360,8 +359,6 @@ export function MyStarshipSettingsSection({ starship, starshipSlug, isLoading = 
               </div>
             </CardContent>
           </Card>
-
-          {starship.id ? <StarshipToolsDefaultsSection starshipId={starship.id} canEdit={canEdit} /> : null}
         </div>
       </form>
     </>

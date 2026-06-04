@@ -11,7 +11,7 @@ import { badgeVariants } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useStarshipAgents } from '@/hooks/useAgents'
 import { cn } from '@/lib/utils'
-import type { AgentModel, RoomPinnedTable, RoomPinnedDoc, RoomPinnedTaskBoard, RoomPinnedView, RoomToolAssignment } from '@starships/protocol'
+import type { AgentModel, RoomPinnedTable, RoomPinnedDoc, RoomPinnedTaskBoard, RoomPinnedView } from '@starships/protocol'
 import Link from 'next/link'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -43,13 +43,10 @@ export function RoomConversationIndexView(props: {
   pinnedTables?: RoomPinnedTable[] | null
   pinnedTaskBoards?: RoomPinnedTaskBoard[] | null
   pinnedDocs?: RoomPinnedDoc[] | null
-  assignedTools?: RoomToolAssignment[] | null
   viewLabelById?: Map<string, string> | null
   tableLabelById?: Map<string, string> | null
   taskBoardLabelById?: Map<string, string> | null
   docLabelById?: Map<string, string> | null
-  toolLabelById?: Map<string, string> | null
-  toolSlugById?: Map<string, string> | null
   onOpenPinnedView?: (viewId: string) => void
   canManagePins?: boolean | null
   onOpenHistoryPane?: () => void
@@ -58,7 +55,6 @@ export function RoomConversationIndexView(props: {
   availableTables?: Array<{ id: string; name: string }> | null
   availableTaskBoards?: Array<{ id: string; name: string }> | null
   availableDocs?: Array<{ id: string; title: string }> | null
-  availableTools?: Array<{ id: string; name: string }> | null
   onPinView?: (viewId: string) => void
   onUnpinView?: (viewId: string) => void
   onPinTable?: (tableId: string) => void
@@ -67,8 +63,6 @@ export function RoomConversationIndexView(props: {
   onUnpinTaskBoard?: (boardId: string) => void
   onPinDoc?: (docId: string) => void
   onUnpinDoc?: (docId: string) => void
-  onAssignTool?: (toolId: string) => void
-  onUnassignTool?: (toolId: string) => void
   /** Open a draft conversation (no persistence until first message). */
   onCreateDraftConversation?: () => void
   /**
@@ -228,12 +222,8 @@ export function RoomConversationIndexView(props: {
     router.push(`/ship/${encodeURIComponent(effectiveStarshipSlug)}/conversations/${encodeURIComponent(props.roomConversationId)}?conversation=draft`)
   }
 
-  const pinnedViews = (props.pinnedViews || []).slice().sort((a, b) => Number(a.position) - Number(b.position))
   const pinnedTables = (props.pinnedTables || []).slice().sort((a, b) => Number(a.position) - Number(b.position))
-  const pinnedBoards = (props.pinnedTaskBoards || []).slice().sort((a, b) => Number(a.position) - Number(b.position))
   const pinnedDocs = (props.pinnedDocs || []).slice().sort((a, b) => Number(a.position) - Number(b.position))
-  const assignedTools = (props.assignedTools || []).slice()
-  const hasAnyResources = assignedTools.length > 0 || pinnedViews.length > 0 || pinnedTables.length > 0 || pinnedBoards.length > 0 || pinnedDocs.length > 0
 
   const openPinnedTable = (tableId: string) => {
     const id = String(tableId || '').trim()

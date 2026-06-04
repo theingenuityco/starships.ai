@@ -43,14 +43,6 @@ export interface AgentModel extends AgentParamsWithoutMetadata {
   blueprint?: Blueprint;
 
   /**
-   * Optional denormalized view of tool assignments for this agent.
-   *
-   * Tools are stored via the agent↔tool junction table, but some endpoints
-   * (e.g. admin review or listing views) include the attached tool slugs for UI convenience.
-   */
-  assignedToolSlugs?: string[];
-
-  /**
    * Optional avatar image for the agent, stored as an Attachment (S3-backed).
    * This is auth-scoped via starship access and served through the attachments endpoints.
    */
@@ -72,36 +64,6 @@ export interface AgentModel extends AgentParamsWithoutMetadata {
 }
 
 // ============================================================================
-// AGENT ↔ TOOL PERMISSIONS (join metadata)
-// ============================================================================
-
-/**
- * Permission an agent has to trigger a tool.
- * - allow: agent can invoke tool
- * - ask: agent can invoke tool but requires confirmation (UI-level / future engine gate)
- * - deny: agent cannot invoke tool
- */
-export type AgentToolPermission = 'allow' | 'ask' | 'deny';
-
-/**
- * Starship-scoped matrix row: (agent, tool) → permission.
- * Returned by starship listing endpoints for rendering permission grids.
- */
-export interface StarshipAgentToolPermissionModel {
-  agentId: string;
-  toolId: string;
-  toolSlug: string;
-  permission: AgentToolPermission;
-}
-
-export interface UpdateAgentToolPermissionsRequest {
-  permissions: Array<{
-    toolSlug: string;
-    permission: AgentToolPermission;
-  }>;
-}
-
-// ============================================================================
 // AGENT REQUEST/RESPONSE TYPES
 // ============================================================================
 
@@ -115,7 +77,6 @@ export type CreateAgentRequest = AgentParamsWithoutMetadata & {
   role: string;
   // Optional categorization (for organizing agents in UI/marketplace)
   category?: string;
-  assignedToolSlugs?: string[]; // Temporary: used during creation to establish relationships
   // Optional prompts
   previewPrompts?: string[];
   // Versioning fields

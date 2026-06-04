@@ -2,12 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useInfiniteQuery } from '@tanstack/react-query'
 import Link from 'next/link'
 
-import api from '@/lib/api'
-import type { AgentModel, ApiResponse, PaginationMeta, ToolModel } from '@starships/protocol'
-import type { FetchResponse } from '@/lib/types'
+import type { AgentModel, PaginationMeta } from '@starships/protocol'
 
 import Icon from '@/components/primitives/Icon'
 import AgentAvatar from '@/components/animated/AgentAvatar'
@@ -28,7 +25,6 @@ import { useMessageAttachments } from '@/hooks/useFileUpload'
 import { useInfiniteConnectorCatalog } from '@/hooks/useConnectors'
 import { cn } from '@/lib/utils'
 import { formatAgentDisplayName } from '@/lib/agentDisplay'
-import { pickToolLeftIcon } from '@/lib/toolTemplateIcon'
 
 interface IntegrationsSettingsContentProps {
   slug: string
@@ -184,61 +180,6 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
     return m
   }, [agentAvatarAttachments])
 
-  // Automations (starship tools, starship-scoped)
-  type ToolsPage = { tools: ToolModel[]; pagination: PaginationMeta | null }
-  const toolsQuery = useInfiniteQuery({
-    queryKey: ['starship-automations', starshipId, 'paged', { limit: QUERY_PAGE_SIZE, search: debouncedQuery || null, order: 'DESC' }] as const,
-    enabled: Boolean(starshipId),
-    initialPageParam: 1,
-    queryFn: async ({ pageParam }): Promise<ToolsPage> => {
-      const page = typeof pageParam === 'number' ? pageParam : Number(pageParam)
-      const response: FetchResponse<ApiResponse<ToolModel[]>> = await api.get(`/api/v1/starships/${starshipId}/tools`, {
-        params: {
-          page,
-          limit: QUERY_PAGE_SIZE,
-          search: debouncedQuery || undefined,
-          order: 'DESC',
-        },
-      })
-      return { tools: response.data.data || [], pagination: response.data.meta?.pagination ?? null }
-    },
-    getNextPageParam: last => {
-      const p = last?.pagination
-      if (!p) return undefined
-      return p.has_next ? p.page + 1 : undefined
-    },
-    staleTime: 30 * 1000,
-  })
-
-  const toolsPagination = useMemo<PaginationMeta | null>(() => {
-    const pages = toolsQuery.data?.pages ?? []
-    for (let i = pages.length - 1; i >= 0; i--) {
-      const p = pages[i]?.pagination ?? null
-      if (p) return p
-    }
-    return null
-  }, [toolsQuery.data])
-
-  const tools = useMemo(() => {
-    const pages = toolsQuery.data?.pages ?? []
-    return pages.flatMap(p => (Array.isArray(p?.tools) ? p.tools : []))
-  }, [toolsQuery.data])
-
-  const visibleAutomations = useMemo(() => {
-    return isAllTab ? tools.slice(0, SECTION_PREVIEW_LIMIT) : tools
-  }, [SECTION_PREVIEW_LIMIT, isAllTab, tools])
-
-  const toolLeftIconById = useMemo(() => {
-    const m = new Map<string, { name: string; title: string }>()
-    for (const t of tools || []) {
-      const id = String(t?.id || '').trim()
-      if (!id) continue
-      const label = String(t?.name || '').trim() || String(t?.slug || '').trim() || 'Tool'
-      m.set(id, pickToolLeftIcon(label))
-    }
-    return m
-  }, [tools])
-
   const [connectorStats, setConnectorStats] = useState<{ total: number; connected: number } | null>(null)
   const handleConnectorStatsChange = useCallback((stats: { total: number; connected: number }) => {
     setConnectorStats(prev => (prev && prev.total === stats.total && prev.connected === stats.connected ? prev : stats))
@@ -275,12 +216,6 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
     if (!agentsQuery.isLoading) return agents.length
     return null
   }, [agents.length, agentsPagination?.total, agentsQuery.isLoading])
-
-  const automationsTotalForBadges = useMemo<number | null>(() => {
-    if (typeof toolsPagination?.total === 'number') return toolsPagination.total
-    if (!toolsQuery.isLoading) return tools.length
-    return null
-  }, [tools.length, toolsPagination?.total, toolsQuery.isLoading])
 
   const connectorsTotalForBadges = useMemo<number | null>(() => {
     if (!canManageConnectors) return 0
@@ -321,7 +256,6 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
   }, [debouncedQuery, isAllTab])
 
   const baseShowAgents = false
-  const baseShowAutomations = false
   const baseShowConnectors = tabFromUrl === 'connectors' && canManageConnectors
 
   // In the All tab, hide empty sections during search (q present).
@@ -331,12 +265,6 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
     if (!isAllTab || !isSearchActive) return true
     return agentsQuery.isLoading || agents.length > 0
   }, [agents.length, agentsQuery.isLoading, baseShowAgents, isAllTab, isSearchActive])
-
-  const showAutomations = useMemo(() => {
-    if (!baseShowAutomations) return false
-    if (!isAllTab || !isSearchActive) return true
-    return toolsQuery.isLoading || tools.length > 0
-  }, [baseShowAutomations, isAllTab, isSearchActive, tools.length, toolsQuery.isLoading])
 
   const showConnectors = useMemo(() => {
     if (!baseShowConnectors) return false
@@ -350,8 +278,6 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
   const q = debouncedQuery.trim()
   const isInitialAgentsLoading = !q && Boolean(agentsQuery.isLoading)
   const isSearchingAgents = Boolean(q && (agentsQuery.isLoading || (agentsQuery.isFetching && !agentsQuery.isFetchingNextPage)))
-  const isInitialAutomationsLoading = !q && Boolean(toolsQuery.isLoading)
-  const isSearchingAutomations = Boolean(q && (toolsQuery.isLoading || (toolsQuery.isFetching && !toolsQuery.isFetchingNextPage)))
 
   const mobileFilterOptions = useMemo(() => {
     const withCount = (label: string, n: number | null) => (typeof n === 'number' ? `${label} (${n})` : label)
@@ -494,91 +420,6 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
     )
   }
 
-  const renderAutomationsList = () => {
-    if (isInitialAutomationsLoading) {
-      return <div className="space-y-2">{Array.from({ length: 3 }, (_, i) => renderRowSkeleton(`automation-skel-${i}`))}</div>
-    }
-    if (isSearchingAutomations) {
-      return renderCenteredState(`Searching “${q}”…`)
-    }
-    if (!Array.isArray(visibleAutomations) || visibleAutomations.length === 0) {
-      return (
-        <div className="flex items-center justify-center py-10">
-          <p className="text-sm text-muted-foreground text-center">{debouncedQuery ? `No automations match “${debouncedQuery}”.` : 'No automations installed in this starship yet.'}</p>
-        </div>
-      )
-    }
-
-    return (
-      <div className="space-y-2">
-        {visibleAutomations.map((t: ToolModel) => {
-          const toolSlug = String(t?.slug || '')
-          const toolLeftIcon = toolLeftIconById.get(String(t?.id || '').trim()) ?? pickToolLeftIcon(String(t?.name || '').trim() || 'Tool')
-          return (
-            <div key={String(t.id)} className="rounded-lg border border-border/60 bg-card px-4 py-3 flex items-start justify-between gap-3">
-              <div className="min-w-0 flex-1" aria-label={t.name || toolSlug || 'Tool'}>
-                <div className="flex items-start gap-3">
-                  <div className="relative mt-0.5 h-10 w-10 flex-shrink-0">
-                    <span
-                      className="flex h-10 w-10 items-center justify-center rounded-full ring-1 ring-border/50 bg-muted/10 overflow-hidden"
-                      title={toolLeftIcon.title}
-                      aria-label={toolLeftIcon.title}
-                    >
-                      <Icon name={toolLeftIcon.name} className="h-4 w-4 text-muted-foreground" />
-                    </span>
-                    <PresenceIndicator kind="online" active={true} size="sm" placement="outset" className="translate-x-[22%] translate-y-[6%]" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        className="text-sm font-medium truncate text-foreground hover:underline text-left"
-                        onClick={() => {
-                          if (!toolSlug) return
-                          router.push(`/ship/${slug}/tool/${encodeURIComponent(toolSlug)}`)
-                        }}
-                        title={t.name || toolSlug}
-                        disabled={!toolSlug}
-                      >
-                        {t.name || 'Untitled tool'}
-                      </button>
-                    </div>
-                    <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-                      {t?.description ? <span className="truncate">{String(t.description)}</span> : null}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-1 self-center">
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className={INTEGRATION_CTA_BUTTON_CLASS}
-                  onClick={() => {
-                    if (!toolSlug) return
-                    router.push(`/ship/${slug}/tool/${encodeURIComponent(toolSlug)}`)
-                  }}
-                  disabled={!toolSlug}
-                >
-                  <Icon name="chevron-right" className={INTEGRATION_CTA_ICON_CLASS} />
-                  Open
-                </Button>
-              </div>
-            </div>
-          )
-        })}
-        {!isAllTab && toolsQuery.hasNextPage ? (
-          <div className="flex justify-center pt-4">
-            <Button size="sm" variant="outline" onClick={() => toolsQuery.fetchNextPage()} disabled={toolsQuery.isFetchingNextPage} className={INTEGRATION_OUTLINE_BUTTON_CLASS}>
-              {toolsQuery.isFetchingNextPage ? 'Loading…' : 'Load more automations'}
-            </Button>
-          </div>
-        ) : null}
-      </div>
-    )
-  }
-
   return (
     <div className="relative flex flex-col min-h-full min-w-0">
       <div className="sticky top-0 z-10 border-b border-border/60 bg-card">
@@ -666,31 +507,6 @@ export function IntegrationsSettingsContent({ slug }: IntegrationsSettingsConten
                           <Link href={buildInstalledTabHref('agents')}>Show all agents</Link>
                         </Button>
                       ) : null}
-                    </div>
-                  ) : null}
-                </section>
-              ) : null}
-
-              {showAutomations ? (
-                <section>
-                  <div className="mb-3 flex items-center justify-between gap-3">
-                    <div className="min-w-0 flex items-baseline gap-3">
-                      <h3 className="text-lg font-semibold leading-tight text-foreground">Automations</h3>
-                      {typeof toolsPagination?.total === 'number' ? <span className="text-xs text-muted-foreground tabular-nums">({toolsPagination.total})</span> : null}
-                    </div>
-                    <Button asChild size="sm" variant="ghost" className="h-8 text-primary hover:text-primary">
-                      <Link href="/explore/automations">
-                        <Icon name="store" iconOverride={{ type: 'phosphor', component: 'Storefront' }} className="h-4 w-4 mr-1.5" />
-                        Explore automations
-                      </Link>
-                    </Button>
-                  </div>
-                  {renderAutomationsList()}
-                  {isAllTab && !isSearchActive ? (
-                    <div className="flex justify-center pt-4">
-                      <Button asChild size="sm" variant="outline" className={INTEGRATION_OUTLINE_BUTTON_CLASS}>
-                        <Link href={buildInstalledTabHref('connectors')}>Show all automations</Link>
-                      </Button>
                     </div>
                   ) : null}
                 </section>

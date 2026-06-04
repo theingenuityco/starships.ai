@@ -26,7 +26,6 @@ export interface AgentFormData {
   reasoning: 'none' | 'low' | 'medium' | 'high'
   systemPrompt: string
   previewPrompts?: string[]
-  assignedToolSlugs: string[] // Array of tool slugs
   blueprint: string // JSON string for the blueprint
   timeout: number
   icon: string

@@ -1,16 +1,14 @@
-import type { AgentModel, AgentToolPermission, CreateAgentRequest } from '../domains/agent';
+import type { AgentModel, CreateAgentRequest } from '../domains/agent';
 import type { ConnectorEndpointV2, CreateConnectorTemplateRequest } from '../domains/connector';
-import type { ToolModel, CreateToolRequest } from '../domains/tool';
 import type { CreateViewRequest } from '../domains/view';
 import type { CreateTaskBoardRequest, TaskCardModel, TaskColumnModel } from '../domains/task-board';
 import type { Room } from '../domains/room';
 import type { CreateStarshipTableRequest, StarshipTableRowModel } from '../domains/table';
 
-export type ImportExportKind = 'agent' | 'tool' | 'connector_template' | 'room' | 'view' | 'table' | 'task_board';
+export type ImportExportKind = 'agent' | 'connector_template' | 'room' | 'view' | 'table' | 'task_board';
 
 /**
  * Shared container/envelope for importing/exporting resources as JSON.
- * This is intentionally stable so the same pipeline can handle both agents and tools.
  */
 export interface ImportExportContainerV1<K extends ImportExportKind = ImportExportKind> {
   schemaVersion: '1';
@@ -32,17 +30,15 @@ export interface ImportExportContainerV1<K extends ImportExportKind = ImportExpo
   };
   payload: K extends 'agent'
     ? AgentExportPayloadV1
-    : K extends 'tool'
-      ? ToolExportPayloadV1
-      : K extends 'room'
-        ? RoomExportPayloadV1
-        : K extends 'view'
-          ? ViewExportPayloadV1
-          : K extends 'table'
-            ? TableExportPayloadV1
-            : K extends 'task_board'
-              ? TaskBoardExportPayloadV1
-              : ConnectorTemplateExportPayloadV1;
+    : K extends 'room'
+      ? RoomExportPayloadV1
+      : K extends 'view'
+        ? ViewExportPayloadV1
+        : K extends 'table'
+          ? TableExportPayloadV1
+          : K extends 'task_board'
+            ? TaskBoardExportPayloadV1
+            : ConnectorTemplateExportPayloadV1;
 }
 
 /**
@@ -51,24 +47,9 @@ export interface ImportExportContainerV1<K extends ImportExportKind = ImportExpo
  * Notes:
  * - We export a create-compatible shape (based on CreateAgentRequest) instead of AgentModel
  *   to avoid including starship-scoped identifiers and database timestamps.
- * - assignedToolSlugs are stored separately as a dependency list.
  */
 export interface AgentExportPayloadV1 {
   agent: Partial<CreateAgentRequest> & {
-    name: string;
-  };
-  assignedToolSlugs?: string[];
-}
-
-/**
- * Export payload for a Tool.
- *
- * Notes:
- * - We export a create-compatible shape (based on CreateToolRequest) instead of ToolModel.
- * - We intentionally omit configuration by default (configs frequently include secrets).
- */
-export interface ToolExportPayloadV1 {
-  tool: Partial<Omit<CreateToolRequest, 'configuration'>> & {
     name: string;
   };
 }
@@ -78,7 +59,6 @@ export interface RoomExportPayloadV1 {
   viewPins?: Array<{ viewSlug: string; position: number }>;
   tablePins?: Array<{ tableSlug: string; position: number }>;
   taskBoardPins?: Array<{ taskBoardSlug: string; position: number }>;
-  toolAssignments?: Array<{ toolSlug: string; permission: AgentToolPermission }>;
   agentParticipantSlugs?: string[];
 }
 
@@ -134,8 +114,7 @@ export interface ConnectorTemplateExportPayloadV1 {
 }
 
 export interface StarshipImportResponse {
-  kind: 'agent' | 'tool';
+  kind: 'agent';
   warnings?: string[];
   agent?: AgentModel;
-  tool?: ToolModel;
 }

@@ -242,7 +242,7 @@ export async function runAgentTurn(deps: AgentTurnDeps, args: AgentTurnArgs): Pr
         ...(agentModel.reasoning ? { reasoning: agentModel.reasoning } : {}),
         ...(extras ? { extras } : {}),
       };
-      result = await cliAgentContainerLauncher.launch({ spec, hostDir: ws.hostDir, onEvent, ...(args.signal ? { signal: args.signal } : {}) });
+      result = await cliAgentContainerLauncher.launch({ spec, hostDir: ws.hostDir, starshipId, onEvent, ...(args.signal ? { signal: args.signal } : {}) });
     } else {
       result = await runInProcessAgentTurn({
         modelId,

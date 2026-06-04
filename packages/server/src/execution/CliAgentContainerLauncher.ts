@@ -3,11 +3,15 @@ import { mkdtemp, writeFile, rm, chown } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { CliAgentJobSpec, CliAgentEvent, CliAgentResult, CliWorkspaceSpec, CliGitCredentials } from '@starships/autopilot-cli';
+import { StarshipVolumeProvisioner, starshipDefinitionDir } from '@starships/models';
+import { getEnvConfig } from '@starships/env';
 import { WORKSPACE_CHECKOUT_SUBDIR } from './WorkspaceSessionManager';
 
 /** Where the persistent per-conversation workspace is mounted inside the sandbox. */
 const CONTAINER_WORKSPACE_BASE = '/workspace';
 const CONTAINER_CHECKOUT_DIR = `${CONTAINER_WORKSPACE_BASE}/${WORKSPACE_CHECKOUT_SUBDIR}`;
+/** Where the durable per-starship definition volume is mounted (read-only) inside the sandbox. */
+const CONTAINER_STARSHIP_DIR = '/starship';
 
 /** Path to the CLI job-agent entrypoint inside the sandbox image (relative to its WORKDIR). */
 const CLI_JOB_AGENT_ENTRYPOINT = process.env.RUNNER_CLI_JOB_AGENT_PATH || 'dist/cliAgent/cliJobAgent.js';
@@ -20,6 +24,12 @@ export interface LaunchCliAgentInput {
   };
   /** Persistent per-conversation host dir, bind-mounted at /workspace. */
   hostDir: string;
+  /**
+   * Starship owning this turn. When STARSHIP_FS_AUTHORITY is on, its durable
+   * definition volume is bind-mounted read-only at /starship so the agent can
+   * read its own `.starship/` definitions.
+   */
+  starshipId?: string;
   /** No-repo run: the agent's cwd is the mount root (/workspace) rather than a checkout subdir. */
   scratch?: boolean;
   onEvent?: (event: CliAgentEvent) => void | Promise<void>;
@@ -77,8 +87,24 @@ export class CliAgentContainerLauncher {
       );
     }
 
+    // When the filesystem definition plane is authoritative, mount the starship's
+    // durable .starship/ volume read-only so the agent can read its own definitions.
+    // Provision first: a read-only bind requires the host dir to exist.
+    let starshipDefHostDir: string | undefined;
+    if (input.starshipId && getEnvConfig().STARSHIP_FS_AUTHORITY === true) {
+      try {
+        await new StarshipVolumeProvisioner().ensureProvisioned(input.starshipId);
+        starshipDefHostDir = starshipDefinitionDir(input.starshipId);
+      } catch (err) {
+        console.warn(
+          `[CliAgentContainerLauncher] could not provision .starship volume for ${input.starshipId}; skipping /starship mount`,
+          err instanceof Error ? err.message : err
+        );
+      }
+    }
+
     try {
-      return await this.runContainer(jobFile, hostDir, onEvent, input.signal);
+      return await this.runContainer(jobFile, hostDir, starshipDefHostDir, onEvent, input.signal);
     } finally {
       // The workspace (hostDir) is the persistent, per-conversation mount owned by
       // WorkspaceSessionManager; only the ephemeral job dir is cleaned here.
@@ -86,7 +112,7 @@ export class CliAgentContainerLauncher {
     }
   }
 
-  private buildDockerArgs(jobFile: string, hostWorkspaceDir: string): string[] {
+  private buildDockerArgs(jobFile: string, hostWorkspaceDir: string, starshipDefHostDir?: string): string[] {
     const image = process.env.RUNNER_SANDBOX_IMAGE || 'starships-sandbox:latest';
     const memory = process.env.RUNNER_SANDBOX_MEMORY || '2g';
     const cpus = process.env.RUNNER_SANDBOX_CPUS || '2';
@@ -122,6 +148,8 @@ export class CliAgentContainerLauncher {
       `${jobFile}:/job/job.json:ro`,
       '-v',
       `${hostWorkspaceDir}:/workspace:rw`,
+      // Read-only definition volume (Stage 4); writable self-edit is Stage 5.
+      ...(starshipDefHostDir ? ['-v', `${starshipDefHostDir}:${CONTAINER_STARSHIP_DIR}:ro`] : []),
       image,
       // Override the image's default CMD (jobAgent) to run the CLI agent entrypoint.
       'node',
@@ -132,11 +160,12 @@ export class CliAgentContainerLauncher {
   private runContainer(
     jobFile: string,
     hostWorkspaceDir: string,
+    starshipDefHostDir?: string,
     onEvent?: (event: CliAgentEvent) => void | Promise<void>,
     signal?: AbortSignal
   ): Promise<CliAgentResult> {
     return new Promise<CliAgentResult>((resolve, reject) => {
-      const child = spawn('docker', this.buildDockerArgs(jobFile, hostWorkspaceDir), {
+      const child = spawn('docker', this.buildDockerArgs(jobFile, hostWorkspaceDir, starshipDefHostDir), {
         stdio: ['ignore', 'pipe', 'pipe'],
       });
 

@@ -6,7 +6,7 @@
  * Starship and Conversation.
  */
 
-import type { LLMUsage } from '@starships/autopilot';
+import type { LLMUsage } from './llm';
 
 export interface UsageModel extends LLMUsage {
   // Database identity

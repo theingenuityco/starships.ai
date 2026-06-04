@@ -33,13 +33,8 @@
       "inputs": ["$TURBO_DEFAULT$", ".env", ".env.local"],
       "outputs": ["dist/**", ".next/**", "build/**"]
     },
-    "@starships/autopilot#build": {
-      "inputs": ["$TURBO_DEFAULT$", "scripts/**", ".env", ".env.local"],
-      "outputs": ["dist/**"],
-      "cache": false
-    },
     "@starships/protocol#build": {
-      "dependsOn": ["@starships/autopilot#build"],
+      "dependsOn": [],
       "inputs": ["$TURBO_DEFAULT$", ".env", ".env.local"],
       "outputs": ["dist/**"]
     },
@@ -49,7 +44,7 @@
       "outputs": ["dist/**"]
     },
     "@starships/models#build": {
-      "dependsOn": ["@starships/env#build", "@starships/autopilot#build", "@starships/errors#build", "@starships/protocol#build"],
+      "dependsOn": ["@starships/env#build", "@starships/errors#build", "@starships/protocol#build"],
       "inputs": ["$TURBO_DEFAULT$", ".env", ".env.local"],
       "outputs": ["dist/**"]
     },
@@ -58,7 +53,6 @@
         "@starships/errors#build",
         "@starships/models#build",
         "@starships/protocol#build",
-        "@starships/autopilot#build",
         "@starships/connectors#build",
         "@starships/autopilot-cli#build"
       ],
@@ -70,9 +64,9 @@
       "outputs": ["dist/**"]
     },
     "@starships/autopilot-runner#build": {
-      "dependsOn": ["@starships/autopilot#build", "@starships/protocol#build", "@starships/autopilot-cli#build"],
-      "inputs": ["$TURBO_DEFAULT$", ".env", ".env.local", "buf.yaml", "buf.gen.yaml", "src/proto/**"],
-      "outputs": ["dist/**", "src/gen/**"]
+      "dependsOn": ["@starships/protocol#build", "@starships/autopilot-cli#build"],
+      "inputs": ["$TURBO_DEFAULT$", ".env", ".env.local"],
+      "outputs": ["dist/**"]
     },
     "@starships/reverse-proxy#build": {
       "inputs": ["$TURBO_DEFAULT$", ".env", ".env.local"],
@@ -88,13 +82,8 @@
       "cache": false,
       "persistent": true
     },
-    "@starships/autopilot#dev": {
-      "dependsOn": ["@starships/autopilot#build"],
-      "cache": false,
-      "persistent": true
-    },
     "@starships/models#dev": {
-      "dependsOn": ["@starships/autopilot#build", "^build"],
+      "dependsOn": ["^build"],
       "cache": false,
       "persistent": true
     },
@@ -132,7 +121,7 @@
       "outputs": []
     },
     "@starships/client#lint": {
-      "dependsOn": ["@starships/autopilot#build", "@starships/protocol#build"],
+      "dependsOn": ["@starships/protocol#build"],
       "inputs": ["$TURBO_DEFAULT$", ".eslintrc.*", "eslint.config.*"],
       "outputs": []
     },
@@ -141,7 +130,6 @@
         "@starships/errors#build",
         "@starships/models#build",
         "@starships/protocol#build",
-        "@starships/autopilot#build",
         "@starships/connectors#build"
       ],
       "inputs": ["$TURBO_DEFAULT$", ".eslintrc.*", "eslint.config.*"],
@@ -153,7 +141,7 @@
       "outputs": []
     },
     "@starships/models#lint": {
-      "dependsOn": ["@starships/env#build", "@starships/autopilot#build", "@starships/errors#build", "@starships/protocol#build"],
+      "dependsOn": ["@starships/env#build", "@starships/errors#build", "@starships/protocol#build"],
       "inputs": ["$TURBO_DEFAULT$", ".eslintrc.*", "eslint.config.*"],
       "outputs": []
     },
@@ -161,26 +149,21 @@
       "inputs": ["$TURBO_DEFAULT$", ".eslintrc.*", "eslint.config.*"],
       "outputs": []
     },
-    "@starships/autopilot#type-check": {
-      "inputs": ["$TURBO_DEFAULT$", "tsconfig.json"],
-      "outputs": []
-    },
     "@starships/env#type-check": {
       "inputs": ["$TURBO_DEFAULT$", "tsconfig.json"],
       "outputs": []
     },
     "@starships/protocol#type-check": {
-      "dependsOn": ["@starships/autopilot#build"],
-      "inputs": ["$TURBO_DEFAULT$", "tsconfig.json", "../../packages/autopilot/dist/**"],
+      "dependsOn": [],
+      "inputs": ["$TURBO_DEFAULT$", "tsconfig.json"],
       "outputs": []
     },
     "@starships/models#type-check": {
-      "dependsOn": ["@starships/env#build", "@starships/autopilot#build", "@starships/errors#build", "@starships/protocol#build"],
+      "dependsOn": ["@starships/env#build", "@starships/errors#build", "@starships/protocol#build"],
       "inputs": [
         "$TURBO_DEFAULT$",
         "tsconfig.json",
         "../../packages/env/dist/**",
-        "../../packages/autopilot/dist/**",
         "../../packages/errors/dist/**",
         "../../packages/protocol/dist/**"
       ],
@@ -191,7 +174,6 @@
         "@starships/errors#build",
         "@starships/models#build",
         "@starships/protocol#build",
-        "@starships/autopilot#build",
         "@starships/connectors#build",
         "@starships/autopilot-cli#build"
       ],
@@ -201,15 +183,14 @@
         "../../packages/errors/dist/**",
         "../../packages/models/dist/**",
         "../../packages/protocol/dist/**",
-        "../../packages/autopilot/dist/**",
         "../../packages/connectors/dist/**",
         "../../packages/autopilot-cli/dist/**"
       ],
       "outputs": []
     },
     "@starships/client#type-check": {
-      "dependsOn": ["@starships/autopilot#build", "@starships/protocol#build"],
-      "inputs": ["$TURBO_DEFAULT$", "tsconfig.json", "../../packages/autopilot/dist/**", "../../packages/protocol/dist/**"],
+      "dependsOn": ["@starships/protocol#build"],
+      "inputs": ["$TURBO_DEFAULT$", "tsconfig.json", "../../packages/protocol/dist/**"],
       "outputs": []
     },
     "@starships/errors#type-check": {
@@ -228,11 +209,10 @@
       "outputs": []
     },
     "@starships/autopilot-runner#type-check": {
-      "dependsOn": ["@starships/autopilot#build", "@starships/protocol#build", "@starships/autopilot-cli#build"],
+      "dependsOn": ["@starships/protocol#build", "@starships/autopilot-cli#build"],
       "inputs": [
         "$TURBO_DEFAULT$",
         "tsconfig.json",
-        "../../packages/autopilot/dist/**",
         "../../packages/protocol/dist/**",
         "../../packages/autopilot-cli/dist/**"
       ],
@@ -247,7 +227,7 @@
       "outputs": []
     },
     "@starships/models#test": {
-      "dependsOn": ["@starships/env#build", "@starships/autopilot#build", "@starships/errors#build", "@starships/protocol#build"],
+      "dependsOn": ["@starships/env#build", "@starships/errors#build", "@starships/protocol#build"],
       "inputs": ["$TURBO_DEFAULT$", "jest.config.*", "**/*.test.*", "**/__tests__/**"],
       "outputs": []
     },

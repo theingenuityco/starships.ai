@@ -29,8 +29,11 @@ jest.mock('@/middleware/verify-starship-access', () => ({
 
 jest.mock('@starships/models', () => ({
   AgentRepository: jest.fn(),
+  ConnectorRepository: jest.fn(),
+  ConnectorSecretRepository: jest.fn(),
   ConversationRepository: jest.fn(),
   ConversationParticipantRepository: jest.fn(),
+  PlatformSecretRepository: jest.fn(),
   PostgresConnection: jest.fn(),
   RoomTablesRepository: jest.fn(),
   RoomRepository: jest.fn(),

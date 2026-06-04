@@ -29,15 +29,12 @@
     "db-cli": "tsx src/scripts/db-cli.ts",
     "migrate:seeded-template-parents": "tsx src/scripts/migrate-seeded-template-parents.ts",
     "migrate:regenerate-slugs": "tsx src/scripts/regenerate-slugs.ts",
-    "update:default-agent-blueprints": "tsx src/scripts/update-default-agent-blueprints.ts",
     "provision:agent-role": "tsx src/scripts/provision-agent-role.ts",
-    "pretest": "pnpm --filter @starships/autopilot build",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage"
   },
   "dependencies": {
-    "@starships/autopilot": "workspace:*",
     "@starships/env": "workspace:*",
     "@starships/errors": "workspace:*",
     "@starships/protocol": "workspace:*",

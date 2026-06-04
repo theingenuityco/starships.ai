@@ -1,31 +1,9 @@
-import { GrpcServer } from '@/server/GrpcServer';
-import { InMemoryQueue } from '@/queue/InMemoryQueue';
-import { WorkerPool } from '@/queue/Worker';
-import { InProcessExecutor } from '@/executor/InProcessExecutor';
-import type { RunnerTask } from '@/queue/Queue';
-
-function getEnv(name: string, fallback?: string): string | undefined {
-  const val = process.env[name];
-  return typeof val === 'string' && val.length > 0 ? val : fallback;
-}
-
-async function main(): Promise<void> {
-  const port = Number(getEnv('RUNNER_PORT', '50051'));
-  const concurrency = Number(getEnv('RUNNER_CONCURRENCY', '4'));
-  const authToken = getEnv('RUNNER_AUTH_TOKEN');
-  const fastPathEnabled = getEnv('RUNNER_FASTPATH_ENABLED', 'true') === 'true';
-
-  const queue = new InMemoryQueue<RunnerTask>();
-  const executor = new InProcessExecutor();
-  const workers = new WorkerPool({ queue, executor, concurrency });
-  workers.start();
-
-  const server = new GrpcServer({ port, authToken, queue, executor, workers, fastPathEnabled });
-  await server.start();
-  console.log(`[autopilot-runner] gRPC server listening on :${port}`);
-}
-
-main().catch((err) => {
-  console.error('[autopilot-runner] Fatal error', err);
-  process.exit(1);
-});
+/**
+ * @starships/autopilot-runner
+ *
+ * Sandbox entrypoint host for the code-native CLI agent. The runnable entrypoint is
+ * `dist/cliAgent/cliJobAgent.js` (launched directly by the server's
+ * CliAgentContainerLauncher). This index just re-exports the job runner for reuse.
+ */
+export { runCliAgentJob } from '@/cliAgent/CliAgentJob';
+export type { CliAgentJobSpec, RunCliAgentJobOptions } from '@/cliAgent/CliAgentJob';

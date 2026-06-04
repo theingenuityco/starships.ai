@@ -41,7 +41,8 @@ export class AvatarGenerationService {
     agentRole?: string;
     agentSystemPrompt?: string;
     agentModel: string;
-    agentBlueprint: Blueprint;
+    /** Inert legacy DAG blueprint (always undefined now; the column was dropped). */
+    agentBlueprint?: Blueprint;
     agentTools?: unknown[];
     starshipId: string;
     runtimeEnv?: Record<string, unknown>;

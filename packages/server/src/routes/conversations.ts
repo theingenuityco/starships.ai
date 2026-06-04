@@ -1323,7 +1323,7 @@ router.post(
             sendError(res, 'RESOURCE_NOT_FOUND', 'Tool not found', 200, { toolSlug, toolCallId, toolId: existing.toolId });
             return;
           }
-          if (toolById.status === 'draft' || !toolById.blueprint) {
+          if (toolById.status === 'draft') {
             sendError(res, 'VALIDATION_ERROR', 'Tool is not ready for execution', 200, { toolSlug, toolCallId, toolId: existing.toolId });
             return;
           }
@@ -1408,7 +1408,7 @@ router.post(
       if (cachedTool === undefined) {
         setCachedTool(toolCacheKey, tool);
       }
-      if (!tool || tool.status === 'draft' || !tool.blueprint) {
+      if (!tool || tool.status === 'draft') {
         sendError(res, 'VALIDATION_ERROR', 'Tool is not ready for execution', 200, { toolSlug, toolCallId });
         return;
       }
@@ -1574,7 +1574,7 @@ async function executeOneToolCallForBatch(params: {
       }
       // status === 'approved' — execute using the approved tool + args
       const toolById = await toolRepo.findById(existing.toolId ?? '');
-      if (!toolById || toolById.starshipId !== starshipId || toolById.status === 'draft' || !toolById.blueprint) {
+      if (!toolById || toolById.starshipId !== starshipId || toolById.status === 'draft') {
         return { kind: 'error', toolCallId, code: 'VALIDATION_ERROR', message: 'Tool is not ready for execution' };
       }
       const runtimeEnv = {
@@ -1633,7 +1633,7 @@ async function executeOneToolCallForBatch(params: {
   if (cachedTool === undefined) {
     setCachedTool(toolCacheKey, tool);
   }
-  if (!tool || tool.status === 'draft' || !tool.blueprint) {
+  if (!tool || tool.status === 'draft') {
     return { kind: 'error', toolCallId, code: 'VALIDATION_ERROR', message: 'Tool is not ready for execution' };
   }
 

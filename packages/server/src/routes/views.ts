@@ -733,7 +733,7 @@ router.post('/views/:id/actions', jwtAuthMiddleware, async (req: Request, res: R
 
       const toolRepo = new ToolRepository();
       const tool = await toolRepo.findBySlugAndStarship(workflowSlug, view.starshipId);
-      if (!tool || tool.status === 'draft' || !tool.blueprint) {
+      if (!tool || tool.status === 'draft') {
         return sendError(res, 'RESOURCE_NOT_FOUND', 'Workflow tool not found or not executable', 404, { workflowSlug });
       }
 

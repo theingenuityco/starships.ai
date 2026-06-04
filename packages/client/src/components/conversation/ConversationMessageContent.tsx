@@ -355,10 +355,6 @@ type ToolResultLike = {
   result?: unknown
 }
 
-// Cache tool display names so we don't refetch per-message/per-render.
-// Keyed by `${starshipId}:${toolSlug}` -> tool display name.
-const TOOL_NAME_CACHE = new Map<string, string>()
-
 // Built-in code-native CLI agent tools have no `tools` table row, so their display
 // names are resolved locally rather than via a (404-ing) getBySlug lookup.
 const CLI_TOOL_DISPLAY_NAMES: Record<string, string> = {
@@ -699,13 +695,10 @@ export function ConversationMessageContent({
     )
     if (slugs.length === 0) return
 
-    // Hydrate from cache first (no state update if already present)
+    // Resolve display names from the local CLI map (no state update if unchanged)
     const hydrated: Record<string, string> = {}
     for (const slug of slugs) {
-      const cached = TOOL_NAME_CACHE.get(`${starshipId}:${slug}`)
-      if (cached) {
-        hydrated[slug] = cached
-      } else if (CLI_TOOL_DISPLAY_NAMES[slug]) {
+      if (CLI_TOOL_DISPLAY_NAMES[slug]) {
         hydrated[slug] = CLI_TOOL_DISPLAY_NAMES[slug]
       }
     }
@@ -724,7 +717,7 @@ export function ConversationMessageContent({
 
     // Tool calls are connector actions / built-in CLI tools; display names come from
     // the local CLI map (above) or fall back to the slug. No remote tool lookup.
-  }, [normalizedToolCalls, starshipId])
+  }, [normalizedToolCalls])
 
   const [showCompletionTick, setShowCompletionTick] = useState(false)
   const prevCompletedRef = useRef<number>(completedToolResults)

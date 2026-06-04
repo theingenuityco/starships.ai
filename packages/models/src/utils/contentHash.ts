@@ -87,14 +87,9 @@ export function computeAgentContentHash(input: {
   blueprint?: unknown;
   category: unknown;
   previewPrompts: unknown;
-  assignedToolSlugs: unknown;
+  /** @deprecated Tools abstraction removed; accepted but ignored for backward-compat with legacy callers. */
+  assignedToolSlugs?: unknown;
 }): string {
-  const slugs = Array.isArray(input.assignedToolSlugs) ? input.assignedToolSlugs : [];
-  const normalizedSlugs = slugs
-    .filter((s) => typeof s === 'string' && s.trim().length > 0)
-    .map((s) => s.trim())
-    .sort();
-
   return sha256Hex(
     stableStringify({
       name: input.name ?? '',
@@ -109,7 +104,6 @@ export function computeAgentContentHash(input: {
       state: input.state ?? null,
       category: input.category ?? null,
       previewPrompts: input.previewPrompts ?? null,
-      assignedToolSlugs: normalizedSlugs,
     })
   );
 }

@@ -74,7 +74,7 @@ const openRouterClient =
 
 const ImportExportContainerSchemaV1 = z.object({
   schemaVersion: z.literal('1'),
-  kind: z.enum(['agent', 'tool']),
+  kind: z.literal('agent'),
   exportedAt: z.string().min(1),
   metadata: z
     .object({
@@ -128,7 +128,7 @@ function assertBundleManifestPathsOrThrow(manifest: z.infer<typeof ImportBundleM
 
 const ImportExportContainerSchemaV1RoomBundle = z.object({
   schemaVersion: z.literal('1'),
-  kind: z.enum(['agent', 'tool', 'room', 'view', 'table', 'task_board']),
+  kind: z.enum(['agent', 'room', 'view', 'table', 'task_board']),
   exportedAt: z.string().min(1),
   metadata: z
     .object({
@@ -1605,7 +1605,7 @@ router.get('/starships/:id/agents', jwtAuthMiddleware, async (req: Request, res:
 
 /**
  * POST /starships/:id/import
- * Import a single agent or tool into the given starship using the shared JSON container schema.
+ * Import a single agent into the given starship using the shared JSON container schema.
  *
  * Instance-admin only.
  */
@@ -1632,7 +1632,7 @@ router.post(
 
 /**
  * POST /starships/:id/import-bundle
- * Import a zipped agent bundle (manifest.json + agents/*.json + tools/*.json) into the given starship.
+ * Import a zipped agent bundle (manifest.json + agents/*.json) into the given starship.
  *
  * Instance-admin only.
  */

@@ -53,12 +53,13 @@ export function createAgentTurnEventMapper(deps: AgentTurnEventMapperDeps, ctx: 
   // Turn-slot sequencing. The user message occupies an earlier slot in this turn,
   // and on resume prior assistant/tool messages already occupy slots — so we start
   // after the max existing slot rather than at a fixed offset. Resolved lazily once.
-  let seqBase: number | null = null;
+  let seqBasePromise: Promise<number> | null = null;
   let seqOffset = 0;
   const nextTurnSeq = async (): Promise<number> => {
-    if (seqBase === null) seqBase = await deps.messageService.getMaxTurnSeq(ctx.turnId);
+    // Share a single in-flight DB read so concurrent events can't each fire their own.
+    seqBasePromise ??= deps.messageService.getMaxTurnSeq(ctx.turnId);
     seqOffset += 1;
-    return seqBase + seqOffset;
+    return (await seqBasePromise) + seqOffset;
   };
 
   const at = (): string => new Date().toISOString();

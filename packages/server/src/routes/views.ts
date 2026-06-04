@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { validateData } from '@/utils/validation';
 import { IdSchema, SlugSchema, noXSS, XSS_ERROR_MESSAGE } from '@/schemas/common';
 import { ViewRepository } from '@starships/models';
+import { AppError } from '@starships/errors';
 import { sendError, sendSuccess, handleError } from '../utils/responseHelpers';
 import { verifyStarshipAccess } from '@/middleware/verify-starship-access';
 import { ViewStreamBus } from '@/services/ViewStreamBus';
@@ -199,7 +200,7 @@ async function executeToolBlueprint(_args: {
   runnerConfig: Record<string, unknown>;
   eventCallback?: (evt: unknown) => void | Promise<void>;
 }): Promise<unknown> {
-  throw new Error('Workflow tool / view-action execution has been removed.');
+  throw new AppError('Workflow tool / view-action execution has been removed.', 'NOT_IMPLEMENTED', 501);
 }
 
 /**

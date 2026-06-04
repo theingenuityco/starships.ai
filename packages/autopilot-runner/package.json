@@ -19,7 +19,7 @@
     "start": "NODE_OPTIONS=--no-node-snapshot node dist/cliAgent/cliJobAgent.js",
     "type-check": "tsc --noEmit",
     "lint": "eslint src --ext .ts",
-    "test": "jest"
+    "test": "jest --passWithNoTests"
   },
   "dependencies": {
     "@starships/autopilot-cli": "workspace:*",

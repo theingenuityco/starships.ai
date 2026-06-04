@@ -27,6 +27,7 @@ import type { ContentBlock, MessageContent } from '@starships/protocol';
 import { isTextFile, MAX_TEXT_FILE_SIZE } from '@starships/protocol';
 import { getEnvConfig } from '@starships/env';
 import { runAgentTurn } from '@/services/AgentTurn';
+import { buildAutopilotExecutionBundle } from '@/services/autopilot-execution-bundle';
 import OpenAI from 'openai';
 import { StarshipTurnLeaseService } from '@/services/StarshipTurnLeaseService';
 import { UIActionService } from '@/services/UIActionService';
@@ -2554,6 +2555,15 @@ export class ConversationService {
       // Expose end-user id for provider-side attribution (abuse detection / caching).
       runtimeEnv.AUTH_USER_ID = authUserId;
 
+      // Build the execution bundle once for the whole hop loop. The fields runAgentTurn reads
+      // (llm, modelRoutes, connectorActionCallback) are stable across hops, so building per-hop
+      // would re-run the getAllModelProviders DB query for every agent in the chain.
+      const { engineConfig: turnEngineConfig } = await buildAutopilotExecutionBundle({
+        starshipId: starship.id,
+        authUserId,
+        runtimeEnv,
+      });
+
       // Orchestrate sequentially without dynamic mention-based handoffs
       while (agentQueue.length > 0 && hops < maxHops) {
         const agentModel = agentQueue.shift()!;
@@ -2677,6 +2687,11 @@ export class ConversationService {
         const cfg = agentModel as unknown as Record<string, unknown>;
         const turnAuthUserId = typeof runtimeEnv?.AUTH_USER_ID === 'string' ? runtimeEnv.AUTH_USER_ID : authUserId;
         const turnRoomId = typeof runtimeEnv?.ROOM_ID === 'string' ? runtimeEnv.ROOM_ID : undefined;
+
+        // Replace the placeholder cancel handle with one that aborts the in-process loop, so a
+        // stop request (cancelTurn -> activeCancellations) propagates into this turn end-to-end.
+        const turnAbort = new AbortController();
+        ConversationService.activeCancellations.set(data.conversationId, () => turnAbort.abort());
         await runAgentTurn(
           {
             messageService: this.messageService,
@@ -2706,6 +2721,8 @@ export class ConversationService {
             ...(Array.isArray(data.modalities) && data.modalities.length > 0 ? { modalities: data.modalities } : {}),
             ...(data.imageConfig && typeof data.imageConfig === 'object' ? { imageConfig: data.imageConfig } : {}),
             ...(plugins !== undefined ? { plugins } : {}),
+            engineConfig: turnEngineConfig,
+            signal: turnAbort.signal,
           }
         );
 

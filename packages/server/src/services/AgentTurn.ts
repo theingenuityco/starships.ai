@@ -30,6 +30,7 @@ import type { ConversationStreamBus } from '@/services/ConversationStreamBus';
 import { cliAgentContainerLauncher } from '@/execution/CliAgentContainerLauncher';
 import { runInProcessAgentTurn } from '@/execution/InProcessCliAgentRunner';
 import { workspaceSessionManager } from '@/execution/WorkspaceSessionManager';
+import type { AutopilotRunnerExecuteConfig } from '@/services/autopilot-execution-bundle';
 import { buildAutopilotRuntimeEnv, buildAutopilotExecutionBundle } from '@/services/autopilot-execution-bundle';
 import { createAgentTurnEventMapper } from '@/services/agentTurnEventMapper';
 
@@ -137,6 +138,18 @@ export interface AgentTurnArgs {
   imageConfig?: Record<string, unknown>;
   /** OpenRouter LLM plugins (e.g. web search), resolved from conversation state. */
   plugins?: Array<{ id: string; max_results?: number }>;
+  /**
+   * Pre-built execution bundle. The fields this turn reads (llm, modelRoutes,
+   * connectorActionCallback) are stable across a conversation's agent hops, so the
+   * caller can build it once and pass it in to avoid a per-hop DB round-trip
+   * (getAllModelProviders). Built on demand when absent.
+   */
+  engineConfig?: AutopilotRunnerExecuteConfig;
+  /**
+   * Cancellation signal. Forwarded into the in-process CLI loop so a stop request
+   * (ConversationService.activeCancellations) aborts the turn end-to-end.
+   */
+  signal?: AbortSignal;
 }
 
 /**
@@ -154,7 +167,7 @@ export async function runAgentTurn(deps: AgentTurnDeps, args: AgentTurnArgs): Pr
     authUserId,
     agentId: agentModel.id,
   });
-  const { engineConfig } = await buildAutopilotExecutionBundle({ starshipId, authUserId, runtimeEnv });
+  const engineConfig = args.engineConfig ?? (await buildAutopilotExecutionBundle({ starshipId, authUserId, runtimeEnv })).engineConfig;
 
   // The agent talks to OpenRouter directly; without an API key we cannot run, and
   // there is no blueprint path to fall back to.
@@ -241,6 +254,7 @@ export async function runAgentTurn(deps: AgentTurnDeps, args: AgentTurnArgs): Pr
         runtimeEnv,
         discoverConnectors,
         onEvent,
+        ...(args.signal ? { signal: args.signal } : {}),
         ...(args.approvals ? { approvals: args.approvals } : {}),
         ...(permissions ? { permission: buildPermissionPolicy(permissions) } : {}),
         ...(agentModel.temperature !== undefined ? { temperature: agentModel.temperature } : {}),

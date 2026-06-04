@@ -2,6 +2,7 @@ import { ScheduleEntity } from '@/entities/ScheduleEntity';
 import { fromDatabase, fromDatabaseArray, toDatabase, toEntityInstance } from '@/helpers/serialization-helper';
 import { BaseRepository } from './BaseRepository';
 import type { ScheduleModel } from '@starships/protocol';
+import type { ScheduleDefinition } from '@/services/definition/types';
 
 /**
  * ScheduleRepository
@@ -122,6 +123,64 @@ export class ScheduleRepository extends BaseRepository {
       'delete',
       'Schedule',
       id
+    );
+  }
+
+  /**
+   * Upsert the schedules INDEX row from a filesystem-authoritative definition.
+   * Authored fields are refreshed; execution state (next_run_at, run_count,
+   * last_run_*) and owner_user_id are preserved on conflict. On a brand-new
+   * insert (a file with no existing row) next_run_at defaults to now — the
+   * scheduler recomputes it for recurring schedules on the next tick.
+   */
+  async upsertIndexFromDefinition(input: { def: ScheduleDefinition; starshipId: string }): Promise<ScheduleModel> {
+    const { def, starshipId } = input;
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        const now = new Date().toISOString();
+        const existing = await this.findById(def.id);
+
+        const authored: Record<string, unknown> = {
+          agent_id: def.agentId,
+          prompt: def.prompt,
+          cron_expression: def.cronExpression,
+          timezone: def.timezone,
+          is_active: def.isActive,
+          is_recurring: def.isRecurring,
+          ends_at: def.endsAt ?? null,
+          max_occurrences: def.maxOccurrences ?? null,
+        };
+
+        const insertRow: Record<string, unknown> = {
+          id: def.id,
+          ...authored,
+          owner_user_id: existing?.ownerUserId ?? null,
+          next_run_at: existing?.nextRunAt ?? now,
+          run_count: 0,
+          last_run_at: null,
+          last_run_conversation_id: null,
+          starship_id: starshipId,
+          created_at: now,
+          updated_at: now,
+        };
+
+        const cols = Object.keys(insertRow);
+        const placeholders = cols.map((_, i) => `$${i + 1}`);
+        const conflict = [...Object.keys(authored), 'updated_at'].map((c) => `${c} = EXCLUDED.${c}`).join(', ');
+
+        const result = await connection.query<Record<string, unknown>>(
+          `INSERT INTO schedules (${cols.join(', ')})
+           VALUES (${placeholders.join(', ')})
+           ON CONFLICT (id) DO UPDATE SET ${conflict}
+           RETURNING *`,
+          Object.values(insertRow)
+        );
+        return fromDatabase(ScheduleEntity, result[0]);
+      },
+      'upsertIndexFromDefinition',
+      'Schedule',
+      def.id
     );
   }
 

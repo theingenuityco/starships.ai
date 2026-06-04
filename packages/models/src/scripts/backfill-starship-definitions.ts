@@ -22,8 +22,10 @@ import { getEnvConfig } from '@starships/env';
 import { createConnection } from '@/helpers/database';
 import { StarshipRepository } from '@/repositories/StarshipRepository';
 import { AgentRepository } from '@/repositories/AgentRepository';
+import { ScheduleRepository } from '@/repositories/ScheduleRepository';
 import { StarshipDefinitionStore } from '@/services/StarshipDefinitionStore';
 import { agentFilename, agentModelToDefinition, parseAgent, serializeAgentDefinition } from '@/services/definition/agentCodec';
+import { parseSchedule, scheduleFilename, serializeSchedule, serializeScheduleDefinition } from '@/services/definition/scheduleCodec';
 import { computeAgentContentHash } from '@/utils/contentHash';
 import type { AgentDefinition } from '@/services/definition/types';
 import type { AgentModel } from '@starships/protocol';
@@ -78,6 +80,7 @@ async function main(): Promise<void> {
   const store = new StarshipDefinitionStore();
   const starshipRepo = new StarshipRepository();
   const agentRepo = new AgentRepository();
+  const scheduleRepo = new ScheduleRepository();
 
   const starships = args.starshipId
     ? [await starshipRepo.findById(args.starshipId)].filter(Boolean)
@@ -90,6 +93,8 @@ async function main(): Promise<void> {
   let agentsWritten = 0;
   let roundTripFailures = 0;
   let indexHashDiffs = 0;
+  let schedulesTotal = 0;
+  let schedulesWritten = 0;
 
   for (const starship of starships) {
     if (!starship) continue;
@@ -125,10 +130,25 @@ async function main(): Promise<void> {
         console.warn(`[index-hash diff] ${starship.id}/${agent.slug}: stored=${dbHash} computed=${hashModel} (hash normalization, not data loss)`);
       }
     }
+
+    const schedules = await scheduleRepo.findByStarship(starship.id);
+    for (const schedule of schedules) {
+      schedulesTotal += 1;
+      const file = serializeSchedule(schedule);
+      if (!args.verifyOnly) {
+        await store.write(starship.id, 'schedules', scheduleFilename(schedule.id), file);
+        schedulesWritten += 1;
+      }
+      // Round-trip: parse the file then re-serialize; must be identical.
+      if (serializeScheduleDefinition(parseSchedule(file)) !== file) {
+        roundTripFailures += 1;
+        console.error(`[ROUND-TRIP FAIL] ${starship.id}/schedule:${schedule.id}: schedule codec is lossy`);
+      }
+    }
   }
 
   console.log(
-    `[backfill] done — agents: ${agentsTotal}, written: ${agentsWritten}, round-trip failures: ${roundTripFailures}, index-hash diffs: ${indexHashDiffs}`
+    `[backfill] done — agents: ${agentsTotal}, written: ${agentsWritten}, schedules: ${schedulesTotal}, written: ${schedulesWritten}, round-trip failures: ${roundTripFailures}, index-hash diffs: ${indexHashDiffs}`
   );
 
   // Fail only on a real codec correctness problem.

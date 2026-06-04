@@ -125,6 +125,7 @@ export {
   StarshipDefinitionReconciler,
   type ReconcileResult,
   type ReconcileTarget,
+  type EntityReconcileResult,
   type AgentReconcileResult,
 } from './services/StarshipDefinitionReconciler';
 export {
@@ -135,7 +136,22 @@ export {
   agentFilename,
   agentSlugFromFilename,
 } from './services/definition/agentCodec';
-export type { AgentDefinition, AgentReasoningConfig } from './services/definition/types';
+export {
+  serializeSchedule,
+  serializeScheduleDefinition,
+  scheduleModelToDefinition,
+  parseSchedule,
+  scheduleFilename,
+  scheduleIdFromFilename,
+} from './services/definition/scheduleCodec';
+export type {
+  AgentDefinition,
+  AgentReasoningConfig,
+  ConnectorDefinition,
+  TableDefinition,
+  TableColumnDefinition,
+  ScheduleDefinition,
+} from './services/definition/types';
 export {
   schemaName as starshipSchemaName,
   roleName as starshipRoleName,

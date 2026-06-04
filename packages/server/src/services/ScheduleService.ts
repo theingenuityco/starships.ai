@@ -1,6 +1,7 @@
-import { ScheduleRepository } from '@starships/models';
+import { ScheduleRepository, StarshipDefinitionStore, serializeSchedule, scheduleFilename } from '@starships/models';
 import type { ScheduleModel } from '@starships/protocol';
 import { CronExpressionParser } from 'cron-parser';
+import { getEnvConfig } from '@starships/env';
 import { getScheduledRunsQueue, type ScheduledRunJobData } from '@/queues/scheduledRunsQueue';
 
 /**
@@ -11,6 +12,7 @@ import { getScheduledRunsQueue, type ScheduledRunJobData } from '@/queues/schedu
  */
 export class ScheduleService {
   private readonly repo: ScheduleRepository;
+  private readonly definitionStore: StarshipDefinitionStore;
 
   // Hardening defaults
   private readonly defaultBatchSize = 50;
@@ -18,6 +20,23 @@ export class ScheduleService {
 
   constructor() {
     this.repo = new ScheduleRepository();
+    this.definitionStore = new StarshipDefinitionStore();
+  }
+
+  private fsAuthority(): boolean {
+    return getEnvConfig().STARSHIP_FS_AUTHORITY === true;
+  }
+
+  /**
+   * Mirror a schedule row to its definition file. Schedules use DB-first-mirror:
+   * creation computes runtime fields (nextRunAt) the models layer can't, so the
+   * canonical row is written first and its authored fields are mirrored here.
+   * Reconcile (file -> index) keeps the file authoritative for authored fields.
+   */
+  private async mirrorToFile(schedule: ScheduleModel | null): Promise<void> {
+    if (!schedule || !this.fsAuthority()) return;
+    await this.definitionStore.ensureProvisioned(schedule.starshipId);
+    await this.definitionStore.write(schedule.starshipId, 'schedules', scheduleFilename(schedule.id), serializeSchedule(schedule));
   }
 
   async createSchedule(data: {
@@ -33,7 +52,9 @@ export class ScheduleService {
     endsAt?: string | null;
     maxOccurrences?: number | null;
   }): Promise<ScheduleModel> {
-    return this.repo.create(data);
+    const created = await this.repo.create(data);
+    await this.mirrorToFile(created);
+    return created;
   }
 
   async getScheduleById(id: string): Promise<ScheduleModel | null> {
@@ -45,11 +66,16 @@ export class ScheduleService {
   }
 
   async updateSchedule(id: string, updates: Partial<ScheduleModel>): Promise<ScheduleModel | null> {
-    return this.repo.update(id, updates);
+    const updated = await this.repo.update(id, updates);
+    // Mirror only when authored fields may have changed (skip pure runtime bumps).
+    if (updated) await this.mirrorToFile(updated);
+    return updated;
   }
 
   async deactivateSchedule(id: string): Promise<ScheduleModel | null> {
-    return this.repo.update(id, { isActive: false });
+    const updated = await this.repo.update(id, { isActive: false });
+    await this.mirrorToFile(updated);
+    return updated;
   }
 
   /**

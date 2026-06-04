@@ -1,10 +1,13 @@
 import { AgentEntity } from '@/entities/AgentEntity';
+import { ScheduleEntity } from '@/entities/ScheduleEntity';
 import { AgentRepository } from '@/repositories/AgentRepository';
-import { computeAgentContentHash } from '@/utils/contentHash';
+import { ScheduleRepository } from '@/repositories/ScheduleRepository';
+import { computeAgentContentHash, sha256Hex, stableStringify } from '@/utils/contentHash';
 import { StarshipDefinitionStore } from '@/services/StarshipDefinitionStore';
 import { StarshipVolumeProvisioner } from '@/services/StarshipVolumeProvisioner';
 import { agentSlugFromFilename, parseAgent } from '@/services/definition/agentCodec';
-import type { AgentDefinition } from '@/services/definition/types';
+import { parseSchedule, scheduleModelToDefinition } from '@/services/definition/scheduleCodec';
+import type { AgentDefinition, ScheduleDefinition } from '@/services/definition/types';
 import type { DefinitionEntityDir } from '@/services/StarshipVolumeProvisioner';
 import type { AgentModel } from '@starships/protocol';
 
@@ -24,15 +27,24 @@ import type { AgentModel } from '@starships/protocol';
 
 const DEFAULT_AGENT_STATE: Record<string, unknown> = { messages: [], tools: [] };
 
-export interface AgentReconcileResult {
+export interface EntityReconcileResult {
   upserted: number;
   unchanged: number;
   pruned: number;
 }
+/** @deprecated use EntityReconcileResult */
+export type AgentReconcileResult = EntityReconcileResult;
 
 export interface ReconcileResult {
   starshipId: string;
-  agents: AgentReconcileResult;
+  agents: EntityReconcileResult;
+  connectors: EntityReconcileResult;
+  tables: EntityReconcileResult;
+  schedules: EntityReconcileResult;
+}
+
+function emptyEntityResult(): EntityReconcileResult {
+  return { upserted: 0, unchanged: 0, pruned: 0 };
 }
 
 export interface ReconcileTarget {
@@ -51,11 +63,23 @@ export class StarshipDefinitionReconciler {
   private readonly store: StarshipDefinitionStore;
   private readonly provisioner: StarshipVolumeProvisioner;
   private readonly agentRepository: AgentRepository;
+  private readonly scheduleRepository: ScheduleRepository;
 
-  constructor(opts?: { store?: StarshipDefinitionStore; agentRepository?: AgentRepository; home?: string }) {
+  constructor(opts?: {
+    store?: StarshipDefinitionStore;
+    agentRepository?: AgentRepository;
+    scheduleRepository?: ScheduleRepository;
+    home?: string;
+  }) {
     this.store = opts?.store ?? new StarshipDefinitionStore(opts?.home);
     this.provisioner = new StarshipVolumeProvisioner(opts?.home);
     this.agentRepository = opts?.agentRepository ?? new AgentRepository();
+    this.scheduleRepository = opts?.scheduleRepository ?? new ScheduleRepository();
+  }
+
+  /** Stable hash of an authored object, for in-memory drift detection. */
+  private authoredHash(authored: Record<string, unknown>): string {
+    return sha256Hex(stableStringify(authored));
   }
 
   /** The content hash for a definition combined with the (preserved) index state. */
@@ -156,31 +180,111 @@ export class StarshipDefinitionReconciler {
     return result;
   }
 
+  /** The authored hash for a schedule definition (drift detection). */
+  private scheduleHash(def: ScheduleDefinition): string {
+    return this.authoredHash({
+      agentId: def.agentId,
+      prompt: def.prompt,
+      cronExpression: def.cronExpression,
+      timezone: def.timezone,
+      isActive: def.isActive,
+      isRecurring: def.isRecurring,
+      endsAt: def.endsAt ?? null,
+      maxOccurrences: def.maxOccurrences ?? null,
+    });
+  }
+
+  /** Reconcile one schedule file into the index. */
+  async reconcileScheduleFile(starshipId: string, filename: string): Promise<{ changed: boolean; id: string } | null> {
+    const raw = await this.store.read(starshipId, 'schedules', filename);
+    if (raw === null) return null;
+    const def = parseSchedule(raw);
+
+    await ScheduleEntity.validate(
+      {
+        agentId: def.agentId,
+        prompt: def.prompt,
+        cronExpression: def.cronExpression,
+        timezone: def.timezone,
+        isActive: def.isActive,
+        isRecurring: def.isRecurring,
+        endsAt: def.endsAt ?? undefined,
+        maxOccurrences: def.maxOccurrences ?? undefined,
+      },
+      'update'
+    );
+
+    const existing = await this.scheduleRepository.findById(def.id);
+    if (existing && this.scheduleHash(scheduleModelToDefinition(existing)) === this.scheduleHash(def)) {
+      return { changed: false, id: def.id };
+    }
+    await this.scheduleRepository.upsertIndexFromDefinition({ def, starshipId });
+    return { changed: true, id: def.id };
+  }
+
+  /** Reconcile every schedule file for a starship; optionally prune orphans. */
+  async reconcileSchedules(starshipId: string, opts?: { pruneOrphans?: boolean }): Promise<EntityReconcileResult> {
+    const filenames = await this.store.list(starshipId, 'schedules', '.yaml');
+    const result = emptyEntityResult();
+    const fileIds = new Set<string>();
+    for (const filename of filenames) {
+      const outcome = await this.reconcileScheduleFile(starshipId, filename);
+      if (!outcome) continue;
+      fileIds.add(outcome.id);
+      if (outcome.changed) result.upserted += 1;
+      else result.unchanged += 1;
+    }
+    if (opts?.pruneOrphans) {
+      const indexed = await this.scheduleRepository.findByStarship(starshipId);
+      for (const row of indexed) {
+        if (!fileIds.has(row.id)) {
+          await this.scheduleRepository.delete(row.id);
+          result.pruned += 1;
+        }
+      }
+    }
+    return result;
+  }
+
   /**
-   * Reconcile a starship's definitions. With no target, reconciles all entities
-   * (currently agents). With `{ entity, filename }`, reconciles a single file —
-   * the fast path invoked right after a CRUD write.
+   * Reconcile a starship's definitions. With no target, reconciles all entity
+   * buckets. With `{ entity, filename }`, reconciles a single file — the fast
+   * path invoked right after a CRUD write.
    */
   async reconcile(starshipId: string, target?: ReconcileTarget): Promise<ReconcileResult> {
     await this.provisioner.ensureProvisioned(starshipId);
-    const agents: AgentReconcileResult = { upserted: 0, unchanged: 0, pruned: 0 };
+    const result: ReconcileResult = {
+      starshipId,
+      agents: emptyEntityResult(),
+      connectors: emptyEntityResult(),
+      tables: emptyEntityResult(),
+      schedules: emptyEntityResult(),
+    };
 
-    const wantsAgents = !target?.entity || target.entity === 'agents';
-    if (wantsAgents) {
-      if (target?.filename) {
+    const wants = (entity: DefinitionEntityDir) => !target?.entity || target.entity === entity;
+
+    if (wants('agents')) {
+      if (target?.entity === 'agents' && target.filename) {
         const outcome = await this.reconcileAgentFile(starshipId, target.filename);
-        if (outcome?.changed) agents.upserted += 1;
-        else if (outcome) agents.unchanged += 1;
+        if (outcome?.changed) result.agents.upserted += 1;
+        else if (outcome) result.agents.unchanged += 1;
       } else {
-        const r = await this.reconcileAgents(starshipId, { pruneOrphans: target?.pruneOrphans });
-        agents.upserted = r.upserted;
-        agents.unchanged = r.unchanged;
-        agents.pruned = r.pruned;
+        result.agents = await this.reconcileAgents(starshipId, { pruneOrphans: target?.pruneOrphans });
       }
     }
 
-    // NOTE: connectors/rooms/tables/schedules reconcile lands in later stages.
-    return { starshipId, agents };
+    if (wants('schedules')) {
+      if (target?.entity === 'schedules' && target.filename) {
+        const outcome = await this.reconcileScheduleFile(starshipId, target.filename);
+        if (outcome?.changed) result.schedules.upserted += 1;
+        else if (outcome) result.schedules.unchanged += 1;
+      } else {
+        result.schedules = await this.reconcileSchedules(starshipId, { pruneOrphans: target?.pruneOrphans });
+      }
+    }
+
+    // NOTE: connectors/tables/rooms reconcile lands in their stages.
+    return result;
   }
 }
 

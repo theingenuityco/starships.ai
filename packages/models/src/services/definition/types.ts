@@ -40,3 +40,56 @@ export interface AgentDefinition {
   /** The agent's system prompt (the markdown body below the frontmatter). */
   systemPrompt?: string;
 }
+
+/**
+ * A connector as authored in `.starship/connectors/<provider>.yaml`: the wiring
+ * only. Secrets live in connector_secrets (DB); runtime health (status/lastError)
+ * is index-only.
+ */
+export interface ConnectorDefinition {
+  id: string;
+  provider: string;
+  templateId?: string;
+  version?: string;
+  metadata?: Record<string, unknown>;
+}
+
+/**
+ * A table as authored in `.starship/tables/<slug>.yaml`: the logical schema only.
+ * The physical binding (schemaName/physicalTable) and `archived` are index-only;
+ * rows live in the per-starship Postgres schema.
+ */
+export interface TableColumnDefinition {
+  name: string;
+  description?: string;
+  type?: string;
+  format?: string;
+  constraints?: Record<string, unknown>;
+  enum?: { options: string[] };
+  reference?: Record<string, unknown>;
+}
+
+export interface TableDefinition {
+  id: string;
+  slug: string;
+  name: string;
+  description?: string;
+  primaryKey?: string | null;
+  columns: TableColumnDefinition[];
+}
+
+/**
+ * A schedule as authored in `.starship/schedules/<id>.yaml`. Execution state
+ * (nextRunAt/runCount/lastRun*) and ownerUserId are index-only.
+ */
+export interface ScheduleDefinition {
+  id: string;
+  agentId: string;
+  prompt: string;
+  cronExpression: string;
+  timezone: string;
+  isActive: boolean;
+  isRecurring: boolean;
+  endsAt?: string | null;
+  maxOccurrences?: number | null;
+}

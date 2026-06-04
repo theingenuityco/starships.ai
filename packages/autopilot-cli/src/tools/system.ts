@@ -216,7 +216,17 @@ function globToRegExp(glob: string): RegExp {
       } else {
         re += '\\{';
       }
-    } else if ('.+^$()|[]\\'.includes(c)) {
+    } else if (c === '[') {
+      // Bracket expression: [tj]s -> regex char class, passed through verbatim for
+      // simple cases. Unclosed '[' is a literal.
+      const close = glob.indexOf(']', i + 1);
+      if (close !== -1) {
+        re += glob.slice(i, close + 1);
+        i = close;
+      } else {
+        re += '\\[';
+      }
+    } else if ('.+^$()|]\\'.includes(c)) {
       re += '\\' + c;
     } else {
       re += c;

@@ -45,13 +45,9 @@ function compact<T extends Record<string, unknown>>(obj: T): Partial<T> {
   return out as Partial<T>;
 }
 
-/**
- * Serialize an agent (index row) to its file form. `connectors` is the optional
- * per-agent connector scope, which is not part of AgentModel and is supplied by
- * the caller (CRUD route / backfill).
- */
-export function serializeAgent(agent: AgentModel, opts?: { connectors?: string[] }): string {
-  const frontmatter = compact({
+/** Map an index row (AgentModel) to its authored definition shape. */
+export function agentModelToDefinition(agent: AgentModel, opts?: { connectors?: string[] }): AgentDefinition {
+  return compact({
     id: agent.id,
     slug: agent.slug,
     name: agent.name,
@@ -59,18 +55,48 @@ export function serializeAgent(agent: AgentModel, opts?: { connectors?: string[]
     description: agent.description,
     model: agent.model,
     category: agent.category,
-    version: agent.version || '1.0.0',
     temperature: agent.temperature,
     maxTokens: agent.maxTokens,
     timeout: agent.timeout,
     reasoning: reasoningOrUndefined(agent.reasoning),
     previewPrompts: agent.previewPrompts && agent.previewPrompts.length > 0 ? agent.previewPrompts : undefined,
+    version: agent.version || '1.0.0',
     connectors: opts?.connectors && opts.connectors.length > 0 ? opts.connectors : undefined,
+    systemPrompt: agent.systemPrompt,
+  }) as AgentDefinition;
+}
+
+/** Serialize an authored agent definition to its `.md` file form. */
+export function serializeAgentDefinition(def: AgentDefinition): string {
+  const frontmatter = compact({
+    id: def.id,
+    slug: def.slug,
+    name: def.name,
+    role: def.role || 'Assistant',
+    description: def.description,
+    model: def.model,
+    category: def.category,
+    version: def.version || '1.0.0',
+    temperature: def.temperature,
+    maxTokens: def.maxTokens,
+    timeout: def.timeout,
+    reasoning: reasoningOrUndefined(def.reasoning),
+    previewPrompts: def.previewPrompts && def.previewPrompts.length > 0 ? def.previewPrompts : undefined,
+    connectors: def.connectors && def.connectors.length > 0 ? def.connectors : undefined,
   });
 
   const fm = yaml.dump(frontmatter, { sortKeys: false, lineWidth: -1, noRefs: true });
-  const body = (agent.systemPrompt ?? '').trim();
+  const body = (def.systemPrompt ?? '').trim();
   return `---\n${fm}---\n\n${body}\n`;
+}
+
+/**
+ * Serialize an agent (index row) to its file form. `connectors` is the optional
+ * per-agent connector scope, which is not part of AgentModel and is supplied by
+ * the caller (CRUD route / backfill).
+ */
+export function serializeAgent(agent: AgentModel, opts?: { connectors?: string[] }): string {
+  return serializeAgentDefinition(agentModelToDefinition(agent, opts));
 }
 
 /** Parse an agent definition file. Throws on malformed/missing required fields. */

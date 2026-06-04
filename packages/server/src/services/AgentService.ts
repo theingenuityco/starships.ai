@@ -14,6 +14,13 @@ import {
   UserRepository,
   DEFAULT_AGENT_TIMEOUT_MS,
   PostgresConnection,
+  StarshipDefinitionStore,
+  StarshipDefinitionReconciler,
+  serializeAgentDefinition,
+  agentModelToDefinition,
+  parseAgent,
+  agentFilename,
+  type AgentDefinition,
 } from '@starships/models';
 import type {
   AgentModel,
@@ -21,9 +28,31 @@ import type {
   UpdateAgentRequest,
   UserModel,
 } from '@starships/protocol';
+import { getEnvConfig } from '@starships/env';
 import { MessageService } from './MessageService';
 import { ConnectorSecretService } from './ConnectorSecretService';
 import { isInstanceAdmin } from '../utils/auth-helpers';
+
+/**
+ * Authored agent fields that live in the `.starship/agents/<slug>.md` file (and
+ * are therefore reconciled from it under STARSHIP_FS_AUTHORITY). Everything else
+ * on UpdateAgentRequest (avatar/profile attachment ids, agent `state`) is
+ * index-only and always written straight to the DB regardless of the flag.
+ */
+const AUTHORED_AGENT_UPDATE_KEYS: ReadonlyArray<keyof UpdateAgentRequest> = [
+  'name',
+  'role',
+  'description',
+  'model',
+  'category',
+  'temperature',
+  'maxTokens',
+  'timeout',
+  'reasoning',
+  'systemPrompt',
+  'previewPrompts',
+  'version',
+];
 
 export interface ConversationRequest {
   agentId: string;
@@ -53,12 +82,33 @@ export class AgentService {
   // Kept for future use (runtime secrets, connector context, etc.)
 
   private connectorSecretService: ConnectorSecretService;
+  private definitionStore: StarshipDefinitionStore;
+  private reconciler: StarshipDefinitionReconciler;
 
   constructor(connection?: PostgresConnection) {
     this.agentRepository = new AgentRepository(connection);
     this.starshipRepository = new StarshipRepository(connection);
     this.messageService = new MessageService();
     this.connectorSecretService = new ConnectorSecretService();
+    this.definitionStore = new StarshipDefinitionStore();
+    // Reuse this service's repository (and its connection) inside the reconciler.
+    this.reconciler = new StarshipDefinitionReconciler({ store: this.definitionStore, agentRepository: this.agentRepository });
+  }
+
+  /** Whether the filesystem-authoritative definition path is enabled. */
+  private fsAuthority(): boolean {
+    return getEnvConfig().STARSHIP_FS_AUTHORITY === true;
+  }
+
+  /**
+   * The authored definition for an existing agent: parsed from its file when
+   * present (source of truth), else derived from the index row (covers agents
+   * not yet backfilled when the flag is freshly enabled).
+   */
+  private async loadAgentDefinition(agent: AgentModel): Promise<AgentDefinition> {
+    const raw = await this.definitionStore.read(agent.starshipId, 'agents', agentFilename(agent.slug));
+    if (raw !== null) return parseAgent(raw);
+    return agentModelToDefinition(agent);
   }
 
   private assertAgentIsEditable(_agent: AgentModel, _action: string): void {
@@ -126,7 +176,19 @@ export class AgentService {
       previewPrompts: data.previewPrompts,
     };
 
-    return await this.agentRepository.create(agentData, data.starshipId);
+    if (!this.fsAuthority()) {
+      return await this.agentRepository.create(agentData, data.starshipId);
+    }
+
+    // Files-first: build a normalized definition, write the file, reconcile the
+    // index. The file is the durable artifact; the index row is derived from it.
+    const def = await this.agentRepository.buildCreateDefinition(agentData, data.starshipId);
+    await this.definitionStore.ensureProvisioned(data.starshipId);
+    await this.definitionStore.write(data.starshipId, 'agents', agentFilename(def.slug), serializeAgentDefinition(def));
+    await this.reconciler.reconcile(data.starshipId, { entity: 'agents', filename: agentFilename(def.slug) });
+    const created = await this.agentRepository.findById(def.id);
+    if (!created) throw new Error(`agent ${def.id} was not indexed after reconcile`);
+    return created;
   }
 
   /**
@@ -137,7 +199,43 @@ export class AgentService {
     if (!current) return null;
     this.assertAgentIsEditable(current, 'edit');
 
-    return await this.agentRepository.update(agentId, updates);
+    if (!this.fsAuthority()) {
+      return await this.agentRepository.update(agentId, updates);
+    }
+
+    // Split authored (file-owned) fields from index-only fields (attachments,
+    // state). Authored changes go file-first + reconcile; index-only changes go
+    // straight to the DB (the reconcile upsert preserves them on conflict).
+    const authoredUpdates: UpdateAgentRequest = {};
+    const indexOnlyUpdates: UpdateAgentRequest = {};
+    for (const [key, value] of Object.entries(updates) as [keyof UpdateAgentRequest, unknown][]) {
+      if (value === undefined) continue;
+      if (AUTHORED_AGENT_UPDATE_KEYS.includes(key)) {
+        (authoredUpdates as Record<string, unknown>)[key] = value;
+      } else {
+        (indexOnlyUpdates as Record<string, unknown>)[key] = value;
+      }
+    }
+
+    if (Object.keys(authoredUpdates).length > 0) {
+      const existingDef = await this.loadAgentDefinition(current);
+      const nextDef = await this.agentRepository.buildUpdatedDefinition(existingDef, authoredUpdates, current.starshipId);
+      await this.definitionStore.ensureProvisioned(current.starshipId);
+      // Carry the immutable id forward and preserve connector scope from the file.
+      nextDef.id = current.id;
+      await this.definitionStore.write(current.starshipId, 'agents', agentFilename(nextDef.slug), serializeAgentDefinition(nextDef));
+      // On slug (rename), drop the stale file so it does not become an orphan.
+      if (nextDef.slug !== existingDef.slug) {
+        await this.definitionStore.delete(current.starshipId, 'agents', agentFilename(existingDef.slug));
+      }
+      await this.reconciler.reconcile(current.starshipId, { entity: 'agents', filename: agentFilename(nextDef.slug) });
+    }
+
+    if (Object.keys(indexOnlyUpdates).length > 0) {
+      await this.agentRepository.update(agentId, indexOnlyUpdates);
+    }
+
+    return await this.agentRepository.findById(agentId);
   }
 
   /**
@@ -172,6 +270,12 @@ export class AgentService {
    * Delete agent
    */
   async deleteAgent(agentId: string): Promise<boolean> {
+    if (this.fsAuthority()) {
+      const current = await this.agentRepository.findById(agentId);
+      if (current) {
+        await this.definitionStore.delete(current.starshipId, 'agents', agentFilename(current.slug));
+      }
+    }
     return await this.agentRepository.delete(agentId);
   }
 
@@ -186,6 +290,19 @@ export class AgentService {
     }
 
     this.assertAgentIsEditable(agent, 'move');
+
+    if (this.fsAuthority()) {
+      // Move the definition file across volumes, preserving the immutable id so
+      // ledger rows (messages/schedules) stay attached. The index starship_id is
+      // updated by updateStarship below.
+      const raw = await this.definitionStore.read(agent.starshipId, 'agents', agentFilename(agent.slug));
+      if (raw !== null) {
+        await this.definitionStore.ensureProvisioned(starshipId);
+        await this.definitionStore.write(starshipId, 'agents', agentFilename(agent.slug), raw);
+        await this.definitionStore.delete(agent.starshipId, 'agents', agentFilename(agent.slug));
+      }
+    }
+
     return await this.agentRepository.updateStarship(agentId, starshipId);
   }
 

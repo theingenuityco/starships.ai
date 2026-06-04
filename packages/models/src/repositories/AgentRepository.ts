@@ -15,6 +15,7 @@ import type { AgentModel, CreateAgentRequest, UpdateAgentRequest } from '@starsh
 import { computeAgentContentHash } from '@/utils/contentHash';
 import type { AgentDefinition } from '@/services/definition/types';
 import type { PostgresConnection } from '@/helpers/database';
+import { nanoid } from 'nanoid';
 
 export class AgentRepository extends BaseRepository {
   constructor(connection?: PostgresConnection) {
@@ -325,6 +326,101 @@ export class AgentRepository extends BaseRepository {
       'Agent',
       id
     );
+  }
+
+  /**
+   * Build a normalized, validated {@link AgentDefinition} for a NEW agent without
+   * writing the DB row — the files-first counterpart of {@link create}. Applies
+   * the same defaults/clamps/slug-generation so the file and a DB-created agent
+   * are equivalent; the reconciler then folds the file into the index.
+   */
+  async buildCreateDefinition(data: CreateAgentRequest, starshipId: string): Promise<AgentDefinition> {
+    const hasValidNumber = (value: unknown): value is number => typeof value === 'number' && !Number.isNaN(value) && Number.isFinite(value);
+
+    const maxTokens = hasValidNumber(data.maxTokens)
+      ? Math.min(MAX_AGENT_MAX_TOKENS, Math.max(MIN_AGENT_MAX_TOKENS, data.maxTokens))
+      : DEFAULT_AGENT_MAX_TOKENS;
+    const timeout = hasValidNumber(data.timeout)
+      ? Math.min(MAX_AGENT_TIMEOUT_MS, Math.max(MIN_AGENT_TIMEOUT_MS, data.timeout))
+      : DEFAULT_AGENT_TIMEOUT_MS;
+
+    const baseFromName = generateSlug((data.name || 'agent').toString()) || 'agent';
+    const slug = await generateUniqueSlugIncremental(
+      baseFromName,
+      async (candidate) => await this.agentSlugExistsOnStarship(starshipId, candidate),
+      { fallbackBase: 'agent', maxLength: 100 }
+    );
+
+    await AgentEntity.validate({ ...data, maxTokens, timeout, starshipId, slug }, 'create');
+
+    return {
+      id: nanoid(),
+      slug,
+      name: data.name,
+      role: data.role || 'Assistant',
+      ...(data.description !== undefined ? { description: data.description } : {}),
+      model: data.model,
+      category: data.category || 'general',
+      ...(data.temperature !== undefined && data.temperature !== null ? { temperature: Number(data.temperature) } : {}),
+      maxTokens,
+      timeout,
+      ...((data as { reasoning?: AgentDefinition['reasoning'] }).reasoning
+        ? { reasoning: (data as { reasoning?: AgentDefinition['reasoning'] }).reasoning }
+        : {}),
+      ...(data.previewPrompts !== undefined ? { previewPrompts: data.previewPrompts } : {}),
+      version: data.version || '1.0.0',
+      ...(data.systemPrompt !== undefined ? { systemPrompt: data.systemPrompt } : {}),
+    };
+  }
+
+  /**
+   * Merge an authored update into an existing {@link AgentDefinition}, regenerating
+   * the slug on a name change (unique per starship, excluding self). Validates the
+   * merged authored fields via the lean update validator. Does not write anything.
+   */
+  async buildUpdatedDefinition(existing: AgentDefinition, updates: UpdateAgentRequest, starshipId: string): Promise<AgentDefinition> {
+    const next: AgentDefinition = { ...existing };
+
+    if (updates.name !== undefined && updates.name !== null) {
+      next.name = String(updates.name);
+      const base = generateSlug(next.name) || 'agent';
+      next.slug = await generateUniqueSlugIncremental(
+        base,
+        async (candidate) => await this.agentSlugExistsOnStarship(starshipId, candidate, existing.id),
+        { fallbackBase: 'agent', maxLength: 100 }
+      );
+    }
+    if (updates.role !== undefined) next.role = String(updates.role) || 'Assistant';
+    if (updates.description !== undefined) next.description = updates.description ?? undefined;
+    if (updates.model !== undefined) next.model = String(updates.model);
+    if (updates.category !== undefined) next.category = updates.category ?? undefined;
+    if (updates.temperature !== undefined) next.temperature = updates.temperature === null ? undefined : Number(updates.temperature);
+    if (updates.maxTokens !== undefined) next.maxTokens = updates.maxTokens === null ? undefined : Number(updates.maxTokens);
+    if (updates.timeout !== undefined) next.timeout = updates.timeout === null ? undefined : Number(updates.timeout);
+    if (updates.reasoning !== undefined) next.reasoning = updates.reasoning === null ? undefined : updates.reasoning;
+    if (updates.systemPrompt !== undefined) next.systemPrompt = updates.systemPrompt ?? undefined;
+    if (updates.previewPrompts !== undefined) next.previewPrompts = updates.previewPrompts ?? undefined;
+    if (updates.version !== undefined) next.version = updates.version || existing.version;
+
+    await AgentEntity.validate(
+      {
+        name: next.name,
+        role: next.role,
+        description: next.description,
+        model: next.model,
+        category: next.category,
+        temperature: next.temperature,
+        maxTokens: next.maxTokens,
+        timeout: next.timeout,
+        reasoning: next.reasoning,
+        systemPrompt: next.systemPrompt,
+        previewPrompts: next.previewPrompts,
+        version: next.version,
+      },
+      'update'
+    );
+
+    return next;
   }
 
   /**

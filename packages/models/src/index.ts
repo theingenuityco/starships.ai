@@ -129,6 +129,8 @@ export {
 } from './services/StarshipDefinitionReconciler';
 export {
   serializeAgent,
+  serializeAgentDefinition,
+  agentModelToDefinition,
   parseAgent,
   agentFilename,
   agentSlugFromFilename,

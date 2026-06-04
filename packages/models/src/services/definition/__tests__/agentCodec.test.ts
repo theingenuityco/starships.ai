@@ -1,4 +1,11 @@
-import { serializeAgent, parseAgent, agentFilename, agentSlugFromFilename } from '@/services/definition/agentCodec';
+import {
+  serializeAgent,
+  serializeAgentDefinition,
+  agentModelToDefinition,
+  parseAgent,
+  agentFilename,
+  agentSlugFromFilename,
+} from '@/services/definition/agentCodec';
 import type { AgentModel } from '@starships/protocol';
 
 function makeAgent(overrides: Partial<AgentModel> = {}): AgentModel {
@@ -81,5 +88,16 @@ describe('agentCodec', () => {
     const parsed = parseAgent('---\nid: a\nslug: s\nname: N\nmodel: m\n---\nhello');
     expect(parsed.role).toBe('Assistant');
     expect(parsed.version).toBe('1.0.0');
+  });
+
+  it('agentModelToDefinition normalizes empty previewPrompts to absent', () => {
+    const def = agentModelToDefinition(makeAgent({ previewPrompts: [] }));
+    expect(def.previewPrompts).toBeUndefined();
+  });
+
+  it('model -> definition -> file -> definition is stable', () => {
+    const def1 = agentModelToDefinition(makeAgent());
+    const def2 = parseAgent(serializeAgentDefinition(def1));
+    expect(def2).toEqual(def1);
   });
 });

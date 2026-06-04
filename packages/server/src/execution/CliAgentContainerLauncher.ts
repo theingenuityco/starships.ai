@@ -23,6 +23,8 @@ export interface LaunchCliAgentInput {
   /** No-repo run: the agent's cwd is the mount root (/workspace) rather than a checkout subdir. */
   scratch?: boolean;
   onEvent?: (event: CliAgentEvent) => void | Promise<void>;
+  /** Cancellation: aborting SIGKILLs the `docker run` child (reaped by `--rm`), ending the turn. */
+  signal?: AbortSignal;
 }
 
 /**
@@ -76,7 +78,7 @@ export class CliAgentContainerLauncher {
     }
 
     try {
-      return await this.runContainer(jobFile, hostDir, onEvent);
+      return await this.runContainer(jobFile, hostDir, onEvent, input.signal);
     } finally {
       // The workspace (hostDir) is the persistent, per-conversation mount owned by
       // WorkspaceSessionManager; only the ephemeral job dir is cleaned here.
@@ -130,17 +132,30 @@ export class CliAgentContainerLauncher {
   private runContainer(
     jobFile: string,
     hostWorkspaceDir: string,
-    onEvent?: (event: CliAgentEvent) => void | Promise<void>
+    onEvent?: (event: CliAgentEvent) => void | Promise<void>,
+    signal?: AbortSignal
   ): Promise<CliAgentResult> {
     return new Promise<CliAgentResult>((resolve, reject) => {
       const child = spawn('docker', this.buildDockerArgs(jobFile, hostWorkspaceDir), {
         stdio: ['ignore', 'pipe', 'pipe'],
       });
 
+      // Cancellation: SIGKILL the `docker run` child (reaped by `--rm`) so a stop request ends the
+      // sandbox turn instead of letting the container run to natural completion. Same kill path as
+      // the deadline below. Registered before any await so an already-aborted signal still fires.
+      let failure: string | undefined;
+      const onAbort = () => {
+        failure = failure ?? 'sandbox turn cancelled';
+        child.kill('SIGKILL');
+      };
+      if (signal) {
+        if (signal.aborted) onAbort();
+        else signal.addEventListener('abort', onAbort, { once: true });
+      }
+
       let stdoutBuffer = '';
       let stderrBuffer = '';
       let result: CliAgentResult | undefined;
-      let failure: string | undefined;
       // Serialize event handling: each onEvent (DB write + stream publish) runs after the
       // previous one. This preserves message ordering and bounds in-flight work (no unbounded
       // array of fire-and-forget promises).
@@ -189,11 +204,13 @@ export class CliAgentContainerLauncher {
 
       child.on('error', (err) => {
         clearTimeout(deadline);
+        signal?.removeEventListener('abort', onAbort);
         reject(err);
       });
 
       child.on('close', async (code) => {
         clearTimeout(deadline);
+        signal?.removeEventListener('abort', onAbort);
         if (stdoutBuffer) handleLine(stdoutBuffer);
         await eventChain;
         if (failure) {

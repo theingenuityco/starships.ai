@@ -210,7 +210,6 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
     if (existingAgent.temperature !== undefined) agentBuilderRef.current.updateField('temperature', existingAgent.temperature as any)
     if (existingAgent.maxTokens !== undefined) agentBuilderRef.current.updateField('maxTokens', existingAgent.maxTokens as any)
     if (existingAgent.timeout !== undefined) agentBuilderRef.current.updateField('timeout', existingAgent.timeout as any)
-    if (Array.isArray((existingAgent as any).assignedToolSlugs)) agentBuilderRef.current.updateField('assignedToolSlugs', (existingAgent as any).assignedToolSlugs as any)
     if ((!Array.isArray(currentForm?.previewPrompts) || (currentForm.previewPrompts || []).length === 0) && Array.isArray(existingAgent.previewPrompts)) {
       const prompts = (existingAgent.previewPrompts as unknown[])
         .filter(p => typeof p === 'string')

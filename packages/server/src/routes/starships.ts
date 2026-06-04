@@ -13,7 +13,6 @@ import { verifyResourceAccess, verifyStarshipAccess, verifyStarshipOwnerAccess }
 import type {
   StarshipModel,
   UpdateAgentRequest,
-  UpdateToolRequest,
   WidgetInstanceNodeInput,
   ViewRuntimeConfig,
   StarshipTableColumn,
@@ -32,7 +31,6 @@ import {
   RoomTablesRepository,
   RoomRepository,
   RoomTaskBoardsRepository,
-  RoomToolsRepository,
   RoomViewsRepository,
   StarshipTableRepository,
   StarshipTableRowRepository,
@@ -41,10 +39,8 @@ import {
   TaskBoardRepository,
   TaskCardRepository,
   TaskColumnRepository,
-  ToolRepository,
   ViewRepository,
   computeAgentContentHash,
-  computeToolContentHash,
   getConnection,
 } from '@starships/models';
 import { getEnvConfig } from '@starships/env';
@@ -111,29 +107,14 @@ const ImportBundleManifestSchemaV1 = z.object({
         })
       )
       .default([]),
-    tools: z
-      .array(
-        z.object({
-          kind: z.literal('tool'),
-          file: z.string().min(1),
-          fromSlug: z.unknown().optional(),
-          fromStarshipSlug: z.unknown().optional(),
-        })
-      )
-      .default([]),
   }),
 });
 
-const BUNDLE_ENTRY_PATH_ALLOWLIST = /^(agents|tools)\/[\w.-]+\.json$/;
+const BUNDLE_ENTRY_PATH_ALLOWLIST = /^agents\/[\w.-]+\.json$/;
 function isAllowedBundlePath(file: unknown): file is string {
   return typeof file === 'string' && BUNDLE_ENTRY_PATH_ALLOWLIST.test(file);
 }
 function assertBundleManifestPathsOrThrow(manifest: z.infer<typeof ImportBundleManifestSchemaV1>): void {
-  for (const t of manifest.entities.tools) {
-    if (!isAllowedBundlePath(t.file) || !t.file.startsWith('tools/')) {
-      throw new Error(`Invalid manifest path for tool entry: ${String(t.file)}`);
-    }
-  }
   for (const a of manifest.entities.agents) {
     if (!isAllowedBundlePath(a.file) || !a.file.startsWith('agents/')) {
       throw new Error(`Invalid manifest path for agent entry: ${String(a.file)}`);
@@ -211,20 +192,15 @@ const ImportRoomBundleManifestSchemaV1 = z.object({
       )
       .default([]),
     agents: ImportBundleManifestSchemaV1.shape.entities.shape.agents,
-    tools: ImportBundleManifestSchemaV1.shape.entities.shape.tools,
   }),
 });
 
-const ROOM_BUNDLE_ENTRY_PATH_ALLOWLIST = /^(agents|tools|rooms|views|tables|task-boards)\/[\w.-]+\.json$/;
+const ROOM_BUNDLE_ENTRY_PATH_ALLOWLIST = /^(agents|rooms|views|tables|task-boards)\/[\w.-]+\.json$/;
 function isAllowedRoomBundlePath(file: unknown): file is string {
   return typeof file === 'string' && ROOM_BUNDLE_ENTRY_PATH_ALLOWLIST.test(file);
 }
 
 function assertRoomBundleManifestPathsOrThrow(manifest: z.infer<typeof ImportRoomBundleManifestSchemaV1>): void {
-  for (const t of manifest.entities.tools) {
-    if (!isAllowedRoomBundlePath(t.file) || !t.file.startsWith('tools/'))
-      throw new Error(`Invalid manifest path for tool entry: ${String(t.file)}`);
-  }
   for (const a of manifest.entities.agents) {
     if (!isAllowedRoomBundlePath(a.file) || !a.file.startsWith('agents/'))
       throw new Error(`Invalid manifest path for agent entry: ${String(a.file)}`);
@@ -278,7 +254,6 @@ const RoomBundleDecisionsSchema = z.object({
   views: z.record(z.string().min(1), RoomBundleDecisionSchema).default({}),
   tables: z.record(z.string().min(1), RoomBundleDecisionSchema).default({}),
   taskBoards: z.record(z.string().min(1), RoomBundleDecisionSchema).default({}),
-  tools: z.record(z.string().min(1), RoomBundleDecisionSchema).default({}),
   agents: z.record(z.string().min(1), RoomBundleDecisionSchema).default({}),
 });
 
@@ -368,7 +343,6 @@ async function applyRoomBundleToStarship(opts: {
 
   const applyResult = await conn.transaction(async (client) => {
     const txConn = makeTransactionConnection(client);
-    const toolRepo = new ToolRepository(txConn);
     const agentRepo = new AgentRepository(txConn);
     const agentService = new AgentService(txConn);
     const svc = new ImportExportService(txConn);
@@ -384,116 +358,16 @@ async function applyRoomBundleToStarship(opts: {
     const roomViewsRepo = new RoomViewsRepository(txConn);
     const roomTablesRepo = new RoomTablesRepository(txConn);
     const roomTaskBoardsRepo = new RoomTaskBoardsRepository(txConn);
-    const roomToolsRepo = new RoomToolsRepository(txConn);
     const participantRepo = new ConversationParticipantRepository(txConn);
     const conversationRepo = new ConversationRepository(txConn);
 
     const warnings: string[] = [];
-    const imported: Record<string, number> = { rooms: 0, views: 0, tables: 0, taskBoards: 0, agents: 0, tools: 0 };
+    const imported: Record<string, number> = { rooms: 0, views: 0, tables: 0, taskBoards: 0, agents: 0 };
 
-    const toolSlugMap = new Map<string, string>();
     const agentIdMap = new Map<string, string>(); // source slug -> created agent id
     const viewSlugMap = new Map<string, string>(); // source slug -> created slug
     const tableSlugMap = new Map<string, string>();
     const taskBoardSlugMap = new Map<string, string>();
-
-    // Index existing tools for overwrite/skip mapping.
-    const existingTools = await toolRepo.findByStarship(starshipId);
-    const toolsByHash = new Map<string, (typeof existingTools)[number]>();
-    const toolsByName = new Map<string, (typeof existingTools)[number]>();
-    const indexTool = (t: (typeof existingTools)[number]) => {
-      const nameKey = String(t.name || '')
-        .trim()
-        .toLowerCase();
-      if (nameKey) toolsByName.set(nameKey, t);
-      const hash = readContentHash((t as unknown as { contentHash?: unknown }).contentHash);
-      if (hash) toolsByHash.set(hash, t);
-    };
-    for (const t of existingTools) indexTool(t);
-
-    // Tools first (same semantics as agent bundle import)
-    for (const t of manifest.entities.tools) {
-      const entry = getBundleEntry(reader, t.file);
-      if (!entry) {
-        warnings.push(`Bundle is missing tool file: ${t.file}`);
-        continue;
-      }
-      let containerRaw: unknown;
-      try {
-        containerRaw = JSON.parse(entry.getData().toString('utf8'));
-      } catch {
-        warnings.push(`Tool file is not valid JSON: ${t.file}`);
-        continue;
-      }
-      const containerParsed = ContainerSchema.safeParse(containerRaw);
-      if (!containerParsed.success || containerParsed.data.kind !== 'tool') {
-        warnings.push(`Tool file is not a valid tool container: ${t.file}`);
-        continue;
-      }
-
-      const payload = containerParsed.data.payload as unknown as { tool?: Record<string, unknown> };
-      const toolPayload = payload?.tool ?? {};
-      const fromSlug = containerParsed.data.metadata?.fromSlug;
-      const bundleHash = computeToolContentHash({
-        name: toolPayload?.name,
-        description: toolPayload?.description,
-        parameters: toolPayload?.parameters,
-        blueprint: toolPayload?.blueprint,
-        transforms: toolPayload?.transforms,
-        mutations: toolPayload?.mutations,
-        condition: toolPayload?.condition,
-        isEnabled: toolPayload?.isEnabled,
-        status: toolPayload?.status,
-      });
-
-      const decision = decisions.tools[bundleHash] ?? { action: 'copy' as const };
-      const toolNameKey = String(toolPayload?.name || '')
-        .trim()
-        .toLowerCase();
-      const existingByHash = toolsByHash.get(bundleHash);
-      const existingByName = toolNameKey ? toolsByName.get(toolNameKey) : undefined;
-      const target = existingByHash ?? existingByName ?? null;
-
-      const sourceSlug = typeof fromSlug === 'string' ? fromSlug.trim() : '';
-      if (decision.action === 'skip') {
-        if (sourceSlug && target?.slug) toolSlugMap.set(sourceSlug, target.slug);
-        continue;
-      }
-
-      if (decision.action === 'overwrite') {
-        const targetId = decision.targetId || target?.id;
-        if (!targetId) {
-          warnings.push(`No overwrite target found for tool: ${String(toolPayload?.name || t.file)}`);
-          continue;
-        }
-        const updateReq: UpdateToolRequest = {
-          name: typeof toolPayload?.name === 'string' ? toolPayload.name : undefined,
-          description: typeof toolPayload?.description === 'string' ? toolPayload.description : '',
-          parameters: toolPayload?.parameters as UpdateToolRequest['parameters'],
-          blueprint: toolPayload?.blueprint as UpdateToolRequest['blueprint'],
-          transforms: toolPayload?.transforms as UpdateToolRequest['transforms'],
-          mutations: toolPayload?.mutations as UpdateToolRequest['mutations'],
-          condition: typeof toolPayload?.condition === 'string' ? toolPayload.condition : undefined,
-          isEnabled: typeof toolPayload?.isEnabled === 'boolean' ? toolPayload.isEnabled : undefined,
-          status: toolPayload?.status === 'draft' || toolPayload?.status === 'active' ? toolPayload.status : undefined,
-        };
-        const updated = await toolRepo.update(targetId, updateReq);
-        if (updated) {
-          imported.tools += 1;
-          indexTool(updated);
-          if (sourceSlug) toolSlugMap.set(sourceSlug, updated.slug);
-        }
-        continue;
-      }
-
-      const result = await svc.importToStarship(starshipId, containerParsed.data as unknown as ImportExportContainerV1);
-      if (result?.warnings?.length) warnings.push(...result.warnings);
-      if (result?.kind === 'tool' && result.tool) {
-        imported.tools += 1;
-        indexTool(result.tool);
-        if (sourceSlug && result.tool.slug) toolSlugMap.set(sourceSlug, result.tool.slug);
-      }
-    }
 
     // Index existing agents for skip/overwrite target discovery.
     const existingAgents = await agentRepo.findByStarship(starshipId);
@@ -505,7 +379,7 @@ async function applyRoomBundleToStarship(opts: {
       if (nameKey) agentsByName.set(nameKey, a);
     }
 
-    // Agents (rewrite assigned tool slugs using toolSlugMap, and create agentIdMap).
+    // Agents (create agentIdMap).
     for (const a of manifest.entities.agents) {
       const entry = getBundleEntry(reader, a.file);
       if (!entry) {
@@ -528,11 +402,8 @@ async function applyRoomBundleToStarship(opts: {
       const fromSlug = containerParsed.data.metadata?.fromSlug;
       const sourceSlug = typeof fromSlug === 'string' ? fromSlug.trim() : '';
 
-      const payload = containerParsed.data.payload as unknown as { agent?: Record<string, unknown>; assignedToolSlugs?: unknown };
+      const payload = containerParsed.data.payload as unknown as { agent?: Record<string, unknown> };
       const agentPayload = payload?.agent ?? {};
-      const assignedToolSlugsRaw = Array.isArray(payload?.assignedToolSlugs) ? payload.assignedToolSlugs : [];
-      const assignedToolSlugs = assignedToolSlugsRaw.filter((s: unknown) => typeof s === 'string' && s.trim().length > 0) as string[];
-      const rewrittenToolSlugs = assignedToolSlugs.map((s) => toolSlugMap.get(s) ?? s);
 
       const bundleHash = computeAgentContentHash({
         name: agentPayload?.name,
@@ -548,7 +419,7 @@ async function applyRoomBundleToStarship(opts: {
         blueprint: agentPayload?.blueprint,
         category: agentPayload?.category,
         previewPrompts: agentPayload?.previewPrompts,
-        assignedToolSlugs: assignedToolSlugs,
+        assignedToolSlugs: [],
       });
 
       const decision = decisions.agents[bundleHash] ?? { action: 'copy' as const };
@@ -601,13 +472,6 @@ async function applyRoomBundleToStarship(opts: {
         };
         const updated = await agentService.updateAgent(targetId, updateReq);
         if (updated) {
-          try {
-            await agentService.assignToolSlugs(targetId, rewrittenToolSlugs, starshipId);
-          } catch (err) {
-            warnings.push(
-              `Agent tools partially applied for ${String(agentPayload?.name || targetId)}: ${String((err as Error)?.message || err)}`
-            );
-          }
           imported.agents += 1;
           if (sourceSlug) agentIdMap.set(sourceSlug, updated.id);
           console.debug('[leadgen] Agent overwritten from bundle', {
@@ -620,16 +484,8 @@ async function applyRoomBundleToStarship(opts: {
         continue;
       }
 
-      const basePayloadObj = isPlainObject(containerParsed.data.payload) ? containerParsed.data.payload : {};
-      const rewrittenContainer = {
-        ...(containerParsed.data as unknown as ImportExportContainerV1),
-        payload: {
-          ...basePayloadObj,
-          assignedToolSlugs: rewrittenToolSlugs,
-        },
-      } as unknown as ImportExportContainerV1;
       try {
-        const result = await svc.importToStarship(starshipId, rewrittenContainer);
+        const result = await svc.importToStarship(starshipId, containerParsed.data as unknown as ImportExportContainerV1);
         if (result?.warnings?.length) warnings.push(...result.warnings);
         if (result?.kind === 'agent' && result.agent) {
           imported.agents += 1;
@@ -1002,25 +858,6 @@ async function applyRoomBundleToStarship(opts: {
         await participantRepo.addAgentParticipant({ conversationId: createdRoom.conversationId, agentId, createdBy: userId });
       }
 
-      // Tool assignments (map source tool slug -> created tool slug -> tool id)
-      const toolAssignments = Array.isArray(payload?.toolAssignments) ? (payload.toolAssignments as Record<string, unknown>[]) : [];
-      if (toolAssignments.length > 0) {
-        for (const ta of toolAssignments) {
-          const sourceToolSlug = typeof ta?.toolSlug === 'string' ? ta.toolSlug.trim() : '';
-          const permission = ta?.permission;
-          if (!sourceToolSlug) continue;
-          if (permission !== 'allow' && permission !== 'ask' && permission !== 'deny') continue;
-          const destToolSlug = toolSlugMap.get(sourceToolSlug) ?? sourceToolSlug;
-          const found = await toolRepo.findBySlugs([destToolSlug], starshipId);
-          const tool = found?.[0] ?? null;
-          if (!tool) {
-            warnings.push(`Skipped missing room tool assignment: ${destToolSlug}`);
-            continue;
-          }
-          await roomToolsRepo.upsert({ roomConversationId: createdRoom.conversationId, toolId: tool.id, permission });
-        }
-      }
-
       // Pins (views/tables/task boards)
       const viewPins = Array.isArray(payload?.viewPins) ? (payload.viewPins as Record<string, unknown>[]) : [];
       for (const p of viewPins) {
@@ -1209,11 +1046,6 @@ router.post('/starships', jwtAuthMiddleware, async (req: Request, res: Response)
       shipClass: 'scout',
     });
     console.log('[STARSHIP-CREATE] Starship created with ID:', starship.id);
-
-    // Deploy default bundle tools — best-effort, does not fail starship creation.
-    ensureDefaultBundleForStarship({ starshipId: starship.id, userId }).catch((err) => {
-      console.error('[STARSHIP-CREATE] Failed to deploy default bundle', { starshipId: starship.id, error: (err as Error)?.message });
-    });
 
     sendSuccess(res, starship, 201);
   } catch (error) {
@@ -1866,48 +1698,7 @@ router.post(
         const svc = new ImportExportService(txConn);
 
         const warnings: string[] = [];
-        const importedTools: unknown[] = [];
         const importedAgents: unknown[] = [];
-        const toolSlugMap = new Map<string, string>();
-
-        // Import tools first so agent tool assignment can be remapped.
-        for (const t of manifestParsed.data.entities.tools) {
-          const entry = zip.getEntry(t.file);
-          if (!entry) {
-            warnings.push(`Bundle is missing tool file: ${t.file}`);
-            continue;
-          }
-
-          let containerRaw: unknown;
-          try {
-            containerRaw = JSON.parse(entry.getData().toString('utf8'));
-          } catch {
-            warnings.push(`Tool file is not valid JSON: ${t.file}`);
-            continue;
-          }
-
-          const containerParsed = ImportExportContainerSchemaV1.safeParse(containerRaw);
-          if (!containerParsed.success || containerParsed.data.kind !== 'tool') {
-            warnings.push(`Tool file is not a valid tool container: ${t.file}`);
-            continue;
-          }
-
-          const result = await svc.importToStarship(starshipId, containerParsed.data as unknown as ImportExportContainerV1);
-          if (result?.warnings?.length) warnings.push(...result.warnings);
-          if (result?.kind === 'tool' && result.tool) {
-            importedTools.push(result.tool);
-            const fromSlug = containerParsed.data.metadata?.fromSlug;
-            const createdSlug = result.tool?.slug;
-            if (
-              typeof fromSlug === 'string' &&
-              fromSlug.trim().length > 0 &&
-              typeof createdSlug === 'string' &&
-              createdSlug.trim().length > 0
-            ) {
-              toolSlugMap.set(fromSlug, createdSlug);
-            }
-          }
-        }
 
         for (const a of manifestParsed.data.entities.agents) {
           const entry = zip.getEntry(a.file);
@@ -1930,21 +1721,7 @@ router.post(
             continue;
           }
 
-          const payload = containerParsed.data.payload as unknown as { assignedToolSlugs?: unknown };
-          const assignedToolSlugsRaw = Array.isArray(payload?.assignedToolSlugs) ? payload.assignedToolSlugs : [];
-          const assignedToolSlugs = assignedToolSlugsRaw.filter((s: unknown) => typeof s === 'string' && s.trim().length > 0) as string[];
-          const rewrittenToolSlugs = assignedToolSlugs.map((s) => toolSlugMap.get(s) ?? s);
-
-          const basePayloadObj = isPlainObject(containerParsed.data.payload) ? containerParsed.data.payload : {};
-          const rewrittenContainer: ImportExportContainerV1 = {
-            ...(containerParsed.data as unknown as ImportExportContainerV1),
-            payload: {
-              ...basePayloadObj,
-              assignedToolSlugs: rewrittenToolSlugs,
-            } as unknown as ImportExportContainerV1['payload'],
-          };
-
-          const result = await svc.importToStarship(starshipId, rewrittenContainer);
+          const result = await svc.importToStarship(starshipId, containerParsed.data as unknown as ImportExportContainerV1);
           if (result?.warnings?.length) warnings.push(...result.warnings);
           if (result?.kind === 'agent' && result.agent) {
             importedAgents.push(result.agent);
@@ -1952,8 +1729,7 @@ router.post(
         }
 
         return {
-          imported: { tools: importedTools.length, agents: importedAgents.length },
-          tools: importedTools.length ? importedTools : undefined,
+          imported: { agents: importedAgents.length },
           agents: importedAgents.length ? importedAgents : undefined,
           warnings: warnings.length ? warnings : undefined,
         };
@@ -2026,44 +1802,9 @@ router.post(
       const ContainerSchema = ImportExportContainerSchemaV1;
 
       const starshipId = paramValidation.id;
-      const toolRepo = new ToolRepository();
       const agentRepo = new AgentRepository();
 
-      const existingTools = await toolRepo.findByStarship(starshipId);
-      const existingToolsByHash = new Map<string, (typeof existingTools)[number]>();
-      const existingToolsByName = new Map<string, (typeof existingTools)[number]>();
-      for (const t of existingTools) {
-        const nameKey = String(t.name || '')
-          .trim()
-          .toLowerCase();
-        if (nameKey) existingToolsByName.set(nameKey, t);
-        const storedHash = readContentHash((t as unknown as { contentHash?: unknown }).contentHash);
-        if (storedHash) existingToolsByHash.set(storedHash, t);
-        // Also index a freshly computed hash to remain robust if the hashing algorithm evolves.
-        const tRec = t as unknown as Record<string, unknown>;
-        const computedHash = computeToolContentHash({
-          name: t.name,
-          description: t.description,
-          parameters: tRec.parameters,
-          blueprint: tRec.blueprint,
-          transforms: tRec.transforms,
-          mutations: tRec.mutations,
-          condition: tRec.condition,
-          isEnabled: tRec.isEnabled,
-          status: tRec.status,
-        });
-        existingToolsByHash.set(computedHash, t);
-      }
-
       const existingAgents = await agentRepo.findByStarship(starshipId);
-      const assignedToolRows = await agentRepo.getAssignedToolSlugsForAgents(existingAgents.map((a) => a.id));
-      const assignedToolSlugsByAgentId = new Map<string, string[]>();
-      for (const row of assignedToolRows) {
-        const list = assignedToolSlugsByAgentId.get(row.agentId) ?? [];
-        list.push(row.toolSlug);
-        assignedToolSlugsByAgentId.set(row.agentId, list);
-      }
-
       const existingAgentsByHash = new Map<string, (typeof existingAgents)[number]>();
       const existingAgentsByName = new Map<string, (typeof existingAgents)[number]>();
       for (const a of existingAgents) {
@@ -2074,7 +1815,6 @@ router.post(
         const storedHash = readContentHash((a as unknown as { contentHash?: unknown }).contentHash);
         if (storedHash) existingAgentsByHash.set(storedHash, a);
         // Always index the freshly computed hash too (contentHash may be stale from older versions).
-        const slugs = assignedToolSlugsByAgentId.get(a.id) ?? [];
         const computed = computeAgentContentHash({
           name: a.name,
           role: a.role,
@@ -2089,66 +1829,9 @@ router.post(
           blueprint: a.blueprint,
           category: a.category,
           previewPrompts: a.previewPrompts,
-          assignedToolSlugs: slugs,
+          assignedToolSlugs: [],
         });
         existingAgentsByHash.set(computed, a);
-      }
-
-      const toolsAnalysis: Array<{
-        kind: 'tool';
-        file: string;
-        name: string;
-        bundleHash: string;
-        status: 'new' | 'same' | 'conflict';
-        existing?: { id: string; name: string; slug: string; contentHash?: string };
-      }> = [];
-
-      for (const t of manifestParsed.data.entities.tools) {
-        const entry = zip.getEntry(t.file);
-        if (!entry) continue;
-        let containerRaw: unknown;
-        try {
-          containerRaw = JSON.parse(entry.getData().toString('utf8'));
-        } catch {
-          continue;
-        }
-        const containerParsed = ContainerSchema.safeParse(containerRaw);
-        if (!containerParsed.success || containerParsed.data.kind !== 'tool') continue;
-
-        const payload = containerParsed.data.payload as unknown as { tool?: Record<string, unknown> };
-        const toolPayload = payload?.tool ?? {};
-        const bundleHash = computeToolContentHash({
-          name: toolPayload?.name,
-          description: toolPayload?.description,
-          parameters: toolPayload?.parameters,
-          blueprint: toolPayload?.blueprint,
-          transforms: toolPayload?.transforms,
-          mutations: toolPayload?.mutations,
-          condition: toolPayload?.condition,
-          isEnabled: toolPayload?.isEnabled,
-          status: toolPayload?.status,
-        });
-        const name = String(toolPayload?.name || '').trim();
-        const existingByHash = existingToolsByHash.get(bundleHash);
-        const existingByName = name ? existingToolsByName.get(name.toLowerCase()) : undefined;
-
-        const status: 'new' | 'same' | 'conflict' = existingByHash ? 'same' : existingByName ? 'conflict' : 'new';
-        const existing = existingByHash ?? existingByName;
-        toolsAnalysis.push({
-          kind: 'tool',
-          file: t.file,
-          name: name || '(unnamed tool)',
-          bundleHash,
-          status,
-          existing: existing
-            ? {
-                id: existing.id,
-                name: existing.name,
-                slug: existing.slug,
-                contentHash: readContentHash((existing as unknown as { contentHash?: unknown }).contentHash),
-              }
-            : undefined,
-        });
       }
 
       const agentsAnalysis: Array<{
@@ -2172,9 +1855,8 @@ router.post(
         const containerParsed = ContainerSchema.safeParse(containerRaw);
         if (!containerParsed.success || containerParsed.data.kind !== 'agent') continue;
 
-        const payload = containerParsed.data.payload as unknown as { agent?: Record<string, unknown>; assignedToolSlugs?: unknown };
+        const payload = containerParsed.data.payload as unknown as { agent?: Record<string, unknown> };
         const agentPayload = payload?.agent ?? {};
-        const assignedToolSlugs = Array.isArray(payload?.assignedToolSlugs) ? payload.assignedToolSlugs : [];
         const bundleHash = computeAgentContentHash({
           name: agentPayload?.name,
           role: agentPayload?.role,
@@ -2189,7 +1871,7 @@ router.post(
           blueprint: agentPayload?.blueprint,
           category: agentPayload?.category,
           previewPrompts: agentPayload?.previewPrompts,
-          assignedToolSlugs,
+          assignedToolSlugs: [],
         });
 
         const name = String(agentPayload?.name || '').trim();
@@ -2214,7 +1896,7 @@ router.post(
         });
       }
 
-      sendSuccess(res, { tools: toolsAnalysis, agents: agentsAnalysis });
+      sendSuccess(res, { agents: agentsAnalysis });
     } catch (error) {
       handleError(error, res, 'analyzing bundle import conflicts');
     }
@@ -2260,7 +1942,6 @@ router.post(
         targetId: z.string().optional(),
       });
       const DecisionsSchema = z.object({
-        tools: z.record(z.string().min(1), DecisionSchema).default({}),
         agents: z.record(z.string().min(1), DecisionSchema).default({}),
       });
       const decisionsParsed = DecisionsSchema.safeParse(decisionsJson);
@@ -2317,126 +1998,12 @@ router.post(
 
       const applyResult = await conn.transaction(async (client) => {
         const txConn = makeTransactionConnection(client);
-        const toolRepo = new ToolRepository(txConn);
         const agentRepo = new AgentRepository(txConn);
         const agentService = new AgentService(txConn);
         const svc = new ImportExportService(txConn);
 
         const warnings: string[] = [];
-        const importedTools: unknown[] = [];
         const importedAgents: unknown[] = [];
-        const toolSlugMap = new Map<string, string>();
-
-        // Snapshot + index existing tools once (update maps as we create/overwrite).
-        const existingTools = await toolRepo.findByStarship(starshipId);
-        const toolsByHash = new Map<string, (typeof existingTools)[number]>();
-        const toolsByName = new Map<string, (typeof existingTools)[number]>();
-        const indexTool = (t: (typeof existingTools)[number]) => {
-          const nameKey = String(t.name || '')
-            .trim()
-            .toLowerCase();
-          if (nameKey) toolsByName.set(nameKey, t);
-          const hash = readContentHash((t as unknown as { contentHash?: unknown }).contentHash);
-          if (hash) toolsByHash.set(hash, t);
-        };
-        for (const t of existingTools) indexTool(t);
-
-        // Tools first
-        for (const t of manifestParsed.data.entities.tools) {
-          const entry = zip.getEntry(t.file);
-          if (!entry) {
-            warnings.push(`Bundle is missing tool file: ${t.file}`);
-            continue;
-          }
-
-          let containerRaw: unknown;
-          try {
-            containerRaw = JSON.parse(entry.getData().toString('utf8'));
-          } catch {
-            warnings.push(`Tool file is not valid JSON: ${t.file}`);
-            continue;
-          }
-
-          const containerParsed = ContainerSchema.safeParse(containerRaw);
-          if (!containerParsed.success || containerParsed.data.kind !== 'tool') {
-            warnings.push(`Tool file is not a valid tool container: ${t.file}`);
-            continue;
-          }
-
-          const payload = containerParsed.data.payload as unknown as { tool?: Record<string, unknown> };
-          const toolPayload = payload?.tool ?? {};
-          const fromSlug = containerParsed.data.metadata?.fromSlug;
-          const bundleHash = computeToolContentHash({
-            name: toolPayload?.name,
-            description: toolPayload?.description,
-            parameters: toolPayload?.parameters,
-            blueprint: toolPayload?.blueprint,
-            transforms: toolPayload?.transforms,
-            mutations: toolPayload?.mutations,
-            condition: toolPayload?.condition,
-            isEnabled: toolPayload?.isEnabled,
-            status: toolPayload?.status,
-          });
-
-          const decision = decisionsParsed.data.tools[bundleHash] ?? { action: 'copy' as const };
-          const toolNameKey = String(toolPayload?.name || '')
-            .trim()
-            .toLowerCase();
-
-          const existingByHash = toolsByHash.get(bundleHash);
-          const existingByName = toolNameKey ? toolsByName.get(toolNameKey) : undefined;
-          const target = existingByHash ?? existingByName ?? null;
-
-          if (decision.action === 'skip') {
-            if (typeof fromSlug === 'string' && fromSlug.trim().length > 0 && target?.slug) {
-              toolSlugMap.set(fromSlug, target.slug);
-            }
-            continue;
-          }
-
-          if (decision.action === 'overwrite') {
-            const targetId = decision.targetId || target?.id;
-            if (!targetId) {
-              warnings.push(`No overwrite target found for tool: ${String(toolPayload?.name || t.file)}`);
-              continue;
-            }
-            const updateReq: UpdateToolRequest = {
-              name: typeof toolPayload?.name === 'string' ? toolPayload.name : undefined,
-              description: typeof toolPayload?.description === 'string' ? toolPayload.description : '',
-              parameters: toolPayload?.parameters as UpdateToolRequest['parameters'],
-              blueprint: toolPayload?.blueprint as UpdateToolRequest['blueprint'],
-              transforms: toolPayload?.transforms as UpdateToolRequest['transforms'],
-              mutations: toolPayload?.mutations as UpdateToolRequest['mutations'],
-              condition: typeof toolPayload?.condition === 'string' ? toolPayload.condition : undefined,
-              isEnabled: typeof toolPayload?.isEnabled === 'boolean' ? toolPayload.isEnabled : undefined,
-              status: toolPayload?.status === 'draft' || toolPayload?.status === 'active' ? toolPayload.status : undefined,
-            };
-            const updated = await toolRepo.update(targetId, updateReq);
-            if (updated) {
-              importedTools.push(updated);
-              indexTool(updated);
-              if (typeof fromSlug === 'string' && fromSlug.trim().length > 0) toolSlugMap.set(fromSlug, updated.slug);
-            }
-            continue;
-          }
-
-          // copy (default)
-          const result = await svc.importToStarship(starshipId, containerParsed.data as unknown as ImportExportContainerV1);
-          if (result?.warnings?.length) warnings.push(...result.warnings);
-          if (result?.kind === 'tool' && result.tool) {
-            importedTools.push(result.tool);
-            indexTool(result.tool);
-            const createdSlug = result.tool?.slug;
-            if (
-              typeof fromSlug === 'string' &&
-              fromSlug.trim().length > 0 &&
-              typeof createdSlug === 'string' &&
-              createdSlug.trim().length > 0
-            ) {
-              toolSlugMap.set(fromSlug, createdSlug);
-            }
-          }
-        }
 
         // Snapshot + index existing agents once (update maps as we create/overwrite).
         const existingAgents = await agentRepo.findByStarship(starshipId);
@@ -2476,12 +2043,8 @@ router.post(
 
           const payload = containerParsed.data.payload as unknown as {
             agent?: Record<string, unknown>;
-            assignedToolSlugs?: unknown;
           };
           const agentPayload = payload?.agent ?? {};
-          const assignedToolSlugsRaw = Array.isArray(payload?.assignedToolSlugs) ? payload.assignedToolSlugs : [];
-          const assignedToolSlugs = assignedToolSlugsRaw.filter((s: unknown) => typeof s === 'string' && s.trim().length > 0) as string[];
-          const rewrittenToolSlugs = assignedToolSlugs.map((s) => toolSlugMap.get(s) ?? s);
 
           const bundleHash = computeAgentContentHash({
             name: agentPayload?.name,
@@ -2497,7 +2060,7 @@ router.post(
             blueprint: agentPayload?.blueprint,
             category: agentPayload?.category,
             previewPrompts: agentPayload?.previewPrompts,
-            assignedToolSlugs: assignedToolSlugs,
+            assignedToolSlugs: [],
           });
 
           const decision = decisionsParsed.data.agents[bundleHash] ?? { action: 'copy' as const };
@@ -2537,13 +2100,6 @@ router.post(
             };
             const updated = await agentService.updateAgent(targetId, updateReq);
             if (updated) {
-              try {
-                await agentService.assignToolSlugs(targetId, rewrittenToolSlugs, starshipId);
-              } catch (err) {
-                warnings.push(
-                  `Agent tools partially applied for ${String(agentPayload?.name || targetId)}: ${String((err as Error)?.message || err)}`
-                );
-              }
               importedAgents.push(updated);
               indexAgent(updated);
             }
@@ -2551,16 +2107,7 @@ router.post(
           }
 
           // copy (default)
-          const basePayloadObj = isPlainObject(containerParsed.data.payload) ? containerParsed.data.payload : {};
-          const rewrittenContainer = {
-            ...(containerParsed.data as unknown as ImportExportContainerV1),
-            payload: {
-              ...basePayloadObj,
-              assignedToolSlugs: rewrittenToolSlugs,
-            },
-          } as unknown as ImportExportContainerV1;
-
-          const result = await svc.importToStarship(starshipId, rewrittenContainer);
+          const result = await svc.importToStarship(starshipId, containerParsed.data as unknown as ImportExportContainerV1);
           if (result?.warnings?.length) warnings.push(...result.warnings);
           if (result?.kind === 'agent' && result.agent) {
             importedAgents.push(result.agent);
@@ -2569,8 +2116,7 @@ router.post(
         }
 
         return {
-          imported: { tools: importedTools.length, agents: importedAgents.length },
-          tools: importedTools.length ? importedTools : undefined,
+          imported: { agents: importedAgents.length },
           agents: importedAgents.length ? importedAgents : undefined,
           warnings: warnings.length ? warnings : undefined,
         };
@@ -2647,42 +2193,9 @@ router.post(
       const ContainerSchema = ImportExportContainerSchemaV1RoomBundle;
       const starshipId = paramValidation.id;
 
-      // Existing tools/agents use the same hashing logic as agent bundle import.
-      const toolRepo = new ToolRepository();
+      // Existing agents use the same hashing logic as agent bundle import.
       const agentRepo = new AgentRepository();
-      const existingTools = await toolRepo.findByStarship(starshipId);
-      const existingToolsByHash = new Map<string, (typeof existingTools)[number]>();
-      const existingToolsByName = new Map<string, (typeof existingTools)[number]>();
-      for (const t of existingTools) {
-        const nameKey = String(t.name || '')
-          .trim()
-          .toLowerCase();
-        if (nameKey) existingToolsByName.set(nameKey, t);
-        const storedHash = readContentHash((t as unknown as { contentHash?: unknown }).contentHash);
-        if (storedHash) existingToolsByHash.set(storedHash, t);
-        const tRec = t as unknown as Record<string, unknown>;
-        const computedHash = computeToolContentHash({
-          name: t.name,
-          description: t.description,
-          parameters: tRec.parameters,
-          blueprint: tRec.blueprint,
-          transforms: tRec.transforms,
-          mutations: tRec.mutations,
-          condition: tRec.condition,
-          isEnabled: tRec.isEnabled,
-          status: tRec.status,
-        });
-        existingToolsByHash.set(computedHash, t);
-      }
-
       const existingAgents = await agentRepo.findByStarship(starshipId);
-      const assignedToolRows = await agentRepo.getAssignedToolSlugsForAgents(existingAgents.map((a) => a.id));
-      const assignedToolSlugsByAgentId = new Map<string, string[]>();
-      for (const row of assignedToolRows) {
-        const list = assignedToolSlugsByAgentId.get(row.agentId) ?? [];
-        list.push(row.toolSlug);
-        assignedToolSlugsByAgentId.set(row.agentId, list);
-      }
       const existingAgentsByHash = new Map<string, (typeof existingAgents)[number]>();
       const existingAgentsByName = new Map<string, (typeof existingAgents)[number]>();
       for (const a of existingAgents) {
@@ -2692,7 +2205,6 @@ router.post(
         if (nameKey) existingAgentsByName.set(nameKey, a);
         const storedHash = readContentHash((a as unknown as { contentHash?: unknown }).contentHash);
         if (storedHash) existingAgentsByHash.set(storedHash, a);
-        const slugs = assignedToolSlugsByAgentId.get(a.id) ?? [];
         const computed = computeAgentContentHash({
           name: a.name,
           role: a.role,
@@ -2707,7 +2219,7 @@ router.post(
           blueprint: a.blueprint,
           category: a.category,
           previewPrompts: a.previewPrompts,
-          assignedToolSlugs: slugs,
+          assignedToolSlugs: [],
         });
         existingAgentsByHash.set(computed, a);
       }
@@ -2771,60 +2283,6 @@ router.post(
         existingRoomsByHash.set(h, r);
       }
 
-      const toolsAnalysis: Array<{
-        kind: 'tool';
-        file: string;
-        name: string;
-        bundleHash: string;
-        status: 'new' | 'same' | 'conflict';
-        existing?: { id: string; name: string; slug: string; contentHash?: string };
-      }> = [];
-      for (const t of manifestParsed.data.entities.tools) {
-        const entry = zip.getEntry(t.file);
-        if (!entry) continue;
-        let containerRaw: unknown;
-        try {
-          containerRaw = JSON.parse(entry.getData().toString('utf8'));
-        } catch {
-          continue;
-        }
-        const containerParsed = ContainerSchema.safeParse(containerRaw);
-        if (!containerParsed.success || containerParsed.data.kind !== 'tool') continue;
-        const payload = containerParsed.data.payload as unknown as { tool?: Record<string, unknown> };
-        const toolPayload = payload?.tool ?? {};
-        const bundleHash = computeToolContentHash({
-          name: toolPayload?.name,
-          description: toolPayload?.description,
-          parameters: toolPayload?.parameters,
-          blueprint: toolPayload?.blueprint,
-          transforms: toolPayload?.transforms,
-          mutations: toolPayload?.mutations,
-          condition: toolPayload?.condition,
-          isEnabled: toolPayload?.isEnabled,
-          status: toolPayload?.status,
-        });
-        const name = String(toolPayload?.name || '').trim();
-        const existingByHash = existingToolsByHash.get(bundleHash);
-        const existingByName = name ? existingToolsByName.get(name.toLowerCase()) : undefined;
-        const status: 'new' | 'same' | 'conflict' = existingByHash ? 'same' : existingByName ? 'conflict' : 'new';
-        const existing = existingByHash ?? existingByName;
-        toolsAnalysis.push({
-          kind: 'tool',
-          file: t.file,
-          name: name || '(unnamed tool)',
-          bundleHash,
-          status,
-          existing: existing
-            ? {
-                id: existing.id,
-                name: existing.name,
-                slug: existing.slug,
-                contentHash: readContentHash((existing as unknown as { contentHash?: unknown }).contentHash),
-              }
-            : undefined,
-        });
-      }
-
       const agentsAnalysis: Array<{
         kind: 'agent';
         file: string;
@@ -2844,9 +2302,8 @@ router.post(
         }
         const containerParsed = ContainerSchema.safeParse(containerRaw);
         if (!containerParsed.success || containerParsed.data.kind !== 'agent') continue;
-        const payload = containerParsed.data.payload as unknown as { agent?: Record<string, unknown>; assignedToolSlugs?: unknown };
+        const payload = containerParsed.data.payload as unknown as { agent?: Record<string, unknown> };
         const agentPayload = payload?.agent ?? {};
-        const assignedToolSlugs = Array.isArray(payload?.assignedToolSlugs) ? payload.assignedToolSlugs : [];
         const bundleHash = computeAgentContentHash({
           name: agentPayload?.name,
           role: agentPayload?.role,
@@ -2861,7 +2318,7 @@ router.post(
           blueprint: agentPayload?.blueprint,
           category: agentPayload?.category,
           previewPrompts: agentPayload?.previewPrompts,
-          assignedToolSlugs,
+          assignedToolSlugs: [],
         });
         const name = String(agentPayload?.name || '').trim();
         const existingByHash = existingAgentsByHash.get(bundleHash);
@@ -3052,7 +2509,6 @@ router.post(
         views: viewsAnalysis,
         tables: tablesAnalysis,
         taskBoards: taskBoardsAnalysis,
-        tools: toolsAnalysis,
         agents: agentsAnalysis,
       });
     } catch (error) {
@@ -3074,57 +2530,6 @@ function mapSizeToEmployeeRange(size: string): string | null {
   if (/^501[-–]1000$/.test(s)) return '501_1000';
   if (/1000\+/.test(s) || /^1001/.test(s)) return '1000_plus';
   return null;
-}
-
-/**
- * Internal helper: idempotently deploy the default bundle (common tools) for a new starship.
- * Uses the same hash-based deduplication as other bundle imports, so repeated calls are safe.
- * Called best-effort from POST /starships — errors are logged but do not fail starship creation.
- */
-async function ensureDefaultBundleForStarship(opts: { starshipId: string; userId: string }): Promise<void> {
-  const { starshipId, userId } = opts;
-  const bundlesRoot = resolveBundlesRoot();
-  const bundleDir = path.join(bundlesRoot, 'tools', 'default');
-  if (!fs.existsSync(bundleDir) || !fs.statSync(bundleDir).isDirectory()) {
-    console.error('[default-bundle] Bundle directory not found', { bundlesRoot, bundleDir });
-    throw Object.assign(new Error('Default room bundle is not available on the server'), { code: 'BUNDLE_NOT_FOUND' });
-  }
-
-  const reader = new DirectoryBundleReader(bundleDir);
-  const manifestEntry = reader.getEntry('manifest.json');
-  if (!manifestEntry) {
-    throw Object.assign(new Error('Default bundle is missing manifest.json'), { code: 'MANIFEST_MISSING' });
-  }
-
-  let manifestRaw: unknown;
-  try {
-    manifestRaw = JSON.parse(manifestEntry.getData().toString('utf8'));
-  } catch {
-    throw Object.assign(new Error('Default bundle manifest.json is not valid JSON'), { code: 'MANIFEST_INVALID_JSON' });
-  }
-
-  const manifestParsed = ImportRoomBundleManifestSchemaV1.safeParse(manifestRaw);
-  if (!manifestParsed.success) {
-    throw Object.assign(new Error('Default bundle manifest.json has an unexpected shape'), { code: 'MANIFEST_INVALID_SHAPE' });
-  }
-
-  assertRoomBundleManifestPathsOrThrow(manifestParsed.data);
-
-  const emptyDecisions: RoomBundleDecisions = { rooms: {}, views: {}, tables: {}, taskBoards: {}, tools: {}, agents: {} };
-
-  await applyRoomBundleToStarship({
-    starshipId,
-    userId,
-    reader,
-    manifest: manifestParsed.data,
-    decisions: emptyDecisions,
-  });
-
-  // Grant starship-level allow permission for every tool in the default bundle.
-  // This makes them available to all agents without requiring per-agent assignment.
-  const agentRepo = new AgentRepository();
-  const toolSlugs = manifestParsed.data.entities.tools.map((t) => t.fromSlug).filter((s): s is string => typeof s === 'string' && s.trim().length > 0);
-  await agentRepo.setStarshipToolPermissionsBySlugs({ starshipId, toolSlugs, permission: 'allow' });
 }
 
 /**
@@ -3238,7 +2643,7 @@ async function ensureLeadGenRoomInternal(opts: {
     throw err;
   }
 
-  const emptyDecisions: RoomBundleDecisions = { rooms: {}, views: {}, tables: {}, taskBoards: {}, tools: {}, agents: {} };
+  const emptyDecisions: RoomBundleDecisions = { rooms: {}, views: {}, tables: {}, taskBoards: {}, agents: {} };
 
   const importSummary = await applyRoomBundleToStarship({
     starshipId,
@@ -3330,22 +2735,6 @@ async function ensureBundleRoomInternal(opts: {
 }): Promise<{ room: Awaited<ReturnType<RoomRepository['findRoomByBundleTag']>> & {}; importSummary?: { imported: Record<string, number>; warnings?: string[] } }> {
   const { starshipId, userId, bundleId, agentSlugs, label } = opts;
 
-  // Ensure the default tool catalog (which includes the engineering tools like
-  // checkout-repo / run-tests / open-pr-with-changes) is present and starship-allowed
-  // before wiring the room. This is idempotent (hash-dedup) and backfills starships that
-  // were created before newer default tools were added — otherwise the room's tool
-  // assignments reference tools that do not exist and the crew lands with no tools.
-  // Best-effort: never block room provisioning on it.
-  try {
-    await ensureDefaultBundleForStarship({ starshipId, userId });
-  } catch (err) {
-    console.error('[room-bundle] default-tool backfill failed (continuing)', {
-      starshipId,
-      bundleId,
-      error: err instanceof Error ? err.message : String(err),
-    });
-  }
-
   const roomRepo = new RoomRepository();
 
   const addAgentParticipants = async (conversationId: string): Promise<void> => {
@@ -3428,7 +2817,7 @@ async function ensureBundleRoomInternal(opts: {
 
   assertRoomBundleManifestPathsOrThrow(manifestParsed.data);
 
-  const emptyDecisions: RoomBundleDecisions = { rooms: {}, views: {}, tables: {}, taskBoards: {}, tools: {}, agents: {} };
+  const emptyDecisions: RoomBundleDecisions = { rooms: {}, views: {}, tables: {}, taskBoards: {}, agents: {} };
 
   const importSummary = await applyRoomBundleToStarship({
     starshipId,
@@ -3616,7 +3005,6 @@ router.post(
 
       const applyResult = await conn.transaction(async (client) => {
         const txConn = makeTransactionConnection(client);
-        const toolRepo = new ToolRepository(txConn);
         const agentRepo = new AgentRepository(txConn);
         const agentService = new AgentService(txConn);
         const svc = new ImportExportService(txConn);
@@ -3630,116 +3018,16 @@ router.post(
         const roomViewsRepo = new RoomViewsRepository(txConn);
         const roomTablesRepo = new RoomTablesRepository(txConn);
         const roomTaskBoardsRepo = new RoomTaskBoardsRepository(txConn);
-        const roomToolsRepo = new RoomToolsRepository(txConn);
         const participantRepo = new ConversationParticipantRepository(txConn);
         const conversationRepo = new ConversationRepository(txConn);
 
         const warnings: string[] = [];
-        const imported: Record<string, number> = { rooms: 0, views: 0, tables: 0, taskBoards: 0, agents: 0, tools: 0 };
+        const imported: Record<string, number> = { rooms: 0, views: 0, tables: 0, taskBoards: 0, agents: 0 };
 
-        const toolSlugMap = new Map<string, string>();
         const agentIdMap = new Map<string, string>(); // source slug -> created agent id
         const viewSlugMap = new Map<string, string>(); // source slug -> created slug
         const tableSlugMap = new Map<string, string>();
         const taskBoardSlugMap = new Map<string, string>();
-
-        // Index existing tools for overwrite/skip mapping.
-        const existingTools = await toolRepo.findByStarship(starshipId);
-        const toolsByHash = new Map<string, (typeof existingTools)[number]>();
-        const toolsByName = new Map<string, (typeof existingTools)[number]>();
-        const indexTool = (t: (typeof existingTools)[number]) => {
-          const nameKey = String(t.name || '')
-            .trim()
-            .toLowerCase();
-          if (nameKey) toolsByName.set(nameKey, t);
-          const hash = readContentHash((t as unknown as { contentHash?: unknown }).contentHash);
-          if (hash) toolsByHash.set(hash, t);
-        };
-        for (const t of existingTools) indexTool(t);
-
-        // Tools first (same semantics as agent bundle import)
-        for (const t of manifestParsed.data.entities.tools) {
-          const entry = zip.getEntry(t.file);
-          if (!entry) {
-            warnings.push(`Bundle is missing tool file: ${t.file}`);
-            continue;
-          }
-          let containerRaw: unknown;
-          try {
-            containerRaw = JSON.parse(entry.getData().toString('utf8'));
-          } catch {
-            warnings.push(`Tool file is not valid JSON: ${t.file}`);
-            continue;
-          }
-          const containerParsed = ContainerSchema.safeParse(containerRaw);
-          if (!containerParsed.success || containerParsed.data.kind !== 'tool') {
-            warnings.push(`Tool file is not a valid tool container: ${t.file}`);
-            continue;
-          }
-
-          const payload = containerParsed.data.payload as unknown as { tool?: Record<string, unknown> };
-          const toolPayload = payload?.tool ?? {};
-          const fromSlug = containerParsed.data.metadata?.fromSlug;
-          const bundleHash = computeToolContentHash({
-            name: toolPayload?.name,
-            description: toolPayload?.description,
-            parameters: toolPayload?.parameters,
-            blueprint: toolPayload?.blueprint,
-            transforms: toolPayload?.transforms,
-            mutations: toolPayload?.mutations,
-            condition: toolPayload?.condition,
-            isEnabled: toolPayload?.isEnabled,
-            status: toolPayload?.status,
-          });
-
-          const decision = decisionsParsed.data.tools[bundleHash] ?? { action: 'copy' as const };
-          const toolNameKey = String(toolPayload?.name || '')
-            .trim()
-            .toLowerCase();
-          const existingByHash = toolsByHash.get(bundleHash);
-          const existingByName = toolNameKey ? toolsByName.get(toolNameKey) : undefined;
-          const target = existingByHash ?? existingByName ?? null;
-
-          const sourceSlug = typeof fromSlug === 'string' ? fromSlug.trim() : '';
-          if (decision.action === 'skip') {
-            if (sourceSlug && target?.slug) toolSlugMap.set(sourceSlug, target.slug);
-            continue;
-          }
-
-          if (decision.action === 'overwrite') {
-            const targetId = decision.targetId || target?.id;
-            if (!targetId) {
-              warnings.push(`No overwrite target found for tool: ${String(toolPayload?.name || t.file)}`);
-              continue;
-            }
-            const updateReq: UpdateToolRequest = {
-              name: typeof toolPayload?.name === 'string' ? toolPayload.name : undefined,
-              description: typeof toolPayload?.description === 'string' ? toolPayload.description : '',
-              parameters: toolPayload?.parameters as UpdateToolRequest['parameters'],
-              blueprint: toolPayload?.blueprint as UpdateToolRequest['blueprint'],
-              transforms: toolPayload?.transforms as UpdateToolRequest['transforms'],
-              mutations: toolPayload?.mutations as UpdateToolRequest['mutations'],
-              condition: typeof toolPayload?.condition === 'string' ? toolPayload.condition : undefined,
-              isEnabled: typeof toolPayload?.isEnabled === 'boolean' ? toolPayload.isEnabled : undefined,
-              status: toolPayload?.status === 'draft' || toolPayload?.status === 'active' ? toolPayload.status : undefined,
-            };
-            const updated = await toolRepo.update(targetId, updateReq);
-            if (updated) {
-              imported.tools += 1;
-              indexTool(updated);
-              if (sourceSlug) toolSlugMap.set(sourceSlug, updated.slug);
-            }
-            continue;
-          }
-
-          const result = await svc.importToStarship(starshipId, containerParsed.data as unknown as ImportExportContainerV1);
-          if (result?.warnings?.length) warnings.push(...result.warnings);
-          if (result?.kind === 'tool' && result.tool) {
-            imported.tools += 1;
-            indexTool(result.tool);
-            if (sourceSlug && result.tool.slug) toolSlugMap.set(sourceSlug, result.tool.slug);
-          }
-        }
 
         // Index existing agents for skip/overwrite target discovery.
         const existingAgents = await agentRepo.findByStarship(starshipId);
@@ -3751,7 +3039,7 @@ router.post(
           if (nameKey) agentsByName.set(nameKey, a);
         }
 
-        // Agents (rewrite assigned tool slugs using toolSlugMap, and create agentIdMap).
+        // Agents (create agentIdMap).
         for (const a of manifestParsed.data.entities.agents) {
           const entry = zip.getEntry(a.file);
           if (!entry) {
@@ -3774,11 +3062,8 @@ router.post(
           const fromSlug = containerParsed.data.metadata?.fromSlug;
           const sourceSlug = typeof fromSlug === 'string' ? fromSlug.trim() : '';
 
-          const payload = containerParsed.data.payload as unknown as { agent?: Record<string, unknown>; assignedToolSlugs?: unknown };
+          const payload = containerParsed.data.payload as unknown as { agent?: Record<string, unknown> };
           const agentPayload = payload?.agent ?? {};
-          const assignedToolSlugsRaw = Array.isArray(payload?.assignedToolSlugs) ? payload.assignedToolSlugs : [];
-          const assignedToolSlugs = assignedToolSlugsRaw.filter((s: unknown) => typeof s === 'string' && s.trim().length > 0) as string[];
-          const rewrittenToolSlugs = assignedToolSlugs.map((s) => toolSlugMap.get(s) ?? s);
 
           const bundleHash = computeAgentContentHash({
             name: agentPayload?.name,
@@ -3794,7 +3079,7 @@ router.post(
             blueprint: agentPayload?.blueprint,
             category: agentPayload?.category,
             previewPrompts: agentPayload?.previewPrompts,
-            assignedToolSlugs: assignedToolSlugs,
+            assignedToolSlugs: [],
           });
 
           const decision = decisionsParsed.data.agents[bundleHash] ?? { action: 'copy' as const };
@@ -3834,28 +3119,13 @@ router.post(
             };
             const updated = await agentService.updateAgent(targetId, updateReq);
             if (updated) {
-              try {
-                await agentService.assignToolSlugs(targetId, rewrittenToolSlugs, starshipId);
-              } catch (err) {
-                warnings.push(
-                  `Agent tools partially applied for ${String(agentPayload?.name || targetId)}: ${String((err as Error)?.message || err)}`
-                );
-              }
               imported.agents += 1;
               if (sourceSlug) agentIdMap.set(sourceSlug, updated.id);
             }
             continue;
           }
 
-          const basePayloadObj = isPlainObject(containerParsed.data.payload) ? containerParsed.data.payload : {};
-          const rewrittenContainer = {
-            ...(containerParsed.data as unknown as ImportExportContainerV1),
-            payload: {
-              ...basePayloadObj,
-              assignedToolSlugs: rewrittenToolSlugs,
-            },
-          } as unknown as ImportExportContainerV1;
-          const result = await svc.importToStarship(starshipId, rewrittenContainer);
+          const result = await svc.importToStarship(starshipId, containerParsed.data as unknown as ImportExportContainerV1);
           if (result?.warnings?.length) warnings.push(...result.warnings);
           if (result?.kind === 'agent' && result.agent) {
             imported.agents += 1;
@@ -4210,25 +3480,6 @@ router.post(
             await participantRepo.addAgentParticipant({ conversationId: createdRoom.conversationId, agentId, createdBy: user.id });
           }
 
-          // Tool assignments (map source tool slug -> created tool slug -> tool id)
-          const toolAssignments = Array.isArray(payload?.toolAssignments) ? (payload.toolAssignments as Record<string, unknown>[]) : [];
-          if (toolAssignments.length > 0) {
-            for (const ta of toolAssignments) {
-              const sourceToolSlug = typeof ta?.toolSlug === 'string' ? ta.toolSlug.trim() : '';
-              const permission = ta?.permission;
-              if (!sourceToolSlug) continue;
-              if (permission !== 'allow' && permission !== 'ask' && permission !== 'deny') continue;
-              const destToolSlug = toolSlugMap.get(sourceToolSlug) ?? sourceToolSlug;
-              const found = await toolRepo.findBySlugs([destToolSlug], starshipId);
-              const tool = found?.[0] ?? null;
-              if (!tool) {
-                warnings.push(`Skipped missing room tool assignment: ${destToolSlug}`);
-                continue;
-              }
-              await roomToolsRepo.upsert({ roomConversationId: createdRoom.conversationId, toolId: tool.id, permission });
-            }
-          }
-
           // Pins (views/tables/task boards)
           const viewPins = Array.isArray(payload?.viewPins) ? (payload.viewPins as Record<string, unknown>[]) : [];
           for (const p of viewPins) {
@@ -4396,7 +3647,7 @@ router.post('/starships/:id/bundle-service/:bundleId/install', jwtAuthMiddleware
       return;
     }
 
-    const emptyDecisions: RoomBundleDecisions = { rooms: {}, views: {}, tables: {}, taskBoards: {}, tools: {}, agents: {} };
+    const emptyDecisions: RoomBundleDecisions = { rooms: {}, views: {}, tables: {}, taskBoards: {}, agents: {} };
 
     const importSummary = await applyRoomBundleToStarship({
       starshipId: paramValidation.id,

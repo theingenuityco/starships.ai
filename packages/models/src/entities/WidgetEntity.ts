@@ -2,7 +2,7 @@
  * Widget Entity - Layer 2
  *
  * Bridges between database records and domain models with validation and transformation capabilities.
- * Follows the layered architecture pattern established by ToolEntity.
+ * Follows the layered architecture pattern established by AgentEntity.
  */
 
 import type { WidgetModel } from '@starships/protocol';

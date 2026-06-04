@@ -337,30 +337,4 @@ describe('AgentRepository', () => {
       await expect(repository.findAll()).rejects.toThrow(DatabaseError);
     });
   });
-
-  describe('room tool precedence (agent → room → starship)', () => {
-    it('should resolve effective permission in room using COALESCE(agent, room, starship)', async () => {
-      mockConnection.queryOne.mockResolvedValue({ permission: 'allow' });
-
-      const perm = await repository.getEffectiveToolPermissionBySlugInRoom('agent-1', 'starship-1', 'tool-slug', 'room-conv-1');
-
-      expect(mockConnection.queryOne).toHaveBeenCalledWith(
-        expect.stringContaining('COALESCE(at.permission, rt.permission, st.permission)'),
-        ['agent-1', 'starship-1', 'tool-slug', 'room-conv-1']
-      );
-      expect(perm).toBe('allow');
-    });
-
-    it('should query effective tool set in room using COALESCE(agent, room, starship)', async () => {
-      mockConnection.query.mockResolvedValue([]);
-
-      const tools = await repository.getEffectiveAgentToolsForRoomConversation('agent-1', 'starship-1', 'room-conv-1');
-
-      expect(mockConnection.query).toHaveBeenCalledWith(
-        expect.stringContaining('COALESCE(at.permission, rt.permission, st.permission)'),
-        ['agent-1', 'starship-1', 'room-conv-1']
-      );
-      expect(Array.isArray(tools)).toBe(true);
-    });
-  });
 });

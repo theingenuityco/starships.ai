@@ -27,7 +27,6 @@ import { useStarshipMembersAndInvites, type StarshipMemberListItem } from '@/hoo
 import { useStarship } from '@/hooks/useStarships'
 import { MessageAttachment, MessageAttachmentSkeleton } from './MessageAttachment'
 import { markAnimationComplete } from '@/hooks/useMessageAnimationState'
-import { toolAPI } from '@/lib/api'
 import { useTurnHover } from './TurnHoverContext'
 import { StatusDots } from '@/components/ui/StatusDots'
 import { ChevronRight } from '@/components/primitives/lucide-compat'
@@ -723,50 +722,8 @@ export function ConversationMessageContent({
       })
     }
 
-    const missing = slugs.filter(slug => {
-      if (TOOL_NAME_CACHE.has(`${starshipId}:${slug}`)) return false
-      // Built-in CLI tools are resolved locally; never hit the API for them.
-      if (CLI_TOOL_DISPLAY_NAMES[slug]) return false
-      return true
-    })
-    if (missing.length === 0) return
-
-    let cancelled = false
-    ;(async () => {
-      try {
-        const results = await Promise.all(
-          missing.map(async slug => {
-            try {
-              const tool = await toolAPI.getBySlug(starshipId, slug)
-              const name = typeof (tool as any)?.name === 'string' ? String((tool as any).name).trim() : ''
-              return { slug, name }
-            } catch {
-              return { slug, name: '' }
-            }
-          })
-        )
-
-        if (cancelled) return
-
-        const updates: Record<string, string> = {}
-        for (const r of results) {
-          if (r.name) {
-            TOOL_NAME_CACHE.set(`${starshipId}:${r.slug}`, r.name)
-            updates[r.slug] = r.name
-          }
-        }
-
-        if (Object.keys(updates).length > 0) {
-          setToolNameBySlug(prev => ({ ...prev, ...updates }))
-        }
-      } catch {
-        // ignore tool name resolution failures; we fall back to slug
-      }
-    })()
-
-    return () => {
-      cancelled = true
-    }
+    // Tool calls are connector actions / built-in CLI tools; display names come from
+    // the local CLI map (above) or fall back to the slug. No remote tool lookup.
   }, [normalizedToolCalls, starshipId])
 
   const [showCompletionTick, setShowCompletionTick] = useState(false)

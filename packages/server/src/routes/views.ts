@@ -5,14 +5,12 @@ import { z } from 'zod';
 import { validateData } from '@/utils/validation';
 import { IdSchema, SlugSchema, noXSS, XSS_ERROR_MESSAGE } from '@/schemas/common';
 import { ViewRepository } from '@starships/models';
-import { AppError } from '@starships/errors';
 import { sendError, sendSuccess, handleError } from '../utils/responseHelpers';
 import { verifyStarshipAccess } from '@/middleware/verify-starship-access';
 import { ViewStreamBus } from '@/services/ViewStreamBus';
-import { buildAutopilotExecutionBundle } from '@/services/autopilot-execution-bundle';
 import { connectorActionExecutor } from '@/services/ConnectorActionExecutor';
 import { getEnvConfig } from '@starships/env';
-import { ToolRepository, ViewWidgetRepository } from '@starships/models';
+import { ViewWidgetRepository } from '@starships/models';
 import { applyPatch } from 'fast-json-patch';
 import type { ViewPatchOp, ViewRuntimeConfig } from '@starships/protocol';
 
@@ -126,11 +124,6 @@ const UpdateViewSchema = z.object({
 
 const ViewRuntimeActionRequestSchema = z.discriminatedUnion('type', [
   z.object({
-    type: z.literal('run_workflow'),
-    workflowSlug: z.string().min(1).max(200),
-    args: z.record(z.string(), z.unknown()).optional(),
-  }),
-  z.object({
     type: z.literal('set_state'),
     path: z.string().min(1).max(500),
     value: z.unknown(),
@@ -189,18 +182,6 @@ function templateDeep(input: unknown, state: Record<string, unknown>): unknown {
     return out;
   }
   return input;
-}
-
-// Workflow-tool / view-action execution removed with the DAG engine. Retained as a
-// throwing stub so the view-action route compiles; these actions are no longer supported.
-async function executeToolBlueprint(_args: {
-  blueprint: unknown;
-  toolConfig: Record<string, unknown>;
-  toolArgs: Record<string, unknown>;
-  runnerConfig: Record<string, unknown>;
-  eventCallback?: (evt: unknown) => void | Promise<void>;
-}): Promise<unknown> {
-  throw new AppError('Workflow tool / view-action execution has been removed.', 'NOT_IMPLEMENTED', 501);
 }
 
 /**
@@ -693,11 +674,6 @@ router.post('/views/:id/actions', jwtAuthMiddleware, async (req: Request, res: R
     const bus = ViewStreamBus.getInstance();
     const at = new Date().toISOString();
 
-    // Basic permission enforcement (view-level allowlist).
-    const allowedWorkflows = Array.isArray((view as any)?.runtimeConfig?.permissions?.workflows)
-      ? ((view as any).runtimeConfig.permissions.workflows as string[]).map(String)
-      : null;
-
     if (body.type === 'set_state') {
       await bus.publish(viewId, {
         type: 'state',
@@ -720,94 +696,6 @@ router.post('/views/:id/actions', jwtAuthMiddleware, async (req: Request, res: R
         data: { viewId, at, patch: body.patch as any },
       });
       return sendSuccess(res, { ok: true });
-    }
-
-    if (body.type === 'run_workflow') {
-      const workflowSlug = String(body.workflowSlug || '').trim();
-      if (!workflowSlug) {
-        return sendError(res, 'VALIDATION_ERROR', 'workflowSlug is required', 400);
-      }
-      if (allowedWorkflows && allowedWorkflows.length > 0 && !allowedWorkflows.includes(workflowSlug)) {
-        return sendError(res, 'ACCESS_DENIED', 'Workflow not permitted for this view', 403, { workflowSlug });
-      }
-
-      const toolRepo = new ToolRepository();
-      const tool = await toolRepo.findBySlugAndStarship(workflowSlug, view.starshipId);
-      if (!tool || tool.status === 'draft') {
-        return sendError(res, 'RESOURCE_NOT_FOUND', 'Workflow tool not found or not executable', 404, { workflowSlug });
-      }
-
-      const runtimeEnv: Record<string, unknown> = {
-        STARSHIP_ID: view.starshipId,
-        VIEW_ID: viewId,
-      };
-      const { engineConfig } = await buildAutopilotExecutionBundle({
-        starshipId: view.starshipId,
-        authUserId: userId,
-        runtimeEnv,
-      });
-
-      // Stream autopilot ui_action events into the view stream.
-      const eventCallback = async (evt: unknown): Promise<void> => {
-        try {
-          if (!evt || typeof evt !== 'object') return;
-          if (!('type' in evt) || !('data' in evt)) return;
-          const t = (evt as any).type;
-          if (t !== 'ui_action') return;
-          const d = (evt as any).data;
-          const action = typeof d?.action === 'string' ? d.action.trim() : '';
-          const payload = d?.payload && typeof d.payload === 'object' && !Array.isArray(d.payload) ? (d.payload as Record<string, unknown>) : {};
-          const atEvt = new Date().toISOString();
-
-          if (action === 'runtime.set_state') {
-            const path = typeof payload.path === 'string' ? payload.path : '';
-            if (!path) return;
-            await bus.publish(viewId, { type: 'state', data: { viewId, at: atEvt, patch: [{ path, value: payload.value }] } });
-            return;
-          }
-
-          if (action === 'view.patch_props') {
-            const instanceId = typeof payload.instanceId === 'string' ? payload.instanceId : '';
-            const patch = payload.patch && typeof payload.patch === 'object' && !Array.isArray(payload.patch) ? (payload.patch as Record<string, unknown>) : null;
-            if (!instanceId || !patch) return;
-            await bus.publish(viewId, {
-              type: 'state',
-              data: { viewId, at: atEvt, patch: [{ path: `_props.${instanceId}`, value: patch }] },
-            });
-            return;
-          }
-
-          if (action === 'view.patch_root') {
-            const patch = Array.isArray(payload.patch) ? payload.patch : null;
-            if (!patch) return;
-            await bus.publish(viewId, { type: 'patch', data: { viewId, at: atEvt, patch: patch as any } });
-            return;
-          }
-
-          if (action === 'toast') {
-            const message = typeof payload.message === 'string' ? payload.message : '';
-            if (!message) return;
-            const level = typeof payload.level === 'string' ? payload.level : undefined;
-            await bus.publish(viewId, { type: 'toast', data: { viewId, at: atEvt, message, ...(level ? { level: level as any } : null) } });
-            return;
-          }
-        } catch {
-          /* ignore */
-        }
-      };
-
-      await bus.publish(viewId, { type: 'toast', data: { viewId, at, level: 'info', message: `Running workflow: ${workflowSlug}` } });
-
-      const result = await executeToolBlueprint({
-        blueprint: tool.blueprint,
-        toolConfig: (tool.configuration || {}) as Record<string, unknown>,
-        toolArgs: (body.args || {}) as Record<string, unknown>,
-        runnerConfig: engineConfig,
-        eventCallback,
-      });
-
-      await bus.publish(viewId, { type: 'toast', data: { viewId, at: new Date().toISOString(), level: 'success', message: `Workflow completed: ${workflowSlug}` } });
-      return sendSuccess(res, { ok: true, result });
     }
 
     return sendError(res, 'VALIDATION_ERROR', 'Unsupported action type', 400);

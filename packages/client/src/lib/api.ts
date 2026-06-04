@@ -1,4 +1,4 @@
-import type { ApiResponse, TemplateCategory, ToolModel as Tool, HeartbeatConfigModel, HeartbeatRunModel, UpdateHeartbeatConfigRequest } from '@starships/protocol'
+import type { ApiResponse, TemplateCategory, HeartbeatConfigModel, HeartbeatRunModel, UpdateHeartbeatConfigRequest } from '@starships/protocol'
 import type { ApiError as ApiErrorLike } from '@/lib/error-utils'
 
 import { apiCache, CACHE_KEYS, invalidateAgentCaches } from './cache'
@@ -668,14 +668,6 @@ export const autopilotAwaitAPI = {
     const qs = params.toString()
     const res = await api.get(`/api/v1/starships/${starshipId}/autopilot/awaits${qs ? `?${qs}` : ''}`)
     return extractResponseData<any>(res as FetchResponse<ApiResponse<any>>)
-  },
-}
-
-// Tool API
-export const toolAPI = {
-  getBySlug: async (starshipId: string, slug: string): Promise<Tool> => {
-    const data = await api.get(`/api/v1/starships/${starshipId}/tools/${slug}`).then(res => extractResponseData<Tool>(res))
-    return data
   },
 }
 

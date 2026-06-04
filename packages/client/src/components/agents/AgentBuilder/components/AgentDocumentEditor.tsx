@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
-import { Badge } from '@/components/ui/badge'
 import Icon from '@/components/primitives/Icon'
 import type { AgentFormData } from '../types'
 import { cn } from '@/lib/utils'
@@ -15,11 +14,10 @@ import { AGENT_CATEGORIES } from '../constants'
 import AgentAvatar from '@/components/animated/AgentAvatar'
 import { useMessageAttachments } from '@/hooks/useFileUpload'
 import { StandardSelect } from './StandardSelect'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQueryClient } from '@tanstack/react-query'
 import api, { getCurrentToken } from '@/lib/api'
-import type { ToolModel, ApiResponse, AgentModel, UpdateAgentRequest } from '@starships/protocol'
+import type { ApiResponse, AgentModel, UpdateAgentRequest } from '@starships/protocol'
 import type { FetchResponse } from '@/lib/types'
-import { toast } from 'sonner'
 import { useLlmModels } from '@/hooks/useLlmModels'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { AGENT_QUERY_KEYS } from '@/hooks/useAgents'
@@ -28,8 +26,6 @@ import { areStatesEqual, shouldSkipStateUpdateToPreservePlugins, baseStateHasPlu
 import type { ConversationState } from '@starships/protocol'
 import { ErrorBoundary } from '@/components/ui/error-boundary'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import type { StarshipAgentToolPermissionModel, UpdateAgentToolPermissionsRequest } from '@starships/protocol'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 
 // Lazy-load the blueprint visualizer so the landing-page "embedded" demo doesn't
 // pull in ELK/WebWorker code (which can break when evaluated in the SSR bundle).
@@ -134,144 +130,6 @@ export function AgentDocumentEditor({
   const [newPreviewPrompt, setNewPreviewPrompt] = useState('')
 
   const promptsEditable = !readOnly
-  const agentIdForPermissions = (providedAgent?.id || providedAgentId || fullAgent?.id || null) as string | null
-
-  const { data: starshipTools = [] } = useQuery({
-    queryKey: ['starship-tools', starshipId] as const,
-    queryFn: async (): Promise<ToolModel[]> => {
-      if (!starshipId) return []
-      const response: FetchResponse<ApiResponse<ToolModel[]>> = await api.get(`/api/v1/starships/${starshipId}/tools`)
-      return response.data.data || []
-    },
-    enabled: !!starshipId,
-    staleTime: 30 * 1000,
-  })
-
-  // Tool permissions (reuse the same starship-scoped rows as the Tools tab, but filter to this agent)
-  const { data: permissionRows = [] } = useQuery({
-    queryKey: ['starship-agent-tool-permissions', starshipId] as const,
-    queryFn: async (): Promise<StarshipAgentToolPermissionModel[]> => {
-      if (!starshipId) return []
-      const response: FetchResponse<ApiResponse<StarshipAgentToolPermissionModel[]>> = await api.get(`/api/v1/starships/${starshipId}/agent-tool-permissions`)
-      return response.data.data || []
-    },
-    enabled: !!starshipId,
-    staleTime: 10 * 1000,
-  })
-
-  const permissionByToolSlug = useMemo(() => {
-    const map = new Map<string, StarshipAgentToolPermissionModel['permission']>()
-    if (!agentIdForPermissions) return map
-    for (const row of permissionRows || []) {
-      if (!row?.agentId || !row?.toolSlug) continue
-      if (row.agentId !== agentIdForPermissions) continue
-      map.set(row.toolSlug, row.permission)
-    }
-    return map
-  }, [permissionRows, agentIdForPermissions])
-
-  const assignedToolModels = useMemo(() => {
-    const slugs = Array.isArray(value?.assignedToolSlugs) ? (value.assignedToolSlugs as string[]) : []
-    if (!slugs.length) return [] as ToolModel[]
-    const bySlug = new Map<string, ToolModel>()
-    for (const t of Array.isArray(starshipTools) ? starshipTools : []) {
-      if (t?.slug) bySlug.set(t.slug, t)
-    }
-    return slugs.map(s => bySlug.get(s)).filter((t): t is ToolModel => !!t)
-  }, [value?.assignedToolSlugs, starshipTools])
-
-  const PERMISSION_ORDER = ['allow', 'ask', 'deny'] as const
-  const permissionLabel = (p: StarshipAgentToolPermissionModel['permission']): string => {
-    if (p === 'allow') return 'Allow'
-    if (p === 'ask') return 'Ask first'
-    return 'Deny'
-  }
-  const permissionDescription = (p: StarshipAgentToolPermissionModel['permission']): string => {
-    if (p === 'allow') return 'Agent can trigger this tool without confirmation.'
-    if (p === 'ask') return 'Agent can trigger this tool, but you will be asked to confirm.'
-    return 'Agent cannot trigger this tool.'
-  }
-  const permissionIconName = (p: StarshipAgentToolPermissionModel['permission']): string => {
-    if (p === 'allow') return 'check-circle'
-    if (p === 'ask') return 'help-circle'
-    return 'x-circle'
-  }
-  const permissionBadgeClassName = (p: StarshipAgentToolPermissionModel['permission']): string => {
-    if (p === 'allow') return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
-    if (p === 'ask') return 'border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300'
-    return 'border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-300'
-  }
-  const permissionMenuItemClassName = (p: StarshipAgentToolPermissionModel['permission']): string => {
-    if (p === 'allow') return 'hover:bg-emerald-500/10 focus:bg-emerald-500/10'
-    if (p === 'ask') return 'hover:bg-amber-500/10 focus:bg-amber-500/10'
-    return 'hover:bg-red-500/10 focus:bg-red-500/10'
-  }
-  const permissionMenuItemSelectedClassName = (p: StarshipAgentToolPermissionModel['permission']): string => {
-    if (p === 'allow') return 'bg-emerald-500/10'
-    if (p === 'ask') return 'bg-amber-500/10'
-    return 'bg-red-500/10'
-  }
-  const permissionMenuIconClassName = (p: StarshipAgentToolPermissionModel['permission']): string => {
-    if (p === 'allow') return 'text-emerald-500'
-    if (p === 'ask') return 'text-amber-500'
-    return 'text-red-500'
-  }
-  const permissionDotClassName = (p: StarshipAgentToolPermissionModel['permission']): string => {
-    if (p === 'allow') return 'bg-emerald-500/70'
-    if (p === 'ask') return 'bg-amber-500/70'
-    return 'bg-red-500/70'
-  }
-  const permissionOptions: Array<{
-    value: StarshipAgentToolPermissionModel['permission']
-    label: string
-    description: string
-    icon: string
-  }> = [
-    { value: 'allow', label: 'Allow', description: permissionDescription('allow'), icon: permissionIconName('allow') },
-    { value: 'ask', label: 'Ask first', description: permissionDescription('ask'), icon: permissionIconName('ask') },
-    { value: 'deny', label: 'Deny', description: permissionDescription('deny'), icon: permissionIconName('deny') },
-  ]
-
-  const setPermissionMutation = useMutation({
-    mutationFn: async (input: { toolSlug: string; permission: StarshipAgentToolPermissionModel['permission'] }) => {
-      if (!agentIdForPermissions) throw new Error('Missing agent id')
-      const body: UpdateAgentToolPermissionsRequest = { permissions: [{ toolSlug: input.toolSlug, permission: input.permission }] }
-      await api.put(`/api/v1/agents/${agentIdForPermissions}/tool-permissions`, body)
-      return input
-    },
-    onMutate: async (input: { toolSlug: string; permission: StarshipAgentToolPermissionModel['permission'] }) => {
-      if (!agentIdForPermissions) return
-      await queryClient.cancelQueries({ queryKey: ['starship-agent-tool-permissions', starshipId] as const })
-      const prev = queryClient.getQueryData<StarshipAgentToolPermissionModel[]>(['starship-agent-tool-permissions', starshipId] as const)
-      queryClient.setQueryData<StarshipAgentToolPermissionModel[]>(['starship-agent-tool-permissions', starshipId] as const, old => {
-        const next = Array.isArray(old) ? [...old] : []
-        const idx = next.findIndex(r => r.agentId === agentIdForPermissions && r.toolSlug === input.toolSlug)
-        if (idx >= 0) {
-          next[idx] = { ...next[idx], permission: input.permission }
-          return next
-        }
-        // Only add a new row when we already have data; otherwise cache was empty and
-        // we'd end up with one row, making all other tools show the fallback ('allow').
-        if (next.length > 0) {
-          next.push({ agentId: agentIdForPermissions, toolId: '', toolSlug: input.toolSlug, permission: input.permission })
-          return next
-        }
-        return old
-      })
-      return { prev }
-    },
-    onError: (_err: unknown, _input: unknown, ctx: { prev?: StarshipAgentToolPermissionModel[] } | undefined) => {
-      if (ctx?.prev) queryClient.setQueryData(['starship-agent-tool-permissions', starshipId] as const, ctx.prev)
-    },
-    onSettled: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['starship-agent-tool-permissions', starshipId] as const })
-    },
-  })
-  const selectedToolSlugs = value.assignedToolSlugs || []
-  const allToolOptions = useMemo(() => {
-    const fetchedSlugs = Array.isArray(starshipTools) ? Array.from(new Set(starshipTools.map((t: ToolModel) => t.slug).filter(Boolean))) : []
-    return Array.from(new Set([...(selectedToolSlugs as string[]), ...fetchedSlugs]))
-  }, [starshipTools, selectedToolSlugs])
 
   // Show compact identity in the sticky banner only after the main page header scrolls out of view.
   useEffect(() => {
@@ -446,24 +304,6 @@ export function AgentDocumentEditor({
     }
   }, [starshipId, value?.slug, providedAgentId, providedAgent, queryClient])
 
-  // Toggle tool assignment with optimistic UI and server persistence when possible
-  const handleToggleTool = async (slug: string, isSelected: boolean) => {
-    if (readOnly) return
-    const next = isSelected ? selectedToolSlugs.filter(s => s !== slug) : [...selectedToolSlugs, slug]
-    onFieldChange?.('assignedToolSlugs', next)
-    if (!agentId) return
-    try {
-      if (isSelected) await api.delete(`/api/v1/agents/${agentId}/tools/${slug}`)
-      else await api.post(`/api/v1/agents/${agentId}/tools/${slug}`)
-    } catch (err: any) {
-      onFieldChange?.('assignedToolSlugs', selectedToolSlugs)
-      const message = err?.response?.data?.error || err?.message || 'Failed to update tools'
-      toast.error('Tool update failed', { description: message })
-    }
-  }
-
-
-
   // If slug is empty but we can infer it from window.location, set it once as a last resort
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -478,30 +318,6 @@ export function AgentDocumentEditor({
       }
     } catch {}
   }, [])
-
-  // Initial sync of assigned tools for existing agents on load
-  const hasSyncedAssignedRef = useRef<boolean>(false)
-  const [agentTools, setAgentTools] = useState<ToolModel[]>([])
-  useEffect(() => {
-    const syncAssigned = async () => {
-      if (!agentId || hasSyncedAssignedRef.current) return
-      try {
-        const res: FetchResponse<ApiResponse<ToolModel[]>> = await api.get(`/api/v1/agents/${agentId}/tools`)
-        const tools = res.data.data || []
-        setAgentTools(tools)
-        const slugs = Array.from(new Set((tools || []).map(t => t.slug).filter(Boolean))) as string[]
-        // Only update if form has no assignments yet to avoid clobbering in-flight edits
-        const cur = value.assignedToolSlugs || []
-        if (cur.length === 0 && slugs.length > 0) {
-          onFieldChange?.('assignedToolSlugs', slugs)
-        }
-        hasSyncedAssignedRef.current = true
-      } catch {
-        // ignore
-      }
-    }
-    void syncAssigned()
-  }, [agentId, value, onChange])
 
   // Initial sync of core agent fields for existing agents on load (non-tools)
   const hasSyncedAgentRef = useRef<boolean>(false)
@@ -936,55 +752,6 @@ export function AgentDocumentEditor({
             </div>
           </div>
 
-          {/* Tools section */}
-          <div className="border-b border-border/10 pb-2">
-            <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-              <div className="flex items-center gap-2 text-muted-foreground w-full sm:min-w-[160px] sm:w-auto">
-                <Icon name="wrench" className="w-4 h-4" />
-                <span className="text-xs font-semibold">Assigned Tools</span>
-              </div>
-              <div className="w-full sm:w-[260px]">
-                <StandardSelect
-                  mode="multiple"
-                  aria-label="Select tools"
-                  disabled={readOnly}
-                  value={selectedToolSlugs}
-                  options={allToolOptions.map(slug => ({
-                    value: slug,
-                    label: (
-                      <span className="flex items-center gap-2">
-                        <Icon name="wrench" className="w-3 h-3" />
-                        <span className="font-mono text-xs">{slug}</span>
-                      </span>
-                    ),
-                    keywords: slug,
-                  }))}
-                  placeholder="Select tools"
-                  searchPlaceholder="Search tools..."
-                  emptyLabel="No tools found."
-                  triggerClassName={cn('w-full', readOnly && 'opacity-60 cursor-not-allowed')}
-                  renderTriggerLabel={({ selectedOptions }) => {
-                    if (!selectedOptions.length) {
-                      return <span className="text-xs text-muted-foreground">{readOnly ? 'No tools assigned' : 'Select tools'}</span>
-                    }
-                    const values = selectedOptions.map(opt => String(opt.value))
-                    let label: string
-                    if (values.length <= 3) {
-                      label = values.join(', ')
-                    } else {
-                      label = `${values[0]}, ${values[1]} and ${values.length - 2} others`
-                    }
-                    return <span className="text-xs font-mono truncate max-w-full">{label}</span>
-                  }}
-                  onOptionToggle={(slug, wasSelected) => {
-                    if (readOnly) return
-                    void handleToggleTool(slug, wasSelected)
-                  }}
-                />
-              </div>
-            </div>
-          </div>
-
           {/* Description */}
           <div className="border-b border-border/10 pb-2">
             <div className="flex flex-col sm:flex-row sm:items-start gap-2">
@@ -1005,88 +772,6 @@ export function AgentDocumentEditor({
           </div>
 
           {/* System prompt moved under Advanced settings */}
-        </CardContent>
-      </Card>
-
-      {/* Capabilities (tool permissions) */}
-      <Card className="rounded-2xl border-border/50 shadow-sm mt-6">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center gap-2">
-            <Icon name="wrench" className="h-4 w-4 text-primary" />
-            Capabilities
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {!agentIdForPermissions ? (
-            <div className="text-sm text-muted-foreground">Save the agent to configure tool permissions.</div>
-          ) : assignedToolModels.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-border/50 bg-muted/10 p-4 text-sm text-muted-foreground">No tools assigned. Assign tools above to configure permissions.</div>
-          ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              {assignedToolModels.map(tool => {
-                const current = permissionByToolSlug.get(tool.slug) ?? ('ask' as StarshipAgentToolPermissionModel['permission'])
-                const disabled = readOnly || setPermissionMutation.isPending
-                const toolSecondary = (tool.description || '').trim() || tool.slug
-                return (
-                  <div key={tool.slug} className="group relative rounded-xl border border-border/50 bg-gradient-to-br from-background/50 to-background/30 p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-start gap-3 min-w-0">
-                        <div className="mt-1.5 flex-shrink-0">
-                          <div className={cn('h-2 w-2 rounded-full', permissionDotClassName(current))} />
-                        </div>
-                        <div className="min-w-0">
-                          <div className="text-sm font-semibold leading-5 text-foreground truncate">{tool.name || tool.slug}</div>
-                          <div className={cn('mt-1.5 text-xs leading-relaxed text-muted-foreground line-clamp-2', !tool.description ? 'font-mono' : undefined)}>{toolSecondary}</div>
-                        </div>
-                      </div>
-
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <span className={cn('inline-flex', disabled && 'cursor-not-allowed')}>
-                            <button
-                              type="button"
-                              disabled={disabled}
-                              className={cn('inline-flex items-center', disabled && 'opacity-70')}
-                              aria-label={`Tool permission for ${tool.slug}: ${permissionLabel(current)}. Open menu to change.`}
-                            >
-                              <Badge variant="outline" className={cn('whitespace-nowrap border', permissionBadgeClassName(current))}>
-                                <span className="inline-flex items-center gap-1.5">
-                                  <Icon name={permissionIconName(current)} className="h-3.5 w-3.5" />
-                                  <span>{permissionLabel(current)}</span>
-                                  <Icon name="chevron-down" className="h-3.5 w-3.5 opacity-70" />
-                                </span>
-                              </Badge>
-                            </button>
-                          </span>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-64">
-                          {permissionOptions.map(opt => (
-                            <DropdownMenuItem
-                              key={opt.value}
-                              className={cn('cursor-pointer', permissionMenuItemClassName(opt.value), opt.value === current && permissionMenuItemSelectedClassName(opt.value))}
-                              onClick={() => {
-                                if (disabled) return
-                                setPermissionMutation.mutate({ toolSlug: tool.slug, permission: opt.value })
-                              }}
-                            >
-                              <div className="flex flex-col gap-0.5">
-                                <div className="flex items-center gap-2">
-                                  <Icon name={opt.icon} className={cn('h-4 w-4', permissionMenuIconClassName(opt.value))} />
-                                  <span className="text-sm font-medium">{opt.label}</span>
-                                  <span className="ml-auto" />
-                                </div>
-                                <div className="text-xs text-muted-foreground">{opt.description}</div>
-                              </div>
-                            </DropdownMenuItem>
-                          ))}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          )}
         </CardContent>
       </Card>
 

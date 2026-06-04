@@ -35,7 +35,7 @@ export class MarketingContentEntity implements MarketingContentModel {
   id!: string;
 
   @Expose()
-  @IsEnum(['agent_template', 'tool_template', 'connector_template'])
+  @IsEnum(['agent', 'connector_template'])
   entityType!: MarketingContentEntityType;
 
   @Expose()

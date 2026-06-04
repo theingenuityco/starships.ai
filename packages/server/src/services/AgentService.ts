@@ -13,7 +13,6 @@ import {
   StarshipRepository,
   UserRepository,
   DEFAULT_AGENT_TIMEOUT_MS,
-  getConnection,
   PostgresConnection,
 } from '@starships/models';
 import type {
@@ -125,7 +124,6 @@ export class AgentService {
       systemPrompt: data.systemPrompt,
       state: agentState, // Use provided state or default initialization
       previewPrompts: data.previewPrompts,
-      assignedToolSlugs: data.assignedToolSlugs,
     };
 
     return await this.agentRepository.create(agentData, data.starshipId);
@@ -175,52 +173,6 @@ export class AgentService {
    */
   async deleteAgent(agentId: string): Promise<boolean> {
     return await this.agentRepository.delete(agentId);
-  }
-
-  /**
-   * Delete agent and (optionally) delete tool instances that become unassigned.
-   *
-   * This only deletes a tool instance if, after the agent is deleted, that tool id no longer
-   * appears in `agent_tools` (i.e. it's not assigned to any other agent).
-   */
-  async deleteAgentAndUnusedTools(agentId: string): Promise<{ deleted: boolean; deletedToolIds: string[] }> {
-    const id = String(agentId || '').trim();
-    if (!id) throw new ValidationError('Agent id is required');
-
-    const agent = await this.agentRepository.findById(id);
-    if (!agent) return { deleted: false, deletedToolIds: [] };
-
-    const starshipId = String(agent.starshipId || '').trim();
-    const conn = getConnection();
-
-    const result = await conn.transaction(async (client) => {
-      const toolRows = await client.query<{ tool_id: string }>(`SELECT tool_id FROM agent_tools WHERE agent_id = $1`, [id]);
-      const toolIds = (toolRows.rows || [])
-        .map((r) => (typeof r?.tool_id === 'string' ? r.tool_id.trim() : ''))
-        .filter(Boolean);
-
-      const delRes = await client.query(`DELETE FROM agents WHERE id = $1`, [id]);
-      const deleted = (delRes.rowCount ?? 0) > 0;
-      if (!deleted) return { deleted: false, deletedToolIds: [] };
-
-      if (toolIds.length === 0) return { deleted: true, deletedToolIds: [] };
-
-      const remainingRows = await client.query<{ tool_id: string }>(
-        `SELECT DISTINCT tool_id FROM agent_tools WHERE tool_id = ANY($1::text[])`,
-        [toolIds]
-      );
-      const stillAssigned = new Set((remainingRows.rows || []).map((r) => String(r.tool_id || '').trim()).filter(Boolean));
-      const unusedToolIds = toolIds.filter((tid) => !stillAssigned.has(tid));
-
-      if (unusedToolIds.length > 0) {
-        // Defensive: ensure we only delete tool instances belonging to the same starship.
-        await client.query(`DELETE FROM tools WHERE id = ANY($1::text[]) AND starship_id = $2`, [unusedToolIds, starshipId]);
-      }
-
-      return { deleted: true, deletedToolIds: unusedToolIds };
-    });
-
-    return result;
   }
 
   /**
@@ -352,190 +304,5 @@ export class AgentService {
   // MODEL ↔ INSTANCE CONVERSION METHODS
   // ============================================================================
 
-  // ============================================================================
-  // TOOL ASSIGNMENT METHODS
-  // ============================================================================
-
-  /**
-   * Get tools assigned to an agent
-   */
-  async getAgentTools(agentId: string, starshipId: string): Promise<import('@starships/protocol').ToolModel[]> {
-    return await this.agentRepository.getAgentTools(agentId, starshipId);
-  }
-
-  /**
-   * Get agent→tool permissions for all agents/tools on a starship.
-   * Returns only rows present in agent_tools.
-   */
-  async getStarshipAgentToolPermissions(
-    starshipId: string,
-    userId: string
-  ): Promise<Array<{ agentId: string; toolId: string; toolSlug: string; permission: 'allow' | 'ask' | 'deny' }>> {
-    const hasAccess = await this.validateStarshipAccess(starshipId, userId);
-    if (!hasAccess) {
-      throw new Error('Access denied to this starship');
-    }
-    return await this.agentRepository.getStarshipAgentToolPermissions(starshipId);
-  }
-
-  /**
-   * Upsert tool permissions for a single agent by tool slug (derived starship + access).
-   */
-  async setAgentToolPermissionsDerived(
-    agentId: string,
-    userId: string,
-    permissions: Array<{ toolSlug: string; permission: 'allow' | 'ask' | 'deny' }>
-  ): Promise<{ ok: true }> {
-    const starshipId = await this.getAgentStarshipIdOrThrow(agentId);
-    const hasAccess = await this.validateStarshipAccess(starshipId, userId);
-    if (!hasAccess) {
-      throw new Error('Access denied to this starship');
-    }
-
-    for (const p of permissions) {
-      if (!p?.toolSlug) continue;
-      await this.agentRepository.setEffectiveToolPermissionBySlug({
-        agentId,
-        starshipId,
-        toolSlug: p.toolSlug,
-        permission: p.permission,
-      });
-    }
-
-    return { ok: true };
-  }
-
-  /**
-   * Get tools assigned to an agent, deriving starship from agent and validating access
-   */
-  async getAgentToolsForAgent(agentId: string, userId: string): Promise<import('@starships/protocol').ToolModel[]> {
-    const starshipId = await this.getAgentStarshipIdOrThrow(agentId);
-    const hasAccess = await this.validateStarshipAccess(starshipId, userId);
-    if (!hasAccess) {
-      throw new Error('Access denied to this starship');
-    }
-    return await this.getAgentTools(agentId, starshipId);
-  }
-
-  /**
-   * Assign multiple tools to an agent via relationships (replaces existing assignments)
-   */
-  async assignToolSlugs(agentId: string, toolSlugs: string[], starshipId: string): Promise<AgentModel> {
-    const agent = await this.agentRepository.findById(agentId);
-    if (!agent) {
-      throw new NotFoundError('Agent', agentId);
-    }
-    this.assertAgentIsEditable(agent, 'edit');
-
-    // Use the new relationship-based approach
-    await this.agentRepository.assignToolsToAgent(agentId, toolSlugs, starshipId);
-
-    // Return the updated agent
-    const updatedAgent = await this.agentRepository.findById(agentId);
-    if (!updatedAgent) {
-      throw new NotFoundError('Agent', agentId);
-    }
-    return updatedAgent;
-  }
-
-  /**
-   * Assign multiple tools by deriving starship from agent and validating access
-   */
-  async assignToolSlugsDerived(agentId: string, userId: string, toolSlugs: string[]): Promise<AgentModel> {
-    const starshipId = await this.getAgentStarshipIdOrThrow(agentId);
-    const hasAccess = await this.validateStarshipAccess(starshipId, userId);
-    if (!hasAccess) {
-      throw new Error('Access denied to this starship');
-    }
-    return await this.assignToolSlugs(agentId, toolSlugs, starshipId);
-  }
-
-  /**
-   * Add a single tool to an agent's existing assignments via relationships
-   */
-  async addToolSlug(agentId: string, toolSlug: string, starshipId: string): Promise<AgentModel> {
-    const agent = await this.agentRepository.findById(agentId);
-    if (!agent) {
-      throw new NotFoundError('Agent', agentId);
-    }
-    this.assertAgentIsEditable(agent, 'edit');
-
-    // Find the deployed tool instance by slug and starship
-    const { ToolRepository } = await import('@starships/models');
-    const toolRepository = new ToolRepository();
-
-    const tool = await toolRepository.findBySlugAndStarship(toolSlug, starshipId);
-    if (!tool) {
-      throw new NotFoundError('Tool', `${toolSlug} on starship ${starshipId}`);
-    }
-
-    // Create the relationship
-    await this.agentRepository.addToolRelationship(agentId, tool.id);
-
-    // Return the updated agent
-    const updatedAgent = await this.agentRepository.findById(agentId);
-    if (!updatedAgent) {
-      throw new NotFoundError('Agent', agentId);
-    }
-    return updatedAgent;
-  }
-
-  /**
-   * Add a single tool by deriving starship from agent and validating access
-   */
-  async addToolSlugDerived(agentId: string, userId: string, toolSlug: string): Promise<AgentModel> {
-    const starshipId = await this.getAgentStarshipIdOrThrow(agentId);
-    const hasAccess = await this.validateStarshipAccess(starshipId, userId);
-    if (!hasAccess) {
-      throw new Error('Access denied to this starship');
-    }
-    return await this.addToolSlug(agentId, toolSlug, starshipId);
-  }
-
-  /**
-   * Remove a single tool from an agent's assignments via relationships
-   */
-  async removeToolSlug(agentId: string, toolSlug: string, starshipId: string): Promise<AgentModel> {
-    const agent = await this.agentRepository.findById(agentId);
-    if (!agent) {
-      throw new NotFoundError('Agent', agentId);
-    }
-    this.assertAgentIsEditable(agent, 'edit');
-
-    // Find the deployed tool instance by slug and starship
-    const { ToolRepository } = await import('@starships/models');
-    const toolRepository = new ToolRepository();
-
-    const tool = await toolRepository.findBySlugAndStarship(toolSlug, starshipId);
-    if (!tool) {
-      throw new NotFoundError('Tool', `${toolSlug} on starship ${starshipId}`);
-    }
-
-    // Remove the relationship
-    await this.agentRepository.removeToolRelationship(agentId, tool.id);
-
-    // Return the updated agent
-    const updatedAgent = await this.agentRepository.findById(agentId);
-    if (!updatedAgent) {
-      throw new NotFoundError('Agent', agentId);
-    }
-    return updatedAgent;
-  }
-
-  /**
-   * Remove a single tool by deriving starship from agent and validating access
-   */
-  async removeToolSlugDerived(agentId: string, userId: string, toolSlug: string): Promise<AgentModel> {
-    const starshipId = await this.getAgentStarshipIdOrThrow(agentId);
-    const hasAccess = await this.validateStarshipAccess(starshipId, userId);
-    if (!hasAccess) {
-      throw new Error('Access denied to this starship');
-    }
-    return await this.removeToolSlug(agentId, toolSlug, starshipId);
-  }
-
-  // ============================================================================
-  // MODEL ↔ INSTANCE CONVERSION METHODS
-  // ============================================================================
 
 }

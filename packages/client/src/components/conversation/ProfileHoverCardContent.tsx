@@ -102,7 +102,6 @@ export function AgentProfileHoverCardContent({
   roleLabel,
   category,
   version,
-  toolsCount,
   lastTurnSummary,
   createdAt,
   updatedAt,
@@ -114,7 +113,6 @@ export function AgentProfileHoverCardContent({
   roleLabel?: string
   category?: string
   version?: string
-  toolsCount?: number
   lastTurnSummary?: string
   createdAt?: string
   updatedAt?: string
@@ -136,7 +134,6 @@ export function AgentProfileHoverCardContent({
           {roleLabel ? <DetailRow label="Role" value={roleLabel} /> : null}
           {category ? <DetailRow label="Category" value={category} /> : null}
           {version ? <DetailRow label="Version" value={version} /> : null}
-          {typeof toolsCount === 'number' && toolsCount > 0 ? <DetailRow label="Tools" value={String(toolsCount)} /> : null}
           {lastTurnSummary ? <DetailRow label="Last turn" value={lastTurnSummary} /> : null}
           {safeFormatDate(createdAt) ? <DetailRow label="Created" value={safeFormatDate(createdAt)!} /> : null}
           {safeFormatDate(updatedAt) ? <DetailRow label="Updated" value={safeFormatDate(updatedAt)!} /> : null}

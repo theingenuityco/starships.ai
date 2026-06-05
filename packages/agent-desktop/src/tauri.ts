@@ -26,6 +26,11 @@ export const stopRunner = (runnerId: string) => invoke<void>('stop_runner', { ru
 
 export const listRunners = () => invoke<RunnerInfo[]>('list_runners');
 
+// Connected-agent persistence lives in a Rust-managed 0600 file (not the
+// webview's localStorage) so agent tokens aren't reachable by in-page script.
+export const loadAgentsRaw = () => invoke<string>('load_agents');
+export const saveAgentsRaw = (json: string) => invoke<void>('save_agents', { json });
+
 /** Hostname for naming agents stably per machine; falls back gracefully. */
 export async function hostname(): Promise<string> {
   try {

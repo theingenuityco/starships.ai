@@ -10,7 +10,7 @@ import {
   type Session,
   type Starship,
 } from './serverApi';
-import { detectAgents, hostname, isTauri, startRunner, stopRunner, type DetectedAgent, type RunnerInfo } from './tauri';
+import { detectAgents, hostname, isTauri, loadAgentsRaw, saveAgentsRaw, startRunner, stopRunner, type DetectedAgent, type RunnerInfo } from './tauri';
 import { subscribeEvents, type RunnerState } from './api';
 
 type Screen = 'login' | 'starship' | 'agents';
@@ -25,7 +25,6 @@ interface ConnectedAgent {
 }
 
 const SERVER_KEY = 'starship-desktop-serverurl';
-const AGENTS_KEY = 'starship-desktop-agents';
 
 const KIND_LABEL: Record<string, string> = {
   'claude-code': 'Claude Code',
@@ -36,15 +35,19 @@ const KIND_LABEL: Record<string, string> = {
 };
 const kindLabel = (k: string) => KIND_LABEL[k] ?? k;
 
-function loadConnected(): ConnectedAgent[] {
+// Persistence is delegated to the Rust shell (0600 file) so tokens never touch
+// the webview's localStorage. No-ops gracefully outside Tauri (e.g. vite dev).
+async function loadConnected(): Promise<ConnectedAgent[]> {
+  if (!isTauri()) return [];
   try {
-    return JSON.parse(localStorage.getItem(AGENTS_KEY) || '[]');
+    return JSON.parse(await loadAgentsRaw());
   } catch {
     return [];
   }
 }
 function saveConnected(list: ConnectedAgent[]) {
-  localStorage.setItem(AGENTS_KEY, JSON.stringify(list));
+  if (!isTauri()) return;
+  saveAgentsRaw(JSON.stringify(list)).catch(() => {});
 }
 
 export default function App() {
@@ -55,18 +58,20 @@ export default function App() {
   const [connected, setConnected] = useState<ConnectedAgent[]>([]);
   const [runners, setRunners] = useState<Record<string, RunnerInfo>>({}); // agentId -> runner
   const [banner, setBanner] = useState<string | null>(null);
+  const [booting, setBooting] = useState(true);
   const started = useRef(false);
 
-  // On launch, auto-restart runners for previously connected agents (no login needed).
+  // On launch, load persisted agents and auto-restart their runners (no login needed).
   useEffect(() => {
     if (started.current) return;
     started.current = true;
-    const saved = loadConnected();
-    setConnected(saved);
-    if (saved.length > 0) setScreen('agents');
-    if (isTauri() && saved.length > 0) {
-      (async () => {
+    (async () => {
+      try {
+        const saved = await loadConnected();
+        setConnected(saved);
+        if (saved.length > 0) setScreen('agents');
         for (const a of saved) {
+          if (!isTauri()) break;
           try {
             const info = await startRunner({ agentId: a.agentId, token: a.token, mcpUrl: a.mcpUrl, executor: a.executor });
             setRunners((prev) => ({ ...prev, [a.agentId]: info }));
@@ -74,9 +79,15 @@ export default function App() {
             setBanner(`Could not restart ${a.name}: ${(e as Error).message}`);
           }
         }
-      })();
-    }
+      } finally {
+        setBooting(false);
+      }
+    })();
   }, []);
+
+  if (booting) {
+    return <Shell title="Starship Agent"><p className="muted">Starting…</p></Shell>;
+  }
 
   if (screen === 'login') {
     return <Login onDone={(s, ship) => { setSession(s); if (ship) { setStarship(ship); setMcpUrl(deriveMcpUrl(s.serverUrl)); setScreen('agents'); } else { setScreen('starship'); } }} />;

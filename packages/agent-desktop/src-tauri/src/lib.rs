@@ -1,5 +1,7 @@
 use std::collections::HashMap;
+use std::fs;
 use std::net::TcpListener;
+use std::path::PathBuf;
 use std::sync::Mutex;
 
 use serde::Serialize;
@@ -75,11 +77,48 @@ fn detect_agents() -> Vec<DetectedAgent> {
 }
 
 /// Grab a free loopback port by binding to :0 and reading the assigned port.
+///
+/// Note: this releases the port before the runner re-binds it, so there's a
+/// small TOCTOU window where another process could claim it. If that happens
+/// the runner logs a bind failure (drained to our log) and its Connected card
+/// shows no status. Ephemeral-port collisions are rare in practice; passing an
+/// inherited socket fd to the sidecar would close the window entirely (future).
 fn pick_port() -> u16 {
     TcpListener::bind("127.0.0.1:0")
         .and_then(|l| l.local_addr())
         .map(|a| a.port())
         .unwrap_or(0)
+}
+
+/// Path to the persisted connected-agents file (holds agent tokens; 0600).
+fn agents_file(app: &tauri::AppHandle) -> Option<PathBuf> {
+    app.path().app_config_dir().ok().map(|d| d.join("connected-agents.json"))
+}
+
+/// Load the persisted connected-agents JSON (returns "[]" when absent).
+#[tauri::command]
+fn load_agents(app: tauri::AppHandle) -> String {
+    agents_file(&app)
+        .and_then(|p| fs::read_to_string(p).ok())
+        .unwrap_or_else(|| "[]".to_string())
+}
+
+/// Persist the connected-agents JSON with owner-only permissions. Storing
+/// tokens in a 0600 file (not the webview's localStorage) keeps them out of
+/// reach of any in-page script.
+#[tauri::command]
+fn save_agents(app: tauri::AppHandle, json: String) -> Result<(), String> {
+    let path = agents_file(&app).ok_or("no app config dir")?;
+    if let Some(dir) = path.parent() {
+        fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+    }
+    fs::write(&path, json).map_err(|e| e.to_string())?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = fs::set_permissions(&path, fs::Permissions::from_mode(0o600));
+    }
+    Ok(())
 }
 
 /// Spawn a runner sidecar for one connected agent and track it in the pool.
@@ -99,16 +138,17 @@ fn start_runner(
     let control_token = uuid::Uuid::new_v4().to_string();
     let runner_id = uuid::Uuid::new_v4().to_string();
 
+    // Token goes via env, not argv, so it isn't visible in `ps aux` /
+    // /proc/<pid>/cmdline. The runner reads STARSHIP_AGENT_TOKEN in loadConfig().
     let sidecar = app
         .shell()
         .sidecar("starship-agent")
         .map_err(|e| e.to_string())?
+        .env("STARSHIP_AGENT_TOKEN", &token)
         .args([
             "run",
             "--endpoint",
             &mcp_url,
-            "--token",
-            &token,
             "--executor",
             &executor,
             "--control-port",
@@ -194,7 +234,9 @@ pub fn run() {
             detect_agents,
             start_runner,
             stop_runner,
-            list_runners
+            list_runners,
+            load_agents,
+            save_agents
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

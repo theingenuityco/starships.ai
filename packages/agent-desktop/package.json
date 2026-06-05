@@ -10,6 +10,7 @@
     "type-check": "tsc --noEmit",
     "lint": "eslint src --ext .ts,.tsx",
     "build:sidecar": "node scripts/build-sidecar.mjs",
+    "dev:tauri": "pnpm build:sidecar && tauri dev",
     "tauri": "tauri"
   },
   "dependencies": {

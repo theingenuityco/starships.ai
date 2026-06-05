@@ -12,14 +12,27 @@ the frontend outside Tauri — e.g. plain `vite dev` — it falls back to a manu
 
 ## Run in development
 
+From the repo root, with the platform stack already running (`pnpm dev`, which
+starts the MCP server on :4100):
+
 ```bash
-# Build the runner sidecar for your machine, then launch the app.
-pnpm --filter @starships/agent-desktop build:sidecar
-pnpm --filter @starships/agent-desktop tauri dev
+pnpm dev:agent
 ```
 
-`build:sidecar` compiles `../agent-runner` into
-`src-tauri/binaries/starship-agent-<target-triple>` with `bun --compile`.
+That builds the runner sidecar and launches the Tauri app, pointing the spawned
+runner at the local MCP server with the seeded dev token. Override any of these
+to use a real agent:
+
+```bash
+STARSHIP_AGENT_TOKEN=sk-ship-… STARSHIP_EXECUTOR="claude -p {{prompt}}" pnpm dev:agent
+```
+
+Equivalent package-level commands:
+
+```bash
+pnpm --filter @starships/agent-desktop build:sidecar   # compile ../agent-runner → src-tauri/binaries/
+pnpm --filter @starships/agent-desktop dev:tauri        # build:sidecar + tauri dev
+```
 
 ## Build
 

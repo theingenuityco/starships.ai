@@ -13,7 +13,8 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "NODE_OPTIONS=--no-node-snapshot turbo run dev --concurrency=15",
+    "dev": "NODE_OPTIONS=--no-node-snapshot turbo run dev --concurrency=15 --filter=!@starships/agent-runner --filter=!@starships/agent-desktop",
+    "dev:agent": "STARSHIP_MCP_URL=\"${STARSHIP_MCP_URL:-http://127.0.0.1:4100/mcp}\" STARSHIP_AGENT_TOKEN=\"${STARSHIP_AGENT_TOKEN:-sk-ship-test}\" STARSHIP_EXECUTOR=\"${STARSHIP_EXECUTOR:-echo}\" pnpm --filter @starships/agent-desktop dev:tauri",
     "lint": "turbo run lint",
     "type-check": "turbo run type-check",
     "test": "turbo run test",

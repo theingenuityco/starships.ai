@@ -56,7 +56,6 @@ export { ConnectorEventRepository } from './repositories/ConnectorEventRepositor
 export { ConnectorWebhookBindingRepository } from './repositories/ConnectorWebhookBindingRepository';
 export { ChannelRepository } from './repositories/ChannelRepository';
 export { RoomRepository } from './repositories/RoomRepository';
-export { RoomViewsRepository } from './repositories/RoomViewsRepository';
 export { RoomTablesRepository } from './repositories/RoomTablesRepository';
 export { RoomDocsRepository } from './repositories/RoomDocsRepository';
 export { RoomTaskBoardsRepository } from './repositories/RoomTaskBoardsRepository';
@@ -154,7 +153,6 @@ export {
   tableSlugFromFilename,
 } from './services/definition/tableCodec';
 export { serializeRoomDefinition, parseRoom, roomFilename, roomSlugFromFilename } from './services/definition/roomCodec';
-export { assembleRoomDefinition, type RoomAssemblerRepos } from './services/definition/roomAssembler';
 export type { RoomDefinition } from './services/definition/types';
 export type {
   AgentDefinition,

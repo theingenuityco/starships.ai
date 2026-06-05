@@ -1,7 +1,7 @@
 /**
  * Room Entity - Layer 2
  *
- * Conversation-backed room record (identity + visibility).
+ * Container room record (own identity + visibility). Groups Tables, Goals, Docs.
  */
 
 import type { RoomModel } from '@starships/protocol';
@@ -12,7 +12,7 @@ export class RoomEntity implements RoomModel {
   @Expose()
   @IsString()
   @Length(1, 255)
-  conversationId!: string;
+  id!: string;
 
   @Expose()
   @IsString()
@@ -43,22 +43,6 @@ export class RoomEntity implements RoomModel {
   topic?: string | null;
 
   @Expose()
-  @IsOptional()
-  @IsString()
-  provisionedByBundle?: string | null;
-
-  @Expose()
-  @IsOptional()
-  @IsString()
-  @Length(1, 255)
-  managerAgentId?: string | null;
-
-  @Expose()
-  @IsOptional()
-  @IsISO8601()
-  managerAgentHeartbeatAt?: string | null;
-
-  @Expose()
   @IsISO8601()
   createdAt!: string;
 
@@ -75,15 +59,12 @@ export class RoomEntity implements RoomModel {
 
     if (operation === 'create') {
       Object.assign(entity, {
-        conversationId: dataRecord.conversationId || '',
+        id: dataRecord.id || '',
         starshipId: dataRecord.starshipId || '',
         slug: dataRecord.slug || '',
         name: dataRecord.name || '',
         isPrivate: Boolean(dataRecord.isPrivate),
         topic: (dataRecord.topic as string | null | undefined) ?? null,
-        provisionedByBundle: (dataRecord.provisionedByBundle as string | null | undefined) ?? null,
-        managerAgentId: (dataRecord.managerAgentId as string | null | undefined) ?? null,
-        managerAgentHeartbeatAt: (dataRecord.managerAgentHeartbeatAt as string | null | undefined) ?? null,
         createdAt: dataRecord.createdAt || new Date().toISOString(),
         updatedAt: dataRecord.updatedAt || new Date().toISOString(),
       });

@@ -4,11 +4,24 @@ import type { Room, RoomModel } from '@starships/protocol';
 import { RoomEntity } from '@/entities/RoomEntity';
 import { generateUniqueSlugIncremental } from '@/utils/slugGenerator';
 import type { PostgresConnection } from '@/helpers/database';
-import type { RoomDefinition } from '@/services/definition/types';
+import { nanoid } from 'nanoid';
 
 export class RoomRepository extends BaseRepository {
   constructor(connection?: PostgresConnection) {
     super('RoomRepository', connection);
+  }
+
+  async findById(id: string): Promise<RoomModel | null> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        const row = await connection.queryOne<Record<string, unknown>>('SELECT * FROM rooms WHERE id = $1', [id]);
+        return row ? fromDatabase(RoomEntity, row) : null;
+      },
+      'findById',
+      'Room',
+      id
+    );
   }
 
   async findBySlug(slug: string, starshipId: string): Promise<RoomModel | null> {
@@ -27,55 +40,6 @@ export class RoomRepository extends BaseRepository {
     );
   }
 
-  async findByConversationId(conversationId: string): Promise<RoomModel | null> {
-    return this.executeWithErrorHandling(
-      async () => {
-        const connection = this.getConnection();
-        const row = await connection.queryOne<Record<string, unknown>>('SELECT * FROM rooms WHERE conversation_id = $1', [conversationId]);
-        return row ? fromDatabase(RoomEntity, row) : null;
-      },
-      'findByConversationId',
-      'Room',
-      conversationId
-    );
-  }
-
-  /**
-   * Update a room's authored metadata from a filesystem definition (reconcile
-   * target). Updates only authored fields (slug, name, is_private, topic,
-   * manager_agent_id, provisioned_by_bundle); preserves the backing conversation,
-   * manager heartbeat, and created_at. Returns null if the room does not exist —
-   * reconcile does NOT create rooms (the backing conversation must exist first).
-   */
-  async updateMetadataFromDefinition(def: RoomDefinition): Promise<RoomModel | null> {
-    return this.executeWithErrorHandling(
-      async () => {
-        const connection = this.getConnection();
-        const result = await connection.query<Record<string, unknown>>(
-          `UPDATE rooms
-             SET slug = $2, name = $3, is_private = $4, topic = $5, manager_agent_id = $6,
-                 provisioned_by_bundle = $7, updated_at = $8
-           WHERE conversation_id = $1
-           RETURNING *`,
-          [
-            def.conversationId,
-            def.slug,
-            def.name,
-            def.isPrivate,
-            def.topic ?? null,
-            def.managerAgentId ?? null,
-            def.provisionedByBundle ?? null,
-            new Date().toISOString(),
-          ]
-        );
-        return result.length > 0 ? fromDatabase(RoomEntity, result[0]) : null;
-      },
-      'updateMetadataFromDefinition',
-      'Room',
-      def.conversationId
-    );
-  }
-
   async listByStarship(starshipId: string): Promise<RoomModel[]> {
     return this.executeWithErrorHandling(
       async () => {
@@ -91,16 +55,7 @@ export class RoomRepository extends BaseRepository {
     );
   }
 
-  async create(
-    args: Omit<Room, 'slug'> & {
-      slug?: string;
-      conversationId: string;
-      starshipId: string;
-      provisionedByBundle?: string | null;
-      managerAgentId?: string | null;
-      managerAgentHeartbeatAt?: string | null;
-    }
-  ): Promise<RoomModel> {
+  async create(args: Omit<Room, 'slug'> & { slug?: string; starshipId: string }): Promise<RoomModel> {
     return this.executeWithErrorHandling(
       async () => {
         const now = new Date().toISOString();
@@ -113,15 +68,12 @@ export class RoomRepository extends BaseRepository {
                 { fallbackBase: 'room', maxLength: 100 }
               );
         const data = {
-          conversationId: args.conversationId,
+          id: nanoid(),
           starshipId: args.starshipId,
           slug,
           name: args.name,
           isPrivate: Boolean(args.isPrivate),
           ...(args.topic !== undefined ? { topic: args.topic } : {}),
-          ...(args.provisionedByBundle !== undefined ? { provisionedByBundle: args.provisionedByBundle } : {}),
-          ...(args.managerAgentId !== undefined ? { managerAgentId: args.managerAgentId } : {}),
-          ...(args.managerAgentHeartbeatAt !== undefined ? { managerAgentHeartbeatAt: args.managerAgentHeartbeatAt } : {}),
           createdAt: now,
           updatedAt: now,
         };
@@ -148,45 +100,45 @@ export class RoomRepository extends BaseRepository {
     );
   }
 
-  /**
-   * Find the first room in a starship that was provisioned by the
-   * lead-generation bundle. This is used to reliably identify the
-   * dedicated lead-gen workspace even if its slug changes.
-   */
-  async findLeadGenBundleRoom(starshipId: string): Promise<RoomModel | null> {
+  async update(
+    id: string,
+    updates: Partial<Pick<Room, 'name' | 'slug' | 'isPrivate' | 'topic'>>
+  ): Promise<RoomModel | null> {
     return this.executeWithErrorHandling(
       async () => {
+        const next: Record<string, unknown> = { ...updates, updatedAt: new Date().toISOString() };
+        await RoomEntity.validate(next, 'update');
+        const serialized = toDatabase(toEntityInstance(RoomEntity, next));
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { id: _id, created_at: _createdAt, ...fields } = serialized;
+        if (Object.keys(fields).length === 0) return await this.findById(id);
+
         const connection = this.getConnection();
+        const cols = Object.keys(fields);
+        const vals = Object.values(fields);
+        const assignments = cols.map((c, i) => `${c} = $${i + 2}`).join(', ');
         const row = await connection.queryOne<Record<string, unknown>>(
-          'SELECT * FROM rooms WHERE starship_id = $1 AND provisioned_by_bundle = $2 ORDER BY created_at ASC LIMIT 1',
-          [starshipId, 'lead-generation']
+          `UPDATE rooms SET ${assignments} WHERE id = $1 RETURNING *`,
+          [id, ...vals]
         );
         return row ? fromDatabase(RoomEntity, row) : null;
       },
-      'findLeadGenBundleRoom',
+      'update',
       'Room',
-      starshipId
+      id
     );
   }
 
-  /**
-   * Find the first room provisioned from a given bundle tag (the value stored in
-   * provisioned_by_bundle), e.g. 'engineering' or 'lead-generation'. Used to make
-   * room provisioning idempotent for any catalog bundle.
-   */
-  async findRoomByBundleTag(starshipId: string, bundleTag: string): Promise<RoomModel | null> {
+  async delete(id: string): Promise<boolean> {
     return this.executeWithErrorHandling(
       async () => {
         const connection = this.getConnection();
-        const row = await connection.queryOne<Record<string, unknown>>(
-          'SELECT * FROM rooms WHERE starship_id = $1 AND provisioned_by_bundle = $2 ORDER BY created_at ASC LIMIT 1',
-          [starshipId, bundleTag]
-        );
-        return row ? fromDatabase(RoomEntity, row) : null;
+        const result = await connection.query('DELETE FROM rooms WHERE id = $1', [id]);
+        return (result as unknown as { rowCount?: number })?.rowCount !== 0;
       },
-      'findRoomByBundleTag',
+      'delete',
       'Room',
-      starshipId
+      id
     );
   }
 }

@@ -107,7 +107,7 @@ export interface ToolContext {
   cwd: string;
   /**
    * Additional absolute roots the read-family tools (read/ls) may read from,
-   * beyond `cwd` — e.g. the read-only `/starship` definition mount. Writes stay
+   * beyond `cwd` — e.g. the read-only `/autopilot` definition mount. Writes stay
    * confined to `cwd`.
    */
   readRoots?: string[];
@@ -202,7 +202,7 @@ export interface CliAgentConfig {
   messages: ChatMessage[];
   /** Working directory for system tools. */
   cwd: string;
-  /** Extra absolute read-only roots for the read-family tools (e.g. the `/starship` mount). */
+  /** Extra absolute read-only roots for the read-family tools (e.g. the `/autopilot` mount). */
   readRoots?: string[];
   /** Connector-action dispatch surface (round-trips to the server in the runner). */
   connectors: ConnectorActionRunner;

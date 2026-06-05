@@ -46,11 +46,24 @@ export function buildPermissionPolicy(table: PermissionTable): PermissionPolicy 
   };
 }
 
-export interface CliAgentJobSpec {
-  requestId: string;
+/**
+ * The DEFINITION half of a turn: the agent's identity, capabilities, and policy.
+ *
+ * In a file-driven starship these are resolved from `.autopilot/agents/<slug>.md`
+ * and `.autopilot/connectors/*.yaml` by the CLI itself (see Stage 2). Today the
+ * server still bakes them from the Postgres index; either way they describe *who*
+ * the agent is, not *this* turn's transient inputs. Everything here is something a
+ * `.autopilot` file could legitimately author.
+ */
+export interface CliAgentDefinitionSpec {
   model: string;
+  /**
+   * The agent persona / system prompt. Today this is the fully-composed prompt
+   * (persona + per-turn starship/thread context) built server-side. When the
+   * persona moves to the file, the file supplies the persona and the per-turn
+   * context arrives via {@link CliAgentRuntimeEnvelope.systemPromptContext}.
+   */
   systemPrompt: string;
-  messages: ChatMessage[];
 
   /** Agent tuning. */
   temperature?: number;
@@ -59,6 +72,23 @@ export interface CliAgentJobSpec {
   reasoning?: { effort?: 'low' | 'medium' | 'high'; max_tokens?: number; exclude?: boolean; enabled?: boolean };
   extras?: LlmExtras;
   maxSteps?: number;
+
+  /** Connector allow-list (the providers this agent may discover/use). */
+  discoverConnectors?: string[];
+
+  /** Serializable allow/ask/deny table; built into a PermissionPolicy in-sandbox. */
+  permissions?: PermissionTable;
+}
+
+/**
+ * The RUNTIME ENVELOPE: per-turn, secret, or ledger inputs the server must always
+ * inject. None of this is file-resolvable — it is conversation history, secrets,
+ * the connector-action callback, the workspace, the agent selector, and the
+ * server-composed per-turn context block.
+ */
+export interface CliAgentRuntimeEnvelope {
+  requestId: string;
+  messages: ChatMessage[];
 
   /** OpenRouter-compatible model endpoint (mirrors the runner's LlmRuntimeConfig). */
   llm: { apiKey: string; baseUrl?: string; defaultHeaders?: Record<string, string> };
@@ -76,12 +106,28 @@ export interface CliAgentJobSpec {
    */
   workspace?: { root?: string; spec?: CliWorkspaceSpec; git?: CliGitCredentials };
 
-  /** Restrict connector-action discovery to these connector names. */
-  discoverConnectors?: string[];
-
-  /** Serializable allow/ask/deny table; built into a PermissionPolicy in-sandbox. */
-  permissions?: PermissionTable;
-
   /** Approval decisions keyed by toolCallId, supplied on resume. */
   approvals?: Record<string, 'approved' | 'denied'>;
+
+  /**
+   * Which agent in `.autopilot/agents/` to embody this turn (the selector, like
+   * `claude --agent <slug>`). Informational until the CLI bootstrap (Stage 2)
+   * consumes it to load the persona/tuning from the file.
+   */
+  agentSlug?: string;
+
+  /**
+   * Server-composed per-turn context (starship/thread/policy) to append after the
+   * file persona once the persona is file-resolved. Unused while `systemPrompt`
+   * carries the fully-composed prompt.
+   */
+  systemPromptContext?: string;
 }
+
+/**
+ * CliAgentJobSpec is the full host -> sandbox wire contract: the definition spec
+ * plus the runtime envelope. Kept a flat intersection (not nested) so the wire
+ * shape and all existing field accesses are unchanged; the split lives in the
+ * type system to name the file-resolvable boundary.
+ */
+export interface CliAgentJobSpec extends CliAgentDefinitionSpec, CliAgentRuntimeEnvelope {}

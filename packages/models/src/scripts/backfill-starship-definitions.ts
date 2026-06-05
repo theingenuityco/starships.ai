@@ -1,6 +1,6 @@
 /**
  * One-time backfill: export existing Postgres definition rows into the
- * filesystem-authoritative definition volume (`$STARSHIP_HOME/<id>/.starship/`).
+ * filesystem-authoritative definition volume (`$STARSHIP_HOME/<id>/.autopilot/`).
  *
  * Run this before flipping STARSHIP_FS_AUTHORITY on so existing starships keep
  * their agents. It is idempotent, NON-destructive (only writes files; never

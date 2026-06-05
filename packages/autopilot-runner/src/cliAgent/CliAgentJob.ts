@@ -26,8 +26,8 @@ import { LocalWorkspaceProvider } from '@/workspace/LocalWorkspaceProvider';
 
 export type { CliAgentJobSpec };
 
-/** Container path where the launcher bind-mounts the starship's `.starship/` volume. */
-const STARSHIP_MOUNT_DIR = '/starship';
+/** Container path where the launcher bind-mounts the starship's `.autopilot/` volume. */
+const STARSHIP_MOUNT_DIR = '/autopilot';
 
 export interface RunCliAgentJobOptions {
   onEvent?: (event: CliAgentEvent) => void | Promise<void>;
@@ -61,7 +61,7 @@ export async function runCliAgentJob(spec: CliAgentJobSpec, opts: RunCliAgentJob
 
   // When the launcher bind-mounts the starship's definition volume (Stage 4+),
   // expose it as a read root so the agent's read/ls tools can read its own
-  // `.starship/` definitions, not just via bash.
+  // `.autopilot/` definitions, not just via bash.
   const readRoots = existsSync(STARSHIP_MOUNT_DIR) ? [STARSHIP_MOUNT_DIR] : undefined;
 
   return runCliAgent({

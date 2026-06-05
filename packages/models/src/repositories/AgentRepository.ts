@@ -427,7 +427,7 @@ export class AgentRepository extends BaseRepository {
    * Upsert the agents INDEX row from a filesystem-authoritative definition.
    *
    * This is the reconciler's write primitive when STARSHIP_FS_AUTHORITY is on:
-   * the `.starship/agents/<slug>.md` file is the source of truth, and this folds
+   * the `.autopilot/agents/<slug>.md` file is the source of truth, and this folds
    * its authored fields into the Postgres index keyed by the file's explicit
    * `id` (NOT a freshly generated one — messages/schedules FK to it).
    *

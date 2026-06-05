@@ -28,7 +28,7 @@ import type { AgentModel, ConnectorProvider } from '@starships/protocol';
 /**
  * Folds the filesystem-authoritative definition plane into the Postgres index.
  *
- * Files in `.starship/` are the source of truth; the existing tables (`agents`,
+ * Files in `.autopilot/` are the source of truth; the existing tables (`agents`,
  * ...) are a derived, rebuildable index. `reconcile` reads definition files,
  * validates them through the existing entity validators, and upserts the index
  * keyed by each entity's immutable `id`. Drift is detected via the same

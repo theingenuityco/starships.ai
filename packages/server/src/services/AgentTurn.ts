@@ -115,6 +115,8 @@ export interface AgentTurnDeps {
 
 export interface AgentTurnAgentModel {
   id: string;
+  /** Filename stem for `.autopilot/agents/<slug>.md`; selects the agent to embody. */
+  slug?: string;
   name: string;
   model: string;
   temperature?: number;
@@ -226,6 +228,7 @@ export async function runAgentTurn(deps: AgentTurnDeps, args: AgentTurnArgs): Pr
         model: modelId,
         systemPrompt: args.systemPrompt,
         messages,
+        ...(agentModel.slug ? { agentSlug: agentModel.slug } : {}),
         discoverConnectors,
         ...(permissions ? { permissions } : {}),
         ...(args.approvals ? { approvals: args.approvals } : {}),
@@ -245,7 +248,7 @@ export async function runAgentTurn(deps: AgentTurnDeps, args: AgentTurnArgs): Pr
       };
       result = await cliAgentContainerLauncher.launch({ spec, hostDir: ws.hostDir, starshipId, onEvent, ...(args.signal ? { signal: args.signal } : {}) });
 
-      // Self-edit mode: the agent may have edited its own .starship/ files in the
+      // Self-edit mode: the agent may have edited its own .autopilot/ files in the
       // writable mount; fold those edits back into the index. Best-effort.
       if (getEnvConfig().STARSHIP_FS_VERIFY_ON_READ === true) {
         try {

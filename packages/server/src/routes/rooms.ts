@@ -40,7 +40,7 @@ import { mirrorRoomToFile } from '@/services/RoomDefinitionMirror';
 const router: Router = Router();
 
 /**
- * Mirror a room's definition to its `.starship/rooms/<slug>.yaml` file after any
+ * Mirror a room's definition to its `.autopilot/rooms/<slug>.yaml` file after any
  * successful mutating request that targets a room (`:roomId` = conversationId).
  * Best-effort and flag-gated (see RoomDefinitionMirror); room CREATE is mirrored
  * explicitly in its handler since it has no `:roomId` param. This keeps files

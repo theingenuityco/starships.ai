@@ -22,7 +22,14 @@ export { buildConnectorTools, connectorRegistryCatalog } from '@/tools/connector
 
 export { serializeToolResult } from '@/serialize';
 export { buildPermissionPolicy } from '@/jobSpec';
-export type { CliAgentJobSpec, CliWorkspaceSpec, CliGitCredentials, PermissionTable } from '@/jobSpec';
+export type {
+  CliAgentJobSpec,
+  CliAgentDefinitionSpec,
+  CliAgentRuntimeEnvelope,
+  CliWorkspaceSpec,
+  CliGitCredentials,
+  PermissionTable,
+} from '@/jobSpec';
 
 export { OpenRouterClient } from '@/llm/OpenRouterClient';
 export type { LlmCallInput, LlmCallResult, ModelTool, DeltaSink } from '@/llm/OpenRouterClient';

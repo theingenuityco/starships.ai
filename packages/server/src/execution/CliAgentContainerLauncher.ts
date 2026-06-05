@@ -11,7 +11,7 @@ import { WORKSPACE_CHECKOUT_SUBDIR } from './WorkspaceSessionManager';
 const CONTAINER_WORKSPACE_BASE = '/workspace';
 const CONTAINER_CHECKOUT_DIR = `${CONTAINER_WORKSPACE_BASE}/${WORKSPACE_CHECKOUT_SUBDIR}`;
 /** Where the durable per-starship definition volume is mounted (read-only) inside the sandbox. */
-const CONTAINER_STARSHIP_DIR = '/starship';
+const CONTAINER_STARSHIP_DIR = '/autopilot';
 
 /** Path to the CLI job-agent entrypoint inside the sandbox image (relative to its WORKDIR). */
 const CLI_JOB_AGENT_ENTRYPOINT = process.env.RUNNER_CLI_JOB_AGENT_PATH || 'dist/cliAgent/cliJobAgent.js';
@@ -26,8 +26,8 @@ export interface LaunchCliAgentInput {
   hostDir: string;
   /**
    * Starship owning this turn. When STARSHIP_FS_AUTHORITY is on, its durable
-   * definition volume is bind-mounted read-only at /starship so the agent can
-   * read its own `.starship/` definitions.
+   * definition volume is bind-mounted read-only at /autopilot so the agent can
+   * read its own `.autopilot/` definitions.
    */
   starshipId?: string;
   /** No-repo run: the agent's cwd is the mount root (/workspace) rather than a checkout subdir. */
@@ -88,7 +88,7 @@ export class CliAgentContainerLauncher {
     }
 
     // When the filesystem definition plane is authoritative, mount the starship's
-    // durable .starship/ volume read-only so the agent can read its own definitions.
+    // durable .autopilot/ volume read-only so the agent can read its own definitions.
     // Provision first: a read-only bind requires the host dir to exist.
     let starshipDefHostDir: string | undefined;
     if (input.starshipId && getEnvConfig().STARSHIP_FS_AUTHORITY === true) {
@@ -97,7 +97,7 @@ export class CliAgentContainerLauncher {
         starshipDefHostDir = starshipDefinitionDir(input.starshipId);
       } catch (err) {
         console.warn(
-          `[CliAgentContainerLauncher] could not provision .starship volume for ${input.starshipId}; skipping /starship mount`,
+          `[CliAgentContainerLauncher] could not provision .autopilot volume for ${input.starshipId}; skipping /autopilot mount`,
           err instanceof Error ? err.message : err
         );
       }
@@ -149,7 +149,7 @@ export class CliAgentContainerLauncher {
       '-v',
       `${hostWorkspaceDir}:/workspace:rw`,
       // Definition volume: read-only by default; read-write in self-edit mode
-      // (STARSHIP_FS_VERIFY_ON_READ) so an agent can edit its own .starship/ and
+      // (STARSHIP_FS_VERIFY_ON_READ) so an agent can edit its own .autopilot/ and
       // have the changes folded back into the index by a post-turn reconcile.
       ...(starshipDefHostDir
         ? ['-v', `${starshipDefHostDir}:${CONTAINER_STARSHIP_DIR}:${getEnvConfig().STARSHIP_FS_VERIFY_ON_READ === true ? 'rw' : 'ro'}`]

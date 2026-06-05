@@ -71,7 +71,7 @@ export class StarshipTableRepository extends BaseRepository {
    * Tables mirror to the definition file at the repository layer (routes call
    * the repo directly, no service seam). DB-first-mirror: the row + physical
    * table is the canonical write (DDL is computed here); its logical schema is
-   * mirrored to `.starship/tables/<slug>.yaml`. The physical binding
+   * mirrored to `.autopilot/tables/<slug>.yaml`. The physical binding
    * (schema/physicalTable) and `archived` are index-only. Gated by
    * STARSHIP_FS_AUTHORITY.
    */

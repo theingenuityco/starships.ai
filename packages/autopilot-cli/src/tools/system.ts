@@ -39,7 +39,7 @@ function isUnder(root: string, resolved: string): boolean {
 
 /**
  * Resolve a path for READING. An absolute path that falls under one of
- * `readRoots` (e.g. the `/starship` definition mount) is allowed as-is; anything
+ * `readRoots` (e.g. the `/autopilot` definition mount) is allowed as-is; anything
  * else is resolved workspace-relative and confined to `cwd` (see resolveInside).
  * This preserves the leading-"/" = workspace-root convention for paths that are
  * not under a read root.

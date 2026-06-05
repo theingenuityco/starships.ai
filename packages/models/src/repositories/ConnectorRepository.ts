@@ -19,7 +19,7 @@ export class ConnectorRepository extends BaseRepository {
    * connector rows are written from many flows (configure/start/OAuth/disconnect)
    * with no single service seam. DB-first-mirror: the row is the canonical write,
    * its authored fields (provider/metadata/templateId/version) are mirrored to
-   * `.starship/connectors/<provider>.yaml`. Secrets stay in connector_secrets;
+   * `.autopilot/connectors/<provider>.yaml`. Secrets stay in connector_secrets;
    * status/lastError are index-only. Gated by STARSHIP_FS_AUTHORITY.
    */
   private get definitionStore(): StarshipDefinitionStore {

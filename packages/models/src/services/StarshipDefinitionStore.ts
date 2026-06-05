@@ -11,7 +11,7 @@ import {
 
 /**
  * The filesystem abstraction over a starship's definition volume. Reads, writes,
- * lists, and deletes raw definition files under `.starship/<entity>/`. It knows
+ * lists, and deletes raw definition files under `.autopilot/<entity>/`. It knows
  * nothing about Postgres or entity schemas: codecs turn domain models into the
  * string content this store persists, and the reconciler folds files into the
  * index. Writes are atomic (tmp + rename) so a crash never leaves a torn file.

@@ -5,7 +5,7 @@ import { assertSafeId } from '@/helpers/starship-tables/identifiers';
 
 /**
  * Provisions the per-starship definition VOLUME: a durable directory
- * `$STARSHIP_HOME/<starshipId>/.starship/` that is the filesystem-authoritative
+ * `$STARSHIP_HOME/<starshipId>/.autopilot/` that is the filesystem-authoritative
  * source of truth for the definition plane (agents/connectors/rooms/tables/
  * schedules). The Postgres tables become a derived index reconciled from here.
  *
@@ -18,7 +18,7 @@ import { assertSafeId } from '@/helpers/starship-tables/identifiers';
  * workspace (`RUNNER_JOB_BASE_DIR`); see the `STARSHIP_HOME` env doc.
  */
 
-/** Subdirectories of `.starship/` holding one file per definition entity. */
+/** Subdirectories of `.autopilot/` holding one file per definition entity. */
 export const DEFINITION_ENTITY_DIRS = ['agents', 'connectors', 'rooms', 'tables', 'schedules'] as const;
 export type DefinitionEntityDir = (typeof DEFINITION_ENTITY_DIRS)[number];
 
@@ -32,9 +32,9 @@ export function starshipVolumeRoot(starshipId: string, home: string = starshipHo
   return path.join(home, assertSafeId(starshipId, 'starshipId'));
 }
 
-/** The definition directory inside a starship volume: `.../<starshipId>/.starship`. */
+/** The definition directory inside a starship volume: `.../<starshipId>/.autopilot`. */
 export function starshipDefinitionDir(starshipId: string, home: string = starshipHomeRoot()): string {
-  return path.join(starshipVolumeRoot(starshipId, home), '.starship');
+  return path.join(starshipVolumeRoot(starshipId, home), '.autopilot');
 }
 
 export class StarshipVolumeProvisioner {
@@ -45,12 +45,12 @@ export class StarshipVolumeProvisioner {
     this.home = home ?? starshipHomeRoot();
   }
 
-  /** Absolute `.starship/` dir for a starship. */
+  /** Absolute `.autopilot/` dir for a starship. */
   definitionDir(starshipId: string): string {
     return starshipDefinitionDir(starshipId, this.home);
   }
 
-  /** Idempotently create `.starship/` and every entity subdirectory. */
+  /** Idempotently create `.autopilot/` and every entity subdirectory. */
   async ensureProvisioned(starshipId: string): Promise<void> {
     assertSafeId(starshipId, 'starshipId');
     const defDir = this.definitionDir(starshipId);
@@ -58,7 +58,7 @@ export class StarshipVolumeProvisioner {
     await Promise.all(DEFINITION_ENTITY_DIRS.map((dir) => fs.ensureDir(path.join(defDir, dir))));
   }
 
-  /** Whether the starship's `.starship/` directory already exists. */
+  /** Whether the starship's `.autopilot/` directory already exists. */
   async isProvisioned(starshipId: string): Promise<boolean> {
     return fs.pathExists(this.definitionDir(starshipId));
   }

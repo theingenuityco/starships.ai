@@ -34,7 +34,7 @@ import { ConnectorSecretService } from './ConnectorSecretService';
 import { isInstanceAdmin } from '../utils/auth-helpers';
 
 /**
- * Authored agent fields that live in the `.starship/agents/<slug>.md` file (and
+ * Authored agent fields that live in the `.autopilot/agents/<slug>.md` file (and
  * are therefore reconciled from it under STARSHIP_FS_AUTHORITY). Everything else
  * on UpdateAgentRequest (avatar/profile attachment ids, agent `state`) is
  * index-only and always written straight to the DB regardless of the flag.
@@ -244,7 +244,7 @@ export class AgentService {
    * With STARSHIP_FS_VERIFY_ON_READ on (self-edit mode), verify the index against
    * the agent's definition file and reconcile on drift before returning — the
    * "files win" safety net for out-of-band edits (e.g. an agent editing its own
-   * `.starship/agents/*.md`). Off by default to keep the hot path index-backed.
+   * `.autopilot/agents/*.md`). Off by default to keep the hot path index-backed.
    */
   async getAgent(agentId: string): Promise<AgentModel | null> {
     const agent = await this.agentRepository.findById(agentId);

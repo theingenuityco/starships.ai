@@ -32,6 +32,7 @@
     "test:coverage": "jest --coverage"
   },
   "dependencies": {
+    "@starships/definition": "workspace:*",
     "@starships/env": "workspace:*",
     "@starships/errors": "workspace:*",
     "@starships/protocol": "workspace:*",

@@ -2704,6 +2704,7 @@ export class ConversationService {
             turnId,
             agentModel: {
               id: agentModel.id,
+              ...(agentModel.slug ? { slug: agentModel.slug } : {}),
               name: agentModel.name,
               model: String(cfg.model ?? ''),
               ...(typeof cfg.temperature === 'number' ? { temperature: cfg.temperature } : {}),
@@ -3162,6 +3163,7 @@ export class ConversationService {
           turnId,
           agentModel: {
             id: agentModel.id,
+            ...(agentModel.slug ? { slug: agentModel.slug } : {}),
             name: agentModel.name,
             model: String(cfg.model ?? ''),
             ...(typeof cfg.temperature === 'number' ? { temperature: cfg.temperature } : {}),

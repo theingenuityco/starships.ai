@@ -9,7 +9,7 @@ import { getEnvConfig } from '@starships/env';
 
 /**
  * Mirror a room's full definition (metadata + composition) to its
- * `.starship/rooms/<slug>.yaml` file. Rooms have no service seam and ~17
+ * `.autopilot/rooms/<slug>.yaml` file. Rooms have no service seam and ~17
  * mutation endpoints, so this best-effort, flag-gated helper recomputes the
  * whole definition from the index and rewrites the file after a mutation.
  *

@@ -82,7 +82,7 @@ export interface EnvironmentConfig {
 
   /**
    * Durable per-starship definition volume. Root directory under which each
-   * starship owns `$STARSHIP_HOME/<starshipId>/.starship/` holding the
+   * starship owns `$STARSHIP_HOME/<starshipId>/.autopilot/` holding the
    * filesystem-authoritative definition plane (agents/connectors/rooms/tables/
    * schedules). MUST be a non-reaped path, distinct from RUNNER_JOB_BASE_DIR
    * (the ephemeral, TTL-reaped workspace), and shared storage (NFS/EFS) in
@@ -98,7 +98,7 @@ export interface EnvironmentConfig {
   /**
    * When true, definition reads also verify against the file (recompute hash,
    * reconcile on drift) before returning. Off by default to keep the hot path
-   * index-backed; enabled for starships whose agents self-edit `.starship/`.
+   * index-backed; enabled for starships whose agents self-edit `.autopilot/`.
    */
   STARSHIP_FS_VERIFY_ON_READ: boolean;
 

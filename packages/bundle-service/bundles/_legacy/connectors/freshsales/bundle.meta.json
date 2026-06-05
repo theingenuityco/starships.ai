@@ -1,9 +1,0 @@
-{
-  "name": "Freshsales CRM",
-  "description": "Freshsales CRM API for managing leads, contacts, deals, and tasks",
-  "version": "1.0.0",
-  "tags": [
-    "crm"
-  ],
-  "kind": "connector"
-}

@@ -1,9 +1,0 @@
-{
-  "name": "Telegram Bot",
-  "description": "Connect a Telegram Bot to send messages, photos, documents, and interact with Telegram chats. Get your bot token from @B",
-  "version": "1.0.0",
-  "tags": [
-    "connector"
-  ],
-  "kind": "connector"
-}

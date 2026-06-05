@@ -1,9 +1,0 @@
-{
-  "name": "Zendesk",
-  "description": "Zendesk customer service platform connector for managing tickets, conversations, users, and support operations with OAut",
-  "version": "1.0.0",
-  "tags": [
-    "connector"
-  ],
-  "kind": "connector"
-}

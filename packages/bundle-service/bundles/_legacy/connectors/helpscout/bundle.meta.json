@@ -1,9 +1,0 @@
-{
-  "name": "Help Scout",
-  "description": "Help Scout is a customer service platform providing email-based help desk (Inbox), live chat and proactive messages (Bea",
-  "version": "1.0.0",
-  "tags": [
-    "customer-support"
-  ],
-  "kind": "connector"
-}

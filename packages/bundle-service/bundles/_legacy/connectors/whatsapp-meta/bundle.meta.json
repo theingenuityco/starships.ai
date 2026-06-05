@@ -1,9 +1,0 @@
-{
-  "name": "WhatsApp Business (Meta)",
-  "description": "WhatsApp Business Cloud API connector for sending messages, templates, and managing conversations via Meta's official AP",
-  "version": "1.0.0",
-  "tags": [
-    "connector"
-  ],
-  "kind": "connector"
-}

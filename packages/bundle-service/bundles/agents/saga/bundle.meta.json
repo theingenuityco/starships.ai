@@ -1,9 +1,0 @@
-{
-  "name": "Saga",
-  "description": "Expert WordPress content manager specializing in creating, updating, and managing blog posts, pages, and media across WordPress sites. Handles post creation, editing, publishing workflows, and content organization. ",
-  "version": "1.0.4",
-  "tags": [
-    "creative"
-  ],
-  "kind": "agent"
-}

@@ -1,9 +1,0 @@
-{
-  "name": "Twilio SendGrid",
-  "description": "Send transactional and marketing emails via Twilio SendGrid API v3. Supports simple emails, dynamic templates, attachmen",
-  "version": "1.0.0",
-  "tags": [
-    "connector"
-  ],
-  "kind": "connector"
-}

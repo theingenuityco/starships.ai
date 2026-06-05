@@ -1,9 +1,0 @@
-{
-  "name": "BigCommerce",
-  "description": "BigCommerce REST Management API connector for managing products, orders, customers, categories, and variants.",
-  "version": "1.0.0",
-  "tags": [
-    "e-commerce"
-  ],
-  "kind": "connector"
-}

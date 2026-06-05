@@ -1,9 +1,0 @@
-{
-  "name": "Postgres",
-  "description": "Connect a Postgres database to enable native SQL actions (read-only by default).",
-  "version": "1.0.0",
-  "tags": [
-    "connector"
-  ],
-  "kind": "connector"
-}

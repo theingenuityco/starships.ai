@@ -1,9 +1,0 @@
-{
-  "name": "Instagram",
-  "description": "Instagram Graph API connector for managing posts, stories, comments, and insights. Supports content publishing, engageme",
-  "version": "1.0.0",
-  "tags": [
-    "social"
-  ],
-  "kind": "connector"
-}

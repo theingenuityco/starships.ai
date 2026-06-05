@@ -1,9 +1,0 @@
-{
-  "name": "Ahrefs",
-  "description": "Ahrefs API connector for SEO data including backlinks, keywords, site metrics, and organic traffic analysis.",
-  "version": "1.0.0",
-  "tags": [
-    "connector"
-  ],
-  "kind": "connector"
-}

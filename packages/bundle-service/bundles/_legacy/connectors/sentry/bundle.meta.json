@@ -1,9 +1,0 @@
-{
-  "name": "Sentry",
-  "description": "Error tracking and performance monitoring platform for identifying and fixing issues.",
-  "version": "1.0.0",
-  "tags": [
-    "connector"
-  ],
-  "kind": "connector"
-}

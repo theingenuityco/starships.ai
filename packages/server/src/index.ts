@@ -19,35 +19,18 @@ import { createServer } from 'http';
 
 // Route imports
 import agentRoutes from '@/routes/agents';
-import attachmentRoutes from '@/routes/attachments';
 import authRoutes from '@/routes/auth';
-import conversationRoutes from '@/routes/conversations';
-import connectorRoutes from '@/routes/connectors';
-import messageRoutes from '@/routes/messages';
 import roomRoutes from '@/routes/rooms';
 import starshipRoutes from '@/routes/starships';
 import userRoutes from '@/routes/users';
-import usageRoutes from '@/routes/usage';
-import openrouterRoutes from '@/routes/openrouter';
-import llmModelsRoutes from '@/routes/llm-models';
-import webhooksRoutes from '@/routes/webhooks';
 import docsRoutes from '@/routes/docs';
-import widgetRoutes from '@/routes/widgets';
-import viewRoutes from '@/routes/views';
-import internalConnectorActionRoutes from '@/routes/internal-connector-action';
-import scheduleRoutes from '@/routes/schedules';
 import taskBoardRoutes from '@/routes/task-boards';
 import tableRoutes from '@/routes/tables';
 import starshipDocsRoutes from '@/routes/starship-docs';
 import platformSecretRoutes from '@/routes/platform-secrets';
-import connectorTemplateRoutes from '@/routes/connector-templates';
 import starshipInvitesRoutes from '@/routes/starship-invites';
 import presenceRoutes from '@/routes/presence';
-import notificationRoutes from '@/routes/notifications';
-import heartbeatRoutes from '@/routes/heartbeats';
-import automateRoutes from '@/routes/automate';
 import setupRoutes from '@/routes/setup';
-// import expeditionRoutes from '@/routes/expeditions';
 
 // Import new error handling and health check routes
 import { errorHandler, notFoundHandler, requestIdMiddleware } from '@/middleware/errorHandler';
@@ -107,9 +90,7 @@ app.use(cors());
 app.use(requestIdMiddleware);
 // Apply global rate limiting (before routes but after request ID)
 app.use(globalRateLimiter);
-// Mount webhooks BEFORE JSON parser to preserve raw body for signature verification
-app.use('/api/v1', webhooksRoutes);
-// Parse JSON for all other routes
+// Parse JSON for all routes
 app.use(express.json());
 app.use(cookieParser());
 
@@ -120,31 +101,16 @@ app.use('/api/v1', authRoutes); // Authentication routes (public)
 app.use('/api/v1', setupRoutes); // First-run setup routes (public, self-locks after first admin)
 app.use('/api/v1', healthRoutes);
 app.use('/api/v1', agentRoutes);
-app.use('/api/v1', attachmentRoutes);
-app.use('/api/v1', conversationRoutes);
 app.use('/api/v1', roomRoutes);
-app.use('/api/v1', connectorRoutes);
-app.use('/api/v1', messageRoutes);
 app.use('/api/v1', userRoutes);
 app.use('/api/v1', starshipRoutes);
 app.use('/api/v1', docsRoutes);
-app.use('/api/v1', usageRoutes);
-app.use('/api/v1', openrouterRoutes);
-app.use('/api/v1', llmModelsRoutes);
-app.use('/api/v1', widgetRoutes);
-app.use('/api/v1', viewRoutes);
-app.use('/api/v1', internalConnectorActionRoutes); // Runner -> server connector action execution (shared-secret auth)
-app.use('/api/v1', scheduleRoutes);
 app.use('/api/v1', taskBoardRoutes);
 app.use('/api/v1', tableRoutes);
 app.use('/api/v1', starshipDocsRoutes);
 app.use('/api/v1', platformSecretRoutes);
-app.use('/api/v1', connectorTemplateRoutes);
 app.use('/api/v1', starshipInvitesRoutes);
 app.use('/api/v1', presenceRoutes);
-app.use('/api/v1', notificationRoutes);
-app.use('/api/v1', heartbeatRoutes);
-app.use('/api/v1', automateRoutes);
 
 // Add 404 handler for unmatched routes
 app.use(notFoundHandler);

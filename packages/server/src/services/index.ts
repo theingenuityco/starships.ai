@@ -1,16 +1,8 @@
 export { AgentService } from './AgentService';
-export { AttachmentService } from './AttachmentService';
-export { AvatarGenerationService } from './AvatarGenerationService';
-export { ConnectorSecretService } from './ConnectorSecretService';
-export { ConnectorService } from './ConnectorService';
-export { ConversationService } from './ConversationService';
 export { EmailService } from './EmailService';
 export { ImportExportService } from './ImportExportService';
-export { MessageService } from './MessageService';
 export { PlatformSecretService } from './PlatformSecretService';
 export { RegistrationOrchestrator } from './RegistrationOrchestrator';
-export { ScheduleService } from './ScheduleService';
 export { ServiceFactory } from './ServiceFactory';
 export { StarshipService } from './StarshipService';
-export { UsageService } from './UsageService';
 export { UserService } from './UserService';

@@ -1,5 +1,4 @@
 import { getRandomStarshipName } from '@/utils/starshipNames';
-import { ensureLobbyRoomForStarship } from '@/utils/default-room';
 import { ConflictError, NotFoundError } from '@starships/errors';
 import {
   AgentRepository,
@@ -67,24 +66,6 @@ export class StarshipService {
       maxConcurrentTurns: data.maxConcurrentTurns ?? defaultEntitlements.maxConcurrentTurns,
       status: 'active',
     });
-
-    // Ensure every starship has a default public room (e.g. #lobby).
-    // This must succeed; otherwise the starship isn't usable in the rooms-first UI.
-    try {
-      await ensureLobbyRoomForStarship({ starshipId: starship.id, createdByUserId: data.ownerId });
-    } catch (err) {
-      logger.error('[StarshipService] Failed to create default room for starship; rolling back', {
-        starshipId: starship.id,
-        operation: 'create_default_room',
-        error: err instanceof Error ? err.message : String(err),
-      });
-      try {
-        await this.starshipRepository.delete(starship.id);
-      } catch {
-        /* ignore */
-      }
-      throw err;
-    }
 
     // Auto-connect the built-in starships connector (platform_jwt — always available).
     try {

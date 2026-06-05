@@ -1,9 +1,0 @@
-{
-  "name": "Bright Data",
-  "description": "Web scraping and proxy infrastructure platform with API key authentication",
-  "version": "1.0.0",
-  "tags": [
-    "connector"
-  ],
-  "kind": "connector"
-}

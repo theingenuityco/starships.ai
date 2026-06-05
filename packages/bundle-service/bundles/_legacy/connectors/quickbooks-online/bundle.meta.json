@@ -1,9 +1,0 @@
-{
-  "name": "QuickBooks Online",
-  "description": "Intuit QuickBooks Online Accounting API for managing invoices, bills, customers, and accounts",
-  "version": "1.0.0",
-  "tags": [
-    "connector"
-  ],
-  "kind": "connector"
-}

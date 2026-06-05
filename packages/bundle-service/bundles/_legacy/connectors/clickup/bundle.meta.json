@@ -1,9 +1,0 @@
-{
-  "name": "ClickUp",
-  "description": "ClickUp is a comprehensive project management and collaboration platform. This connector enables integration with ClickU",
-  "version": "1.0.0",
-  "tags": [
-    "connector"
-  ],
-  "kind": "connector"
-}

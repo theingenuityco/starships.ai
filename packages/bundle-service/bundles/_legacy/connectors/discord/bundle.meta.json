@@ -1,9 +1,0 @@
-{
-  "name": "Discord",
-  "description": "Connect a Discord bot to enable tools that send messages or notifications to your Discord servers via an installed bot.",
-  "version": "1.0.0",
-  "tags": [
-    "connector"
-  ],
-  "kind": "connector"
-}

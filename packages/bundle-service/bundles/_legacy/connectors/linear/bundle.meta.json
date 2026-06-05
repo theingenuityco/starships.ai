@@ -1,9 +1,0 @@
-{
-  "name": "Linear",
-  "description": "Linear is a modern issue tracking and project management platform. This connector enables integration with Linear's Grap",
-  "version": "1.0.0",
-  "tags": [
-    "connector"
-  ],
-  "kind": "connector"
-}

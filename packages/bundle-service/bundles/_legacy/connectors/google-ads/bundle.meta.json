@@ -1,9 +1,0 @@
-{
-  "name": "Google Ads",
-  "description": "Manage Google Ads campaigns, ad groups, keywords, and performance reporting via OAuth2.",
-  "version": "1.0.0",
-  "tags": [
-    "connector"
-  ],
-  "kind": "connector"
-}

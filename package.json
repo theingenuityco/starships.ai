@@ -14,7 +14,6 @@
   ],
   "scripts": {
     "dev": "NODE_OPTIONS=--no-node-snapshot turbo run dev --concurrency=15",
-    "dev:with-workers": "turbo run build && concurrently --verbose -n app,scheduler,worker,hb-sched,hb-worker -c \"cyan,magenta,green,yellow,blue\" \"NODE_OPTIONS=--no-node-snapshot turbo run dev --concurrency=15\" \"NODE_OPTIONS=--no-node-snapshot pnpm --filter @starships/server run schedule:scheduler\" \"NODE_OPTIONS=--no-node-snapshot pnpm --filter @starships/server run schedule:worker\" \"NODE_OPTIONS=--no-node-snapshot pnpm --filter @starships/server run heartbeat:scheduler\" \"NODE_OPTIONS=--no-node-snapshot pnpm --filter @starships/server run heartbeat:worker\"",
     "lint": "turbo run lint",
     "type-check": "turbo run type-check",
     "test": "turbo run test",
@@ -23,10 +22,7 @@
     "postgres:install": "docker run -d --name starships-postgres -p 5432:5432 -e POSTGRES_PASSWORD=password -e POSTGRES_DB=starships postgres:18 || echo 'Container may already exist. Use postgres:reset to recreate.'",
     "postgres:reset": "docker stop starships-postgres 2>/dev/null || true && docker rm starships-postgres 2>/dev/null || true && echo 'PostgreSQL container cleaned up. Use postgres:install to recreate.'",
     "postgres:shell": "docker exec -it starships-postgres psql -U postgres -d starships || echo 'Container not running. Use postgres:start first.'",
-    "postgres:backup": "docker exec starships-postgres pg_dump -U postgres starships > backup_$(date +%Y%m%d_%H%M%S).sql || echo 'Backup failed. Ensure container is running.'",
-    "redis:install": "docker run -d --name starships-redis -p 6379:6379 redis:7-alpine || echo 'Container may already exist. Use redis:reset to recreate.'",
-    "redis:reset": "docker stop starships-redis 2>/dev/null || true && docker rm starships-redis 2>/dev/null || true && echo 'Redis container cleaned up. Use redis:install to recreate.'",
-    "redis:shell": "docker exec -it starships-redis redis-cli || echo 'Container not running. Use redis:install first.'"
+    "postgres:backup": "docker exec starships-postgres pg_dump -U postgres starships > backup_$(date +%Y%m%d_%H%M%S).sql || echo 'Backup failed. Ensure container is running.'"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.1",

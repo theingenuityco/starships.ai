@@ -1,9 +1,0 @@
-{
-  "name": "Buffer",
-  "description": "Social media scheduling and publishing platform for managing posts across multiple networks.",
-  "version": "1.0.0",
-  "tags": [
-    "connector"
-  ],
-  "kind": "connector"
-}

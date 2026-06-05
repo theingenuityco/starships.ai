@@ -1,9 +1,0 @@
-{
-  "name": "Asana",
-  "description": "Asana is a work management platform that helps teams organize, track, and manage their work. Integrate tasks, projects, ",
-  "version": "1.0.0",
-  "tags": [
-    "project-management"
-  ],
-  "kind": "connector"
-}

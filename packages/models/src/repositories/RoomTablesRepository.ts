@@ -5,7 +5,7 @@ import type { PostgresConnection } from '@/helpers/database';
 // Backed by the `room_tables` join table (table_id), surfaced through the
 // RoomPinnedTable shape (tableId).
 type DbRow = {
-  room_conversation_id: string;
+  room_id: string;
   table_id: string;
   position: number;
   created_at: string;
@@ -15,7 +15,7 @@ type DbRow = {
 function fromDb(r: DbRow): RoomPinnedTable {
   return {
     kind: 'table',
-    roomConversationId: String(r.room_conversation_id),
+    roomId: String(r.room_id),
     tableId: String(r.table_id),
     position: Number(r.position) || 0,
     createdAt: String(r.created_at),
@@ -28,43 +28,43 @@ export class RoomTablesRepository extends BaseRepository {
     super('RoomTablesRepository', connection);
   }
 
-  async list(roomConversationId: string): Promise<RoomPinnedTable[]> {
+  async list(roomId: string): Promise<RoomPinnedTable[]> {
     return this.executeWithErrorHandling(async () => {
       const conn = this.getConnection();
       const rows = await conn.query<DbRow>(
-        `SELECT room_conversation_id, table_id, position, created_at, created_by
+        `SELECT room_id, table_id, position, created_at, created_by
            FROM room_tables
-          WHERE room_conversation_id = $1
+          WHERE room_id = $1
           ORDER BY position ASC, created_at ASC`,
-        [roomConversationId]
+        [roomId]
       );
       return rows.map(fromDb);
-    }, 'list', 'room_tables', roomConversationId);
+    }, 'list', 'room_tables', roomId);
   }
 
-  async upsert(args: { roomConversationId: string; tableId: string; position?: number | null; createdBy?: string | null }): Promise<RoomPinnedTable> {
+  async upsert(args: { roomId: string; tableId: string; position?: number | null; createdBy?: string | null }): Promise<RoomPinnedTable> {
     return this.executeWithErrorHandling(async () => {
       const conn = this.getConnection();
-      const roomConversationId = String(args.roomConversationId || '').trim();
+      const roomId = String(args.roomId || '').trim();
       const tableId = String(args.tableId || '').trim();
       const createdBy = args.createdBy ?? null;
       const requestedPosition = typeof args.position === 'number' ? Math.max(0, Math.trunc(args.position)) : null;
 
       await conn.query('BEGIN');
       try {
-        await conn.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`room_tables:${roomConversationId}`]);
+        await conn.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`room_tables:${roomId}`]);
 
         const existing = await conn.queryOne<{ position: number }>(
-          `SELECT position FROM room_tables WHERE room_conversation_id = $1 AND table_id = $2`,
-          [roomConversationId, tableId]
+          `SELECT position FROM room_tables WHERE room_id = $1 AND table_id = $2`,
+          [roomId, tableId]
         );
 
         if (existing && requestedPosition == null) {
           const row = await conn.queryOne<DbRow>(
-            `SELECT room_conversation_id, table_id, position, created_at, created_by
+            `SELECT room_id, table_id, position, created_at, created_by
                FROM room_tables
-              WHERE room_conversation_id = $1 AND table_id = $2`,
-            [roomConversationId, tableId]
+              WHERE room_id = $1 AND table_id = $2`,
+            [roomId, tableId]
           );
           if (!row) throw new Error('Failed to upsert room table');
           await conn.query('COMMIT');
@@ -80,8 +80,8 @@ export class RoomTablesRepository extends BaseRepository {
                     await conn.queryOne<{ next_pos: number }>(
                       `SELECT COALESCE(MAX(position) + 1, 0) AS next_pos
                          FROM room_tables
-                        WHERE room_conversation_id = $1`,
-                      [roomConversationId]
+                        WHERE room_id = $1`,
+                      [roomId]
                     )
                   )?.next_pos ?? 0
                 );
@@ -89,16 +89,16 @@ export class RoomTablesRepository extends BaseRepository {
           await conn.query(
             `UPDATE room_tables
                 SET position = position + 1
-              WHERE room_conversation_id = $1
+              WHERE room_id = $1
                 AND position >= $2`,
-            [roomConversationId, desired]
+            [roomId, desired]
           );
 
           const inserted = await conn.queryOne<DbRow>(
-            `INSERT INTO room_tables (room_conversation_id, table_id, position, created_by)
+            `INSERT INTO room_tables (room_id, table_id, position, created_by)
              VALUES ($1, $2, $3, $4)
-             RETURNING room_conversation_id, table_id, position, created_at, created_by`,
-            [roomConversationId, tableId, desired, createdBy]
+             RETURNING room_id, table_id, position, created_at, created_by`,
+            [roomId, tableId, desired, createdBy]
           );
           if (!inserted) throw new Error('Failed to upsert room table');
           await conn.query('COMMIT');
@@ -112,12 +112,12 @@ export class RoomTablesRepository extends BaseRepository {
           const tmpRow = await conn.queryOne<{ tmp: number }>(
             `SELECT -(COALESCE(MAX(ABS(position)), 0) + 1) AS tmp
                FROM room_tables
-              WHERE room_conversation_id = $1`,
-            [roomConversationId]
+              WHERE room_id = $1`,
+            [roomId]
           );
           const tmp = Number(tmpRow?.tmp ?? -1);
-          await conn.query(`UPDATE room_tables SET position = $3 WHERE room_conversation_id = $1 AND table_id = $2`, [
-            roomConversationId,
+          await conn.query(`UPDATE room_tables SET position = $3 WHERE room_id = $1 AND table_id = $2`, [
+            roomId,
             tableId,
             tmp,
           ]);
@@ -126,34 +126,34 @@ export class RoomTablesRepository extends BaseRepository {
             await conn.query(
               `UPDATE room_tables
                   SET position = position + 1
-                WHERE room_conversation_id = $1
+                WHERE room_id = $1
                   AND position >= $2
                   AND position < $3`,
-              [roomConversationId, desired, current]
+              [roomId, desired, current]
             );
           } else {
             await conn.query(
               `UPDATE room_tables
                   SET position = position - 1
-                WHERE room_conversation_id = $1
+                WHERE room_id = $1
                   AND position <= $2
                   AND position > $3`,
-              [roomConversationId, desired, current]
+              [roomId, desired, current]
             );
           }
 
-          await conn.query(`UPDATE room_tables SET position = $3 WHERE room_conversation_id = $1 AND table_id = $2`, [
-            roomConversationId,
+          await conn.query(`UPDATE room_tables SET position = $3 WHERE room_id = $1 AND table_id = $2`, [
+            roomId,
             tableId,
             desired,
           ]);
         }
 
         const row = await conn.queryOne<DbRow>(
-          `SELECT room_conversation_id, table_id, position, created_at, created_by
+          `SELECT room_id, table_id, position, created_at, created_by
              FROM room_tables
-            WHERE room_conversation_id = $1 AND table_id = $2`,
-          [roomConversationId, tableId]
+            WHERE room_id = $1 AND table_id = $2`,
+          [roomId, tableId]
         );
         if (!row) throw new Error('Failed to upsert room table');
         await conn.query('COMMIT');
@@ -165,11 +165,11 @@ export class RoomTablesRepository extends BaseRepository {
     }, 'upsert', 'room_tables');
   }
 
-  async remove(roomConversationId: string, tableId: string): Promise<boolean> {
+  async remove(roomId: string, tableId: string): Promise<boolean> {
     return this.executeWithErrorHandling(async () => {
       const conn = this.getConnection();
-      const result = await conn.queryWithResult(`DELETE FROM room_tables WHERE room_conversation_id = $1 AND table_id = $2`, [
-        roomConversationId,
+      const result = await conn.queryWithResult(`DELETE FROM room_tables WHERE room_id = $1 AND table_id = $2`, [
+        roomId,
         tableId,
       ]);
       return (result.rowCount ?? 0) > 0;

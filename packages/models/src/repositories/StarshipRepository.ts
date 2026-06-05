@@ -1,5 +1,4 @@
 import { AgentEntity } from '@/entities/AgentEntity';
-import { ConversationEntity } from '@/entities/ConversationEntity';
 import { StarshipEntity } from '@/entities/StarshipEntity';
 import { fromDatabase, fromDatabaseArray, toDatabase, toEntityInstance } from '@/helpers/serialization-helper';
 import { BaseRepository } from '@/repositories/BaseRepository';
@@ -445,87 +444,4 @@ export class StarshipRepository extends BaseRepository {
       .replace(/^-|-$/g, ''); // Remove leading/trailing hyphens
   }
 
-  // Conversation methods (relationships converted to foreign keys)
-  async getConversations(starshipId: string): Promise<Record<string, unknown>[]> {
-    if (!starshipId) {
-      throw new Error('Starship ID is required');
-    }
-
-    return this.executeWithErrorHandling(
-      async () => {
-        const connection = this.getConnection();
-        const result = await connection.query<Record<string, unknown>>(
-          `SELECT * FROM conversations WHERE starship_id = $1 ORDER BY created_at DESC`,
-          [starshipId]
-        );
-
-        return result.map((record) => toDatabase(fromDatabase(ConversationEntity, record)));
-      },
-      'getConversations',
-      'Conversation'
-    );
-  }
-
-  async getConversationCount(starshipId: string): Promise<number> {
-    if (!starshipId) {
-      throw new Error('Starship ID is required');
-    }
-
-    return this.executeWithErrorHandling(
-      async () => {
-        const connection = this.getConnection();
-        const result = await connection.queryOne<{ count: string }>(`SELECT COUNT(*) as count FROM conversations WHERE starship_id = $1`, [
-          starshipId,
-        ]);
-
-        return parseInt(result?.count || '0', 10);
-      },
-      'getConversationCount',
-      'Conversation'
-    );
-  }
-
-  async getActiveConversations(starshipId: string): Promise<Record<string, unknown>[]> {
-    if (!starshipId) {
-      throw new Error('Starship ID is required');
-    }
-
-    return this.executeWithErrorHandling(
-      async () => {
-        const connection = this.getConnection();
-        const result = await connection.query<Record<string, unknown>>(
-          `SELECT * FROM conversations WHERE starship_id = $1 AND status = 'active' ORDER BY created_at DESC`,
-          [starshipId]
-        );
-
-        return result.map((record) => toDatabase(fromDatabase(ConversationEntity, record)));
-      },
-      'getActiveConversations',
-      'Conversation'
-    );
-  }
-
-  async removeConversation(starshipId: string, conversationId: string): Promise<boolean> {
-    if (!starshipId) {
-      throw new Error('Starship ID is required');
-    }
-    if (!conversationId) {
-      throw new Error('Conversation ID is required');
-    }
-
-    return this.executeWithErrorHandling(
-      async () => {
-        const connection = this.getConnection();
-        const result = await connection.query(
-          `UPDATE conversations SET starship_id = NULL, updated_at = NOW() WHERE id = $1 AND starship_id = $2`,
-          [conversationId, starshipId]
-        );
-
-        return (result as unknown as { rowCount: number }).rowCount > 0;
-      },
-      'removeConversation',
-      'Conversation',
-      conversationId
-    );
-  }
 }

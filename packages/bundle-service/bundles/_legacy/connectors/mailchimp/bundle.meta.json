@@ -1,9 +1,0 @@
-{
-  "name": "Mailchimp",
-  "description": "Mailchimp email marketing platform connector for managing contacts, campaigns, lists, and sending transactional emails",
-  "version": "1.0.0",
-  "tags": [
-    "connector"
-  ],
-  "kind": "connector"
-}

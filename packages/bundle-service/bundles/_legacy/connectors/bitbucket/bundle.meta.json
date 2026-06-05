@@ -1,9 +1,0 @@
-{
-  "name": "Bitbucket Cloud",
-  "description": "Bitbucket Cloud REST API connector for managing repositories, pull requests, issues, commits, and deployments.",
-  "version": "1.0.0",
-  "tags": [
-    "version_control"
-  ],
-  "kind": "connector"
-}

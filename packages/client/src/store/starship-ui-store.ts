@@ -1,7 +1,8 @@
 import React from 'react'
 import { create } from 'zustand'
 import { devtools, persist } from 'zustand/middleware'
-import type { MessageModel } from '@starships/protocol'
+// Conversation messages removed in the pivot; minimal local shape for legacy UI state.
+type MessageModel = { id: string; content: string; role?: string; createdAt?: string; [k: string]: unknown }
 
 // UI conversation message shape (extends protocol with UI flags)
 interface UIStreamChunk {

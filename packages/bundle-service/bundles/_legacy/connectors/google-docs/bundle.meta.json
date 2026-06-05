@@ -1,9 +1,0 @@
-{
-  "name": "Google Docs",
-  "description": "Google Docs connector for creating, reading, and updating documents using the Google Docs API",
-  "version": "1.0.0",
-  "tags": [
-    "connector"
-  ],
-  "kind": "connector"
-}

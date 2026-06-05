@@ -1,9 +1,0 @@
-{
-  "name": "Tabitha",
-  "description": "Google Sheets specialist for creating/managing sheets (tabs) and guiding correct spreadsheetId/title/index usage.",
-  "version": "1.0.1",
-  "tags": [
-    "general"
-  ],
-  "kind": "agent"
-}

@@ -1,5 +1,7 @@
 import api from '@/lib/api'
-import type { ApiResponse, RoomModel, RoomPinnedTable, RoomPinnedDoc, RoomPinnedTaskBoard, RoomPinnedView, TaskBoardModel } from '@starships/protocol'
+import type { ApiResponse, RoomModel, RoomPinnedTable, RoomPinnedDoc, RoomPinnedTaskBoard, TaskBoardModel } from '@starships/protocol'
+// Views cut from v1; local shape keeps inert view-pin hooks compiling.
+type RoomPinnedView = { kind: 'view'; viewId: string; roomId: string; position: number; createdAt: string; createdBy?: string | null }
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { getSafeErrorMessage } from '@/lib/error-utils'

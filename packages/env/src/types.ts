@@ -80,6 +80,28 @@ export interface EnvironmentConfig {
   // Bundle service (optional)
   BUNDLE_SERVICE_URL?: string;
 
+  /**
+   * Durable per-starship definition volume. Root directory under which each
+   * starship owns `$STARSHIP_HOME/<starshipId>/.autopilot/` holding the
+   * filesystem-authoritative definition plane (agents/connectors/rooms/tables/
+   * schedules). MUST be a non-reaped path, distinct from RUNNER_JOB_BASE_DIR
+   * (the ephemeral, TTL-reaped workspace), and shared storage (NFS/EFS) in
+   * multi-host deployments so every runner host can read it.
+   */
+  STARSHIP_HOME: string;
+  /**
+   * When true, definition-plane CRUD writes to the filesystem volume first and
+   * reconciles the Postgres index from files (files win). When false (default),
+   * the legacy DB-authoritative write path is used. See StarshipDefinitionReconciler.
+   */
+  STARSHIP_FS_AUTHORITY: boolean;
+  /**
+   * When true, definition reads also verify against the file (recompute hash,
+   * reconcile on drift) before returning. Off by default to keep the hot path
+   * index-backed; enabled for starships whose agents self-edit `.autopilot/`.
+   */
+  STARSHIP_FS_VERIFY_ON_READ: boolean;
+
   // Email Service Configuration (Amazon SES)
   /**
    * Global gate for outbound email delivery.

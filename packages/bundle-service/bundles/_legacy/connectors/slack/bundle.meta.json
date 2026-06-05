@@ -1,9 +1,0 @@
-{
-  "name": "Slack",
-  "description": "Connect to Slack's Web API to send messages, manage conversations, list channels and users, and automate workspace inter",
-  "version": "1.0.0",
-  "tags": [
-    "connector"
-  ],
-  "kind": "connector"
-}

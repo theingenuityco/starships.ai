@@ -1,2 +1,0 @@
-export { ViewEditorShell } from './ViewEditorShell'
-

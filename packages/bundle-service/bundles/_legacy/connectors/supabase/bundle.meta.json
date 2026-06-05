@@ -1,9 +1,0 @@
-{
-  "name": "Supabase",
-  "description": "PostgreSQL platform with Auth, Storage, Edge Functions, and Real-time APIs",
-  "version": "1.0.0",
-  "tags": [
-    "connector"
-  ],
-  "kind": "connector"
-}

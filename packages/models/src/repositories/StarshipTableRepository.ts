@@ -252,7 +252,8 @@ export class StarshipTableRepository extends BaseRepository {
           }
         });
 
-        return this.findById(id);
+        const updated = await this.findById(id);
+        return updated;
       },
       'update',
       'StarshipTable',

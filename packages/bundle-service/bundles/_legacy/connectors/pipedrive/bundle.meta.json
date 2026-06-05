@@ -1,9 +1,0 @@
-{
-  "name": "Pipedrive",
-  "description": "Pipedrive is a web-based sales CRM with a comprehensive REST API for managing deals, persons, organizations, activities,",
-  "version": "1.0.0",
-  "tags": [
-    "crm"
-  ],
-  "kind": "connector"
-}

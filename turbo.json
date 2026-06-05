@@ -13,15 +13,7 @@
     "POSTGRES_SSL",
     "STRIPE_SECRET_KEY",
     "STRIPE_PUBLISHABLE_KEY",
-    "RUNNER_URL",
-    "RUNNER_PORT",
-    "RUNNER_AUTH_TOKEN",
-    "AUTOPILOT_ISOLATE_MEM_MB",
-    "AUTOPILOT_ISOLATE_TIMEOUT_MS",
     "GA_MEASUREMENT_ID",
-    "VAPID_SUBJECT",
-    "VAPID_PUBLIC_KEY",
-    "VAPID_PRIVATE_KEY",
     "PUBLIC_URL",
     "CLIENT_URL",
     "SERVER_URL",
@@ -52,9 +44,7 @@
       "dependsOn": [
         "@starships/errors#build",
         "@starships/models#build",
-        "@starships/protocol#build",
-        "@starships/connectors#build",
-        "@starships/autopilot-cli#build"
+        "@starships/protocol#build"
       ],
       "inputs": ["$TURBO_DEFAULT$", ".env", ".env.local"],
       "outputs": ["dist/**"]
@@ -63,10 +53,23 @@
       "inputs": ["$TURBO_DEFAULT$", ".env", ".env.local"],
       "outputs": ["dist/**"]
     },
-    "@starships/autopilot-runner#build": {
-      "dependsOn": ["@starships/protocol#build", "@starships/autopilot-cli#build"],
+    "@starships/mcp-server#build": {
+      "dependsOn": [
+        "@starships/errors#build",
+        "@starships/models#build",
+        "@starships/protocol#build"
+      ],
       "inputs": ["$TURBO_DEFAULT$", ".env", ".env.local"],
       "outputs": ["dist/**"]
+    },
+    "@starships/mcp-server#type-check": {
+      "dependsOn": [
+        "@starships/errors#build",
+        "@starships/models#build",
+        "@starships/protocol#build"
+      ],
+      "inputs": ["$TURBO_DEFAULT$", "tsconfig.json"],
+      "outputs": []
     },
     "@starships/reverse-proxy#build": {
       "inputs": ["$TURBO_DEFAULT$", ".env", ".env.local"],
@@ -92,11 +95,6 @@
       "cache": false,
       "persistent": true
     },
-    "@starships/autopilot-runner#dev": {
-      "dependsOn": ["@starships/autopilot-runner#build"],
-      "cache": false,
-      "persistent": true
-    },
     "@starships/server#dev": {
       "dependsOn": ["@starships/server#build"],
       "cache": false,
@@ -108,11 +106,6 @@
     },
     "start": {
       "dependsOn": ["build"],
-      "cache": false,
-      "persistent": true
-    },
-    "@starships/autopilot-runner#start": {
-      "dependsOn": ["@starships/autopilot-runner#build"],
       "cache": false,
       "persistent": true
     },
@@ -129,8 +122,7 @@
       "dependsOn": [
         "@starships/errors#build",
         "@starships/models#build",
-        "@starships/protocol#build",
-        "@starships/connectors#build"
+        "@starships/protocol#build"
       ],
       "inputs": ["$TURBO_DEFAULT$", ".eslintrc.*", "eslint.config.*"],
       "outputs": []
@@ -173,18 +165,14 @@
       "dependsOn": [
         "@starships/errors#build",
         "@starships/models#build",
-        "@starships/protocol#build",
-        "@starships/connectors#build",
-        "@starships/autopilot-cli#build"
+        "@starships/protocol#build"
       ],
       "inputs": [
         "$TURBO_DEFAULT$",
         "tsconfig.json",
         "../../packages/errors/dist/**",
         "../../packages/models/dist/**",
-        "../../packages/protocol/dist/**",
-        "../../packages/connectors/dist/**",
-        "../../packages/autopilot-cli/dist/**"
+        "../../packages/protocol/dist/**"
       ],
       "outputs": []
     },
@@ -201,21 +189,6 @@
     "@starships/reverse-proxy#type-check": {
       "dependsOn": ["@starships/env#build"],
       "inputs": ["$TURBO_DEFAULT$", "tsconfig.json", "../../packages/env/dist/**"],
-      "outputs": []
-    },
-    "@starships/autopilot-cli#type-check": {
-      "dependsOn": ["@starships/connectors#build"],
-      "inputs": ["$TURBO_DEFAULT$", "tsconfig.json", "../../packages/connectors/dist/**"],
-      "outputs": []
-    },
-    "@starships/autopilot-runner#type-check": {
-      "dependsOn": ["@starships/protocol#build", "@starships/autopilot-cli#build"],
-      "inputs": [
-        "$TURBO_DEFAULT$",
-        "tsconfig.json",
-        "../../packages/protocol/dist/**",
-        "../../packages/autopilot-cli/dist/**"
-      ],
       "outputs": []
     },
     "@starships/docs#type-check": {

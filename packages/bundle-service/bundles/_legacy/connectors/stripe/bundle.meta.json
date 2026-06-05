@@ -1,9 +1,0 @@
-{
-  "name": "Stripe",
-  "description": "Stripe payment processing and billing platform. Create charges, manage customers, handle invoices, and manage subscripti",
-  "version": "1.0.0",
-  "tags": [
-    "payments"
-  ],
-  "kind": "connector"
-}

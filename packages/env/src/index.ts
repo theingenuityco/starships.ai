@@ -2,6 +2,7 @@ import { EnvironmentConfig } from '@/types';
 import * as dotenv from 'dotenv';
 import dotenvExpand from 'dotenv-expand';
 import * as path from 'path';
+import * as os from 'os';
 
 // Load environment variables from the root .env file
 const rootEnvPath = path.resolve(__dirname, '../../../.env');
@@ -58,6 +59,10 @@ export function getEnvConfig(): EnvironmentConfig {
   const resolvedPostgresDatabase = process.env.POSTGRES_DATABASE || 'starships';
   const resolvedPostgresSSL = process.env.POSTGRES_SSL === 'true';
   const resolvedPostgresAgentUser = process.env.POSTGRES_AGENT_USER || 'starships_agent';
+
+  // Durable per-starship definition volume. Defaults to a stable, non-reaped
+  // path under the user's home dir (NOT tmpdir, which the workspace reaper uses).
+  const resolvedStarshipHome = process.env.STARSHIP_HOME || path.join(os.homedir(), '.starships', 'home');
 
   // Safe default: if ENABLE_EMAILS is unset, treat emails as disabled.
   // Set ENABLE_EMAILS=true explicitly in environments where outbound email is desired.
@@ -137,6 +142,11 @@ export function getEnvConfig(): EnvironmentConfig {
 
     // Bundle service (optional)
     BUNDLE_SERVICE_URL: process.env.BUNDLE_SERVICE_URL || undefined,
+
+    // Durable per-starship definition volume + filesystem-authoritative flags
+    STARSHIP_HOME: resolvedStarshipHome,
+    STARSHIP_FS_AUTHORITY: process.env.STARSHIP_FS_AUTHORITY === 'true',
+    STARSHIP_FS_VERIFY_ON_READ: process.env.STARSHIP_FS_VERIFY_ON_READ === 'true',
 
     // Experimental: route repo-backed agent turns through the code-native CLI agent.
     USE_CLI_AGENT_PATH: process.env.USE_CLI_AGENT_PATH === 'true',

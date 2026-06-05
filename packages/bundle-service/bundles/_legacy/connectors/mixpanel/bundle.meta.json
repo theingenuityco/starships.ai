@@ -1,9 +1,0 @@
-{
-  "name": "Mixpanel",
-  "description": "Analytics platform for tracking user behavior and querying event data.",
-  "version": "1.0.0",
-  "tags": [
-    "connector"
-  ],
-  "kind": "connector"
-}

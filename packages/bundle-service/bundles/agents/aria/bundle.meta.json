@@ -1,9 +1,0 @@
-{
-  "name": "Aria",
-  "description": "Executive Officer that routes user requests to the best specialist agents on the current starship and summarizes their results. ",
-  "version": "1.0.18",
-  "tags": [
-    "general"
-  ],
-  "kind": "agent"
-}

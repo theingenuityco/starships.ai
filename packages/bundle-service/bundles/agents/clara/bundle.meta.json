@@ -1,9 +1,0 @@
-{
-  "name": "Clara",
-  "description": "Expert agent for managing Gmail operations including email organization, prioritization, categorization, and inbox management strategies.",
-  "version": "1.0.6",
-  "tags": [
-    "communication"
-  ],
-  "kind": "agent"
-}

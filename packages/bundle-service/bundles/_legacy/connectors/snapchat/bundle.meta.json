@@ -1,9 +1,0 @@
-{
-  "name": "Snapchat Marketing",
-  "description": "Snapchat Marketing API connector with OAuth 2.0 authentication. Supports ad creative management, media upload, campaign ",
-  "version": "1.0.0",
-  "tags": [
-    "social"
-  ],
-  "kind": "connector"
-}

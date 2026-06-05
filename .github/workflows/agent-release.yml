@@ -1,0 +1,110 @@
+name: Agent Release
+
+# Builds the downloadable agent artifacts on a tag:
+#   - CLI single-file binaries (starship-agent) for each OS/arch, via Bun
+#   - the desktop app installers (Tauri) for macOS / Windows / Linux
+# Both attach to the GitHub Release for the tag.
+#
+# Tag with `agent-v*` (e.g. agent-v0.1.0) or run manually with a tag input.
+
+on:
+  push:
+    tags:
+      - 'agent-v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to publish to (e.g. agent-v0.1.0)'
+        required: true
+
+permissions:
+  contents: write
+
+env:
+  RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
+
+jobs:
+  # ---- CLI binaries (cross-compiled in one job with Bun) -------------------
+  cli-binaries:
+    name: CLI binaries
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Compile binaries
+        working-directory: packages/agent-runner
+        run: |
+          set -euo pipefail
+          mkdir -p out
+          declare -A targets=(
+            [bun-darwin-arm64]=starship-agent-aarch64-apple-darwin
+            [bun-darwin-x64]=starship-agent-x86_64-apple-darwin
+            [bun-linux-x64]=starship-agent-x86_64-unknown-linux-gnu
+            [bun-linux-arm64]=starship-agent-aarch64-unknown-linux-gnu
+            [bun-windows-x64]=starship-agent-x86_64-pc-windows-msvc.exe
+          )
+          for bunTarget in "${!targets[@]}"; do
+            out="out/${targets[$bunTarget]}"
+            echo "→ $bunTarget → $out"
+            bun build src/cli.ts --compile --target "$bunTarget" --outfile "$out"
+          done
+          ls -lh out
+
+      - name: Attach to release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          # Keep in the same draft state as the desktop installers (tauri-action
+          # uses releaseDraft: true) so the release goes live atomically.
+          draft: true
+          files: packages/agent-runner/out/*
+
+  # ---- Desktop installers (per-OS Tauri build) ----------------------------
+  desktop:
+    name: Desktop (${{ matrix.label }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: macos-14, label: macos-arm64 }
+          - { os: macos-13, label: macos-x64 }
+          - { os: ubuntu-22.04, label: linux-x64 }
+          - { os: windows-latest, label: windows-x64 }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Linux system deps (webkit2gtk)
+        if: matrix.os == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build runner sidecar (host target)
+        run: pnpm --filter @starships/agent-desktop build:sidecar
+
+      - name: Build + publish desktop app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: packages/agent-desktop
+          tagName: ${{ env.RELEASE_TAG }}
+          releaseName: 'Starship Agent ${{ env.RELEASE_TAG }}'
+          releaseDraft: true

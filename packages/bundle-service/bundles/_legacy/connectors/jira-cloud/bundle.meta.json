@@ -1,9 +1,0 @@
-{
-  "name": "Jira Cloud",
-  "description": "Jira Cloud connector for project management and issue tracking",
-  "version": "1.0.0",
-  "tags": [
-    "project-management"
-  ],
-  "kind": "connector"
-}

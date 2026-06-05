@@ -1,9 +1,0 @@
-{
-  "name": "Google Analytics 4",
-  "description": "Connect to Google Analytics 4 to retrieve analytics data, events, users, and generate custom reports. Requires OAuth2 au",
-  "version": "1.0.0",
-  "tags": [
-    "analytics"
-  ],
-  "kind": "connector"
-}

@@ -6,6 +6,11 @@
     "main"
   ],
   "permissions": [
-    "core:default"
+    "core:default",
+    "shell:default",
+    {
+      "identifier": "shell:allow-spawn",
+      "allow": [{ "name": "binaries/starship-agent", "sidecar": true, "args": true }]
+    }
   ]
 }

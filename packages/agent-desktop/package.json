@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "type-check": "tsc --noEmit",
     "lint": "eslint src --ext .ts,.tsx",
+    "build:sidecar": "node scripts/build-sidecar.mjs",
     "tauri": "tauri"
   },
   "dependencies": {

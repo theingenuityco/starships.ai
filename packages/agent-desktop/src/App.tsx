@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { invoke } from '@tauri-apps/api/core';
 import {
   getStatus,
   pause,
@@ -45,15 +46,35 @@ export default function App() {
 
   useEffect(() => () => closeRef.current?.(), []);
 
-  async function connect() {
+  // In the desktop app, the Rust shell spawned a runner sidecar; ask it for the
+  // control coordinates and connect automatically. Outside Tauri (e.g. `vite
+  // dev` in a browser) this no-ops and the manual Setup screen is shown.
+  useEffect(() => {
+    let cancelled = false;
+    invoke<{ port: number; token: string }>('runner_info')
+      .then((info) => {
+        if (cancelled) return;
+        const auto = { baseUrl: `http://127.0.0.1:${info.port}`, token: info.token };
+        setCfg(auto);
+        void connect(auto);
+      })
+      .catch(() => {
+        /* not running under Tauri / no sidecar — fall back to manual Setup */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  async function connect(use: ControlConfig = cfg) {
     setError(null);
     try {
-      const s = await getStatus(cfg); // validate reachability + token
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(cfg));
+      const s = await getStatus(use); // validate reachability + token
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(use));
       setState(s);
       setConnected(true);
       closeRef.current?.();
-      closeRef.current = subscribeEvents(cfg, {
+      closeRef.current = subscribeEvents(use, {
         onState: setState,
         onLog: (l) => setLogs((prev) => [l, ...prev].slice(0, 200)),
         onError: () => setError('Stream disconnected. The runner may have stopped.'),
@@ -73,7 +94,7 @@ export default function App() {
   }
 
   if (!connected) {
-    return <Setup cfg={cfg} setCfg={setCfg} onConnect={connect} error={error} />;
+    return <Setup cfg={cfg} setCfg={setCfg} onConnect={() => connect()} error={error} />;
   }
 
   const status = state?.status ?? 'offline';

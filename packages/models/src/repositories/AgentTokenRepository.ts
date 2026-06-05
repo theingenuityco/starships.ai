@@ -78,6 +78,18 @@ export class AgentTokenRepository extends BaseRepository {
     );
   }
 
+  async findById(id: string): Promise<AgentTokenModel | null> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const row = await this.getConnection().queryOne<DbRow>(`SELECT * FROM agent_tokens WHERE id = $1`, [id]);
+        return row ? fromDb(row) : null;
+      },
+      'findById',
+      'AgentToken',
+      id
+    );
+  }
+
   async listByStarship(starshipId: string): Promise<AgentTokenModel[]> {
     return this.executeWithErrorHandling(
       async () => {

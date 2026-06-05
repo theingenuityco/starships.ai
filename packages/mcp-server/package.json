@@ -1,0 +1,31 @@
+{
+  "name": "@starships/mcp-server",
+  "version": "0.0.0",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "dev": "NODE_OPTIONS=--no-node-snapshot tsx watch --include ../../.env src/index.ts",
+    "build": "rm -rf dist && rm -f tsconfig.tsbuildinfo && tsc -p tsconfig.json && tsc-alias -p tsconfig.json",
+    "start": "NODE_OPTIONS=--no-node-snapshot node dist/index.js",
+    "type-check": "tsc --noEmit",
+    "lint": "eslint src --ext .ts"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@starships/env": "workspace:*",
+    "@starships/errors": "workspace:*",
+    "@starships/models": "workspace:*",
+    "@starships/protocol": "workspace:*",
+    "express": "^5.2.0",
+    "nanoid": "^5.1.5",
+    "zod": "^4.1.5"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.3",
+    "@types/node": "^22.10.6",
+    "tsc-alias": "^1.8.16",
+    "tsx": "^4.20.3",
+    "typescript": "^5.8.3"
+  }
+}

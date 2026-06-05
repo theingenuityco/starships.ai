@@ -30,6 +30,7 @@ import starshipDocsRoutes from '@/routes/starship-docs';
 import platformSecretRoutes from '@/routes/platform-secrets';
 import starshipInvitesRoutes from '@/routes/starship-invites';
 import presenceRoutes from '@/routes/presence';
+import agentTokenRoutes from '@/routes/agent-tokens';
 import setupRoutes from '@/routes/setup';
 
 // Import new error handling and health check routes
@@ -111,6 +112,7 @@ app.use('/api/v1', starshipDocsRoutes);
 app.use('/api/v1', platformSecretRoutes);
 app.use('/api/v1', starshipInvitesRoutes);
 app.use('/api/v1', presenceRoutes);
+app.use('/api/v1', agentTokenRoutes);
 
 // Add 404 handler for unmatched routes
 app.use(notFoundHandler);

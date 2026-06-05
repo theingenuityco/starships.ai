@@ -33,6 +33,8 @@ export class Runner extends EventEmitter {
   private stopping = false;
   private inFlight = 0;
   private backoffMs = 0;
+  /** Aborted on stop() so in-flight executor children are killed promptly. */
+  private readonly abort = new AbortController();
 
   private state: RunnerState = {
     connected: false,
@@ -118,7 +120,7 @@ export class Runner extends EventEmitter {
       this.patch({ lastPollAt: new Date().toISOString(), lastError: null });
       this.backoffMs = 0;
 
-      const batch = pending.slice(0, this.config.maxConcurrent);
+      const batch = pending.slice(0, this.config.batchSize);
       if (batch.length === 0) {
         await this.setStatus('idle');
       } else {
@@ -163,7 +165,7 @@ export class Runner extends EventEmitter {
       this.log('info', `▶ ${dispatch.commandType} (${dispatch.id})`);
       this.pushRecent({ id: dispatch.id, commandType: dispatch.commandType, phase: 'running', at: new Date().toISOString() });
 
-      const result: ExecutionResult = await runDispatch(this.config.executor, dispatch);
+      const result: ExecutionResult = await runDispatch(this.config.executor, dispatch, this.abort.signal);
       const ok = result.exitCode === 0 && !result.timedOut;
 
       if (ok) {
@@ -206,13 +208,21 @@ export class Runner extends EventEmitter {
     }
   }
 
+  /**
+   * Stop the loop. Gives an in-flight execution a brief grace period to finish;
+   * if it doesn't, the executor child is killed (via the abort signal) so it is
+   * not orphaned — the un-`complete`d dispatch is re-delivered on next start.
+   */
   async stop(): Promise<void> {
     this.stopping = true;
     if (this.timer) clearTimeout(this.timer);
-    // Let an in-flight execution finish (best effort, short grace).
     const deadline = Date.now() + 3000;
     while (this.inFlight > 0 && Date.now() < deadline) {
       await new Promise((r) => setTimeout(r, 100));
+    }
+    if (this.inFlight > 0) {
+      this.log('warn', `Aborting ${this.inFlight} in-flight execution(s).`);
+      this.abort.abort();
     }
     await this.setStatus('offline');
     await this.client.close();

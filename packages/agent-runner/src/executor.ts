@@ -36,7 +36,7 @@ function substitute(arg: string, dispatch: AgentDispatchModel, promptField: stri
  * shell metacharacters. The full payload is also exposed via env for executors
  * that prefer to read it structured.
  */
-export function runDispatch(executor: ExecutorConfig, dispatch: AgentDispatchModel): Promise<ExecutionResult> {
+export function runDispatch(executor: ExecutorConfig, dispatch: AgentDispatchModel, signal?: AbortSignal): Promise<ExecutionResult> {
   const args = executor.args.map((a) => substitute(a, dispatch, executor.promptField));
 
   const env = { ...process.env };
@@ -60,10 +60,15 @@ export function runDispatch(executor: ExecutorConfig, dispatch: AgentDispatchMod
       child.kill('SIGKILL');
     }, executor.timeoutMs);
 
+    // Kill the child if the runner is shutting down.
+    const onAbort = () => child.kill('SIGKILL');
+    signal?.addEventListener('abort', onAbort, { once: true });
+
     const finish = (exitCode: number | null) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
+      signal?.removeEventListener('abort', onAbort);
       resolve({ exitCode, timedOut, durationMs: Date.now() - startedAt, stdout: truncate(stdout), stderr: truncate(stderr) });
     };
 

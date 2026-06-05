@@ -25,7 +25,8 @@ export interface RunnerConfig {
   /** Agent connection secret (sk-ship-…). */
   token: string;
   pollIntervalMs: number;
-  maxConcurrent: number;
+  /** Max dispatches claimed per poll. They are executed sequentially. */
+  batchSize: number;
   executor: ExecutorConfig;
 }
 
@@ -39,7 +40,7 @@ export const DEFAULT_EXECUTOR: ExecutorConfig = {
 
 export const DEFAULT_CONFIG: Omit<RunnerConfig, 'endpoint' | 'token'> = {
   pollIntervalMs: 5000,
-  maxConcurrent: 1,
+  batchSize: 1,
   executor: DEFAULT_EXECUTOR,
 };
 
@@ -51,9 +52,24 @@ export function configPath(): string {
   return join(configDir(), 'config.json');
 }
 
-/** Parse a shell-ish command line into command + args (whitespace split, no quoting). */
-function parseExecutorString(s: string): Pick<ExecutorConfig, 'command' | 'args'> | null {
-  const parts = s.trim().split(/\s+/).filter(Boolean);
+/**
+ * Tokenize a command line, honoring single/double quotes so multi-word args
+ * survive (e.g. `claude --system "be concise" -p {{prompt}}` → 5 tokens).
+ * Does not handle escaped quotes — that's a deliberate simplification.
+ */
+export function tokenizeCommand(s: string): string[] {
+  const tokens: string[] = [];
+  const re = /"([^"]*)"|'([^']*)'|(\S+)/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(s)) !== null) {
+    tokens.push(m[1] ?? m[2] ?? m[3]);
+  }
+  return tokens;
+}
+
+/** Parse a command line into command + args (quote-aware). */
+export function parseExecutorString(s: string): Pick<ExecutorConfig, 'command' | 'args'> | null {
+  const parts = tokenizeCommand(s.trim());
   if (parts.length === 0) return null;
   return { command: parts[0], args: parts.slice(1) };
 }

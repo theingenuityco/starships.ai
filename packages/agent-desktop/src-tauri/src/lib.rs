@@ -3,7 +3,7 @@ use std::net::TcpListener;
 use std::sync::Mutex;
 
 use serde::Serialize;
-use tauri::{Manager, State, WindowEvent};
+use tauri::{Manager, RunEvent, State};
 use tauri_plugin_shell::process::{CommandChild, CommandEvent};
 use tauri_plugin_shell::ShellExt;
 
@@ -196,16 +196,16 @@ pub fn run() {
             stop_runner,
             list_runners
         ])
-        .on_window_event(|window, event| {
-            // Stop every runner when the last window closes.
-            if let WindowEvent::Destroyed = event {
-                if let Some(pool) = window.app_handle().try_state::<RunnerPool>() {
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app_handle, event| {
+            // Fires once when the app exits (not per-window) — stop every runner.
+            if let RunEvent::Exit = event {
+                if let Some(pool) = app_handle.try_state::<RunnerPool>() {
                     for (_, proc) in pool.0.lock().unwrap().drain() {
                         let _ = proc.child.kill();
                     }
                 }
             }
-        })
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        });
 }

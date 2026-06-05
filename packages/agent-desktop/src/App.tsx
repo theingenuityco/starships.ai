@@ -11,7 +11,7 @@ import {
   type Starship,
 } from './serverApi';
 import { detectAgents, hostname, isTauri, startRunner, stopRunner, type DetectedAgent, type RunnerInfo } from './tauri';
-import { getStatus, type RunnerState } from './api';
+import { subscribeEvents, type RunnerState } from './api';
 
 type Screen = 'login' | 'starship' | 'agents';
 
@@ -311,14 +311,8 @@ function ConnectedCard({ agent, runner, onStop }: { agent: ConnectedAgent; runne
   useEffect(() => {
     if (!runner) return;
     const cfg = { baseUrl: `http://127.0.0.1:${runner.control_port}`, token: runner.control_token };
-    let alive = true;
-    const tick = () => getStatus(cfg).then((s) => alive && setState(s)).catch(() => {});
-    tick();
-    const t = setInterval(tick, 3000);
-    return () => {
-      alive = false;
-      clearInterval(t);
-    };
+    // SSE: the control server primes with the current snapshot, then streams updates.
+    return subscribeEvents(cfg, { onState: setState, onError: () => {} });
   }, [runner]);
 
   const status = state?.paused ? 'paused' : state?.status ?? (runner ? 'starting' : 'stopped');

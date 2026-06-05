@@ -2,7 +2,7 @@
 import { randomBytes } from 'node:crypto';
 import { createInterface } from 'node:readline/promises';
 import { stdin, stdout } from 'node:process';
-import { assertRunnable, configPath, DEFAULT_CONFIG, DEFAULT_EXECUTOR, loadConfig, saveConfig, type RunnerConfig } from './config';
+import { assertRunnable, configPath, DEFAULT_CONFIG, DEFAULT_EXECUTOR, loadConfig, parseExecutorString, saveConfig, type RunnerConfig } from './config';
 import { StarshipMcpClient } from './mcpClient';
 import { Runner } from './runner';
 import { startControlServer } from './controlServer';
@@ -35,8 +35,8 @@ function resolveConfig(flags: Flags): RunnerConfig {
   if (typeof flags.token === 'string') loaded.token = flags.token;
   if (flags['poll-interval']) loaded.pollIntervalMs = Number(flags['poll-interval']);
   if (typeof flags.executor === 'string') {
-    const parts = flags.executor.trim().split(/\s+/).filter(Boolean);
-    loaded.executor = { ...DEFAULT_EXECUTOR, ...(loaded.executor ?? {}), command: parts[0], args: parts.slice(1) };
+    const parsed = parseExecutorString(flags.executor);
+    if (parsed) loaded.executor = { ...DEFAULT_EXECUTOR, ...(loaded.executor ?? {}), ...parsed };
   }
   assertRunnable(loaded);
   return loaded;
@@ -56,13 +56,13 @@ async function cmdInit(): Promise<void> {
       'Executor command (use {{prompt}} for the dispatch prompt)',
       existing.executor ? [existing.executor.command, ...existing.executor.args].join(' ') : 'claude -p {{prompt}}'
     );
-    const parts = executorStr.split(/\s+/).filter(Boolean);
+    const parsed = parseExecutorString(executorStr) ?? { command: DEFAULT_EXECUTOR.command, args: DEFAULT_EXECUTOR.args };
 
     const config: RunnerConfig = {
       ...DEFAULT_CONFIG,
       endpoint,
       token,
-      executor: { ...DEFAULT_EXECUTOR, command: parts[0], args: parts.slice(1) },
+      executor: { ...DEFAULT_EXECUTOR, ...parsed },
     };
     assertRunnable(config);
     saveConfig(config);

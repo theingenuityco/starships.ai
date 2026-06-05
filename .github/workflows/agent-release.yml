@@ -61,6 +61,9 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ env.RELEASE_TAG }}
+          # Keep in the same draft state as the desktop installers (tauri-action
+          # uses releaseDraft: true) so the release goes live atomically.
+          draft: true
           files: packages/agent-runner/out/*
 
   # ---- Desktop installers (per-OS Tauri build) ----------------------------

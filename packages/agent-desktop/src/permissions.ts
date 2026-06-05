@@ -77,3 +77,22 @@ export function permissionArgs(kind: RuntimeKind, executor: string, policy: Perm
       return [];
   }
 }
+
+/**
+ * Flags that switch a runtime into a structured, streamable output mode so the app can
+ * render the conversation live (verified against each CLI's official docs). Returns [] when
+ * the executor already sets the relevant flag, or for runtimes that only stream plain text
+ * (hermes/openclaw/custom) — those stream their raw stdout lines as-is.
+ */
+export function streamArgs(kind: RuntimeKind, executor: string): string[] {
+  switch (kind) {
+    case 'claude-code':
+      // Token-by-token: stream-json requires --verbose; --include-partial-messages adds text deltas.
+      return executor.includes('--output-format') ? [] : ['--output-format', 'stream-json', '--verbose', '--include-partial-messages'];
+    case 'codex':
+      // `codex exec --json` emits a JSONL event stream (thread.*/turn.*/item.*).
+      return executor.includes('--json') ? [] : ['--json'];
+    default:
+      return [];
+  }
+}

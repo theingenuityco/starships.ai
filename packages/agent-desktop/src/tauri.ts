@@ -1,5 +1,5 @@
 // Bindings for the Rust commands exposed by the Tauri shell (src-tauri/src/lib.rs).
-import { invoke } from '@tauri-apps/api/core';
+import { Channel, invoke } from '@tauri-apps/api/core';
 import { hostname as osHostname } from '@tauri-apps/plugin-os';
 
 export interface DetectedAgent {
@@ -10,17 +10,25 @@ export interface DetectedAgent {
   default_executor: string;
 }
 
+/** Returned once the process exits; the output itself arrives live over the channel. */
 export interface RunResult {
   exit_code: number | null;
   duration_ms: number;
-  stdout: string;
-  stderr: string;
 }
+
+/** One streamed line / lifecycle event from a run (mirrors Rust `StreamMsg`). */
+export type StreamMsg =
+  | { kind: 'stdout'; data: { line: string } }
+  | { kind: 'stderr'; data: { line: string } }
+  | { kind: 'exit'; data: { exitCode: number | null; durationMs: number } };
 
 export const detectAgents = () => invoke<DetectedAgent[]>('detect_agents');
 
-/** Run an agent CLI once (argv array, no shell) and capture its output. */
-export const runAgent = (args: { command: string; args: string[]; env: Record<string, string> }) =>
+/**
+ * Run an agent CLI once (argv array, no shell). `onEvent` streams each stdout/stderr
+ * line as it arrives; the promise resolves with the exit code + duration when it ends.
+ */
+export const runAgent = (args: { command: string; args: string[]; env: Record<string, string>; onEvent: Channel<StreamMsg> }) =>
   invoke<RunResult>('run_agent', args);
 
 // Local state lives in a Rust-managed 0600 file (not the webview's localStorage)

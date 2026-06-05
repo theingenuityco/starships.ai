@@ -1,10 +1,12 @@
 use std::collections::HashMap;
 use std::fs;
+use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
-use std::process::Command;
+use std::process::{Command, Stdio};
 use std::time::Instant;
 
 use serde::Serialize;
+use tauri::ipc::Channel;
 use tauri::Manager;
 
 #[derive(Serialize)]
@@ -126,53 +128,89 @@ fn read_agent_transcript(app: tauri::AppHandle, session_id: String) -> Result<Op
     Ok(None)
 }
 
+/// Slim result returned once the process exits. The full output is delivered
+/// live over the `Channel` (see `StreamMsg`), so we no longer capture/truncate it
+/// here — the webview accumulates the stream and, for Claude, the on-disk
+/// transcript holds the durable copy.
 #[derive(Serialize)]
 struct RunResult {
     exit_code: Option<i32>,
     duration_ms: u64,
-    stdout: String,
-    stderr: String,
 }
 
-const MAX_CAPTURE: usize = 8 * 1024;
-
-fn truncate(mut s: String) -> String {
-    if s.len() > MAX_CAPTURE {
-        s.truncate(MAX_CAPTURE);
-        s.push_str("…[truncated]");
-    }
-    s
+/// One streamed message from a run, sent over the IPC channel as it happens.
+/// Serializes to `{ kind: "stdout"|"stderr"|"exit", data: {...} }` (camelCase).
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase", tag = "kind", content = "data")]
+enum StreamMsg {
+    Stdout { line: String },
+    Stderr { line: String },
+    Exit { exit_code: Option<i32>, duration_ms: u64 },
 }
 
-/// Run an agent CLI once and capture its output.
+/// Run an agent CLI once, streaming each stdout/stderr line over `on_event` as it
+/// arrives, then return the exit code + duration.
 ///
 /// Safety: the command + args are passed as an ARGV ARRAY (no shell), so a
 /// prompt baked into an arg is a discrete argument and cannot inject shell
 /// metacharacters. Templating ({{prompt}}, {{sessionId}}, …) happens in the
-/// webview before this is called; here we just spawn and wait.
+/// webview before this is called; here we just spawn and stream.
+///
+/// stdin is set to null so CLIs that read stdin in non-interactive mode (e.g.
+/// `codex exec`) see EOF instead of blocking forever.
 ///
 /// Note: there is no timeout yet — a CLI that never exits will leave this call
 /// pending. Acceptable for a single-user local app; revisit if it bites.
-fn run_agent_blocking(command: String, args: Vec<String>, env: HashMap<String, String>) -> Result<RunResult, String> {
+fn run_agent_blocking(
+    command: String,
+    args: Vec<String>,
+    env: HashMap<String, String>,
+    on_event: Channel<StreamMsg>,
+) -> Result<RunResult, String> {
     let started = Instant::now();
-    let output = Command::new(&command)
+    let mut child = Command::new(&command)
         .args(&args)
         .envs(&env)
-        .output()
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
         .map_err(|e| format!("could not start {command}: {e}"))?;
-    Ok(RunResult {
-        exit_code: output.status.code(),
-        duration_ms: started.elapsed().as_millis() as u64,
-        stdout: truncate(String::from_utf8_lossy(&output.stdout).to_string()),
-        stderr: truncate(String::from_utf8_lossy(&output.stderr).to_string()),
-    })
+
+    let stdout = child.stdout.take().expect("piped stdout");
+    let stderr = child.stderr.take().expect("piped stderr");
+
+    // Drain stderr on a helper thread (Channel is Clone + Send + Sync) while we
+    // drain stdout here, so neither pipe's buffer can fill and deadlock the child.
+    let err_event = on_event.clone();
+    let stderr_handle = std::thread::spawn(move || {
+        for line in BufReader::new(stderr).lines().map_while(Result::ok) {
+            let _ = err_event.send(StreamMsg::Stderr { line });
+        }
+    });
+
+    for line in BufReader::new(stdout).lines().map_while(Result::ok) {
+        let _ = on_event.send(StreamMsg::Stdout { line });
+    }
+    let _ = stderr_handle.join();
+
+    let status = child.wait().map_err(|e| e.to_string())?;
+    let exit_code = status.code();
+    let duration_ms = started.elapsed().as_millis() as u64;
+    let _ = on_event.send(StreamMsg::Exit { exit_code, duration_ms });
+    Ok(RunResult { exit_code, duration_ms })
 }
 
 /// Async command: runs the agent on a worker thread so the UI stays responsive
 /// while the CLI works.
 #[tauri::command]
-async fn run_agent(command: String, args: Vec<String>, env: HashMap<String, String>) -> Result<RunResult, String> {
-    tauri::async_runtime::spawn_blocking(move || run_agent_blocking(command, args, env))
+async fn run_agent(
+    command: String,
+    args: Vec<String>,
+    env: HashMap<String, String>,
+    on_event: Channel<StreamMsg>,
+) -> Result<RunResult, String> {
+    tauri::async_runtime::spawn_blocking(move || run_agent_blocking(command, args, env, on_event))
         .await
         .map_err(|e| e.to_string())?
 }

@@ -23,6 +23,7 @@ import { detectAgents, hostname, isTauri, readAgentTranscript, type DetectedAgen
 import { parseClaudeTranscript, type TranscriptTurn, type TurnRole } from './transcript';
 import { Onboarding } from './Onboarding';
 import { COMMON_TOOLS, DEFAULT_PERMISSIONS, SUPPORTS_ALLOWLIST, type PermissionPolicy } from './permissions';
+import { useLiveRun, type LiveRun } from './liveRuns';
 
 const KIND_LABEL: Record<string, string> = {
   'claude-code': 'Claude Code',
@@ -364,6 +365,8 @@ function PersonaCard({ persona, runtimes }: { persona: Persona; runtimes: Runtim
   const [prompt, setPrompt] = useState('');
   const [outcome, setOutcome] = useState<string | null>(null);
   const [editPerms, setEditPerms] = useState(false);
+  const [activeDispatch, setActiveDispatch] = useState<string | null>(null);
+  const live = useLiveRun(activeDispatch);
   const events = open ? eventsForPersona(persona.id).slice(-30).reverse() : [];
 
   const policy = persona.permissions ?? DEFAULT_PERMISSIONS;
@@ -376,7 +379,7 @@ function PersonaCard({ persona, runtimes }: { persona: Persona; runtimes: Runtim
     setRunning(true);
     setOutcome(null);
     try {
-      const r = await runPersona(persona.id, prompt.trim());
+      const r = await runPersona(persona.id, prompt.trim(), setActiveDispatch);
       setOutcome(r.ok ? `Done in ${r.durationMs}ms` : `Failed${r.exitCode != null ? ` (exit ${r.exitCode})` : ''}`);
     } catch (e) {
       setOutcome((e as Error).message);
@@ -447,6 +450,7 @@ function PersonaCard({ persona, runtimes }: { persona: Persona; runtimes: Runtim
           </button>
           {outcome ? <span className="muted text-[11px]">{outcome}</span> : null}
         </div>
+        {live ? <LiveConversation run={live} /> : null}
       </div>
 
       {open ? (
@@ -723,6 +727,7 @@ function SessionCard({ session, personaName, runtimeName }: { session: RunSessio
   const [open, setOpen] = useState(false);
   const [turns, setTurns] = useState<TranscriptTurn[]>([]);
   const [tState, setTState] = useState<TranscriptState>('unloaded');
+  const live = useLiveRun(session.dispatchId);
   const title = session.dispatchId ? `Run ${session.dispatchId.slice(0, 8)}` : session.events[0].type;
   const hasTranscript = Boolean(session.sessionId) && isTauri();
 
@@ -764,7 +769,9 @@ function SessionCard({ session, personaName, runtimeName }: { session: RunSessio
 
       {open ? (
         <div className="mt-2 border-t border-zinc-800 pt-2">
-          {hasTranscript ? (
+          {live ? (
+            <LiveConversation run={live} />
+          ) : hasTranscript ? (
             tState === 'loading' ? (
               <div className="muted text-[11px]">Reading transcript…</div>
             ) : tState === 'missing' ? (
@@ -772,11 +779,7 @@ function SessionCard({ session, personaName, runtimeName }: { session: RunSessio
             ) : tState === 'error' ? (
               <div className="text-[11px] text-red-400">Could not read the transcript file.</div>
             ) : turns.length > 0 ? (
-              <ol className="flex flex-col gap-2">
-                {turns.map((t, i) => (
-                  <TurnRow key={i} turn={t} />
-                ))}
-              </ol>
+              <Conversation committed={turns} />
             ) : (
               <div className="muted text-[11px]">Transcript is empty.</div>
             )
@@ -819,7 +822,7 @@ const TURN_META: Record<TurnRole, { label: string; cls: string }> = {
   result: { label: 'Result', cls: 'text-zinc-500' },
 };
 
-function TurnRow({ turn }: { turn: TranscriptTurn }) {
+function TurnRow({ turn, streaming }: { turn: TranscriptTurn; streaming?: boolean }) {
   const meta = TURN_META[turn.role];
   const mono = turn.role === 'tool' || turn.role === 'result';
   return (
@@ -828,9 +831,59 @@ function TurnRow({ turn }: { turn: TranscriptTurn }) {
         <span className={meta.cls}>{meta.label}</span>
         {turn.tool && turn.role === 'tool' ? <span className="muted"> · {turn.tool}</span> : null}
       </div>
-      <div className={`whitespace-pre-wrap break-words text-[11px] leading-relaxed ${mono ? 'font-mono text-zinc-400' : 'text-zinc-200'}`}>{turn.text}</div>
+      <div className={`whitespace-pre-wrap break-words text-[11px] leading-relaxed ${mono ? 'font-mono text-zinc-400' : 'text-zinc-200'}`}>
+        {turn.text}
+        {streaming ? <span className="caret" /> : null}
+      </div>
     </li>
   );
+}
+
+/**
+ * Renders one conversation — live (token-by-token, with a typing caret) or historical.
+ * Auto-scrolls to the newest content while a run is in flight. For raw runtimes the growing
+ * stdout/stderr text is shown verbatim.
+ */
+function Conversation({
+  committed,
+  streamingText,
+  raw,
+  running,
+}: {
+  committed: TranscriptTurn[];
+  streamingText?: string;
+  raw?: string;
+  running?: boolean;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (running && ref.current) ref.current.scrollTop = ref.current.scrollHeight;
+  });
+  const empty = committed.length === 0 && !streamingText && !raw;
+
+  return (
+    <div ref={ref} className="max-h-96 overflow-auto rounded-md border border-zinc-800 bg-zinc-900/40 p-2">
+      {committed.length > 0 ? (
+        <ol className="flex flex-col gap-2">
+          {committed.map((t, i) => (
+            <TurnRow key={i} turn={t} />
+          ))}
+        </ol>
+      ) : null}
+      {streamingText ? (
+        <ol className="mt-2 flex flex-col gap-2">
+          <TurnRow turn={{ role: 'assistant', text: streamingText }} streaming={running} />
+        </ol>
+      ) : null}
+      {raw ? <pre className="mt-2 overflow-x-auto whitespace-pre-wrap break-words font-mono text-[10px] leading-relaxed text-zinc-400">{raw}</pre> : null}
+      {empty ? <div className="muted text-[11px]">{running ? 'Starting…' : 'No output.'}</div> : null}
+    </div>
+  );
+}
+
+/** Bridges a `LiveRun` (or its absence) into <Conversation>. */
+function LiveConversation({ run }: { run: LiveRun }) {
+  return <Conversation committed={run.committed} streamingText={run.streamingText} raw={run.raw} running={run.status === 'running'} />;
 }
 
 // ---- small presentational helpers ----
@@ -872,6 +925,8 @@ export function Style() {
       .tab { padding:8px 12px; font-size:13px; color:#a1a1aa; border-bottom:2px solid transparent; margin-bottom:-1px; }
       .tab:hover { color:#e4e4e7; }
       .tab-active { color:#e6e8ee; border-bottom-color:#3b82f6; }
+      .caret { display:inline-block; width:6px; height:12px; margin-left:2px; vertical-align:text-bottom; background:#3b82f6; animation:blink 1s step-start infinite; }
+      @keyframes blink { 50% { opacity:0; } }
     `}</style>
   );
 }

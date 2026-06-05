@@ -41,7 +41,7 @@ struct DetectedAgent {
 /// The executor is a best-effort default and is editable in the UI before Connect.
 fn known_agents() -> &'static [(&'static str, &'static str, &'static str)] {
     &[
-        ("claude", "claude-code", "claude -p {{prompt}}"),
+        ("claude", "claude-code", "claude --session-id {{sessionId}} -p {{prompt}}"),
         ("codex", "codex", "codex exec {{prompt}}"),
         ("hermes", "hermes", "hermes -p {{prompt}}"),
         ("openclaw", "openclaw", "openclaw -p {{prompt}}"),
@@ -128,6 +128,38 @@ fn save_agents(app: tauri::AppHandle, json: String) -> Result<(), String> {
         let _ = fs::set_permissions(&path, fs::Permissions::from_mode(0o600));
     }
     Ok(())
+}
+
+/// Read a CLI's on-disk conversation transcript for a given session id.
+///
+/// Agent CLIs (Claude Code today) persist each run as `<session-id>.jsonl` under
+/// `~/.claude/projects/<project-slug>/`. Because the session id is a unique UUID
+/// we mint per dispatch, a filename match across the project dirs is enough — we
+/// don't need to know the working directory the CLI ran in. Returns the raw JSONL
+/// (parsed in the webview), or `None` when no transcript exists yet.
+#[tauri::command]
+fn read_agent_transcript(app: tauri::AppHandle, session_id: String) -> Result<Option<String>, String> {
+    // The id becomes a filename, so refuse anything that isn't UUID-shaped
+    // (defends against `..`/path separators reaching the join below).
+    if session_id.is_empty() || !session_id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-') {
+        return Err("invalid session id".into());
+    }
+    let home = app.path().home_dir().map_err(|e| e.to_string())?;
+    let projects = home.join(".claude").join("projects");
+    let file_name = format!("{session_id}.jsonl");
+    let Ok(entries) = fs::read_dir(&projects) else {
+        return Ok(None);
+    };
+    for entry in entries.flatten() {
+        let dir = entry.path();
+        if dir.is_dir() {
+            let candidate = dir.join(&file_name);
+            if candidate.is_file() {
+                return fs::read_to_string(&candidate).map(Some).map_err(|e| e.to_string());
+            }
+        }
+    }
+    Ok(None)
 }
 
 /// Spawn a runner sidecar for one connected agent and track it in the pool.
@@ -245,7 +277,8 @@ pub fn run() {
             stop_runner,
             list_runners,
             load_agents,
-            save_agents
+            save_agents,
+            read_agent_transcript
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

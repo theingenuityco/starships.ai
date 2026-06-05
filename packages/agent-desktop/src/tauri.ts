@@ -31,6 +31,9 @@ export const listRunners = () => invoke<RunnerInfo[]>('list_runners');
 export const loadAgentsRaw = () => invoke<string>('load_agents');
 export const saveAgentsRaw = (json: string) => invoke<void>('save_agents', { json });
 
+/** Raw JSONL of a CLI run's transcript by session id, or null if none on disk. */
+export const readAgentTranscript = (sessionId: string) => invoke<string | null>('read_agent_transcript', { sessionId });
+
 /** Hostname for naming agents stably per machine; falls back gracefully. */
 export async function hostname(): Promise<string> {
   try {

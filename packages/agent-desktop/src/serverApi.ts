@@ -57,6 +57,22 @@ export interface AgentRuntimeEvent {
   createdAt: string;
 }
 
+/** A recurring heartbeat that periodically dispatches a command to a persona. */
+export interface AgentHeartbeat {
+  id: string;
+  starshipId: string;
+  personaId: string;
+  name?: string | null;
+  commandType: string;
+  payload: Record<string, unknown>;
+  intervalSeconds: number;
+  enabled: boolean;
+  lastFiredAt?: string | null;
+  nextFireAt: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 const base = (serverUrl: string) => `${serverUrl.replace(/\/$/, '')}/api/v1`;
 
 async function request<T>(serverUrl: string, path: string, opts: RequestInit & { token?: string } = {}): Promise<T> {
@@ -148,6 +164,42 @@ export function deletePersona(s: Session, personaId: string): Promise<void> {
 
 export function personaActivity(s: Session, personaId: string, limit = 50): Promise<AgentRuntimeEvent[]> {
   return request<AgentRuntimeEvent[]>(s.serverUrl, `/agent-personas/${personaId}/activity?limit=${limit}`, { token: s.token });
+}
+
+/** Whole-starship activity log (most recent first), across every persona and runtime. */
+export function listStarshipEvents(s: Session, starshipId: string, limit = 200): Promise<AgentRuntimeEvent[]> {
+  return request<AgentRuntimeEvent[]>(s.serverUrl, `/starships/${starshipId}/agent-events?limit=${limit}`, { token: s.token });
+}
+
+// ---- Heartbeats (recurring dispatches) ----
+
+export function listHeartbeats(s: Session, starshipId: string, personaId: string): Promise<AgentHeartbeat[]> {
+  return request<AgentHeartbeat[]>(s.serverUrl, `/starships/${starshipId}/agent-personas/${personaId}/heartbeats`, { token: s.token });
+}
+
+export function createHeartbeat(
+  s: Session,
+  starshipId: string,
+  personaId: string,
+  input: { name?: string; commandType: string; payload?: Record<string, unknown>; intervalSeconds: number; enabled?: boolean }
+): Promise<AgentHeartbeat> {
+  return request<AgentHeartbeat>(s.serverUrl, `/starships/${starshipId}/agent-personas/${personaId}/heartbeats`, {
+    method: 'POST',
+    token: s.token,
+    body: JSON.stringify(input),
+  });
+}
+
+export function updateHeartbeat(
+  s: Session,
+  id: string,
+  input: { name?: string | null; commandType?: string; payload?: Record<string, unknown>; intervalSeconds?: number; enabled?: boolean }
+): Promise<AgentHeartbeat> {
+  return request<AgentHeartbeat>(s.serverUrl, `/agent-runtime-heartbeats/${id}`, { method: 'PUT', token: s.token, body: JSON.stringify(input) });
+}
+
+export function deleteHeartbeat(s: Session, id: string): Promise<void> {
+  return request<void>(s.serverUrl, `/agent-runtime-heartbeats/${id}`, { method: 'DELETE', token: s.token });
 }
 
 /** Derive the MCP endpoint from the server URL: same host, port 4100, /mcp. */

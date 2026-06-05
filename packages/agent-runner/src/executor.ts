@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import type { AgentRuntimeDispatchModel } from '@starships/protocol';
 import type { ExecutorConfig } from './config';
 
@@ -8,6 +9,12 @@ export interface ExecutionResult {
   durationMs: number;
   stdout: string;
   stderr: string;
+  /**
+   * The session id we minted for this run, present only when the executor
+   * template actually consumed `{{sessionId}}` (i.e. the CLI was told to use
+   * it). Lets the caller correlate the run to the CLI's on-disk transcript.
+   */
+  sessionId?: string;
 }
 
 const MAX_CAPTURE = 8 * 1024; // bytes of stdout/stderr to retain
@@ -24,7 +31,7 @@ function truncate(s: string): string {
  * the assigned persona's behaviour. Templates that omit these tokens still get
  * the values via env (see runDispatch).
  */
-function substitute(arg: string, dispatch: AgentRuntimeDispatchModel, promptField: string): string {
+function substitute(arg: string, dispatch: AgentRuntimeDispatchModel, promptField: string, sessionId: string): string {
   const prompt = String((dispatch.payload as Record<string, unknown>)?.[promptField] ?? '');
   const persona = dispatch.persona ?? null;
   return arg
@@ -34,6 +41,8 @@ function substitute(arg: string, dispatch: AgentRuntimeDispatchModel, promptFiel
     .join(dispatch.commandType)
     .split('{{dispatchId}}')
     .join(dispatch.id)
+    .split('{{sessionId}}')
+    .join(sessionId)
     .split('{{systemPrompt}}')
     .join(String(persona?.systemPrompt ?? ''))
     .split('{{model}}')
@@ -51,7 +60,13 @@ function substitute(arg: string, dispatch: AgentRuntimeDispatchModel, promptFiel
  * that prefer to read it structured.
  */
 export function runDispatch(executor: ExecutorConfig, dispatch: AgentRuntimeDispatchModel, signal?: AbortSignal): Promise<ExecutionResult> {
-  const args = executor.args.map((a) => substitute(a, dispatch, executor.promptField));
+  // Mint a session id up front and feed it to the CLI (e.g. `claude --session-id`)
+  // so the run lands in a transcript file we can find later. Only reported back
+  // when the template actually used it — CLIs that don't understand it are left
+  // untouched and simply produce no correlatable session.
+  const sessionId = randomUUID();
+  const usesSession = executor.args.some((a) => a.includes('{{sessionId}}'));
+  const args = executor.args.map((a) => substitute(a, dispatch, executor.promptField, sessionId));
 
   const env = { ...process.env };
   if (executor.passPayloadEnv) {
@@ -92,7 +107,14 @@ export function runDispatch(executor: ExecutorConfig, dispatch: AgentRuntimeDisp
       settled = true;
       clearTimeout(timer);
       signal?.removeEventListener('abort', onAbort);
-      resolve({ exitCode, timedOut, durationMs: Date.now() - startedAt, stdout: truncate(stdout), stderr: truncate(stderr) });
+      resolve({
+        exitCode,
+        timedOut,
+        durationMs: Date.now() - startedAt,
+        stdout: truncate(stdout),
+        stderr: truncate(stderr),
+        sessionId: usesSession ? sessionId : undefined,
+      });
     };
 
     child.stdout?.on('data', (d: Buffer) => {

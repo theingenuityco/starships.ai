@@ -5,8 +5,10 @@ import { join } from 'node:path';
 /**
  * How a dispatch is turned into a local child process. The command is run via
  * spawn(command, args) with an argv ARRAY — never a shell string — so the
- * (remotely-supplied) prompt can't inject shell. `{{prompt}}`, `{{commandType}}`
- * and `{{dispatchId}}` tokens inside any arg are substituted before spawn.
+ * (remotely-supplied) prompt can't inject shell. `{{prompt}}`, `{{commandType}}`,
+ * `{{dispatchId}}` and `{{sessionId}}` tokens inside any arg are substituted
+ * before spawn. Using `{{sessionId}}` (e.g. `claude --session-id {{sessionId}}`)
+ * makes the run's transcript locatable on disk afterwards.
  */
 export interface ExecutorConfig {
   command: string;
@@ -32,7 +34,7 @@ export interface RunnerConfig {
 
 export const DEFAULT_EXECUTOR: ExecutorConfig = {
   command: 'claude',
-  args: ['-p', '{{prompt}}'],
+  args: ['--session-id', '{{sessionId}}', '-p', '{{prompt}}'],
   promptField: 'prompt',
   timeoutMs: 10 * 60 * 1000,
   passPayloadEnv: true,

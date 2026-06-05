@@ -116,6 +116,9 @@ export function buildServer(ctx: AgentContext): McpServer {
       if (denied) return denied;
       const board = await new TaskBoardRepository().findById(boardId);
       if (!board || board.starshipId !== ctx.starshipId) return err('Board not found');
+      // Ensure the column actually belongs to this board (not just any column ID the agent knows).
+      const column = await new TaskColumnRepository().findById(columnId);
+      if (!column || column.boardId !== boardId) return err('Column not found on this board');
       const card = await new TaskCardRepository().create({ boardId, columnId, title, description });
       return ok(card);
     }
@@ -168,7 +171,7 @@ export function buildServer(ctx: AgentContext): McpServer {
 
   server.registerTool(
     'post_event',
-    { description: 'Append an event to the workspace activity log.', inputSchema: { type: z.string(), payload: z.record(z.string(), z.unknown()).optional(), cardId: z.string().optional(), dispatchId: z.string().optional() } },
+    { description: "Append an event to the workspace activity log. `type` is a lowercase namespaced slug (e.g. 'status', 'note', 'custom:my_event').", inputSchema: { type: z.string().regex(/^[a-z][a-z0-9_:]{0,63}$/, 'type must be a lowercase slug (a-z 0-9 _ :)'), payload: z.record(z.string(), z.unknown()).optional(), cardId: z.string().optional(), dispatchId: z.string().optional() } },
     async ({ type, payload, cardId, dispatchId }) => {
       const e = await new AgentEventRepository().append({
         starshipId: ctx.starshipId,

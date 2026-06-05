@@ -7,6 +7,7 @@
  * to one starship + one agent.
  */
 import express, { type Request, type Response } from 'express';
+import rateLimit from 'express-rate-limit';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { getEnvConfig } from '@starships/env';
 import { createConnection } from '@starships/models';
@@ -28,11 +29,20 @@ const dbConnection = createConnection({
 const app: express.Application = express();
 app.use(express.json());
 
+// Per-token (fall back to per-IP) rate limit so a single token can't hammer the DB.
+const mcpLimiter = rateLimit({
+  windowMs: 60_000,
+  max: 300,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => req.headers.authorization ?? req.ip ?? 'anon',
+});
+
 app.get('/health', (_req: Request, res: Response) => {
   res.json({ ok: true, service: 'starship-mcp' });
 });
 
-app.post('/mcp', async (req: Request, res: Response): Promise<void> => {
+app.post('/mcp', mcpLimiter, async (req: Request, res: Response): Promise<void> => {
   const ctx = await resolveAgentContext(req.headers.authorization);
   if (!ctx) {
     res.status(401).json({ error: 'Invalid or missing agent token' });

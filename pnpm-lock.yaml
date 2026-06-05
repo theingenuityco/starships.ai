@@ -649,6 +649,9 @@ importers:
       express:
         specifier: ^5.2.0
         version: 5.2.0
+      express-rate-limit:
+        specifier: ^7.5.1
+        version: 7.5.1(express@5.2.0)
       nanoid:
         specifier: ^5.1.5
         version: 5.1.5

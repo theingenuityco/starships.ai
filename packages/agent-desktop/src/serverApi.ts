@@ -73,12 +73,18 @@ export function createAgent(
   return request<Agent>(s.serverUrl, '/agents', { method: 'POST', token: s.token, body: JSON.stringify(input) });
 }
 
-export function mintToken(s: Session, starshipId: string, agentId: string, name?: string): Promise<{ token: string }> {
-  return request<{ token: string }>(s.serverUrl, `/starships/${starshipId}/agent-tokens`, {
+export async function mintToken(s: Session, starshipId: string, agentId: string, name?: string): Promise<{ token: string; tokenId: string }> {
+  const data = await request<{ token: string; record: { id: string } }>(s.serverUrl, `/starships/${starshipId}/agent-tokens`, {
     method: 'POST',
     token: s.token,
     body: JSON.stringify({ agentId, ...(name ? { name } : {}) }),
   });
+  return { token: data.token, tokenId: data.record.id };
+}
+
+/** Revoke a previously minted connection token (best-effort; owner-only server-side). */
+export function revokeToken(s: Session, tokenId: string): Promise<void> {
+  return request<void>(s.serverUrl, `/agent-tokens/${tokenId}`, { method: 'DELETE', token: s.token });
 }
 
 /** Derive the MCP endpoint from the server URL: same host, port 4100, /mcp. */

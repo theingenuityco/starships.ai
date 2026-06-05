@@ -52,9 +52,9 @@ fn known_agents() -> &'static [(&'static str, &'static str, &'static str)] {
     ]
 }
 
-/// Scan PATH for the agent CLIs we recognise.
-#[tauri::command]
-fn detect_agents() -> Vec<DetectedAgent> {
+/// Scan PATH for the agent CLIs we recognise. Runs `<cmd> --version` per
+/// candidate, so it's kept off the command thread (see `detect_agents`).
+fn detect_agents_blocking() -> Vec<DetectedAgent> {
     let mut out = Vec::new();
     for (cmd, kind, default_executor) in known_agents() {
         let Ok(path) = which::which(cmd) else { continue };
@@ -74,6 +74,15 @@ fn detect_agents() -> Vec<DetectedAgent> {
         });
     }
     out
+}
+
+/// Async command: runs the blocking scan on a worker thread so a slow/hanging
+/// `--version` can't freeze the UI.
+#[tauri::command]
+async fn detect_agents() -> Vec<DetectedAgent> {
+    tauri::async_runtime::spawn_blocking(detect_agents_blocking)
+        .await
+        .unwrap_or_default()
 }
 
 /// Grab a free loopback port by binding to :0 and reading the assigned port.

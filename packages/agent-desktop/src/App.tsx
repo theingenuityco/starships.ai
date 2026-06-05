@@ -6,6 +6,7 @@ import {
   listStarships,
   login,
   mintToken,
+  revokeToken,
   type AgentKind,
   type Session,
   type Starship,
@@ -20,6 +21,7 @@ interface ConnectedAgent {
   kind: string;
   name: string;
   token: string;
+  tokenId: string;
   executor: string;
   mcpUrl: string;
 }
@@ -120,9 +122,9 @@ export default function App() {
           if (!agent) {
             agent = await createAgent(session, { starshipId: starship.id, name, kind: d.kind as AgentKind, accessRole: 'contributor' });
           }
-          const { token } = await mintToken(session, starship.id, agent.id, `${name} (desktop)`);
+          const { token, tokenId } = await mintToken(session, starship.id, agent.id, `${name} (desktop)`);
           const info = await startRunner({ agentId: agent.id, token, mcpUrl, executor });
-          const rec: ConnectedAgent = { agentId: agent.id, kind: d.kind, name, token, executor, mcpUrl };
+          const rec: ConnectedAgent = { agentId: agent.id, kind: d.kind, name, token, tokenId, executor, mcpUrl };
           const next = [...connected.filter((c) => c.agentId !== agent.id), rec];
           setConnected(next);
           saveConnected(next);
@@ -138,6 +140,9 @@ export default function App() {
         } catch {
           /* ignore */
         }
+        // Best-effort revoke so stopped agents don't leave live tokens behind.
+        const rec = connected.find((c) => c.agentId === agentId);
+        if (session && rec?.tokenId) revokeToken(session, rec.tokenId).catch(() => {});
         const next = connected.filter((c) => c.agentId !== agentId);
         setConnected(next);
         saveConnected(next);

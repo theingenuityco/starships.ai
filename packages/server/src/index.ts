@@ -32,12 +32,15 @@ import starshipInvitesRoutes from '@/routes/starship-invites';
 import presenceRoutes from '@/routes/presence';
 import agentTokenRoutes from '@/routes/agent-tokens';
 import agentDispatchRoutes from '@/routes/agent-dispatch';
+import agentHeartbeatRoutes from '@/routes/agent-heartbeats';
 import setupRoutes from '@/routes/setup';
 
 // Import new error handling and health check routes
 import { errorHandler, notFoundHandler, requestIdMiddleware } from '@/middleware/errorHandler';
 import { globalRateLimiter } from '@/middleware/rateLimiter';
 import healthRoutes from '@/routes/health';
+
+import { HeartbeatScheduler } from '@/services/HeartbeatScheduler';
 
 // Load server configuration
 const config = getEnvConfig();
@@ -115,6 +118,7 @@ app.use('/api/v1', starshipInvitesRoutes);
 app.use('/api/v1', presenceRoutes);
 app.use('/api/v1', agentTokenRoutes);
 app.use('/api/v1', agentDispatchRoutes);
+app.use('/api/v1', agentHeartbeatRoutes);
 
 // Add 404 handler for unmatched routes
 app.use(notFoundHandler);
@@ -165,6 +169,10 @@ httpServer.listen(PORT, async () => {
     // Initialize complete database schema (includes seeding)
     await migrationRunner.runAllPendingMigrations();
     console.log('✅ Database schema initialized with seed data');
+
+    // Start the in-process heartbeat scheduler (recurring agent dispatches)
+    HeartbeatScheduler.getInstance().start();
+    console.log('✅ Heartbeat scheduler started');
   } catch (error) {
     console.error('❌ Failed to initialize database:', error);
     process.exit(1);

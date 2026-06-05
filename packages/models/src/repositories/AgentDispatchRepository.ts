@@ -8,6 +8,7 @@ type DbRow = {
   starship_id: string;
   agent_id: string;
   card_id: string | null;
+  heartbeat_id: string | null;
   command_type: string;
   payload: unknown;
   delivery_status: string;
@@ -23,6 +24,7 @@ function fromDb(r: DbRow): AgentDispatchModel {
     starshipId: String(r.starship_id),
     agentId: String(r.agent_id),
     cardId: r.card_id ?? null,
+    heartbeatId: r.heartbeat_id ?? null,
     commandType: String(r.command_type),
     payload: (typeof r.payload === 'object' && r.payload !== null ? r.payload : {}) as Record<string, unknown>,
     deliveryStatus: String(r.delivery_status) as DispatchDeliveryStatus,
@@ -44,19 +46,51 @@ export class AgentDispatchRepository extends BaseRepository {
     commandType: string;
     payload?: Record<string, unknown>;
     cardId?: string | null;
+    heartbeatId?: string | null;
   }): Promise<AgentDispatchModel> {
     return this.executeWithErrorHandling(
       async () => {
         const row = await this.getConnection().queryOne<DbRow>(
-          `INSERT INTO agent_dispatches (id, starship_id, agent_id, card_id, command_type, payload)
-           VALUES ($1,$2,$3,$4,$5,$6::jsonb) RETURNING *`,
-          [nanoid(), input.starshipId, input.agentId, input.cardId ?? null, input.commandType, JSON.stringify(input.payload ?? {})]
+          `INSERT INTO agent_dispatches (id, starship_id, agent_id, card_id, heartbeat_id, command_type, payload)
+           VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb) RETURNING *`,
+          [
+            nanoid(),
+            input.starshipId,
+            input.agentId,
+            input.cardId ?? null,
+            input.heartbeatId ?? null,
+            input.commandType,
+            JSON.stringify(input.payload ?? {}),
+          ]
         );
         if (!row) throw new Error('Failed to create dispatch');
         return fromDb(row);
       },
       'create',
       'AgentDispatch'
+    );
+  }
+
+  /**
+   * Whether a dispatch from this heartbeat is still awaiting the agent (pending
+   * or acked but not yet done). The scheduler uses this to coalesce: don't pile
+   * up beats while the agent is offline or still working the last one.
+   */
+  async hasOutstandingForHeartbeat(heartbeatId: string): Promise<boolean> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const row = await this.getConnection().queryOne<{ exists: boolean }>(
+          `SELECT EXISTS (
+             SELECT 1 FROM agent_dispatches
+              WHERE heartbeat_id = $1 AND ack_status IN ('pending', 'acked')
+           ) AS exists`,
+          [heartbeatId]
+        );
+        return Boolean(row?.exists);
+      },
+      'hasOutstandingForHeartbeat',
+      'AgentDispatch',
+      heartbeatId
     );
   }
 

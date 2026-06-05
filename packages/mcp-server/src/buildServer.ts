@@ -130,12 +130,30 @@ export function buildServer(ctx: AgentContext): McpServer {
   server.registerTool('ack_command', { description: 'Acknowledge a dispatched command.', inputSchema: { dispatchId: z.string() } }, async ({ dispatchId }) => {
     const d = await new AgentDispatchRepository().markAcked(dispatchId, ctx.agentId);
     if (!d) return err('Dispatch not found or already acknowledged');
+    // Record the transition so it shows in the activity log (proof of pickup).
+    await new AgentEventRepository().append({
+      starshipId: ctx.starshipId,
+      agentId: ctx.agentId,
+      dispatchId: d.id,
+      cardId: d.cardId ?? null,
+      type: 'command_acked',
+      payload: { commandType: d.commandType, heartbeatId: d.heartbeatId ?? null },
+    });
     return ok(d);
   });
 
   server.registerTool('complete_command', { description: 'Mark a dispatched command done.', inputSchema: { dispatchId: z.string() } }, async ({ dispatchId }) => {
     const d = await new AgentDispatchRepository().markDone(dispatchId, ctx.agentId);
     if (!d) return err('Dispatch not found');
+    // Record the transition so it shows in the activity log (proof of completion).
+    await new AgentEventRepository().append({
+      starshipId: ctx.starshipId,
+      agentId: ctx.agentId,
+      dispatchId: d.id,
+      cardId: d.cardId ?? null,
+      type: 'command_completed',
+      payload: { commandType: d.commandType, heartbeatId: d.heartbeatId ?? null },
+    });
     return ok(d);
   });
 

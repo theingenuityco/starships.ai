@@ -98,7 +98,7 @@ export class AgentRepository extends BaseRepository {
     return !!row?.id;
   }
 
-  async create(data: CreateAgentRequest, starshipId: string, createdByUserId?: string): Promise<AgentModel> {
+  async create(data: Omit<CreateAgentRequest, 'starshipId'>, starshipId: string, createdByUserId?: string): Promise<AgentModel> {
     return this.executeWithErrorHandling(
       async () => {
         const now = new Date().toISOString();

@@ -27,6 +27,7 @@ export { AgentTokenRepository } from './repositories/AgentTokenRepository';
 export { AgentDeviceRepository } from './repositories/AgentDeviceRepository';
 export { AgentDispatchRepository } from './repositories/AgentDispatchRepository';
 export { AgentEventRepository } from './repositories/AgentEventRepository';
+export { AgentHeartbeatRepository } from './repositories/AgentHeartbeatRepository';
 export { PlatformSecretRepository } from './repositories/PlatformSecretRepository';
 export { RoomRepository } from './repositories/RoomRepository';
 export { RoomTablesRepository } from './repositories/RoomTablesRepository';

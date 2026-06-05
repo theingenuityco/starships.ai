@@ -34,6 +34,8 @@ export interface AgentModel {
  * Request to register a new agent.
  */
 export interface CreateAgentRequest {
+  /** Workspace the agent is registered in. */
+  starshipId: string;
   name: string;
   kind: AgentKind;
   /** Defaults to 'contributor' when omitted. */

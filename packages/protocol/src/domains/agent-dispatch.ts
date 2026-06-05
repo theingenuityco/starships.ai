@@ -48,6 +48,8 @@ export interface AgentDispatchModel {
   starshipId: string;
   agentId: string;
   cardId?: string | null;
+  /** Set when this dispatch was created by a recurring heartbeat (see AgentHeartbeatModel). */
+  heartbeatId?: string | null;
   commandType: string;
   payload: Record<string, unknown>;
   deliveryStatus: DispatchDeliveryStatus;
@@ -55,6 +57,31 @@ export interface AgentDispatchModel {
   createdAt: string;
   ackedAt?: string | null;
   completedAt?: string | null;
+}
+
+/**
+ * A recurring heartbeat that periodically dispatches a command to an agent. The
+ * server's in-process scheduler fires each enabled heartbeat every
+ * `intervalSeconds`, creating an `AgentDispatchModel` the agent picks up on its
+ * next `pull_commands`.
+ */
+export interface AgentHeartbeatModel {
+  id: string;
+  starshipId: string;
+  agentId: string;
+  name?: string | null;
+  /** Command type stamped on each dispatch this heartbeat creates. */
+  commandType: string;
+  /** Payload stamped on each dispatch this heartbeat creates. */
+  payload: Record<string, unknown>;
+  /** How often to fire, in seconds. */
+  intervalSeconds: number;
+  enabled: boolean;
+  lastFiredAt?: string | null;
+  nextFireAt: string;
+  createdByUserId?: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 /** Append-only activity record (the audit trail; not chat). */

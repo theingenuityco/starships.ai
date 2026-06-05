@@ -1,32 +1,11 @@
 use std::collections::HashMap;
 use std::fs;
-use std::net::TcpListener;
 use std::path::PathBuf;
-use std::sync::Mutex;
+use std::process::Command;
+use std::time::Instant;
 
 use serde::Serialize;
-use tauri::{Manager, RunEvent, State};
-use tauri_plugin_shell::process::{CommandChild, CommandEvent};
-use tauri_plugin_shell::ShellExt;
-
-/// A running runner sidecar process + how to reach its loopback control API.
-struct RunnerProc {
-    child: CommandChild,
-    control_port: u16,
-    control_token: String,
-    agent_id: String,
-}
-
-#[derive(Default)]
-struct RunnerPool(Mutex<HashMap<String, RunnerProc>>);
-
-#[derive(Serialize, Clone)]
-struct RunnerInfo {
-    runner_id: String,
-    agent_id: String,
-    control_port: u16,
-    control_token: String,
-}
+use tauri::Manager;
 
 #[derive(Serialize)]
 struct DetectedAgent {
@@ -58,7 +37,7 @@ fn detect_agents_blocking() -> Vec<DetectedAgent> {
     let mut out = Vec::new();
     for (cmd, kind, default_executor) in known_agents() {
         let Ok(path) = which::which(cmd) else { continue };
-        let version = std::process::Command::new(cmd)
+        let version = Command::new(cmd)
             .arg("--version")
             .output()
             .ok()
@@ -85,39 +64,24 @@ async fn detect_agents() -> Vec<DetectedAgent> {
         .unwrap_or_default()
 }
 
-/// Grab a free loopback port by binding to :0 and reading the assigned port.
-///
-/// Note: this releases the port before the runner re-binds it, so there's a
-/// small TOCTOU window where another process could claim it. If that happens
-/// the runner logs a bind failure (drained to our log) and its Connected card
-/// shows no status. Ephemeral-port collisions are rare in practice; passing an
-/// inherited socket fd to the sidecar would close the window entirely (future).
-fn pick_port() -> u16 {
-    TcpListener::bind("127.0.0.1:0")
-        .and_then(|l| l.local_addr())
-        .map(|a| a.port())
-        .unwrap_or(0)
+/// Path to the local state file. Holds the whole app store (runtimes, personas,
+/// heartbeats, events) as one JSON blob, with owner-only (0600) permissions.
+fn store_file(app: &tauri::AppHandle) -> Option<PathBuf> {
+    app.path().app_config_dir().ok().map(|d| d.join("store.json"))
 }
 
-/// Path to the persisted connected-agents file (holds agent tokens; 0600).
-fn agents_file(app: &tauri::AppHandle) -> Option<PathBuf> {
-    app.path().app_config_dir().ok().map(|d| d.join("connected-agents.json"))
-}
-
-/// Load the persisted connected-agents JSON (returns "[]" when absent).
+/// Load the local state JSON (returns "{}" when absent).
 #[tauri::command]
-fn load_agents(app: tauri::AppHandle) -> String {
-    agents_file(&app)
+fn read_store(app: tauri::AppHandle) -> String {
+    store_file(&app)
         .and_then(|p| fs::read_to_string(p).ok())
-        .unwrap_or_else(|| "[]".to_string())
+        .unwrap_or_else(|| "{}".to_string())
 }
 
-/// Persist the connected-agents JSON with owner-only permissions. Storing
-/// tokens in a 0600 file (not the webview's localStorage) keeps them out of
-/// reach of any in-page script.
+/// Persist the local state JSON with owner-only permissions.
 #[tauri::command]
-fn save_agents(app: tauri::AppHandle, json: String) -> Result<(), String> {
-    let path = agents_file(&app).ok_or("no app config dir")?;
+fn write_store(app: tauri::AppHandle, json: String) -> Result<(), String> {
+    let path = store_file(&app).ok_or("no app config dir")?;
     if let Some(dir) = path.parent() {
         fs::create_dir_all(dir).map_err(|e| e.to_string())?;
     }
@@ -134,7 +98,7 @@ fn save_agents(app: tauri::AppHandle, json: String) -> Result<(), String> {
 ///
 /// Agent CLIs (Claude Code today) persist each run as `<session-id>.jsonl` under
 /// `~/.claude/projects/<project-slug>/`. Because the session id is a unique UUID
-/// we mint per dispatch, a filename match across the project dirs is enough — we
+/// we mint per run, a filename match across the project dirs is enough — we
 /// don't need to know the working directory the CLI ran in. Returns the raw JSONL
 /// (parsed in the webview), or `None` when no transcript exists yet.
 #[tauri::command]
@@ -162,105 +126,61 @@ fn read_agent_transcript(app: tauri::AppHandle, session_id: String) -> Result<Op
     Ok(None)
 }
 
-/// Spawn a runner sidecar for one connected agent and track it in the pool.
-#[tauri::command]
-fn start_runner(
-    app: tauri::AppHandle,
-    pool: State<'_, RunnerPool>,
-    agent_id: String,
-    token: String,
-    mcp_url: String,
-    executor: String,
-) -> Result<RunnerInfo, String> {
-    let port = pick_port();
-    if port == 0 {
-        return Err("could not allocate a loopback port".into());
-    }
-    let control_token = uuid::Uuid::new_v4().to_string();
-    let runner_id = uuid::Uuid::new_v4().to_string();
+#[derive(Serialize)]
+struct RunResult {
+    exit_code: Option<i32>,
+    duration_ms: u64,
+    stdout: String,
+    stderr: String,
+}
 
-    // Token goes via env, not argv, so it isn't visible in `ps aux` /
-    // /proc/<pid>/cmdline. The runner reads STARSHIP_AGENT_TOKEN in loadConfig().
-    let sidecar = app
-        .shell()
-        .sidecar("starship-agent")
+const MAX_CAPTURE: usize = 8 * 1024;
+
+fn truncate(mut s: String) -> String {
+    if s.len() > MAX_CAPTURE {
+        s.truncate(MAX_CAPTURE);
+        s.push_str("…[truncated]");
+    }
+    s
+}
+
+/// Run an agent CLI once and capture its output.
+///
+/// Safety: the command + args are passed as an ARGV ARRAY (no shell), so a
+/// prompt baked into an arg is a discrete argument and cannot inject shell
+/// metacharacters. Templating ({{prompt}}, {{sessionId}}, …) happens in the
+/// webview before this is called; here we just spawn and wait.
+///
+/// Note: there is no timeout yet — a CLI that never exits will leave this call
+/// pending. Acceptable for a single-user local app; revisit if it bites.
+fn run_agent_blocking(command: String, args: Vec<String>, env: HashMap<String, String>) -> Result<RunResult, String> {
+    let started = Instant::now();
+    let output = Command::new(&command)
+        .args(&args)
+        .envs(&env)
+        .output()
+        .map_err(|e| format!("could not start {command}: {e}"))?;
+    Ok(RunResult {
+        exit_code: output.status.code(),
+        duration_ms: started.elapsed().as_millis() as u64,
+        stdout: truncate(String::from_utf8_lossy(&output.stdout).to_string()),
+        stderr: truncate(String::from_utf8_lossy(&output.stderr).to_string()),
+    })
+}
+
+/// Async command: runs the agent on a worker thread so the UI stays responsive
+/// while the CLI works.
+#[tauri::command]
+async fn run_agent(command: String, args: Vec<String>, env: HashMap<String, String>) -> Result<RunResult, String> {
+    tauri::async_runtime::spawn_blocking(move || run_agent_blocking(command, args, env))
+        .await
         .map_err(|e| e.to_string())?
-        .env("STARSHIP_AGENT_TOKEN", &token)
-        .args([
-            "run",
-            "--endpoint",
-            &mcp_url,
-            "--executor",
-            &executor,
-            "--control-port",
-            &port.to_string(),
-            "--control-token",
-            &control_token,
-        ]);
-    let (mut rx, child) = sidecar.spawn().map_err(|e| e.to_string())?;
-
-    let aid = agent_id.clone();
-    tauri::async_runtime::spawn(async move {
-        while let Some(event) = rx.recv().await {
-            match event {
-                CommandEvent::Stdout(line) => log::info!("[{}] {}", aid, String::from_utf8_lossy(&line)),
-                CommandEvent::Stderr(line) => log::warn!("[{}] {}", aid, String::from_utf8_lossy(&line)),
-                CommandEvent::Terminated(payload) => {
-                    log::warn!("[{}] runner exited: {:?}", aid, payload.code);
-                    break;
-                }
-                _ => {}
-            }
-        }
-    });
-
-    let info = RunnerInfo {
-        runner_id: runner_id.clone(),
-        agent_id: agent_id.clone(),
-        control_port: port,
-        control_token: control_token.clone(),
-    };
-    pool.0.lock().unwrap().insert(
-        runner_id,
-        RunnerProc {
-            child,
-            control_port: port,
-            control_token,
-            agent_id,
-        },
-    );
-    Ok(info)
-}
-
-#[tauri::command]
-fn stop_runner(pool: State<'_, RunnerPool>, runner_id: String) -> Result<(), String> {
-    if let Some(proc) = pool.0.lock().unwrap().remove(&runner_id) {
-        let _ = proc.child.kill();
-    }
-    Ok(())
-}
-
-#[tauri::command]
-fn list_runners(pool: State<'_, RunnerPool>) -> Vec<RunnerInfo> {
-    pool.0
-        .lock()
-        .unwrap()
-        .iter()
-        .map(|(id, p)| RunnerInfo {
-            runner_id: id.clone(),
-            agent_id: p.agent_id.clone(),
-            control_port: p.control_port,
-            control_token: p.control_token.clone(),
-        })
-        .collect()
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
-        .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_os::init())
-        .manage(RunnerPool::default())
         .setup(|app| {
             if cfg!(debug_assertions) {
                 app.handle().plugin(
@@ -273,23 +193,11 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             detect_agents,
-            start_runner,
-            stop_runner,
-            list_runners,
-            load_agents,
-            save_agents,
-            read_agent_transcript
+            read_store,
+            write_store,
+            read_agent_transcript,
+            run_agent
         ])
-        .build(tauri::generate_context!())
-        .expect("error while building tauri application")
-        .run(|app_handle, event| {
-            // Fires once when the app exits (not per-window) — stop every runner.
-            if let RunEvent::Exit = event {
-                if let Some(pool) = app_handle.try_state::<RunnerPool>() {
-                    for (_, proc) in pool.0.lock().unwrap().drain() {
-                        let _ = proc.child.kill();
-                    }
-                }
-            }
-        });
+        .run(tauri::generate_context!())
+        .expect("error while running tauri application");
 }

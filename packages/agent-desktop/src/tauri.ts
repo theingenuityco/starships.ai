@@ -10,31 +10,28 @@ export interface DetectedAgent {
   default_executor: string;
 }
 
-export interface RunnerInfo {
-  runner_id: string;
-  agent_id: string;
-  control_port: number;
-  control_token: string;
+export interface RunResult {
+  exit_code: number | null;
+  duration_ms: number;
+  stdout: string;
+  stderr: string;
 }
 
 export const detectAgents = () => invoke<DetectedAgent[]>('detect_agents');
 
-export const startRunner = (args: { agentId: string; token: string; mcpUrl: string; executor: string }) =>
-  invoke<RunnerInfo>('start_runner', args);
+/** Run an agent CLI once (argv array, no shell) and capture its output. */
+export const runAgent = (args: { command: string; args: string[]; env: Record<string, string> }) =>
+  invoke<RunResult>('run_agent', args);
 
-export const stopRunner = (runnerId: string) => invoke<void>('stop_runner', { runnerId });
-
-export const listRunners = () => invoke<RunnerInfo[]>('list_runners');
-
-// Connected-agent persistence lives in a Rust-managed 0600 file (not the
-// webview's localStorage) so agent tokens aren't reachable by in-page script.
-export const loadAgentsRaw = () => invoke<string>('load_agents');
-export const saveAgentsRaw = (json: string) => invoke<void>('save_agents', { json });
+// Local state lives in a Rust-managed 0600 file (not the webview's localStorage)
+// so anything sensitive in it stays out of reach of in-page script.
+export const readStoreRaw = () => invoke<string>('read_store');
+export const writeStoreRaw = (json: string) => invoke<void>('write_store', { json });
 
 /** Raw JSONL of a CLI run's transcript by session id, or null if none on disk. */
 export const readAgentTranscript = (sessionId: string) => invoke<string | null>('read_agent_transcript', { sessionId });
 
-/** Hostname for naming agents stably per machine; falls back gracefully. */
+/** Hostname for naming runtimes stably per machine; falls back gracefully. */
 export async function hostname(): Promise<string> {
   try {
     return (await osHostname()) || 'this-machine';

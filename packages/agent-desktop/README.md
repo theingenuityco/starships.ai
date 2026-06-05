@@ -1,31 +1,35 @@
 # Starship Agent (desktop)
 
-A small Tauri desktop app — a live dashboard over the
-[agent-runner](../agent-runner) control API: connection status, recent
-dispatches, a log stream, and pause/resume.
+A Tauri desktop app that onboards local agents into a Starship:
 
-The app bundles the runner as a Tauri **sidecar**: on launch the Rust shell
-spawns `starship-agent run` on a random loopback port + token, the UI connects
-automatically, and the runner is stopped when the window closes. (If you open
-the frontend outside Tauri — e.g. plain `vite dev` — it falls back to a manual
-"connect to a running runner" screen.)
+1. **Sign in** to your Starship (enter the server URL + email/password).
+2. **Pick a starship** (auto-selected if you only have one).
+3. **Detect** — the app scans your `PATH` for known agent CLIs (Claude Code,
+   Codex, aider, …).
+4. **Connect** — one click registers (or reuses) the agent in the starship,
+   mints a token, and starts a runner bound to that agent's local command.
+
+The app supervises a **pool of runners** — one per connected agent — each a
+bundled `starship-agent` sidecar on its own loopback control port. Connected
+agents persist and auto-restart on next launch (no re-login needed; login is
+only required to connect new agents). Connected cards show live status and
+recent dispatches; **Stop** kills a runner.
+
+The executor command is auto-derived from the agent kind (e.g. `claude -p
+{{prompt}}`) and editable before you click Connect.
 
 ## Run in development
 
-From the repo root, with the platform stack already running (`pnpm dev`, which
-starts the MCP server on :4100):
+From the repo root, with the platform stack running (`pnpm dev` — starts the
+server on :4000 and the MCP server on :4100):
 
 ```bash
-pnpm dev:agent
+pnpm dev:agent     # build:sidecar + tauri dev
 ```
 
-That builds the runner sidecar and launches the Tauri app, pointing the spawned
-runner at the local MCP server with the seeded dev token. Override any of these
-to use a real agent:
-
-```bash
-STARSHIP_AGENT_TOKEN=sk-ship-… STARSHIP_EXECUTOR="claude -p {{prompt}}" pnpm dev:agent
-```
+Then in the app: sign in (Server URL `http://localhost:4000`), pick your
+starship, and Connect a detected agent. Create a heartbeat for that agent in
+the cloud UI and watch it flow picked-up → completed on the Connected card.
 
 Equivalent package-level commands:
 

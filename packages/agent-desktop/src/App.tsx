@@ -1,255 +1,391 @@
 import { useEffect, useRef, useState } from 'react';
-import { invoke } from '@tauri-apps/api/core';
 import {
-  getStatus,
-  pause,
-  resume,
-  subscribeEvents,
-  type ControlConfig,
-  type LogLine,
-  type RunnerState,
-  type RunnerStatus,
-} from './api';
+  createAgent,
+  deriveMcpUrl,
+  listAgents,
+  listStarships,
+  login,
+  mintToken,
+  type AgentKind,
+  type Session,
+  type Starship,
+} from './serverApi';
+import { detectAgents, hostname, isTauri, startRunner, stopRunner, type DetectedAgent, type RunnerInfo } from './tauri';
+import { getStatus, type RunnerState } from './api';
 
-const STATUS_COLOR: Record<RunnerStatus, string> = {
-  online: 'bg-emerald-500',
-  busy: 'bg-blue-500',
-  idle: 'bg-zinc-500',
-  offline: 'bg-red-500',
+type Screen = 'login' | 'starship' | 'agents';
+
+interface ConnectedAgent {
+  agentId: string;
+  kind: string;
+  name: string;
+  token: string;
+  executor: string;
+  mcpUrl: string;
+}
+
+const SERVER_KEY = 'starship-desktop-serverurl';
+const AGENTS_KEY = 'starship-desktop-agents';
+
+const KIND_LABEL: Record<string, string> = {
+  'claude-code': 'Claude Code',
+  codex: 'Codex',
+  hermes: 'Hermes',
+  openclaw: 'OpenClaw',
+  custom: 'Agent',
 };
+const kindLabel = (k: string) => KIND_LABEL[k] ?? k;
 
-const PHASE_COLOR: Record<string, string> = {
-  running: 'text-blue-400',
-  completed: 'text-emerald-400',
-  failed: 'text-red-400',
-};
-
-const STORAGE_KEY = 'starship-agent-control';
-
-function loadCfg(): ControlConfig {
+function loadConnected(): ConnectedAgent[] {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw) as ControlConfig;
+    return JSON.parse(localStorage.getItem(AGENTS_KEY) || '[]');
   } catch {
-    /* ignore */
+    return [];
   }
-  return { baseUrl: 'http://127.0.0.1:7777', token: '' };
+}
+function saveConnected(list: ConnectedAgent[]) {
+  localStorage.setItem(AGENTS_KEY, JSON.stringify(list));
 }
 
 export default function App() {
-  const [cfg, setCfg] = useState<ControlConfig>(loadCfg);
-  const [connected, setConnected] = useState(false);
-  const [state, setState] = useState<RunnerState | null>(null);
-  const [logs, setLogs] = useState<LogLine[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const closeRef = useRef<(() => void) | null>(null);
+  const [screen, setScreen] = useState<Screen>('login');
+  const [session, setSession] = useState<Session | null>(null);
+  const [starship, setStarship] = useState<Starship | null>(null);
+  const [mcpUrl, setMcpUrl] = useState('');
+  const [connected, setConnected] = useState<ConnectedAgent[]>([]);
+  const [runners, setRunners] = useState<Record<string, RunnerInfo>>({}); // agentId -> runner
+  const [banner, setBanner] = useState<string | null>(null);
+  const started = useRef(false);
 
-  useEffect(() => () => closeRef.current?.(), []);
-
-  // In the desktop app, the Rust shell spawned a runner sidecar; ask it for the
-  // control coordinates and connect automatically. Outside Tauri (e.g. `vite
-  // dev` in a browser) this no-ops and the manual Setup screen is shown.
+  // On launch, auto-restart runners for previously connected agents (no login needed).
   useEffect(() => {
-    let cancelled = false;
-    invoke<{ port: number; token: string }>('runner_info')
-      .then((info) => {
-        if (cancelled) return;
-        const auto = { baseUrl: `http://127.0.0.1:${info.port}`, token: info.token };
-        setCfg(auto);
-        void connect(auto);
-      })
-      .catch(() => {
-        /* not running under Tauri / no sidecar — fall back to manual Setup */
-      });
-    return () => {
-      cancelled = true;
-    };
+    if (started.current) return;
+    started.current = true;
+    const saved = loadConnected();
+    setConnected(saved);
+    if (saved.length > 0) setScreen('agents');
+    if (isTauri() && saved.length > 0) {
+      (async () => {
+        for (const a of saved) {
+          try {
+            const info = await startRunner({ agentId: a.agentId, token: a.token, mcpUrl: a.mcpUrl, executor: a.executor });
+            setRunners((prev) => ({ ...prev, [a.agentId]: info }));
+          } catch (e) {
+            setBanner(`Could not restart ${a.name}: ${(e as Error).message}`);
+          }
+        }
+      })();
+    }
   }, []);
 
-  async function connect(use: ControlConfig = cfg) {
+  if (screen === 'login') {
+    return <Login onDone={(s, ship) => { setSession(s); if (ship) { setStarship(ship); setMcpUrl(deriveMcpUrl(s.serverUrl)); setScreen('agents'); } else { setScreen('starship'); } }} />;
+  }
+  if (screen === 'starship' && session) {
+    return <StarshipPicker session={session} onPick={(ship) => { setStarship(ship); setMcpUrl(deriveMcpUrl(session.serverUrl)); setScreen('agents'); }} />;
+  }
+
+  return (
+    <Agents
+      session={session}
+      starship={starship}
+      mcpUrl={mcpUrl}
+      setMcpUrl={setMcpUrl}
+      connected={connected}
+      runners={runners}
+      banner={banner}
+      onLogin={() => setScreen('login')}
+      onConnect={async (d, executor) => {
+        if (!session || !starship) {
+          setScreen('login');
+          return;
+        }
+        setBanner(null);
+        try {
+          const host = await hostname();
+          const name = `${kindLabel(d.kind)} — ${host}`;
+          const existing = await listAgents(session, starship.id);
+          let agent = existing.find((a) => a.name === name);
+          if (!agent) {
+            agent = await createAgent(session, { starshipId: starship.id, name, kind: d.kind as AgentKind, accessRole: 'contributor' });
+          }
+          const { token } = await mintToken(session, starship.id, agent.id, `${name} (desktop)`);
+          const info = await startRunner({ agentId: agent.id, token, mcpUrl, executor });
+          const rec: ConnectedAgent = { agentId: agent.id, kind: d.kind, name, token, executor, mcpUrl };
+          const next = [...connected.filter((c) => c.agentId !== agent.id), rec];
+          setConnected(next);
+          saveConnected(next);
+          setRunners((prev) => ({ ...prev, [agent!.id]: info }));
+        } catch (e) {
+          setBanner(`Connect failed: ${(e as Error).message}`);
+        }
+      }}
+      onStop={async (agentId) => {
+        const info = runners[agentId];
+        try {
+          if (info && isTauri()) await stopRunner(info.runner_id);
+        } catch {
+          /* ignore */
+        }
+        const next = connected.filter((c) => c.agentId !== agentId);
+        setConnected(next);
+        saveConnected(next);
+        setRunners((prev) => Object.fromEntries(Object.entries(prev).filter(([k]) => k !== agentId)));
+      }}
+    />
+  );
+}
+
+function Login({ onDone }: { onDone: (s: Session, starship: Starship | null) => void }) {
+  const [serverUrl, setServerUrl] = useState(localStorage.getItem(SERVER_KEY) || 'http://localhost:4000');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function submit() {
+    setBusy(true);
     setError(null);
     try {
-      const s = await getStatus(use); // validate reachability + token
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(use));
-      setState(s);
-      setConnected(true);
-      closeRef.current?.();
-      closeRef.current = subscribeEvents(use, {
-        onState: setState,
-        onLog: (l) => setLogs((prev) => [l, ...prev].slice(0, 200)),
-        onError: () => setError('Stream disconnected. The runner may have stopped.'),
-      });
+      const { user, token, starship } = await login(serverUrl, email, password);
+      localStorage.setItem(SERVER_KEY, serverUrl);
+      onDone({ serverUrl, token, user }, starship);
     } catch (e) {
-      setError(`Could not connect: ${(e as Error).message}`);
-      setConnected(false);
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
     }
   }
 
-  function disconnect() {
-    closeRef.current?.();
-    closeRef.current = null;
-    setConnected(false);
-    setState(null);
-    setLogs([]);
-  }
-
-  if (!connected) {
-    return <Setup cfg={cfg} setCfg={setCfg} onConnect={() => connect()} error={error} />;
-  }
-
-  const status = state?.status ?? 'offline';
   return (
-    <div className="mx-auto flex min-h-full max-w-2xl flex-col gap-4 p-6">
+    <Shell title="Sign in to your Starship">
+      <Field label="Server URL">
+        <input className="inp" value={serverUrl} onChange={(e) => setServerUrl(e.target.value)} placeholder="http://localhost:4000" />
+      </Field>
+      <Field label="Email">
+        <input className="inp" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoFocus />
+      </Field>
+      <Field label="Password">
+        <input className="inp" type="password" value={password} onChange={(e) => setPassword(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && submit()} />
+      </Field>
+      {error ? <Err>{error}</Err> : null}
+      <button className="btn" onClick={submit} disabled={busy || !email || !password}>
+        {busy ? 'Signing in…' : 'Sign in'}
+      </button>
+    </Shell>
+  );
+}
+
+function StarshipPicker({ session, onPick }: { session: Session; onPick: (s: Starship) => void }) {
+  const [ships, setShips] = useState<Starship[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    listStarships(session).then(setShips).catch((e) => setError((e as Error).message));
+  }, [session]);
+
+  return (
+    <Shell title="Choose a Starship">
+      {error ? <Err>{error}</Err> : null}
+      {!ships ? (
+        <p className="muted">Loading…</p>
+      ) : ships.length === 0 ? (
+        <p className="muted">No starships on this account.</p>
+      ) : (
+        <ul className="list">
+          {ships.map((s) => (
+            <li key={s.id}>
+              <button className="row-btn" onClick={() => onPick(s)}>
+                <span>{s.name}</span>
+                <span className="muted">{s.slug}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Shell>
+  );
+}
+
+function Agents(props: {
+  session: Session | null;
+  starship: Starship | null;
+  mcpUrl: string;
+  setMcpUrl: (v: string) => void;
+  connected: ConnectedAgent[];
+  runners: Record<string, RunnerInfo>;
+  banner: string | null;
+  onLogin: () => void;
+  onConnect: (d: DetectedAgent, executor: string) => void;
+  onStop: (agentId: string) => void;
+}) {
+  const { session, starship, mcpUrl, setMcpUrl, connected, runners, banner, onLogin, onConnect, onStop } = props;
+  const [detected, setDetected] = useState<DetectedAgent[] | null>(null);
+  const [execEdits, setExecEdits] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (!isTauri()) {
+      setDetected([]);
+      return;
+    }
+    detectAgents().then(setDetected).catch(() => setDetected([]));
+  }, []);
+
+  return (
+    <div className="mx-auto flex min-h-full max-w-2xl flex-col gap-5 p-6">
       <header className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <span className={`h-3 w-3 rounded-full ${STATUS_COLOR[status]}`} />
-          <div>
-            <div className="text-lg font-semibold capitalize">{state?.paused ? 'Paused' : status}</div>
-            <div className="text-xs text-zinc-500">{cfg.baseUrl}</div>
-          </div>
+        <div>
+          <h1 className="text-lg font-semibold">Agents</h1>
+          <div className="muted text-xs">{starship ? `${starship.name}` : 'Not signed in'}</div>
         </div>
         <div className="flex items-center gap-2">
-          {state?.paused ? (
-            <button className="btn" onClick={() => resume(cfg).then(setState)}>
-              Resume
-            </button>
-          ) : (
-            <button className="btn" onClick={() => pause(cfg).then(setState)}>
-              Pause
-            </button>
-          )}
-          <button className="btn-ghost" onClick={disconnect}>
-            Disconnect
+          {session ? <span className="muted text-xs">{session.user.email}</span> : null}
+          <button className="btn-ghost" onClick={onLogin}>
+            {session ? 'Switch starship' : 'Log in'}
           </button>
         </div>
       </header>
 
-      {error ? <div className="rounded-md border border-red-900 bg-red-950/40 px-3 py-2 text-sm text-red-300">{error}</div> : null}
+      {banner ? <Err>{banner}</Err> : null}
 
-      <div className="grid grid-cols-3 gap-3">
-        <Stat label="Processed" value={String(state?.processed ?? 0)} />
-        <Stat label="Last poll" value={state?.lastPollAt ? new Date(state.lastPollAt).toLocaleTimeString() : '—'} />
-        <Stat label="Recent" value={String(state?.recent.length ?? 0)} />
-      </div>
+      {starship ? (
+        <Field label="MCP endpoint">
+          <input className="inp" value={mcpUrl} onChange={(e) => setMcpUrl(e.target.value)} />
+        </Field>
+      ) : null}
 
       <section>
-        <h2 className="mb-2 text-xs uppercase tracking-wide text-zinc-500">Recent dispatches</h2>
-        {state && state.recent.length > 0 ? (
-          <ul className="flex flex-col gap-1.5">
-            {state.recent.map((d) => (
-              <li key={`${d.id}-${d.phase}-${d.at}`} className="flex items-center justify-between rounded-md border border-zinc-800 px-3 py-2 text-sm">
-                <span className="truncate">
-                  <span className={PHASE_COLOR[d.phase] ?? ''}>●</span> {d.commandType}{' '}
-                  <span className="text-zinc-600">{d.id}</span>
-                </span>
-                <span className="shrink-0 text-xs text-zinc-500">
-                  {d.phase}
-                  {d.durationMs != null ? ` · ${d.durationMs}ms` : ''}
-                  {d.exitCode != null ? ` · exit ${d.exitCode}` : ''}
-                </span>
-              </li>
+        <h2 className="section">Connected ({connected.length})</h2>
+        {connected.length === 0 ? (
+          <p className="muted text-sm">No agents connected yet.</p>
+        ) : (
+          <ul className="flex flex-col gap-2">
+            {connected.map((c) => (
+              <ConnectedCard key={c.agentId} agent={c} runner={runners[c.agentId]} onStop={() => onStop(c.agentId)} />
             ))}
           </ul>
-        ) : (
-          <p className="text-sm text-zinc-600">No dispatches handled yet.</p>
         )}
       </section>
 
-      <section className="flex min-h-0 flex-1 flex-col">
-        <h2 className="mb-2 text-xs uppercase tracking-wide text-zinc-500">Log</h2>
-        <div className="flex-1 overflow-auto rounded-md border border-zinc-800 bg-black/40 p-2 font-mono text-xs">
-          {logs.length === 0 ? (
-            <p className="text-zinc-600">Waiting for activity…</p>
-          ) : (
-            logs.map((l, i) => (
-              <div key={i} className={l.level === 'error' ? 'text-red-400' : l.level === 'warn' ? 'text-amber-400' : 'text-zinc-300'}>
-                <span className="text-zinc-600">{new Date(l.ts).toLocaleTimeString()} </span>
-                {l.message}
-              </div>
-            ))
-          )}
-        </div>
+      <section>
+        <h2 className="section">Detected on this machine</h2>
+        {!isTauri() ? (
+          <p className="muted text-sm">Agent detection runs in the desktop app.</p>
+        ) : detected === null ? (
+          <p className="muted text-sm">Scanning…</p>
+        ) : detected.length === 0 ? (
+          <p className="muted text-sm">No known agent CLIs found on your PATH.</p>
+        ) : (
+          <ul className="flex flex-col gap-2">
+            {detected.map((d) => {
+              const exec = execEdits[d.command] ?? d.default_executor;
+              return (
+                <li key={d.command} className="rounded-md border border-zinc-800 p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="text-sm">
+                        {kindLabel(d.kind)} <span className="muted">· {d.command}</span>
+                      </div>
+                      <div className="muted truncate text-[11px]">{d.version || d.path}</div>
+                    </div>
+                    <button className="btn" disabled={!session || !starship} onClick={() => onConnect(d, exec)}>
+                      Connect
+                    </button>
+                  </div>
+                  <input className="inp mt-2 font-mono text-xs" value={exec} onChange={(e) => setExecEdits((p) => ({ ...p, [d.command]: e.target.value }))} />
+                </li>
+              );
+            })}
+          </ul>
+        )}
+        {!session ? <p className="muted mt-2 text-xs">Log in to connect a detected agent.</p> : null}
       </section>
 
-      <style>{`
-        .btn { background:#2563eb; color:white; border-radius:6px; padding:6px 12px; font-size:13px; }
-        .btn:hover { background:#1d4ed8; }
-        .btn-ghost { color:#a1a1aa; border-radius:6px; padding:6px 12px; font-size:13px; }
-        .btn-ghost:hover { color:#e4e4e7; }
-      `}</style>
+      <Style />
     </div>
   );
 }
 
-function Setup({
-  cfg,
-  setCfg,
-  onConnect,
-  error,
-}: {
-  cfg: ControlConfig;
-  setCfg: (c: ControlConfig) => void;
-  onConnect: () => void;
-  error: string | null;
-}) {
-  const port = (() => {
-    try {
-      return new URL(cfg.baseUrl).port || '7777';
-    } catch {
-      return '7777';
-    }
-  })();
+function ConnectedCard({ agent, runner, onStop }: { agent: ConnectedAgent; runner?: RunnerInfo; onStop: () => void }) {
+  const [state, setState] = useState<RunnerState | null>(null);
+  useEffect(() => {
+    if (!runner) return;
+    const cfg = { baseUrl: `http://127.0.0.1:${runner.control_port}`, token: runner.control_token };
+    let alive = true;
+    const tick = () => getStatus(cfg).then((s) => alive && setState(s)).catch(() => {});
+    tick();
+    const t = setInterval(tick, 3000);
+    return () => {
+      alive = false;
+      clearInterval(t);
+    };
+  }, [runner]);
 
+  const status = state?.paused ? 'paused' : state?.status ?? (runner ? 'starting' : 'stopped');
+  const color =
+    status === 'online' || status === 'idle' ? 'bg-emerald-500' : status === 'busy' ? 'bg-blue-500' : status === 'stopped' ? 'bg-red-500' : 'bg-zinc-500';
+
+  return (
+    <li className="rounded-md border border-zinc-800 p-3">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <span className={`h-2.5 w-2.5 rounded-full ${color}`} />
+          <div>
+            <div className="text-sm">{agent.name}</div>
+            <div className="muted text-[11px] capitalize">
+              {status}
+              {state ? ` · ${state.processed} processed` : ''}
+            </div>
+          </div>
+        </div>
+        <button className="btn-ghost text-red-400" onClick={onStop}>
+          Stop
+        </button>
+      </div>
+      {state && state.recent.length > 0 ? (
+        <div className="muted mt-2 text-[11px]">
+          last: {state.recent[0].commandType} · {state.recent[0].phase}
+          {state.recent[0].durationMs != null ? ` · ${state.recent[0].durationMs}ms` : ''}
+        </div>
+      ) : null}
+    </li>
+  );
+}
+
+// ---- small presentational helpers ----
+function Shell({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="mx-auto flex min-h-full max-w-md flex-col justify-center gap-4 p-6">
-      <div>
-        <h1 className="text-xl font-semibold">Starship Agent</h1>
-        <p className="mt-1 text-sm text-zinc-500">Connect to a running agent-runner to watch and control it.</p>
-      </div>
-
-      <label className="flex flex-col gap-1 text-sm">
-        <span className="text-zinc-400">Control URL</span>
-        <input
-          className="rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 outline-none focus:border-blue-500"
-          value={cfg.baseUrl}
-          onChange={(e) => setCfg({ ...cfg, baseUrl: e.target.value })}
-          placeholder="http://127.0.0.1:7777"
-        />
-      </label>
-
-      <label className="flex flex-col gap-1 text-sm">
-        <span className="text-zinc-400">Control token</span>
-        <input
-          className="rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 font-mono outline-none focus:border-blue-500"
-          value={cfg.token}
-          onChange={(e) => setCfg({ ...cfg, token: e.target.value })}
-          placeholder="from the runner's startup log"
-        />
-      </label>
-
-      {error ? <div className="rounded-md border border-red-900 bg-red-950/40 px-3 py-2 text-sm text-red-300">{error}</div> : null}
-
-      <button
-        className="rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-        onClick={onConnect}
-        disabled={!cfg.baseUrl || !cfg.token}
-      >
-        Connect
-      </button>
-
-      <div className="rounded-md border border-zinc-800 bg-zinc-900/50 p-3 text-xs text-zinc-500">
-        <div className="mb-1 text-zinc-400">Start a runner first:</div>
-        <code className="break-all text-zinc-300">starship-agent run --control-port {port} --control-token {cfg.token || '<token>'}</code>
-      </div>
+      <h1 className="text-xl font-semibold">{title}</h1>
+      {children}
+      <Style />
     </div>
   );
 }
-
-function Stat({ label, value }: { label: string; value: string }) {
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-md border border-zinc-800 px-3 py-2">
-      <div className="text-xs text-zinc-500">{label}</div>
-      <div className="text-lg font-semibold">{value}</div>
-    </div>
+    <label className="flex flex-col gap-1 text-sm">
+      <span className="muted">{label}</span>
+      {children}
+    </label>
+  );
+}
+function Err({ children }: { children: React.ReactNode }) {
+  return <div className="rounded-md border border-red-900 bg-red-950/40 px-3 py-2 text-sm text-red-300">{children}</div>;
+}
+function Style() {
+  return (
+    <style>{`
+      .inp { background:#18181b; border:1px solid #3f3f46; border-radius:6px; padding:8px 10px; color:#e6e8ee; outline:none; }
+      .inp:focus { border-color:#3b82f6; }
+      .btn { background:#2563eb; color:#fff; border-radius:6px; padding:8px 14px; font-size:13px; }
+      .btn:hover { background:#1d4ed8; } .btn:disabled { opacity:.5; }
+      .btn-ghost { color:#a1a1aa; border-radius:6px; padding:6px 12px; font-size:13px; } .btn-ghost:hover { color:#e4e4e7; }
+      .muted { color:#71717a; }
+      .section { font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:#71717a; margin-bottom:8px; }
+      .list { display:flex; flex-direction:column; gap:6px; }
+      .row-btn { width:100%; display:flex; justify-content:space-between; gap:8px; border:1px solid #27272a; border-radius:6px; padding:10px 12px; text-align:left; }
+      .row-btn:hover { border-color:#3b82f6; }
+    `}</style>
   );
 }

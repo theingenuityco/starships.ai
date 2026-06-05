@@ -31,6 +31,8 @@ function parseArgs(argv: string[]): { command: string; flags: Flags } {
 /** Merge a loaded config with flag overrides into a complete RunnerConfig. */
 function resolveConfig(flags: Flags): RunnerConfig {
   const loaded = loadConfig();
+  if (typeof flags.endpoint === 'string') loaded.endpoint = flags.endpoint;
+  if (typeof flags.token === 'string') loaded.token = flags.token;
   if (flags['poll-interval']) loaded.pollIntervalMs = Number(flags['poll-interval']);
   if (typeof flags.executor === 'string') {
     const parts = flags.executor.trim().split(/\s+/).filter(Boolean);
@@ -148,6 +150,8 @@ Usage:
 
 Run flags:
   --once                      Drain pending commands once, then exit
+  --endpoint <url>            Override MCP endpoint
+  --token <sk-ship-…>         Override agent token
   --poll-interval <ms>        Override poll interval
   --executor "<cmd …>"        Override executor command (use {{prompt}})
   --control-port <port>       Expose a loopback control API (for the desktop app)

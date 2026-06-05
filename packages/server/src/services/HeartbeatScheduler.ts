@@ -1,4 +1,9 @@
-import { AgentDispatchRepository, AgentEventRepository, AgentHeartbeatRepository } from '@starships/models';
+import {
+  AgentPersonaRepository,
+  AgentRuntimeDispatchRepository,
+  AgentRuntimeEventRepository,
+  AgentRuntimeHeartbeatRepository,
+} from '@starships/models';
 
 export type HeartbeatSchedulerConfig = {
   /** How often the scheduler scans for due heartbeats. */
@@ -58,9 +63,10 @@ export class HeartbeatScheduler {
     if (this.running) return; // skip if the previous tick is still in flight
     this.running = true;
     try {
-      const heartbeats = new AgentHeartbeatRepository();
-      const dispatches = new AgentDispatchRepository();
-      const events = new AgentEventRepository();
+      const heartbeats = new AgentRuntimeHeartbeatRepository();
+      const dispatches = new AgentRuntimeDispatchRepository();
+      const events = new AgentRuntimeEventRepository();
+      const personas = new AgentPersonaRepository();
 
       const due = await heartbeats.claimDue(this.cfg.batchSize);
       for (const hb of due) {
@@ -68,16 +74,32 @@ export class HeartbeatScheduler {
           // Coalesce: don't stack beats while the last one is still outstanding.
           if (await dispatches.hasOutstandingForHeartbeat(hb.id)) continue;
 
+          // Resolve the target persona's current runtime + snapshot its behaviour.
+          const persona = await personas.findById(hb.personaId);
+          if (!persona) {
+            console.error(`[HEARTBEAT] persona ${hb.personaId} for heartbeat ${hb.id} no longer exists; skipping`);
+            continue;
+          }
+
           const dispatch = await dispatches.create({
             starshipId: hb.starshipId,
-            agentId: hb.agentId,
+            personaId: hb.personaId,
+            runtimeId: persona.runtimeId ?? null,
             commandType: hb.commandType,
             payload: hb.payload,
             heartbeatId: hb.id,
+            persona: {
+              personaId: persona.id,
+              systemPrompt: persona.systemPrompt ?? null,
+              model: persona.model ?? null,
+              instructions: persona.instructions ?? null,
+              temperature: persona.temperature ?? null,
+            },
           });
           await events.append({
             starshipId: hb.starshipId,
-            agentId: hb.agentId,
+            personaId: hb.personaId,
+            runtimeId: persona.runtimeId ?? null,
             dispatchId: dispatch.id,
             type: 'heartbeat_fired',
             payload: { heartbeatId: hb.id, commandType: hb.commandType },

@@ -1,19 +1,18 @@
 /**
- * Agent Entity - Layer 2
+ * AgentRuntime Entity - Layer 2
  *
- * Bridges database records and the slim agent-registry domain model.
- * An agent is a registry entry for an external agent runtime, not an
- * in-house execution config.
+ * Bridges database records and the agent-runtime domain model. A runtime is a
+ * registry entry for an external agent engine (Claude Code, Codex, ...). Identity
+ * and behaviour live on the persona, not here.
  */
 
-import type { AgentModel, AgentKind, AgentAccessRole } from '@starships/protocol';
+import type { AgentRuntimeModel, AgentRuntimeKind } from '@starships/protocol';
 import { Expose } from 'class-transformer';
 import { IsISO8601, IsIn, IsOptional, IsString, Length, validate, ValidationError } from 'class-validator';
 
-const AGENT_KINDS: AgentKind[] = ['claude-code', 'codex', 'hermes', 'openclaw', 'custom'];
-const AGENT_ACCESS_ROLES: AgentAccessRole[] = ['viewer', 'contributor'];
+const AGENT_RUNTIME_KINDS: AgentRuntimeKind[] = ['claude-code', 'codex', 'hermes', 'openclaw', 'custom'];
 
-export class AgentEntity implements AgentModel {
+export class AgentRuntimeEntity implements AgentRuntimeModel {
   @Expose()
   @IsString()
   @Length(1, 255)
@@ -36,19 +35,8 @@ export class AgentEntity implements AgentModel {
 
   @Expose()
   @IsString()
-  @IsIn(AGENT_KINDS)
-  kind!: AgentKind;
-
-  @Expose()
-  @IsString()
-  @IsIn(AGENT_ACCESS_ROLES)
-  accessRole!: AgentAccessRole;
-
-  @Expose()
-  @IsOptional()
-  @IsString()
-  @Length(0, 500)
-  description?: string;
+  @IsIn(AGENT_RUNTIME_KINDS)
+  kind!: AgentRuntimeKind;
 
   @Expose()
   @IsOptional()
@@ -69,7 +57,7 @@ export class AgentEntity implements AgentModel {
       throw new Error('Data must be an object');
     }
     const dataRecord = data as Record<string, unknown>;
-    const entity = new AgentEntity();
+    const entity = new AgentRuntimeEntity();
 
     if (operation === 'create') {
       Object.assign(entity, {
@@ -77,11 +65,9 @@ export class AgentEntity implements AgentModel {
         createdAt: dataRecord.createdAt || new Date().toISOString(),
         updatedAt: dataRecord.updatedAt || new Date().toISOString(),
         starshipId: (dataRecord.starshipId as string) || '',
-        slug: (dataRecord.slug as string) || 'agent',
+        slug: (dataRecord.slug as string) || 'runtime',
         name: dataRecord.name || '',
-        kind: (dataRecord.kind as AgentKind) || 'custom',
-        accessRole: (dataRecord.accessRole as AgentAccessRole) || 'contributor',
-        description: dataRecord.description,
+        kind: (dataRecord.kind as AgentRuntimeKind) || 'custom',
         createdByUserId: dataRecord.createdByUserId,
       });
     } else {

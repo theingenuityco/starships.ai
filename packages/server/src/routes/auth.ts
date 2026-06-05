@@ -21,7 +21,7 @@ import { z } from 'zod';
 import { logger } from '@/utils/logger';
 import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
 import { rateLimiters } from '@/middleware/rateLimiter';
-import { AgentService } from '@/services/AgentService';
+import { AgentPersonaService } from '@/services/AgentPersonaService';
 import { StarshipService } from '@/services/StarshipService';
 import { verifyResourceAccess } from '@/middleware/verify-starship-access';
 
@@ -325,21 +325,22 @@ router.post('/auth/token/agent', jwtAuthMiddleware, async (req: Request, res: Re
     const { agentId, starshipId } = body;
     const userId = req.user!.id;
 
-    const agentService = new AgentService();
-    const agent = await agentService.getAgent(agentId);
+    // `agentId` here identifies the persona (actor) the user wants to act as.
+    const personaService = new AgentPersonaService();
+    const persona = await personaService.getPersona(agentId);
 
-    if (!agent) {
-      sendError(res, 'RESOURCE_NOT_FOUND', 'Agent not found', 404, { resource: 'agent', id: agentId });
+    if (!persona) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Persona not found', 404, { resource: 'agent-persona', id: agentId });
       return;
     }
 
-    if (agent.starshipId !== starshipId) {
-      sendError(res, 'ACCESS_DENIED', 'Agent does not belong to the specified starship', 403);
+    if (persona.starshipId !== starshipId) {
+      sendError(res, 'ACCESS_DENIED', 'Persona does not belong to the specified starship', 403);
       return;
     }
 
-    // Ensure the user has access to this agent/starship
-    const hasAccess = await verifyResourceAccess(agent.starshipId, userId, 'agent', agentId, res);
+    // Ensure the user has access to this persona/starship
+    const hasAccess = await verifyResourceAccess(persona.starshipId, userId, 'agent-persona', agentId, res);
     if (!hasAccess) return;
 
     const user = req.user as UserModel;
@@ -347,8 +348,8 @@ router.post('/auth/token/agent', jwtAuthMiddleware, async (req: Request, res: Re
       id: user.id,
       email: user.email,
       name: user.displayName || user.email?.split('@')[0],
-      agentId: agent.id,
-      starshipId: agent.starshipId,
+      agentId: persona.id,
+      starshipId: persona.starshipId,
     });
 
     sendSuccess(res, { token }, 200);

@@ -1,5 +1,5 @@
 import { EventEmitter } from 'node:events';
-import type { AgentConnectionStatus, AgentDispatchModel } from '@starships/protocol';
+import type { AgentConnectionStatus, AgentRuntimeDispatchModel } from '@starships/protocol';
 import type { RunnerConfig } from './config';
 import { StarshipMcpClient } from './mcpClient';
 import { runDispatch, type ExecutionResult } from './executor';
@@ -158,7 +158,7 @@ export class Runner extends EventEmitter {
     this.patch({ recent });
   }
 
-  private async processOne(dispatch: AgentDispatchModel): Promise<void> {
+  private async processOne(dispatch: AgentRuntimeDispatchModel): Promise<void> {
     this.inFlight += 1;
     try {
       await this.client.ack(dispatch.id);

@@ -1,23 +1,32 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  createAgent,
+  assignPersonaRuntime,
+  createPersona,
+  createRuntime,
+  deletePersona,
   deriveMcpUrl,
-  listAgents,
+  listPersonas,
+  listRuntimes,
   listStarships,
   login,
   mintToken,
+  personaActivity,
   revokeToken,
-  type AgentKind,
+  type AccessRole,
+  type AgentPersona,
+  type AgentRuntimeEvent,
+  type AgentRuntimeKind,
   type Session,
   type Starship,
 } from './serverApi';
 import { detectAgents, hostname, isTauri, loadAgentsRaw, saveAgentsRaw, startRunner, stopRunner, type DetectedAgent, type RunnerInfo } from './tauri';
-import { subscribeEvents, type RunnerState } from './api';
+import { subscribeEvents, type RecentDispatch, type RunnerState } from './api';
 
-type Screen = 'login' | 'starship' | 'agents';
+type Screen = 'login' | 'starship' | 'runtimes';
 
-interface ConnectedAgent {
-  agentId: string;
+/** A runtime connected from this machine, persisted to the Rust 0600 store. */
+interface ConnectedRuntime {
+  runtimeId: string;
   kind: string;
   name: string;
   token: string;
@@ -33,13 +42,13 @@ const KIND_LABEL: Record<string, string> = {
   codex: 'Codex',
   hermes: 'Hermes',
   openclaw: 'OpenClaw',
-  custom: 'Agent',
+  custom: 'Custom',
 };
 const kindLabel = (k: string) => KIND_LABEL[k] ?? k;
 
 // Persistence is delegated to the Rust shell (0600 file) so tokens never touch
 // the webview's localStorage. No-ops gracefully outside Tauri (e.g. vite dev).
-async function loadConnected(): Promise<ConnectedAgent[]> {
+async function loadConnected(): Promise<ConnectedRuntime[]> {
   if (!isTauri()) return [];
   try {
     return JSON.parse(await loadAgentsRaw());
@@ -47,7 +56,7 @@ async function loadConnected(): Promise<ConnectedAgent[]> {
     return [];
   }
 }
-function saveConnected(list: ConnectedAgent[]) {
+function saveConnected(list: ConnectedRuntime[]) {
   if (!isTauri()) return;
   saveAgentsRaw(JSON.stringify(list)).catch(() => {});
 }
@@ -57,13 +66,13 @@ export default function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [starship, setStarship] = useState<Starship | null>(null);
   const [mcpUrl, setMcpUrl] = useState('');
-  const [connected, setConnected] = useState<ConnectedAgent[]>([]);
-  const [runners, setRunners] = useState<Record<string, RunnerInfo>>({}); // agentId -> runner
+  const [connected, setConnected] = useState<ConnectedRuntime[]>([]);
+  const [runners, setRunners] = useState<Record<string, RunnerInfo>>({}); // runtimeId -> runner
   const [banner, setBanner] = useState<string | null>(null);
   const [booting, setBooting] = useState(true);
   const started = useRef(false);
 
-  // On launch, load persisted agents and auto-restart their runners (no login needed).
+  // On launch, load persisted runtimes and auto-restart their runners (no login needed).
   useEffect(() => {
     if (started.current) return;
     started.current = true;
@@ -71,14 +80,14 @@ export default function App() {
       try {
         const saved = await loadConnected();
         setConnected(saved);
-        if (saved.length > 0) setScreen('agents');
-        for (const a of saved) {
+        if (saved.length > 0) setScreen('runtimes');
+        for (const r of saved) {
           if (!isTauri()) break;
           try {
-            const info = await startRunner({ agentId: a.agentId, token: a.token, mcpUrl: a.mcpUrl, executor: a.executor });
-            setRunners((prev) => ({ ...prev, [a.agentId]: info }));
+            const info = await startRunner({ agentId: r.runtimeId, token: r.token, mcpUrl: r.mcpUrl, executor: r.executor });
+            setRunners((prev) => ({ ...prev, [r.runtimeId]: info }));
           } catch (e) {
-            setBanner(`Could not restart ${a.name}: ${(e as Error).message}`);
+            setBanner(`Could not restart ${r.name}: ${(e as Error).message}`);
           }
         }
       } finally {
@@ -92,14 +101,14 @@ export default function App() {
   }
 
   if (screen === 'login') {
-    return <Login onDone={(s, ship) => { setSession(s); if (ship) { setStarship(ship); setMcpUrl(deriveMcpUrl(s.serverUrl)); setScreen('agents'); } else { setScreen('starship'); } }} />;
+    return <Login onDone={(s, ship) => { setSession(s); if (ship) { setStarship(ship); setMcpUrl(deriveMcpUrl(s.serverUrl)); setScreen('runtimes'); } else { setScreen('starship'); } }} />;
   }
   if (screen === 'starship' && session) {
-    return <StarshipPicker session={session} onPick={(ship) => { setStarship(ship); setMcpUrl(deriveMcpUrl(session.serverUrl)); setScreen('agents'); }} />;
+    return <StarshipPicker session={session} onPick={(ship) => { setStarship(ship); setMcpUrl(deriveMcpUrl(session.serverUrl)); setScreen('runtimes'); }} />;
   }
 
   return (
-    <Agents
+    <Runtimes
       session={session}
       starship={starship}
       mcpUrl={mcpUrl}
@@ -116,37 +125,37 @@ export default function App() {
         setBanner(null);
         try {
           const host = await hostname();
-          const name = `${kindLabel(d.kind)} — ${host}`;
-          const existing = await listAgents(session, starship.id);
-          let agent = existing.find((a) => a.name === name);
-          if (!agent) {
-            agent = await createAgent(session, { starshipId: starship.id, name, kind: d.kind as AgentKind, accessRole: 'contributor' });
+          const name = `${kindLabel(d.kind)} · ${host}`;
+          const existing = await listRuntimes(session, starship.id);
+          let runtime = existing.find((r) => r.name === name);
+          if (!runtime) {
+            runtime = await createRuntime(session, { starshipId: starship.id, name, kind: d.kind as AgentRuntimeKind });
           }
-          const { token, tokenId } = await mintToken(session, starship.id, agent.id, `${name} (desktop)`);
-          const info = await startRunner({ agentId: agent.id, token, mcpUrl, executor });
-          const rec: ConnectedAgent = { agentId: agent.id, kind: d.kind, name, token, tokenId, executor, mcpUrl };
-          const next = [...connected.filter((c) => c.agentId !== agent.id), rec];
+          const { token, tokenId } = await mintToken(session, starship.id, runtime.id, `${name} (desktop)`);
+          const info = await startRunner({ agentId: runtime.id, token, mcpUrl, executor });
+          const rec: ConnectedRuntime = { runtimeId: runtime.id, kind: d.kind, name, token, tokenId, executor, mcpUrl };
+          const next = [...connected.filter((c) => c.runtimeId !== runtime.id), rec];
           setConnected(next);
           saveConnected(next);
-          setRunners((prev) => ({ ...prev, [agent!.id]: info }));
+          setRunners((prev) => ({ ...prev, [runtime!.id]: info }));
         } catch (e) {
           setBanner(`Connect failed: ${(e as Error).message}`);
         }
       }}
-      onStop={async (agentId) => {
-        const info = runners[agentId];
+      onStop={async (runtimeId) => {
+        const info = runners[runtimeId];
         try {
           if (info && isTauri()) await stopRunner(info.runner_id);
         } catch {
           /* ignore */
         }
-        // Best-effort revoke so stopped agents don't leave live tokens behind.
-        const rec = connected.find((c) => c.agentId === agentId);
+        // Best-effort revoke so stopped runtimes don't leave live tokens behind.
+        const rec = connected.find((c) => c.runtimeId === runtimeId);
         if (session && rec?.tokenId) revokeToken(session, rec.tokenId).catch(() => {});
-        const next = connected.filter((c) => c.agentId !== agentId);
+        const next = connected.filter((c) => c.runtimeId !== runtimeId);
         setConnected(next);
         saveConnected(next);
-        setRunners((prev) => Object.fromEntries(Object.entries(prev).filter(([k]) => k !== agentId)));
+        setRunners((prev) => Object.fromEntries(Object.entries(prev).filter(([k]) => k !== runtimeId)));
       }}
     />
   );
@@ -223,17 +232,17 @@ function StarshipPicker({ session, onPick }: { session: Session; onPick: (s: Sta
   );
 }
 
-function Agents(props: {
+function Runtimes(props: {
   session: Session | null;
   starship: Starship | null;
   mcpUrl: string;
   setMcpUrl: (v: string) => void;
-  connected: ConnectedAgent[];
+  connected: ConnectedRuntime[];
   runners: Record<string, RunnerInfo>;
   banner: string | null;
   onLogin: () => void;
   onConnect: (d: DetectedAgent, executor: string) => void;
-  onStop: (agentId: string) => void;
+  onStop: (runtimeId: string) => void;
 }) {
   const { session, starship, mcpUrl, setMcpUrl, connected, runners, banner, onLogin, onConnect, onStop } = props;
   const [detected, setDetected] = useState<DetectedAgent[] | null>(null);
@@ -251,7 +260,7 @@ function Agents(props: {
     <div className="mx-auto flex min-h-full max-w-2xl flex-col gap-5 p-6">
       <header className="flex items-center justify-between">
         <div>
-          <h1 className="text-lg font-semibold">Agents</h1>
+          <h1 className="text-lg font-semibold">Agent Runtimes</h1>
           <div className="muted text-xs">{starship ? `${starship.name}` : 'Not signed in'}</div>
         </div>
         <div className="flex items-center gap-2">
@@ -271,13 +280,20 @@ function Agents(props: {
       ) : null}
 
       <section>
-        <h2 className="section">Connected ({connected.length})</h2>
+        <h2 className="section">Connected runtimes ({connected.length})</h2>
         {connected.length === 0 ? (
-          <p className="muted text-sm">No agents connected yet.</p>
+          <p className="muted text-sm">No runtimes connected yet.</p>
         ) : (
           <ul className="flex flex-col gap-2">
             {connected.map((c) => (
-              <ConnectedCard key={c.agentId} agent={c} runner={runners[c.agentId]} onStop={() => onStop(c.agentId)} />
+              <RuntimeCard
+                key={c.runtimeId}
+                runtime={c}
+                runner={runners[c.runtimeId]}
+                session={session}
+                starship={starship}
+                onStop={() => onStop(c.runtimeId)}
+              />
             ))}
           </ul>
         )}
@@ -286,7 +302,7 @@ function Agents(props: {
       <section>
         <h2 className="section">Detected on this machine</h2>
         {!isTauri() ? (
-          <p className="muted text-sm">Agent detection runs in the desktop app.</p>
+          <p className="muted text-sm">Runtime detection runs in the desktop app.</p>
         ) : detected === null ? (
           <p className="muted text-sm">Scanning…</p>
         ) : detected.length === 0 ? (
@@ -314,7 +330,7 @@ function Agents(props: {
             })}
           </ul>
         )}
-        {!session ? <p className="muted mt-2 text-xs">Log in to connect a detected agent.</p> : null}
+        {!session ? <p className="muted mt-2 text-xs">Log in to connect a detected runtime.</p> : null}
       </section>
 
       <Style />
@@ -322,7 +338,19 @@ function Agents(props: {
   );
 }
 
-function ConnectedCard({ agent, runner, onStop }: { agent: ConnectedAgent; runner?: RunnerInfo; onStop: () => void }) {
+function RuntimeCard({
+  runtime,
+  runner,
+  session,
+  starship,
+  onStop,
+}: {
+  runtime: ConnectedRuntime;
+  runner?: RunnerInfo;
+  session: Session | null;
+  starship: Starship | null;
+  onStop: () => void;
+}) {
   const [state, setState] = useState<RunnerState | null>(null);
   useEffect(() => {
     if (!runner) return;
@@ -341,10 +369,13 @@ function ConnectedCard({ agent, runner, onStop }: { agent: ConnectedAgent; runne
         <div className="flex items-center gap-2">
           <span className={`h-2.5 w-2.5 rounded-full ${color}`} />
           <div>
-            <div className="text-sm">{agent.name}</div>
+            <div className="text-sm">
+              {runtime.name} <span className="muted text-[11px]">· {kindLabel(runtime.kind)}</span>
+            </div>
             <div className="muted text-[11px] capitalize">
               {status}
               {state ? ` · ${state.processed} processed` : ''}
+              {state?.lastPollAt ? ` · polled ${timeAgo(state.lastPollAt)}` : ''}
             </div>
           </div>
         </div>
@@ -352,17 +383,239 @@ function ConnectedCard({ agent, runner, onStop }: { agent: ConnectedAgent; runne
           Stop
         </button>
       </div>
-      {state && state.recent.length > 0 ? (
-        <div className="muted mt-2 text-[11px]">
-          last: {state.recent[0].commandType} · {state.recent[0].phase}
-          {state.recent[0].durationMs != null ? ` · ${state.recent[0].durationMs}ms` : ''}
+
+      {state?.lastError ? <div className="mt-2 rounded border border-red-900/60 bg-red-950/30 px-2 py-1 text-[11px] text-red-300">{state.lastError}</div> : null}
+
+      <ActivityList recent={state?.recent ?? []} />
+
+      <PersonaSection session={session} starship={starship} runtimeId={runtime.runtimeId} />
+    </li>
+  );
+}
+
+const PHASE_COLOR: Record<RecentDispatch['phase'], string> = {
+  running: 'text-blue-400',
+  completed: 'text-emerald-400',
+  failed: 'text-red-400',
+};
+
+function ActivityList({ recent }: { recent: RecentDispatch[] }) {
+  if (recent.length === 0) return <div className="muted mt-2 text-[11px]">No activity yet.</div>;
+  return (
+    <div className="mt-2">
+      <div className="section">Recent activity</div>
+      <ul className="flex flex-col gap-1">
+        {recent.slice(0, 8).map((r) => (
+          <li key={r.id} className="flex items-center justify-between gap-2 text-[11px]">
+            <span className="truncate">
+              <span className="font-mono">{r.commandType}</span>
+              <span className={`ml-1 ${PHASE_COLOR[r.phase]}`}>{r.phase}</span>
+              {r.exitCode != null && r.phase === 'failed' ? <span className="muted"> · exit {r.exitCode}</span> : null}
+              {r.timedOut ? <span className="text-red-400"> · timed out</span> : null}
+            </span>
+            <span className="muted shrink-0">
+              {r.durationMs != null ? `${r.durationMs}ms · ` : ''}
+              {timeAgo(r.at)}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function PersonaSection({ session, starship, runtimeId }: { session: Session | null; starship: Starship | null; runtimeId: string }) {
+  const [personas, setPersonas] = useState<AgentPersona[] | null>(null);
+  const [adding, setAdding] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function refresh() {
+    if (!session || !starship) return;
+    try {
+      const all = await listPersonas(session, starship.id);
+      setPersonas(all.filter((p) => p.runtimeId === runtimeId));
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
+
+  useEffect(() => {
+    void refresh();
+  }, [session, starship, runtimeId]);
+
+  if (!session || !starship) {
+    return <div className="muted mt-3 text-[11px]">Sign in to manage personas on this runtime.</div>;
+  }
+
+  return (
+    <div className="mt-3 border-t border-zinc-800 pt-2">
+      <div className="flex items-center justify-between">
+        <div className="section mb-0">Personas ({personas?.length ?? 0})</div>
+        <button className="btn-ghost text-[11px]" onClick={() => setAdding((v) => !v)}>
+          {adding ? 'Cancel' : '+ New persona'}
+        </button>
+      </div>
+
+      {error ? <div className="mt-1 text-[11px] text-red-400">{error}</div> : null}
+
+      {adding ? (
+        <NewPersonaForm
+          onCreate={async (input) => {
+            await createPersona(session, { ...input, starshipId: starship.id, runtimeId });
+            setAdding(false);
+            await refresh();
+          }}
+        />
+      ) : null}
+
+      {personas && personas.length > 0 ? (
+        <ul className="mt-2 flex flex-col gap-2">
+          {personas.map((p) => (
+            <PersonaRow
+              key={p.id}
+              session={session}
+              persona={p}
+              onUnassign={async () => {
+                await assignPersonaRuntime(session, p.id, null);
+                await refresh();
+              }}
+              onDelete={async () => {
+                await deletePersona(session, p.id);
+                await refresh();
+              }}
+            />
+          ))}
+        </ul>
+      ) : personas ? (
+        <div className="muted mt-1 text-[11px]">No personas assigned to this runtime yet.</div>
+      ) : null}
+    </div>
+  );
+}
+
+function NewPersonaForm({ onCreate }: { onCreate: (input: { name: string; accessRole: AccessRole; model?: string; systemPrompt?: string }) => Promise<void> }) {
+  const [name, setName] = useState('');
+  const [model, setModel] = useState('');
+  const [systemPrompt, setSystemPrompt] = useState('');
+  const [accessRole, setAccessRole] = useState<AccessRole>('contributor');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function submit() {
+    setBusy(true);
+    setError(null);
+    try {
+      await onCreate({ name: name.trim(), accessRole, model: model.trim() || undefined, systemPrompt: systemPrompt.trim() || undefined });
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="mt-2 flex flex-col gap-2 rounded-md border border-zinc-800 p-2">
+      <input className="inp text-xs" placeholder="Persona name" value={name} onChange={(e) => setName(e.target.value)} autoFocus />
+      <div className="flex gap-2">
+        <input className="inp flex-1 text-xs" placeholder="Model (optional, e.g. claude-opus-4-8)" value={model} onChange={(e) => setModel(e.target.value)} />
+        <select className="inp text-xs" value={accessRole} onChange={(e) => setAccessRole(e.target.value as AccessRole)}>
+          <option value="contributor">contributor</option>
+          <option value="viewer">viewer</option>
+        </select>
+      </div>
+      <textarea
+        className="inp font-mono text-xs"
+        rows={3}
+        placeholder="System prompt (optional) — injected into the runtime at execution time"
+        value={systemPrompt}
+        onChange={(e) => setSystemPrompt(e.target.value)}
+      />
+      {error ? <div className="text-[11px] text-red-400">{error}</div> : null}
+      <button className="btn self-start text-xs" onClick={submit} disabled={busy || !name.trim()}>
+        {busy ? 'Creating…' : 'Create persona'}
+      </button>
+    </div>
+  );
+}
+
+function PersonaRow({
+  session,
+  persona,
+  onUnassign,
+  onDelete,
+}: {
+  session: Session;
+  persona: AgentPersona;
+  onUnassign: () => Promise<void>;
+  onDelete: () => Promise<void>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [events, setEvents] = useState<AgentRuntimeEvent[] | null>(null);
+
+  async function toggle() {
+    const next = !open;
+    setOpen(next);
+    if (next && events === null) {
+      try {
+        setEvents(await personaActivity(session, persona.id, 30));
+      } catch {
+        setEvents([]);
+      }
+    }
+  }
+
+  return (
+    <li className="rounded-md border border-zinc-800/70 p-2">
+      <div className="flex items-center justify-between gap-2">
+        <button className="min-w-0 text-left" onClick={toggle}>
+          <div className="truncate text-xs">
+            {persona.name} <span className="muted">· {persona.accessRole}</span>
+            {persona.model ? <span className="muted"> · {persona.model}</span> : null}
+          </div>
+          {persona.systemPrompt ? <div className="muted truncate text-[11px]">{persona.systemPrompt}</div> : null}
+        </button>
+        <div className="flex shrink-0 gap-1">
+          <button className="btn-ghost text-[11px]" onClick={onUnassign} title="Move off this runtime">
+            Unassign
+          </button>
+          <button className="btn-ghost text-[11px] text-red-400" onClick={onDelete}>
+            Delete
+          </button>
         </div>
+      </div>
+      {open ? (
+        events === null ? (
+          <div className="muted mt-1 text-[11px]">Loading activity…</div>
+        ) : events.length === 0 ? (
+          <div className="muted mt-1 text-[11px]">No recorded activity.</div>
+        ) : (
+          <ul className="mt-1 flex flex-col gap-0.5">
+            {events.map((e) => (
+              <li key={e.id} className="flex items-center justify-between gap-2 text-[11px]">
+                <span className="truncate font-mono">{e.type}</span>
+                <span className="muted shrink-0">{timeAgo(e.createdAt)}</span>
+              </li>
+            ))}
+          </ul>
+        )
       ) : null}
     </li>
   );
 }
 
 // ---- small presentational helpers ----
+function timeAgo(iso: string): string {
+  const t = new Date(iso).getTime();
+  if (Number.isNaN(t)) return '';
+  const s = Math.max(0, Math.round((Date.now() - t) / 1000));
+  if (s < 60) return `${s}s ago`;
+  const m = Math.round(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.round(m / 60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.round(h / 24)}d ago`;
+}
+
 function Shell({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="mx-auto flex min-h-full max-w-md flex-col justify-center gap-4 p-6">

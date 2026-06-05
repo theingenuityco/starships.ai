@@ -1,5 +1,6 @@
-// Client for the Starship server REST API (bearer-JWT). Used by the desktop
-// app to log in, list starships/agents, register agents, and mint tokens.
+// Client for the Starship server REST API (bearer-JWT). Used by the desktop app
+// to log in, list starships, register agent runtimes, mint runtime tokens, and
+// manage the personas that run on a runtime.
 
 export interface User {
   id: string;
@@ -19,15 +20,41 @@ export interface Starship {
   name: string;
 }
 
-export type AgentKind = 'claude-code' | 'codex' | 'hermes' | 'openclaw' | 'custom';
+export type AgentRuntimeKind = 'claude-code' | 'codex' | 'hermes' | 'openclaw' | 'custom';
+export type AccessRole = 'viewer' | 'contributor';
 
-export interface Agent {
+/** The engine (an external CLI) registered on a starship. */
+export interface AgentRuntime {
   id: string;
   starshipId: string;
   slug: string;
   name: string;
-  kind: AgentKind;
-  accessRole: 'viewer' | 'contributor';
+  kind: AgentRuntimeKind;
+}
+
+/** The user-authored actor that runs on a runtime. */
+export interface AgentPersona {
+  id: string;
+  starshipId: string;
+  slug: string;
+  name: string;
+  description?: string | null;
+  accessRole: AccessRole;
+  systemPrompt?: string | null;
+  model?: string | null;
+  instructions?: string | null;
+  runtimeId?: string | null;
+}
+
+/** Append-only activity record attributed to a persona + runtime. */
+export interface AgentRuntimeEvent {
+  id: string;
+  personaId?: string | null;
+  runtimeId?: string | null;
+  dispatchId?: string | null;
+  type: string;
+  payload: Record<string, unknown>;
+  createdAt: string;
 }
 
 const base = (serverUrl: string) => `${serverUrl.replace(/\/$/, '')}/api/v1`;
@@ -62,29 +89,65 @@ export function listStarships(s: Session): Promise<Starship[]> {
   return request<Starship[]>(s.serverUrl, `/users/${s.user.id}/starships?limit=100`, { token: s.token });
 }
 
-export function listAgents(s: Session, starshipId: string): Promise<Agent[]> {
-  return request<Agent[]>(s.serverUrl, `/starships/${starshipId}/agents?limit=100`, { token: s.token });
+// ---- Runtimes (engines) ----
+
+export function listRuntimes(s: Session, starshipId: string): Promise<AgentRuntime[]> {
+  return request<AgentRuntime[]>(s.serverUrl, `/starships/${starshipId}/agent-runtimes?limit=100`, { token: s.token });
 }
 
-export function createAgent(
-  s: Session,
-  input: { starshipId: string; name: string; kind: AgentKind; accessRole?: 'viewer' | 'contributor'; description?: string }
-): Promise<Agent> {
-  return request<Agent>(s.serverUrl, '/agents', { method: 'POST', token: s.token, body: JSON.stringify(input) });
+export function createRuntime(s: Session, input: { starshipId: string; name: string; kind: AgentRuntimeKind }): Promise<AgentRuntime> {
+  return request<AgentRuntime>(s.serverUrl, '/agent-runtimes', { method: 'POST', token: s.token, body: JSON.stringify(input) });
 }
 
-export async function mintToken(s: Session, starshipId: string, agentId: string, name?: string): Promise<{ token: string; tokenId: string }> {
-  const data = await request<{ token: string; record: { id: string } }>(s.serverUrl, `/starships/${starshipId}/agent-tokens`, {
+export async function mintToken(s: Session, starshipId: string, runtimeId: string, name?: string): Promise<{ token: string; tokenId: string }> {
+  const data = await request<{ token: string; record: { id: string } }>(s.serverUrl, `/starships/${starshipId}/agent-runtime-tokens`, {
     method: 'POST',
     token: s.token,
-    body: JSON.stringify({ agentId, ...(name ? { name } : {}) }),
+    body: JSON.stringify({ runtimeId, ...(name ? { name } : {}) }),
   });
   return { token: data.token, tokenId: data.record.id };
 }
 
 /** Revoke a previously minted connection token (best-effort; owner-only server-side). */
 export function revokeToken(s: Session, tokenId: string): Promise<void> {
-  return request<void>(s.serverUrl, `/agent-tokens/${tokenId}`, { method: 'DELETE', token: s.token });
+  return request<void>(s.serverUrl, `/agent-runtime-tokens/${tokenId}`, { method: 'DELETE', token: s.token });
+}
+
+// ---- Personas (actors) ----
+
+export function listPersonas(s: Session, starshipId: string): Promise<AgentPersona[]> {
+  return request<AgentPersona[]>(s.serverUrl, `/starships/${starshipId}/agent-personas?limit=100`, { token: s.token });
+}
+
+export function createPersona(
+  s: Session,
+  input: {
+    starshipId: string;
+    name: string;
+    accessRole?: AccessRole;
+    systemPrompt?: string;
+    model?: string;
+    instructions?: string;
+    runtimeId?: string | null;
+  }
+): Promise<AgentPersona> {
+  return request<AgentPersona>(s.serverUrl, '/agent-personas', { method: 'POST', token: s.token, body: JSON.stringify(input) });
+}
+
+export function assignPersonaRuntime(s: Session, personaId: string, runtimeId: string | null): Promise<AgentPersona> {
+  return request<AgentPersona>(s.serverUrl, `/agent-personas/${personaId}/runtime`, {
+    method: 'PUT',
+    token: s.token,
+    body: JSON.stringify({ runtimeId }),
+  });
+}
+
+export function deletePersona(s: Session, personaId: string): Promise<void> {
+  return request<void>(s.serverUrl, `/agent-personas/${personaId}`, { method: 'DELETE', token: s.token });
+}
+
+export function personaActivity(s: Session, personaId: string, limit = 50): Promise<AgentRuntimeEvent[]> {
+  return request<AgentRuntimeEvent[]>(s.serverUrl, `/agent-personas/${personaId}/activity?limit=${limit}`, { token: s.token });
 }
 
 /** Derive the MCP endpoint from the server URL: same host, port 4100, /mcp. */

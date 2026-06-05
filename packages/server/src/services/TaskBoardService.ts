@@ -2,7 +2,7 @@ import {
   TaskBoardRepository,
   TaskCardRepository,
   TaskColumnRepository,
-  AgentRepository,
+  AgentPersonaRepository,
   StarshipMemberRepository,
   getConnection,
 } from '@starships/models';
@@ -31,14 +31,14 @@ export class TaskBoardService {
   private readonly boards: TaskBoardRepository;
   private readonly columns: TaskColumnRepository;
   private readonly cards: TaskCardRepository;
-  private readonly agents: AgentRepository;
+  private readonly agents: AgentPersonaRepository;
   private readonly starshipMembers: StarshipMemberRepository;
 
   constructor() {
     this.boards = new TaskBoardRepository();
     this.columns = new TaskColumnRepository();
     this.cards = new TaskCardRepository();
-    this.agents = new AgentRepository();
+    this.agents = new AgentPersonaRepository();
     this.starshipMembers = new StarshipMemberRepository();
   }
 
@@ -254,7 +254,7 @@ export class TaskBoardService {
     const agentSlugById = new Map<string, string>();
     if (agentIds.length > 0) {
       const conn = getConnection();
-      const rows = await conn.query<{ id: string; slug: string }>(`SELECT id, slug FROM agents WHERE id = ANY($1::text[])`, [agentIds]);
+      const rows = await conn.query<{ id: string; slug: string }>(`SELECT id, slug FROM agent_personas WHERE id = ANY($1::text[])`, [agentIds]);
       for (const r of rows) {
         const id = String(r.id || '').trim();
         const slug = String(r.slug || '').trim();

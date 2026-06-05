@@ -3,7 +3,8 @@ export { createConnection, getConnection, createAgentConnection, getAgentConnect
 export type { PostgresConfig } from './helpers/database';
 
 /* Entity exports */
-export { AgentEntity } from './entities/AgentEntity';
+export { AgentRuntimeEntity } from './entities/AgentRuntimeEntity';
+export { AgentPersonaEntity } from './entities/AgentPersonaEntity';
 export { PlatformSecretEntity } from './entities/PlatformSecretEntity';
 export { RoomEntity } from './entities/RoomEntity';
 export { OAuthAccountEntity } from './entities/OAuthAccountEntity';
@@ -22,12 +23,13 @@ export { StarshipDocEntity } from './entities/StarshipDocEntity';
 // Turns
 
 /* Repository exports */
-export { AgentRepository } from './repositories/AgentRepository';
-export { AgentTokenRepository } from './repositories/AgentTokenRepository';
-export { AgentDeviceRepository } from './repositories/AgentDeviceRepository';
-export { AgentDispatchRepository } from './repositories/AgentDispatchRepository';
-export { AgentEventRepository } from './repositories/AgentEventRepository';
-export { AgentHeartbeatRepository } from './repositories/AgentHeartbeatRepository';
+export { AgentRuntimeRepository } from './repositories/AgentRuntimeRepository';
+export { AgentPersonaRepository } from './repositories/AgentPersonaRepository';
+export { AgentRuntimeTokenRepository } from './repositories/AgentRuntimeTokenRepository';
+export { AgentRuntimeDeviceRepository } from './repositories/AgentRuntimeDeviceRepository';
+export { AgentRuntimeDispatchRepository } from './repositories/AgentRuntimeDispatchRepository';
+export { AgentRuntimeEventRepository } from './repositories/AgentRuntimeEventRepository';
+export { AgentRuntimeHeartbeatRepository } from './repositories/AgentRuntimeHeartbeatRepository';
 export { PlatformSecretRepository } from './repositories/PlatformSecretRepository';
 export { RoomRepository } from './repositories/RoomRepository';
 export { RoomTablesRepository } from './repositories/RoomTablesRepository';

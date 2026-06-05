@@ -6,7 +6,7 @@
  */
 
 import { fromDatabase, toDatabase, fromDatabaseArray } from '@/helpers/serialization-helper';
-import { AgentEntity } from '@/entities/AgentEntity';
+import { AgentRuntimeEntity } from '@/entities/AgentRuntimeEntity';
 import { UserEntity } from '@/entities/UserEntity';
 import { Expose, Transform } from 'class-transformer';
 import { IsString, Length } from 'class-validator';
@@ -116,23 +116,20 @@ describe('Serialization Helper', () => {
 
     it('should work with real entities', () => {
       const agentRecord = {
-        id: 'agent-123',
+        id: 'runtime-123',
         starshipId: 'ship-1',
-        slug: 'test-agent',
-        name: 'Test Agent',
+        slug: 'test-runtime',
+        name: 'Test Runtime',
         kind: 'claude-code',
-        accessRole: 'contributor',
-        description: 'Test agent',
         createdAt: '2024-01-01T00:00:00.000Z',
         updatedAt: '2024-01-01T00:00:00.000Z',
       };
 
-      const agent = fromDatabase(AgentEntity, agentRecord);
+      const runtime = fromDatabase(AgentRuntimeEntity, agentRecord);
 
-      expect(agent).toBeInstanceOf(AgentEntity);
-      expect(agent.name).toBe('Test Agent');
-      expect(agent.kind).toBe('claude-code');
-      expect(agent.accessRole).toBe('contributor');
+      expect(runtime).toBeInstanceOf(AgentRuntimeEntity);
+      expect(runtime.name).toBe('Test Runtime');
+      expect(runtime.kind).toBe('claude-code');
     });
 
     it('should throw error for null or undefined data', () => {

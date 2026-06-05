@@ -387,7 +387,7 @@ export class MigrationRunner {
         SELECT COUNT(*) as count
         FROM information_schema.tables
         WHERE table_schema = 'public'
-        AND table_name IN ('users', 'starships', 'agents', 'conversations', 'messages')
+        AND table_name IN ('users', 'starships', 'agent_runtimes', 'conversations', 'messages')
       `);
       const tableCount = parseInt(tableResult[0]?.count || '0');
       if (tableCount < 5) {

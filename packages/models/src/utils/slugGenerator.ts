@@ -5,7 +5,7 @@
  * Ensures slugs follow the pattern: {template-slug}-{random-suffix}
  */
 
-import { AgentRepository } from '../repositories/AgentRepository';
+import type { AgentRuntimeRepository } from '../repositories/AgentRuntimeRepository';
 import { generateSlug } from '../helpers/slugUtils';
 
 /**
@@ -29,7 +29,7 @@ export function generateRandomSuffix(): string {
  * @param agentRepository - Repository instance for checking uniqueness
  * @returns Promise<string> - Unique agent slug
  */
-export async function generateUniqueAgentSlug(templateSlug: string, agentRepository: AgentRepository): Promise<string> {
+export async function generateUniqueAgentSlug(templateSlug: string, agentRepository: AgentRuntimeRepository): Promise<string> {
   const baseSlug = templateSlug;
   let attempts = 0;
   const maxAttempts = 10;
@@ -59,7 +59,7 @@ export async function generateUniqueAgentSlug(templateSlug: string, agentReposit
  * @param agentRepository - Repository instance for checking uniqueness
  * @returns Promise<string> - Unique agent slug
  */
-export async function generateSimpleAgentSlug(agentRepository: AgentRepository): Promise<string> {
+export async function generateSimpleAgentSlug(agentRepository: AgentRuntimeRepository): Promise<string> {
   let attempts = 0;
   const maxAttempts = 10;
 

@@ -6,14 +6,15 @@ import { IdSchema, noXSS, XSS_ERROR_MESSAGE } from '@/schemas/common';
 import type { Request, Response } from 'express';
 import { Router } from 'express';
 import { z } from 'zod';
-import { AgentRepository, AgentDispatchRepository, AgentEventRepository } from '@starships/models';
+import { AgentPersonaRepository, AgentRuntimeDispatchRepository, AgentRuntimeEventRepository } from '@starships/models';
+import type { PersonaExecutionConfig } from '@starships/protocol';
 
 const router: Router = Router();
 
-// POST /starships/:starshipId/agents/:agentId/dispatch - Dispatch a command to an agent (owner only)
-router.post('/starships/:starshipId/agents/:agentId/dispatch', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+// POST /starships/:starshipId/agent-personas/:personaId/dispatch - Dispatch a command to a persona (owner only)
+router.post('/starships/:starshipId/agent-personas/:personaId/dispatch', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
-    const params = validateData(z.object({ starshipId: IdSchema, agentId: IdSchema }), req.params, res, 'dispatch parameters');
+    const params = validateData(z.object({ starshipId: IdSchema, personaId: IdSchema }), req.params, res, 'dispatch parameters');
     if (!params) return;
     if (!(await verifyStarshipOwnerAccess(params.starshipId, req.user!.id, res))) return;
 
@@ -29,21 +30,33 @@ router.post('/starships/:starshipId/agents/:agentId/dispatch', jwtAuthMiddleware
     );
     if (!body) return;
 
-    const agent = await new AgentRepository().findById(params.agentId);
-    if (!agent || String(agent.starshipId) !== String(params.starshipId)) {
-      sendError(res, 'VALIDATION_ERROR', 'Agent not found in this starship', 400, { agentId: params.agentId });
+    const persona = await new AgentPersonaRepository().findById(params.personaId);
+    if (!persona || String(persona.starshipId) !== String(params.starshipId)) {
+      sendError(res, 'VALIDATION_ERROR', 'Persona not found in this starship', 400, { personaId: params.personaId });
       return;
     }
 
-    const dispatch = await new AgentDispatchRepository().create({
+    // Snapshot the persona's behaviour so the runtime injects it at execution time,
+    // and resolve the runtime currently assigned to this persona.
+    const personaConfig: PersonaExecutionConfig = {
+      personaId: persona.id,
+      systemPrompt: persona.systemPrompt ?? null,
+      model: persona.model ?? null,
+      instructions: persona.instructions ?? null,
+      temperature: persona.temperature ?? null,
+    };
+
+    const dispatch = await new AgentRuntimeDispatchRepository().create({
       starshipId: params.starshipId,
-      agentId: params.agentId,
+      personaId: persona.id,
+      runtimeId: persona.runtimeId ?? null,
       commandType: body.commandType,
       payload: body.payload ?? {},
+      persona: personaConfig,
       cardId: body.cardId ?? null,
     });
     // TODO(dispatch-push): when an in-memory WS channel exists, push to a connected
-    // agent here. Until then agents retrieve via the MCP `pull_commands` tool.
+    // runtime here. Until then runtimes retrieve via the MCP `pull_commands` tool.
     sendSuccess(res, dispatch, 201);
   } catch (error) {
     handleError(error, res, 'dispatching command');
@@ -60,7 +73,7 @@ router.get('/starships/:starshipId/agent-events', jwtAuthMiddleware, async (req:
     const query = validateData(z.object({ limit: z.coerce.number().int().min(1).max(200).optional() }), req.query, res, 'events query');
     if (!query) return;
 
-    const events = await new AgentEventRepository().listByStarship(params.starshipId, query.limit ?? 100);
+    const events = await new AgentRuntimeEventRepository().listByStarship(params.starshipId, query.limit ?? 100);
     sendSuccess(res, events);
   } catch (error) {
     handleError(error, res, 'listing agent events');

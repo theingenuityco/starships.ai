@@ -1,4 +1,5 @@
-export { AgentRepository } from './AgentRepository';
+export { AgentRuntimeRepository } from './AgentRuntimeRepository';
+export { AgentPersonaRepository } from './AgentPersonaRepository';
 export { OAuthAccountRepository } from './OAuthAccountRepository';
 export { StarshipRepository } from './StarshipRepository';
 export { UserRepository } from './UserRepository';

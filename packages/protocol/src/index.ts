@@ -23,7 +23,8 @@ export type TemplateCategory =
 export type AgentCategory = TemplateCategory;
 export type ToolCategory = TemplateCategory;
 /* Export domain types (database domains) */
-export * from './domains/agent';
+export * from './domains/agent-runtime';
+export * from './domains/agent-persona';
 export * from './domains/agent-dispatch';
 export * from './domains/auth';
 export * from './domains/starship';

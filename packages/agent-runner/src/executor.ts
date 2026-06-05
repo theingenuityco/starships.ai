@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import type { AgentDispatchModel } from '@starships/protocol';
+import type { AgentRuntimeDispatchModel } from '@starships/protocol';
 import type { ExecutorConfig } from './config';
 
 export interface ExecutionResult {
@@ -16,16 +16,30 @@ function truncate(s: string): string {
   return s.length > MAX_CAPTURE ? `${s.slice(0, MAX_CAPTURE)}…[truncated]` : s;
 }
 
-/** Resolve a single arg's `{{…}}` tokens against the dispatch. */
-function substitute(arg: string, dispatch: AgentDispatchModel, promptField: string): string {
+/**
+ * Resolve a single arg's `{{…}}` tokens against the dispatch.
+ *
+ * Persona tokens ({{systemPrompt}}, {{model}}, {{instructions}}) come from the
+ * persona snapshot the server attached to the dispatch, so each runtime executes
+ * the assigned persona's behaviour. Templates that omit these tokens still get
+ * the values via env (see runDispatch).
+ */
+function substitute(arg: string, dispatch: AgentRuntimeDispatchModel, promptField: string): string {
   const prompt = String((dispatch.payload as Record<string, unknown>)?.[promptField] ?? '');
+  const persona = dispatch.persona ?? null;
   return arg
     .split('{{prompt}}')
     .join(prompt)
     .split('{{commandType}}')
     .join(dispatch.commandType)
     .split('{{dispatchId}}')
-    .join(dispatch.id);
+    .join(dispatch.id)
+    .split('{{systemPrompt}}')
+    .join(String(persona?.systemPrompt ?? ''))
+    .split('{{model}}')
+    .join(String(persona?.model ?? ''))
+    .split('{{instructions}}')
+    .join(String(persona?.instructions ?? ''));
 }
 
 /**
@@ -36,7 +50,7 @@ function substitute(arg: string, dispatch: AgentDispatchModel, promptField: stri
  * shell metacharacters. The full payload is also exposed via env for executors
  * that prefer to read it structured.
  */
-export function runDispatch(executor: ExecutorConfig, dispatch: AgentDispatchModel, signal?: AbortSignal): Promise<ExecutionResult> {
+export function runDispatch(executor: ExecutorConfig, dispatch: AgentRuntimeDispatchModel, signal?: AbortSignal): Promise<ExecutionResult> {
   const args = executor.args.map((a) => substitute(a, dispatch, executor.promptField));
 
   const env = { ...process.env };
@@ -44,6 +58,15 @@ export function runDispatch(executor: ExecutorConfig, dispatch: AgentDispatchMod
     env.STARSHIP_DISPATCH_ID = dispatch.id;
     env.STARSHIP_COMMAND_TYPE = dispatch.commandType;
     env.STARSHIP_DISPATCH_PAYLOAD = JSON.stringify(dispatch.payload ?? {});
+    // Persona behaviour snapshot, for executors that read it from env rather
+    // than via {{…}} arg tokens.
+    const persona = dispatch.persona ?? null;
+    if (persona) {
+      env.STARSHIP_PERSONA_ID = persona.personaId;
+      if (persona.systemPrompt) env.STARSHIP_PERSONA_SYSTEM_PROMPT = persona.systemPrompt;
+      if (persona.model) env.STARSHIP_PERSONA_MODEL = persona.model;
+      if (persona.instructions) env.STARSHIP_PERSONA_INSTRUCTIONS = persona.instructions;
+    }
   }
 
   return new Promise<ExecutionResult>((resolve) => {

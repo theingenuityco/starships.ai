@@ -221,34 +221,6 @@ export class StarshipService {
   }
 
   /**
-   * Get starship conversations
-   */
-  async getStarshipConversations(starshipId: string): Promise<Record<string, unknown>[]> {
-    return this.starshipRepository.getConversations(starshipId);
-  }
-
-  /**
-   * Get conversation count for starship
-   */
-  async getConversationCount(starshipId: string): Promise<number> {
-    return this.starshipRepository.getConversationCount(starshipId);
-  }
-
-  /**
-   * Get active conversations for starship
-   */
-  async getActiveConversations(starshipId: string): Promise<Record<string, unknown>[]> {
-    return this.starshipRepository.getActiveConversations(starshipId);
-  }
-
-  /**
-   * Remove conversation from starship
-   */
-  async removeConversation(starshipId: string, conversationId: string): Promise<boolean> {
-    return this.starshipRepository.removeConversation(starshipId, conversationId);
-  }
-
-  /**
    * Check if user has access to starship (owner, collaborator, or instance admin).
    *
    * NOTE: This is collaborator-level access (non-billing). Use hasOwnerAccess() for

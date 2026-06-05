@@ -2,15 +2,11 @@ import type { StarshipTableColumn } from '@starships/protocol';
 import { BaseRepository } from './BaseRepository';
 import { NotFoundError, ValidationError } from '@starships/errors';
 import { nanoid } from 'nanoid';
-import { getEnvConfig } from '@starships/env';
 import type { PostgresConnection } from '@/helpers/database';
 import { generateUniqueSlugIncremental } from '@/utils/slugGenerator';
 import { schemaName, qualifiedTable, sanitizeTableName, assertSafeId } from '@/helpers/starship-tables/identifiers';
 import { compileCreateTable, compileAlterTable, TableSchemaChangeError } from '@/services/StarshipTableDdlCompiler';
 import { StarshipDatabaseProvisioner } from '@/services/StarshipDatabaseProvisioner';
-import { StarshipDefinitionStore } from '@/services/StarshipDefinitionStore';
-import { serializeTable, tableFilename } from '@/services/definition/tableCodec';
-import type { TableDefinition } from '@/services/definition/types';
 
 type DbRow = Record<string, unknown>;
 
@@ -61,38 +57,8 @@ function dropFormula(columns: StarshipTableColumn[] | undefined): StarshipTableC
 }
 
 export class StarshipTableRepository extends BaseRepository {
-  private _definitionStore?: StarshipDefinitionStore;
-
   constructor(connection?: PostgresConnection) {
     super('StarshipTableRepository', connection);
-  }
-
-  /**
-   * Tables mirror to the definition file at the repository layer (routes call
-   * the repo directly, no service seam). DB-first-mirror: the row + physical
-   * table is the canonical write (DDL is computed here); its logical schema is
-   * mirrored to `.autopilot/tables/<slug>.yaml`. The physical binding
-   * (schema/physicalTable) and `archived` are index-only. Gated by
-   * STARSHIP_FS_AUTHORITY.
-   */
-  private get definitionStore(): StarshipDefinitionStore {
-    if (!this._definitionStore) this._definitionStore = new StarshipDefinitionStore();
-    return this._definitionStore;
-  }
-
-  private fsAuthority(): boolean {
-    return getEnvConfig().STARSHIP_FS_AUTHORITY === true;
-  }
-
-  private async mirrorToFile(record: StarshipTableRecord | null): Promise<void> {
-    if (!record || !this.fsAuthority()) return;
-    await this.definitionStore.ensureProvisioned(record.starshipId);
-    await this.definitionStore.write(record.starshipId, 'tables', tableFilename(record.slug), serializeTable(record));
-  }
-
-  private async removeFile(record: StarshipTableRecord | null): Promise<void> {
-    if (!record || !this.fsAuthority()) return;
-    await this.definitionStore.delete(record.starshipId, 'tables', tableFilename(record.slug));
   }
 
   private mapRow(row: DbRow): StarshipTableRecord {
@@ -214,7 +180,6 @@ export class StarshipTableRepository extends BaseRepository {
 
         const created = await this.findById(id);
         if (!created) throw new NotFoundError('StarshipTable', id);
-        await this.mirrorToFile(created);
         return created;
       },
       'create',
@@ -288,7 +253,6 @@ export class StarshipTableRepository extends BaseRepository {
         });
 
         const updated = await this.findById(id);
-        await this.mirrorToFile(updated);
         return updated;
       },
       'update',
@@ -311,84 +275,11 @@ export class StarshipTableRepository extends BaseRepository {
           await client.query(`DROP TABLE IF EXISTS ${table} CASCADE`);
           await client.query(`DELETE FROM starship_tables WHERE id = $1`, [id]);
         });
-        await this.removeFile(existing);
         return true;
       },
       'delete',
       'StarshipTable',
       id
-    );
-  }
-
-  /**
-   * Upsert the starship_tables INDEX row + physical table from a filesystem
-   * definition (the reconcile target; does NOT mirror back to a file).
-   *
-   * - New (no row for def.id): provision schema, generate a physical table name,
-   *   compileCreateTable, INSERT (explicit id + authored slug) + DDL in one tx.
-   * - Existing: compileAlterTable(old -> new) for column/primaryKey changes, then
-   *   ALTER + UPDATE authored columns in one tx. Physical binding (schema_name,
-   *   physical_table) and `archived` are preserved.
-   *
-   * A destructive schema change surfaces as a ValidationError (mappable to 400).
-   */
-  async upsertIndexFromDefinition(input: { def: TableDefinition; starshipId: string }): Promise<StarshipTableRecord> {
-    const { def } = input;
-    return this.executeWithErrorHandling(
-      async () => {
-        const starshipId = assertSafeId(input.starshipId, 'starshipId');
-        const columns = dropFormula(def.columns as unknown as StarshipTableColumn[]);
-        const primaryKey = typeof def.primaryKey === 'string' ? def.primaryKey : null;
-        const existing = await this.findById(def.id);
-        const now = new Date().toISOString();
-
-        if (!existing) {
-          await new StarshipDatabaseProvisioner(this.getConnection()).ensureProvisioned(starshipId);
-          const schema = schemaName(starshipId);
-          const physicalTable = await this.uniquePhysicalTable(schema, def.slug);
-          const ddl = compileCreateTable({ table: qualifiedTable(starshipId, physicalTable), physicalTable, columns, primaryKey });
-          await this.getConnection().transaction(async (client) => {
-            await client.query(
-              `INSERT INTO starship_tables
-                 (id, starship_id, name, slug, description, schema_name, physical_table, columns_meta_json, primary_key, archived, created_at, updated_at)
-               VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9,$10,$11,$12)`,
-              [def.id, starshipId, def.name, def.slug, def.description ?? '', schema, physicalTable, JSON.stringify(columns), primaryKey, false, now, now]
-            );
-            for (const stmt of ddl) await client.query(stmt);
-          });
-        } else {
-          let alter: string[] = [];
-          try {
-            alter = compileAlterTable({
-              table: qualifiedTable(existing.starshipId, existing.physicalTable),
-              physicalTable: existing.physicalTable,
-              oldColumns: existing.columns,
-              columns,
-              primaryKey,
-              oldPrimaryKey: existing.primaryKey,
-            });
-          } catch (e) {
-            if (e instanceof TableSchemaChangeError) throw new ValidationError(e.message);
-            throw e;
-          }
-          await this.getConnection().transaction(async (client) => {
-            for (const stmt of alter) await client.query(stmt);
-            await client.query(
-              `UPDATE starship_tables
-                 SET name = $1, description = $2, columns_meta_json = $3::jsonb, primary_key = $4, updated_at = $5
-               WHERE id = $6`,
-              [def.name, def.description ?? '', JSON.stringify(columns), primaryKey, now, def.id]
-            );
-          });
-        }
-
-        const result = await this.findById(def.id);
-        if (!result) throw new NotFoundError('StarshipTable', def.id);
-        return result;
-      },
-      'upsertIndexFromDefinition',
-      'StarshipTable',
-      def.id
     );
   }
 }

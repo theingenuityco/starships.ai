@@ -111,10 +111,19 @@ export interface CliAgentRuntimeEnvelope {
 
   /**
    * Which agent in `.autopilot/agents/` to embody this turn (the selector, like
-   * `claude --agent <slug>`). Informational until the CLI bootstrap (Stage 2)
-   * consumes it to load the persona/tuning from the file.
+   * `claude --agent <slug>`). Consumed by the CLI bootstrap to load the
+   * persona/tuning/connector allow-list from the file when {@link fsBootstrap} is on.
    */
   agentSlug?: string;
+
+  /**
+   * When true, the CLI resolves the agent's definition from the mounted
+   * `.autopilot/` volume (overriding the baked definition fields). Set by the
+   * server when the filesystem definition plane is authoritative
+   * (STARSHIP_FS_AUTHORITY). Injected explicitly so the CLI does not depend on
+   * host env resolving inside the sandbox.
+   */
+  fsBootstrap?: boolean;
 
   /**
    * Server-composed per-turn context (starship/thread/policy) to append after the

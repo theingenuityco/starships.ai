@@ -20,6 +20,14 @@ export type { HttpConnectorActionRunnerOptions } from '@/runtime/httpConnectorAc
 export { buildSystemTools } from '@/tools/system';
 export { buildConnectorTools, connectorRegistryCatalog } from '@/tools/connectors';
 
+export {
+  loadAutopilotDefinition,
+  resolveDefinitionRoot,
+  ALWAYS_DISCOVERABLE_CONNECTORS,
+  PERSONA_PLACEHOLDER,
+} from '@/bootstrap/loadAutopilotDefinition';
+export type { LoadedAutopilotDefinition } from '@/bootstrap/loadAutopilotDefinition';
+
 export { serializeToolResult } from '@/serialize';
 export { buildPermissionPolicy } from '@/jobSpec';
 export type {

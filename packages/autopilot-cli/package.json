@@ -22,6 +22,7 @@
   },
   "dependencies": {
     "@starships/connectors": "workspace:*",
+    "@starships/definition": "workspace:*",
     "openai": "^6.10.0"
   },
   "devDependencies": {

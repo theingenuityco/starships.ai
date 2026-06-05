@@ -130,6 +130,12 @@ export interface AgentTurnArgs {
   turnId: string;
   agentModel: AgentTurnAgentModel;
   systemPrompt: string;
+  /**
+   * The canonical system prompt composed with a persona placeholder, supplied
+   * when the filesystem definition plane is authoritative so the sandbox CLI can
+   * splice in the file persona. Absent when files are not authoritative.
+   */
+  systemPromptContext?: string;
   /** Conversation history shaped for the LLM (excluding the system prompt). */
   llmMessages: LlmMessage[];
   starshipId: string;
@@ -223,12 +229,15 @@ export async function runAgentTurn(deps: AgentTurnDeps, args: AgentTurnArgs): Pr
       if (!engineConfig.connectorActionCallback?.url) {
         throw new Error('Sandbox agent turn cannot run: missing connector-action callback URL.');
       }
+      const fsBootstrap = getEnvConfig().STARSHIP_FS_AUTHORITY === true;
       const spec: Omit<CliAgentJobSpec, 'workspace'> = {
         requestId: turnId,
         model: modelId,
         systemPrompt: args.systemPrompt,
         messages,
         ...(agentModel.slug ? { agentSlug: agentModel.slug } : {}),
+        ...(fsBootstrap ? { fsBootstrap: true } : {}),
+        ...(fsBootstrap && args.systemPromptContext ? { systemPromptContext: args.systemPromptContext } : {}),
         discoverConnectors,
         ...(permissions ? { permissions } : {}),
         ...(args.approvals ? { approvals: args.approvals } : {}),

@@ -75,6 +75,9 @@ importers:
       '@starships/connectors':
         specifier: workspace:*
         version: link:../connectors
+      '@starships/definition':
+        specifier: workspace:*
+        version: link:../definition
       openai:
         specifier: ^6.10.0
         version: 6.10.0(ws@8.21.0)(zod@4.1.12)

@@ -36,6 +36,7 @@ import { parse, Allow } from 'partial-json-parser';
 import { fetchTextFromS3 } from '@/utils/s3-helper';
 import { buildStarshipSystemPromptContext } from '@/utils/starship-system-prompt-context';
 import { composeCanonicalSystemPrompt, type ThreadContextState } from '@/utils/SystemPromptComposer';
+import { PERSONA_PLACEHOLDER } from '@starships/autopilot-cli';
 // Connector runtime (http_request.connector) removed in v2; connector_action uses template+session bundles.
 import { AgentService } from '@/services/AgentService';
 import {
@@ -2614,6 +2615,19 @@ export class ConversationService {
           historyTruncated: Boolean(hasMoreBefore),
           historyLimit: llmHistoryLimit,
         });
+        // When the filesystem definition plane is authoritative, also compose the
+        // canonical prompt with the persona replaced by a placeholder, so the
+        // sandbox CLI can splice in the file persona at the same position.
+        const systemPromptContext =
+          getEnvConfig().STARSHIP_FS_AUTHORITY === true
+            ? this.buildCanonicalSystemPrompt({
+                agentSystemPrompt: PERSONA_PLACEHOLDER,
+                injectedStarshipContext,
+                conversationState,
+                historyTruncated: Boolean(hasMoreBefore),
+                historyLimit: llmHistoryLimit,
+              })
+            : undefined;
 
         // Prepare input messages snapshot for this agent (with multimodal content support)
         const mentionRefs = ConversationService.collectMentionRefsFromMessages(messages);
@@ -2715,6 +2729,7 @@ export class ConversationService {
                 : {}),
             },
             systemPrompt: combinedSystemPrompt,
+            ...(systemPromptContext ? { systemPromptContext } : {}),
             llmMessages,
             starshipId: starship.id,
             authUserId: turnAuthUserId,
@@ -3102,6 +3117,16 @@ export class ConversationService {
         historyTruncated: Boolean(page.hasMoreBefore),
         historyLimit: llmHistoryLimit,
       });
+      const systemPromptContext =
+        getEnvConfig().STARSHIP_FS_AUTHORITY === true
+          ? this.buildCanonicalSystemPrompt({
+              agentSystemPrompt: PERSONA_PLACEHOLDER,
+              injectedStarshipContext,
+              conversationState,
+              historyTruncated: Boolean(page.hasMoreBefore),
+              historyLimit: llmHistoryLimit,
+            })
+          : undefined;
 
       const authUserId = ctx?.authContext?.userId ?? (conversation as { userId?: string }).userId;
       if (!authUserId) {
@@ -3174,6 +3199,7 @@ export class ConversationService {
               : {}),
           },
           systemPrompt: combinedSystemPrompt,
+          ...(systemPromptContext ? { systemPromptContext } : {}),
           llmMessages,
           starshipId: starship.id,
           authUserId,

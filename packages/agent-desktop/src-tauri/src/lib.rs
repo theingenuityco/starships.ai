@@ -36,10 +36,13 @@ struct DetectedAgent {
 }
 
 /// Curated map of agent CLIs we know how to drive: (command, AgentKind, default executor).
+/// The executor is a best-effort default and is editable in the UI before Connect.
 fn known_agents() -> &'static [(&'static str, &'static str, &'static str)] {
     &[
         ("claude", "claude-code", "claude -p {{prompt}}"),
         ("codex", "codex", "codex exec {{prompt}}"),
+        ("hermes", "hermes", "hermes -p {{prompt}}"),
+        ("openclaw", "openclaw", "openclaw -p {{prompt}}"),
         ("aider", "custom", "aider --message {{prompt}}"),
         ("gemini", "custom", "gemini -p {{prompt}}"),
         ("opencode", "custom", "opencode run {{prompt}}"),

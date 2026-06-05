@@ -1,50 +1,60 @@
 /**
  * Agent Entity - Layer 2
  *
- * Bridges between database records and domain models with validation and transformation capabilities.
- * Follows the layered architecture pattern established by ConversationEntity and MessageEntity.
+ * Bridges database records and the slim agent-registry domain model.
+ * An agent is a registry entry for an external agent runtime, not an
+ * in-house execution config.
  */
 
-import type { AgentState } from '@starships/protocol';
-import type { AgentModel } from '@starships/protocol';
+import type { AgentModel, AgentKind, AgentAccessRole } from '@starships/protocol';
 import { Expose } from 'class-transformer';
-import {
-  IsISO8601,
-  IsNumber,
-  IsObject,
-  IsOptional,
-  IsString,
-  Length,
-  Max,
-  Min,
-  validate,
-  ValidationError,
-  IsArray,
-  IsIn,
-} from 'class-validator';
-import { DEFAULT_AGENT_TIMEOUT_MS } from '@/constants/agentDefaults';
+import { IsISO8601, IsIn, IsOptional, IsString, Length, validate, ValidationError } from 'class-validator';
+
+const AGENT_KINDS: AgentKind[] = ['claude-code', 'codex', 'hermes', 'openclaw', 'custom'];
+const AGENT_ACCESS_ROLES: AgentAccessRole[] = ['viewer', 'contributor'];
 
 export class AgentEntity implements AgentModel {
-  // Core database fields
   @Expose()
   @IsString()
   @Length(1, 255)
   id!: string;
 
-  // Stable content hash used for import/export conflict detection (stored in DB)
-  @Expose()
-  @IsOptional()
-  @IsString()
-  @Length(64, 64)
-  contentHash?: string;
-
-  /**
-   * Human-readable role label for this agent (required).
-   */
   @Expose()
   @IsString()
   @Length(1, 255)
-  role!: string;
+  starshipId!: string;
+
+  @Expose()
+  @IsString()
+  @Length(1, 100)
+  slug!: string;
+
+  @Expose()
+  @IsString()
+  @Length(1, 100)
+  name!: string;
+
+  @Expose()
+  @IsString()
+  @IsIn(AGENT_KINDS)
+  kind!: AgentKind;
+
+  @Expose()
+  @IsString()
+  @IsIn(AGENT_ACCESS_ROLES)
+  accessRole!: AgentAccessRole;
+
+  @Expose()
+  @IsOptional()
+  @IsString()
+  @Length(0, 500)
+  description?: string;
+
+  @Expose()
+  @IsOptional()
+  @IsString()
+  @Length(1, 255)
+  createdByUserId?: string;
 
   @Expose()
   @IsISO8601()
@@ -54,125 +64,6 @@ export class AgentEntity implements AgentModel {
   @IsISO8601()
   updatedAt!: string;
 
-  // Foreign key relationships
-  @Expose()
-  @IsString()
-  @Length(1, 255)
-  starshipId!: string;
-
-  // Optional avatar attachment ID (S3-backed image stored via AttachmentService)
-  @Expose()
-  @IsOptional()
-  @IsString()
-  @Length(1, 255)
-  avatarAttachmentId?: string;
-
-  // Optional agent-authored avatar prompt used to guide avatar generation
-  @Expose()
-  @IsOptional()
-  @IsString()
-  @Length(0, 8000)
-  avatarPrompt?: string;
-
-  // Optional profile image attachment IDs (S3-backed images stored via AttachmentService)
-  @Expose()
-  @IsOptional()
-  @IsString()
-  @Length(1, 255)
-  problemStatementsAttachmentId?: string;
-
-  @Expose()
-  @IsOptional()
-  @IsString()
-  @Length(1, 255)
-  capabilitiesAttachmentId?: string;
-
-  @Expose()
-  @IsOptional()
-  @IsString()
-  @Length(1, 255)
-  tryThesePromptsAttachmentId?: string;
-
-  // Core AgentParams fields
-  @Expose()
-  @IsString()
-  @Length(1, 100)
-  name!: string;
-
-  @Expose()
-  @IsString()
-  @Length(1, 100)
-  slug!: string;
-
-  @Expose()
-  @IsOptional()
-  @IsString()
-  @Length(0, 500)
-  description?: string;
-
-  @Expose()
-  @IsString()
-  @Length(1, 100)
-  model!: string;
-
-  @Expose()
-  @IsOptional()
-  @IsString()
-  @IsIn(['general', 'coding', 'creative', 'analysis', 'support', 'utility', 'data', 'communication', 'automation'])
-  category?: AgentModel['category'];
-
-  @Expose()
-  @IsOptional()
-  @IsNumber()
-  @Min(0)
-  @Max(2)
-  temperature?: number;
-
-  @Expose()
-  @IsOptional()
-  @IsNumber()
-  @Min(1)
-  @Max(100000)
-  maxTokens?: number;
-
-  @Expose()
-  @IsOptional()
-  @IsObject()
-  reasoning?: AgentModel['reasoning'];
-
-  @Expose()
-  @IsNumber()
-  @Min(1000)
-  @Max(600000)
-  timeout!: number;
-
-  @Expose()
-  @IsOptional()
-  @IsString()
-  systemPrompt?: string; // System prompt moved to root level
-
-  @Expose()
-  @IsOptional()
-  @IsObject()
-  state?: AgentState; // Runtime state with messages and tools
-
-  // Optional example prompts surfaced on agents (usually inherited from template)
-  @Expose()
-  @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  previewPrompts?: string[];
-
-  // Versioning fields
-  @Expose()
-  @IsString()
-  @Length(1, 20)
-  version!: string; // Semantic version (e.g., '1.0.2')
-
-  /**
-   * Simple validation function using class-validator
-   * This replaces the manual validation approach with a decorator-based solution
-   */
   static async validate(data: unknown, operation: 'create' | 'update' = 'create'): Promise<void> {
     if (!data || typeof data !== 'object') {
       throw new Error('Data must be an object');
@@ -180,29 +71,20 @@ export class AgentEntity implements AgentModel {
     const dataRecord = data as Record<string, unknown>;
     const entity = new AgentEntity();
 
-    // For create operations, validate all required fields
     if (operation === 'create') {
       Object.assign(entity, {
-        id: dataRecord.id || 'temp-id', // Will be replaced by auto-generated ID
+        id: dataRecord.id || 'temp-id',
         createdAt: dataRecord.createdAt || new Date().toISOString(),
         updatedAt: dataRecord.updatedAt || new Date().toISOString(),
-        // Require starshipId for creation
         starshipId: (dataRecord.starshipId as string) || '',
+        slug: (dataRecord.slug as string) || 'agent',
         name: dataRecord.name || '',
-        role: (dataRecord.role as string) || 'Assistant',
+        kind: (dataRecord.kind as AgentKind) || 'custom',
+        accessRole: (dataRecord.accessRole as AgentAccessRole) || 'contributor',
         description: dataRecord.description,
-        model: dataRecord.model || '',
-        temperature: dataRecord.temperature,
-        maxTokens: dataRecord.maxTokens,
-        reasoning: dataRecord.reasoning,
-        timeout: dataRecord.timeout ?? DEFAULT_AGENT_TIMEOUT_MS,
-        systemPrompt: dataRecord.systemPrompt,
-        state: dataRecord.state || { messages: [], tools: [] },
-        version: dataRecord.version || '1.0.0',
-        ...dataRecord,
+        createdByUserId: dataRecord.createdByUserId,
       });
     } else {
-      // For update operations, only validate provided fields
       Object.assign(entity, dataRecord);
     }
 

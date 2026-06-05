@@ -118,22 +118,22 @@ describe('Serialization Helper', () => {
     it('should work with real entities', () => {
       const agentRecord = {
         id: 'agent-123',
+        starshipId: 'ship-1',
+        slug: 'test-agent',
         name: 'Test Agent',
-        model: 'gpt-4',
-        timeout: 30000,
+        kind: 'claude-code',
+        accessRole: 'contributor',
+        description: 'Test agent',
         createdAt: '2024-01-01T00:00:00.000Z',
         updatedAt: '2024-01-01T00:00:00.000Z',
-        systemPrompt: 'Test agent',
-        state: '{"messages":[], "tools":[]}',
       };
 
       const agent = fromDatabase(AgentEntity, agentRecord);
 
       expect(agent).toBeInstanceOf(AgentEntity);
       expect(agent.name).toBe('Test Agent');
-      expect(agent.systemPrompt).toBe('Test agent');
-      // With exposeAll strategy, JSONB strings remain as strings and need explicit parsing if needed
-      expect(agent.state).toBeDefined();
+      expect(agent.kind).toBe('claude-code');
+      expect(agent.accessRole).toBe('contributor');
     });
 
     it('should throw error for null or undefined data', () => {

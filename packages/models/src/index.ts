@@ -122,13 +122,6 @@ export {
 } from './services/StarshipVolumeProvisioner';
 export { StarshipDefinitionStore, type DefinitionFileRef } from './services/StarshipDefinitionStore';
 export {
-  StarshipDefinitionReconciler,
-  type ReconcileResult,
-  type ReconcileTarget,
-  type EntityReconcileResult,
-  type AgentReconcileResult,
-} from './services/StarshipDefinitionReconciler';
-export {
   serializeAgent,
   serializeAgentDefinition,
   agentModelToDefinition,

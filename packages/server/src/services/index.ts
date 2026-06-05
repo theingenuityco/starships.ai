@@ -1,6 +1,5 @@
 export { AgentService } from './AgentService';
 export { EmailService } from './EmailService';
-export { ImportExportService } from './ImportExportService';
 export { PlatformSecretService } from './PlatformSecretService';
 export { RegistrationOrchestrator } from './RegistrationOrchestrator';
 export { ServiceFactory } from './ServiceFactory';

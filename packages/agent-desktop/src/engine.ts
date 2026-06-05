@@ -3,6 +3,7 @@
 // direct, in-app call to the Rust `run_agent` command.
 import { runAgent } from './tauri';
 import { addEvent, getStore, type Persona, type Runtime } from './store';
+import { DEFAULT_PERMISSIONS, permissionArgs } from './permissions';
 
 /**
  * Tokenize a command line, honoring single/double quotes so multi-word args
@@ -57,7 +58,10 @@ export async function runPersona(personaId: string, prompt: string): Promise<Run
   const sessionId = crypto.randomUUID();
   const usesSession = parts.some((a) => a.includes('{{sessionId}}'));
   const command = parts[0];
-  const args = parts.slice(1).map((a) => substitute(a, prompt, sessionId, persona));
+  // Compile the persona's permission policy into this CLI's approval flags and append them
+  // after the prompt (trailing options parse cleanly and avoid subcommand-position issues).
+  const permArgs = permissionArgs(runtime.kind, runtime.executor, persona.permissions ?? DEFAULT_PERMISSIONS);
+  const args = [...parts.slice(1).map((a) => substitute(a, prompt, sessionId, persona)), ...permArgs];
 
   const env: Record<string, string> = {
     STARSHIP_DISPATCH_ID: dispatchId,

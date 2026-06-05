@@ -21,6 +21,8 @@ import {
 import { runPersona } from './engine';
 import { detectAgents, hostname, isTauri, readAgentTranscript, type DetectedAgent } from './tauri';
 import { parseClaudeTranscript, type TranscriptTurn, type TurnRole } from './transcript';
+import { Onboarding } from './Onboarding';
+import { COMMON_TOOLS, DEFAULT_PERMISSIONS, SUPPORTS_ALLOWLIST, type PermissionPolicy } from './permissions';
 
 const KIND_LABEL: Record<string, string> = {
   'claude-code': 'Claude Code',
@@ -29,7 +31,7 @@ const KIND_LABEL: Record<string, string> = {
   openclaw: 'OpenClaw',
   custom: 'Custom',
 };
-const kindLabel = (k: string) => KIND_LABEL[k] ?? k;
+export const kindLabel = (k: string) => KIND_LABEL[k] ?? k;
 
 /** Poll cadence for the in-app heartbeat scheduler (runs only while the app is open). */
 const SCHEDULER_TICK_MS = 20_000;
@@ -63,6 +65,8 @@ export default function App() {
     return () => clearInterval(id);
   }, [booting]);
 
+  const store = useStore();
+
   if (booting) {
     return (
       <div className="mx-auto flex min-h-full max-w-md flex-col justify-center gap-4 p-6">
@@ -72,6 +76,8 @@ export default function App() {
       </div>
     );
   }
+
+  if (!store.onboardedAt) return <Onboarding />;
 
   return <Dashboard />;
 }
@@ -244,10 +250,15 @@ function PersonasTab() {
   );
 }
 
-function NewPersonaForm({ onCreate }: { onCreate: (input: { name: string; model?: string; systemPrompt?: string }) => void }) {
+function NewPersonaForm({
+  onCreate,
+}: {
+  onCreate: (input: { name: string; model?: string; systemPrompt?: string; permissions?: PermissionPolicy }) => void;
+}) {
   const [name, setName] = useState('');
   const [model, setModel] = useState('');
   const [systemPrompt, setSystemPrompt] = useState('');
+  const [permissions, setPermissions] = useState<PermissionPolicy>(DEFAULT_PERMISSIONS);
 
   return (
     <div className="mt-2 flex flex-col gap-2 rounded-md border border-zinc-800 p-2">
@@ -260,13 +271,89 @@ function NewPersonaForm({ onCreate }: { onCreate: (input: { name: string; model?
         value={systemPrompt}
         onChange={(e) => setSystemPrompt(e.target.value)}
       />
+      <div className="flex flex-col gap-1">
+        <span className="section mb-0">Tool permissions</span>
+        <PermissionEditor value={permissions} onChange={setPermissions} />
+      </div>
       <button
         className="btn self-start text-xs"
-        onClick={() => onCreate({ name: name.trim(), model: model.trim() || undefined, systemPrompt: systemPrompt.trim() || undefined })}
+        onClick={() => onCreate({ name: name.trim(), model: model.trim() || undefined, systemPrompt: systemPrompt.trim() || undefined, permissions })}
         disabled={!name.trim()}
       >
         Create persona
       </button>
+    </div>
+  );
+}
+
+/**
+ * Edits a persona's tool-permission policy. Runtime-aware: a tool-name allowlist is only
+ * offered when the assigned runtime kind supports one (otherwise "Restrict" falls back to
+ * the CLI's default approvals, which we make explicit). `kind` is undefined before a runtime
+ * is assigned (e.g. at creation).
+ */
+function PermissionEditor({
+  kind,
+  value,
+  onChange,
+}: {
+  kind?: RuntimeKind;
+  value: PermissionPolicy;
+  onChange: (p: PermissionPolicy) => void;
+}) {
+  const supportsAllowlist = kind != null && SUPPORTS_ALLOWLIST.includes(kind);
+  const commons = value.allow.filter((t) => COMMON_TOOLS.includes(t));
+  const parseExtra = (text: string) =>
+    text
+      .split(',')
+      .map((s) => s.trim())
+      .filter((s) => s && !COMMON_TOOLS.includes(s));
+  const [extraText, setExtraText] = useState(() => value.allow.filter((t) => !COMMON_TOOLS.includes(t)).join(', '));
+
+  const toggle = (tool: string) => {
+    const nextCommons = commons.includes(tool) ? commons.filter((t) => t !== tool) : [...commons, tool];
+    onChange({ ...value, allow: [...nextCommons, ...parseExtra(extraText)] });
+  };
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex gap-1">
+        <button className={value.mode === 'all' ? 'tab tab-active' : 'tab'} onClick={() => onChange({ ...value, mode: 'all' })}>
+          Allow all tools
+        </button>
+        <button className={value.mode === 'allowlist' ? 'tab tab-active' : 'tab'} onClick={() => onChange({ ...value, mode: 'allowlist' })}>
+          Restrict
+        </button>
+      </div>
+
+      {value.mode === 'allowlist' ? (
+        supportsAllowlist ? (
+          <>
+            <div className="flex flex-wrap gap-x-3 gap-y-1">
+              {COMMON_TOOLS.map((t) => (
+                <label key={t} className="flex items-center gap-1 text-[11px]">
+                  <input type="checkbox" checked={value.allow.includes(t)} onChange={() => toggle(t)} />
+                  {t}
+                </label>
+              ))}
+            </div>
+            <input
+              className="inp font-mono text-xs"
+              placeholder="Extra patterns, comma-separated (e.g. Bash(git *))"
+              value={extraText}
+              onChange={(e) => {
+                setExtraText(e.target.value);
+                onChange({ ...value, allow: [...commons, ...parseExtra(e.target.value)] });
+              }}
+            />
+          </>
+        ) : (
+          <p className="muted text-[11px]">
+            {kind ? kindLabel(kind) : 'This runtime'} runs with its default approvals; in unattended runs most tools stay
+            blocked. Use “Allow all” to let it act.
+          </p>
+        )
+      ) : null}
     </div>
   );
 }
@@ -276,7 +363,13 @@ function PersonaCard({ persona, runtimes }: { persona: Persona; runtimes: Runtim
   const [running, setRunning] = useState(false);
   const [prompt, setPrompt] = useState('');
   const [outcome, setOutcome] = useState<string | null>(null);
+  const [editPerms, setEditPerms] = useState(false);
   const events = open ? eventsForPersona(persona.id).slice(-30).reverse() : [];
+
+  const policy = persona.permissions ?? DEFAULT_PERMISSIONS;
+  const runtimeKind = runtimes.find((r) => r.id === persona.runtimeId)?.kind;
+  const permSummary =
+    policy.mode === 'all' ? 'Allow all tools' : policy.allow.length ? `Restrict · ${policy.allow.join(', ')}` : 'Restrict · nothing';
 
   async function run() {
     if (!prompt.trim()) return;
@@ -322,6 +415,22 @@ function PersonaCard({ persona, runtimes }: { persona: Persona; runtimes: Runtim
           ))}
         </select>
       </label>
+
+      <div className="mt-2 flex flex-col gap-1">
+        <div className="flex items-center justify-between gap-2 text-[11px]">
+          <span className="muted truncate">Permissions · {permSummary}</span>
+          <button className="btn-ghost shrink-0 text-[11px]" onClick={() => setEditPerms((v) => !v)}>
+            {editPerms ? 'Done' : 'Edit'}
+          </button>
+        </div>
+        {editPerms ? (
+          <PermissionEditor
+            kind={runtimeKind}
+            value={policy}
+            onChange={(permissions) => updatePersona(persona.id, { permissions })}
+          />
+        ) : null}
+      </div>
 
       <div className="mt-2 flex flex-col gap-1">
         <textarea
@@ -750,7 +859,7 @@ function timeUntil(iso: string): string {
   return `in ${Math.round(h / 24)}d`;
 }
 
-function Style() {
+export function Style() {
   return (
     <style>{`
       .inp { background:#18181b; border:1px solid #3f3f46; border-radius:6px; padding:8px 10px; color:#e6e8ee; outline:none; }

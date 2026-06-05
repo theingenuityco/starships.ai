@@ -3,6 +3,10 @@
 // No server, no auth: this app is the source of truth.
 import { useSyncExternalStore } from 'react';
 import { isTauri, readStoreRaw, writeStoreRaw } from './tauri';
+import type { PermissionPolicy } from './permissions';
+
+export type { PermissionPolicy } from './permissions';
+export { DEFAULT_PERMISSIONS } from './permissions';
 
 export type RuntimeKind = 'claude-code' | 'codex' | 'hermes' | 'openclaw' | 'custom';
 
@@ -24,6 +28,8 @@ export interface Persona {
   systemPrompt?: string;
   instructions?: string;
   runtimeId?: string | null;
+  /** Tool-permission policy compiled into the runtime's approval flags at run time. */
+  permissions?: PermissionPolicy;
   createdAt: string;
 }
 
@@ -56,6 +62,8 @@ export interface StoreData {
   personas: Persona[];
   heartbeats: Heartbeat[];
   events: AgentEvent[];
+  /** Set once the first-run onboarding wizard is completed (or skipped). Absent = show it. */
+  onboardedAt?: string;
 }
 
 const EMPTY: StoreData = { runtimes: [], personas: [], heartbeats: [], events: [] };
@@ -74,6 +82,7 @@ function coerce(raw: unknown): StoreData {
     personas: Array.isArray(d.personas) ? d.personas : [],
     heartbeats: Array.isArray(d.heartbeats) ? d.heartbeats : [],
     events: Array.isArray(d.events) ? d.events : [],
+    onboardedAt: typeof d.onboardedAt === 'string' ? d.onboardedAt : undefined,
   };
 }
 
@@ -121,7 +130,14 @@ export function removeRuntime(id: string): void {
 }
 
 // ---- Personas ----
-export function addPersona(input: { name: string; model?: string; systemPrompt?: string; instructions?: string; runtimeId?: string | null }): Persona {
+export function addPersona(input: {
+  name: string;
+  model?: string;
+  systemPrompt?: string;
+  instructions?: string;
+  runtimeId?: string | null;
+  permissions?: PermissionPolicy;
+}): Persona {
   const p: Persona = { id: uid(), createdAt: now(), ...input };
   commit({ ...data, personas: [...data.personas, p] });
   return p;
@@ -166,3 +182,13 @@ export function addEvent(input: Omit<AgentEvent, 'id' | 'createdAt'>): AgentEven
   return e;
 }
 export const eventsForPersona = (personaId: string): AgentEvent[] => data.events.filter((e) => e.personaId === personaId);
+
+// ---- Onboarding ----
+/** Mark first-run onboarding as done so the dashboard loads directly from now on. */
+export function completeOnboarding(): void {
+  commit({ ...data, onboardedAt: now() });
+}
+/** Clear the onboarding flag so the wizard shows again (re-run setup). */
+export function resetOnboarding(): void {
+  commit({ ...data, onboardedAt: undefined });
+}

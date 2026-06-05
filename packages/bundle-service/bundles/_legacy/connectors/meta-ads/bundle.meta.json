@@ -1,9 +1,0 @@
-{
-  "name": "Meta Ads",
-  "description": "Connect to Meta Marketing API to manage Facebook and Instagram advertising campaigns, ad accounts, and insights across M",
-  "version": "1.0.0",
-  "tags": [
-    "marketing"
-  ],
-  "kind": "connector"
-}

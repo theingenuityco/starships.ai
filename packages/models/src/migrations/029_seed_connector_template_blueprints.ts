@@ -1,9 +1,10 @@
 import type { Client } from 'pg';
-import {
-  createOAuthConnectBlueprint,
-  createApiKeyConnectBlueprint,
-  createNoopTestBlueprint,
-} from '@/seeders/connectors/createConnectorBlueprints';
+// Connector blueprint seeders were removed in the org-layer pivot. These tables
+// are dropped by migration 197; seeds are stubbed to keep the historical chain
+// valid on a fresh DB.
+const createOAuthConnectBlueprint = (..._a: unknown[]): Record<string, unknown> => ({});
+const createApiKeyConnectBlueprint = (..._a: unknown[]): Record<string, unknown> => ({});
+const createNoopTestBlueprint = (..._a: unknown[]): Record<string, unknown> => ({});
 
 /**
  * Seed common inline blueprints onto connector_templates.

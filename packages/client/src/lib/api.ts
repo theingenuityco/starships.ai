@@ -1,4 +1,4 @@
-import type { ApiResponse, TemplateCategory, HeartbeatConfigModel, HeartbeatRunModel, UpdateHeartbeatConfigRequest } from '@starships/protocol'
+import type { ApiResponse, TemplateCategory } from '@starships/protocol'
 import type { ApiError as ApiErrorLike } from '@/lib/error-utils'
 
 import { apiCache, CACHE_KEYS, invalidateAgentCaches } from './cache'
@@ -376,9 +376,6 @@ import {
   UpdateAgentRequest,
   UpdateStarshipRequest,
   UpdateStarshipStatusRequest,
-  type ScheduleModel,
-  type CreateScheduleRequest,
-  type UpdateScheduleRequest,
   type TaskBoardModel,
   type TaskBoardDetailsResponse,
   type TaskCardModel,
@@ -563,28 +560,6 @@ export const agentAPI = {
   },
 }
 
-export const scheduleAPI = {
-  create: async (payload: CreateScheduleRequest): Promise<ScheduleModel> => {
-    const { starshipId, ...body } = payload
-    const res = await api.post(`/api/v1/starships/${starshipId}/schedules`, body)
-    return extractResponseData<ScheduleModel>(res as FetchResponse<ApiResponse<ScheduleModel>>)
-  },
-
-  listByStarship: async (starshipId: string): Promise<ScheduleModel[]> => {
-    const res = await api.get(`/api/v1/starships/${starshipId}/schedules`)
-    return extractResponseData<ScheduleModel[]>(res as FetchResponse<ApiResponse<ScheduleModel[]>>)
-  },
-
-  update: async (scheduleId: string, updates: UpdateScheduleRequest): Promise<ScheduleModel> => {
-    const res = await api.patch(`/api/v1/schedules/${scheduleId}`, updates)
-    return extractResponseData<ScheduleModel>(res as FetchResponse<ApiResponse<ScheduleModel>>)
-  },
-
-  deactivate: async (scheduleId: string): Promise<void> => {
-    await api.delete(`/api/v1/schedules/${scheduleId}`)
-  },
-}
-
 export const taskBoardAPI = {
   listBoardsByStarship: async (starshipId: string, args?: { includeArchived?: boolean }): Promise<TaskBoardModel[]> => {
     const includeArchived = Boolean(args?.includeArchived)
@@ -681,52 +656,7 @@ export const userAPI = {
   getById: (id: string): Promise<SyncedUser> => api.get(`/api/v1/users/${id}`).then(res => extractResponseData<SyncedUser>(res)),
 }
 
-export const heartbeatAPI = {
-  getByRoomAndAgent: async (roomConversationId: string, agentId: string): Promise<HeartbeatConfigModel | null> => {
-    try {
-      const res = await api.get(`/api/v1/rooms/${roomConversationId}/heartbeats/${agentId}`)
-      return extractResponseData<HeartbeatConfigModel>(res as FetchResponse<ApiResponse<HeartbeatConfigModel>>)
-    } catch {
-      return null
-    }
-  },
-
-  listByRoom: async (roomConversationId: string): Promise<HeartbeatConfigModel[]> => {
-    try {
-      const res = await api.get(`/api/v1/rooms/${roomConversationId}/heartbeats`)
-      return extractResponseData<HeartbeatConfigModel[]>(res as FetchResponse<ApiResponse<HeartbeatConfigModel[]>>)
-    } catch {
-      return []
-    }
-  },
-
-  create: async (roomConversationId: string, body: { agentId: string; isEnabled?: boolean; intervalMinutes?: number; prompt?: string; ackMaxChars?: number; activeHoursStart?: string | null; activeHoursEnd?: string | null; activeHoursTimezone?: string | null }): Promise<HeartbeatConfigModel> => {
-    const res = await api.post(`/api/v1/rooms/${roomConversationId}/heartbeats`, body)
-    return extractResponseData<HeartbeatConfigModel>(res as FetchResponse<ApiResponse<HeartbeatConfigModel>>)
-  },
-
-  update: async (roomConversationId: string, agentId: string, updates: UpdateHeartbeatConfigRequest): Promise<HeartbeatConfigModel> => {
-    const res = await api.patch(`/api/v1/rooms/${roomConversationId}/heartbeats/${agentId}`, updates)
-    return extractResponseData<HeartbeatConfigModel>(res as FetchResponse<ApiResponse<HeartbeatConfigModel>>)
-  },
-
-  delete: async (roomConversationId: string, agentId: string): Promise<void> => {
-    await api.delete(`/api/v1/rooms/${roomConversationId}/heartbeats/${agentId}`)
-  },
-
-  wake: async (roomConversationId: string, agentId: string): Promise<void> => {
-    await api.post(`/api/v1/rooms/${roomConversationId}/heartbeats/${agentId}/wake`, {})
-  },
-
-  listRuns: async (roomConversationId: string, agentId: string, limit = 20): Promise<HeartbeatRunModel[]> => {
-    const res = await api.get(`/api/v1/rooms/${roomConversationId}/heartbeats/${agentId}/runs`, { params: { limit: String(limit) } })
-    return extractResponseData<HeartbeatRunModel[]>(res as FetchResponse<ApiResponse<HeartbeatRunModel[]>>)
-  },
-}
-
-// Starship API functions for compatibility
 export const starshipAPI = {
-  // Get starship by slug
   getStarshipBySlug: async (slug: string): Promise<{ starship: Starship }> => {
     const response = await api.get(`/api/v1/starships/${slug}`)
     const data = extractResponseData<{ starship: Starship; agents: any[]; availableSlots: number }>(response)

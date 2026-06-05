@@ -1,9 +1,0 @@
-{
-  "name": "Calendly",
-  "description": "Scheduling and calendar management via Calendly API",
-  "version": "1.0.0",
-  "tags": [
-    "enterprise"
-  ],
-  "kind": "connector"
-}

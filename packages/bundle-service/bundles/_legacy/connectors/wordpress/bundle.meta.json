@@ -1,9 +1,0 @@
-{
-  "name": "WordPress",
-  "description": "Connect a WordPress.com site or Jetpack-connected WordPress site to create, read, update, and manage posts, pages, media",
-  "version": "1.0.0",
-  "tags": [
-    "connector"
-  ],
-  "kind": "connector"
-}

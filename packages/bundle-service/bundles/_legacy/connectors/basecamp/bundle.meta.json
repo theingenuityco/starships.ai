@@ -1,9 +1,0 @@
-{
-  "name": "Basecamp 4",
-  "description": "Integrate with Basecamp 4 to manage projects, to-dos, messages, and comments. Requires OAuth2 authentication and an acco",
-  "version": "1.0.0",
-  "tags": [
-    "connector"
-  ],
-  "kind": "connector"
-}

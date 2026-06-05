@@ -3,7 +3,7 @@ import type { RoomPinnedDoc } from '@starships/protocol';
 import type { PostgresConnection } from '@/helpers/database';
 
 type DbRow = {
-  room_conversation_id: string;
+  room_id: string;
   doc_id: string;
   position: number;
   created_at: string;
@@ -13,7 +13,7 @@ type DbRow = {
 function fromDb(r: DbRow): RoomPinnedDoc {
   return {
     kind: 'doc',
-    roomConversationId: String(r.room_conversation_id),
+    roomId: String(r.room_id),
     docId: String(r.doc_id),
     position: Number(r.position) || 0,
     createdAt: String(r.created_at),
@@ -26,43 +26,43 @@ export class RoomDocsRepository extends BaseRepository {
     super('RoomDocsRepository', connection);
   }
 
-  async list(roomConversationId: string): Promise<RoomPinnedDoc[]> {
+  async list(roomId: string): Promise<RoomPinnedDoc[]> {
     return this.executeWithErrorHandling(async () => {
       const conn = this.getConnection();
       const rows = await conn.query<DbRow>(
-        `SELECT room_conversation_id, doc_id, position, created_at, created_by
+        `SELECT room_id, doc_id, position, created_at, created_by
            FROM room_docs
-          WHERE room_conversation_id = $1
+          WHERE room_id = $1
           ORDER BY position ASC, created_at ASC`,
-        [roomConversationId]
+        [roomId]
       );
       return rows.map(fromDb);
-    }, 'list', 'room_docs', roomConversationId);
+    }, 'list', 'room_docs', roomId);
   }
 
-  async upsert(args: { roomConversationId: string; docId: string; position?: number | null; createdBy?: string | null }): Promise<RoomPinnedDoc> {
+  async upsert(args: { roomId: string; docId: string; position?: number | null; createdBy?: string | null }): Promise<RoomPinnedDoc> {
     return this.executeWithErrorHandling(async () => {
       const conn = this.getConnection();
-      const roomConversationId = String(args.roomConversationId || '').trim();
+      const roomId = String(args.roomId || '').trim();
       const docId = String(args.docId || '').trim();
       const createdBy = args.createdBy ?? null;
       const requestedPosition = typeof args.position === 'number' ? Math.max(0, Math.trunc(args.position)) : null;
 
       await conn.query('BEGIN');
       try {
-        await conn.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`room_docs:${roomConversationId}`]);
+        await conn.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`room_docs:${roomId}`]);
 
         const existing = await conn.queryOne<{ position: number }>(
-          `SELECT position FROM room_docs WHERE room_conversation_id = $1 AND doc_id = $2`,
-          [roomConversationId, docId]
+          `SELECT position FROM room_docs WHERE room_id = $1 AND doc_id = $2`,
+          [roomId, docId]
         );
 
         if (existing && requestedPosition == null) {
           const row = await conn.queryOne<DbRow>(
-            `SELECT room_conversation_id, doc_id, position, created_at, created_by
+            `SELECT room_id, doc_id, position, created_at, created_by
                FROM room_docs
-              WHERE room_conversation_id = $1 AND doc_id = $2`,
-            [roomConversationId, docId]
+              WHERE room_id = $1 AND doc_id = $2`,
+            [roomId, docId]
           );
           if (!row) throw new Error('Failed to upsert room doc');
           await conn.query('COMMIT');
@@ -76,22 +76,22 @@ export class RoomDocsRepository extends BaseRepository {
               : Number(
                   (
                     await conn.queryOne<{ next_pos: number }>(
-                      `SELECT COALESCE(MAX(position) + 1, 0) AS next_pos FROM room_docs WHERE room_conversation_id = $1`,
-                      [roomConversationId]
+                      `SELECT COALESCE(MAX(position) + 1, 0) AS next_pos FROM room_docs WHERE room_id = $1`,
+                      [roomId]
                     )
                   )?.next_pos ?? 0
                 );
 
           await conn.query(
-            `UPDATE room_docs SET position = position + 1 WHERE room_conversation_id = $1 AND position >= $2`,
-            [roomConversationId, desired]
+            `UPDATE room_docs SET position = position + 1 WHERE room_id = $1 AND position >= $2`,
+            [roomId, desired]
           );
 
           const inserted = await conn.queryOne<DbRow>(
-            `INSERT INTO room_docs (room_conversation_id, doc_id, position, created_by)
+            `INSERT INTO room_docs (room_id, doc_id, position, created_by)
              VALUES ($1, $2, $3, $4)
-             RETURNING room_conversation_id, doc_id, position, created_at, created_by`,
-            [roomConversationId, docId, desired, createdBy]
+             RETURNING room_id, doc_id, position, created_at, created_by`,
+            [roomId, docId, desired, createdBy]
           );
           if (!inserted) throw new Error('Failed to upsert room doc');
           await conn.query('COMMIT');
@@ -103,40 +103,40 @@ export class RoomDocsRepository extends BaseRepository {
 
         if (desired !== current) {
           const tmpRow = await conn.queryOne<{ tmp: number }>(
-            `SELECT -(COALESCE(MAX(ABS(position)), 0) + 1) AS tmp FROM room_docs WHERE room_conversation_id = $1`,
-            [roomConversationId]
+            `SELECT -(COALESCE(MAX(ABS(position)), 0) + 1) AS tmp FROM room_docs WHERE room_id = $1`,
+            [roomId]
           );
           const tmp = Number(tmpRow?.tmp ?? -1);
-          await conn.query(`UPDATE room_docs SET position = $3 WHERE room_conversation_id = $1 AND doc_id = $2`, [
-            roomConversationId,
+          await conn.query(`UPDATE room_docs SET position = $3 WHERE room_id = $1 AND doc_id = $2`, [
+            roomId,
             docId,
             tmp,
           ]);
 
           if (desired < current) {
             await conn.query(
-              `UPDATE room_docs SET position = position + 1 WHERE room_conversation_id = $1 AND position >= $2 AND position < $3`,
-              [roomConversationId, desired, current]
+              `UPDATE room_docs SET position = position + 1 WHERE room_id = $1 AND position >= $2 AND position < $3`,
+              [roomId, desired, current]
             );
           } else {
             await conn.query(
-              `UPDATE room_docs SET position = position - 1 WHERE room_conversation_id = $1 AND position <= $2 AND position > $3`,
-              [roomConversationId, desired, current]
+              `UPDATE room_docs SET position = position - 1 WHERE room_id = $1 AND position <= $2 AND position > $3`,
+              [roomId, desired, current]
             );
           }
 
-          await conn.query(`UPDATE room_docs SET position = $3 WHERE room_conversation_id = $1 AND doc_id = $2`, [
-            roomConversationId,
+          await conn.query(`UPDATE room_docs SET position = $3 WHERE room_id = $1 AND doc_id = $2`, [
+            roomId,
             docId,
             desired,
           ]);
         }
 
         const row = await conn.queryOne<DbRow>(
-          `SELECT room_conversation_id, doc_id, position, created_at, created_by
+          `SELECT room_id, doc_id, position, created_at, created_by
              FROM room_docs
-            WHERE room_conversation_id = $1 AND doc_id = $2`,
-          [roomConversationId, docId]
+            WHERE room_id = $1 AND doc_id = $2`,
+          [roomId, docId]
         );
         if (!row) throw new Error('Failed to upsert room doc');
         await conn.query('COMMIT');
@@ -148,25 +148,25 @@ export class RoomDocsRepository extends BaseRepository {
     }, 'upsert', 'room_docs');
   }
 
-  async remove(roomConversationId: string, docId: string): Promise<boolean> {
+  async remove(roomId: string, docId: string): Promise<boolean> {
     return this.executeWithErrorHandling(async () => {
       const conn = this.getConnection();
       const result = await conn.queryWithResult(
-        `DELETE FROM room_docs WHERE room_conversation_id = $1 AND doc_id = $2`,
-        [roomConversationId, docId]
+        `DELETE FROM room_docs WHERE room_id = $1 AND doc_id = $2`,
+        [roomId, docId]
       );
       return (result.rowCount ?? 0) > 0;
     }, 'remove', 'room_docs');
   }
 
-  async reorder(roomConversationId: string, docIds: string[]): Promise<RoomPinnedDoc[]> {
+  async reorder(roomId: string, docIds: string[]): Promise<RoomPinnedDoc[]> {
     return this.executeWithErrorHandling(async () => {
       const conn = this.getConnection();
       if (docIds.length === 0) return [];
 
       await conn.query('BEGIN');
       try {
-        await conn.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`room_docs:${roomConversationId}`]);
+        await conn.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`room_docs:${roomId}`]);
 
         // Two-pass update: first set negative temps, then set final positions
         const tmpCases = docIds.map((id, idx) => `WHEN $${idx + 2} THEN ${-(idx + 1)}`).join(' ');
@@ -174,12 +174,12 @@ export class RoomDocsRepository extends BaseRepository {
         const placeholders = docIds.map((_, idx) => `$${idx + 2}`).join(', ');
 
         await conn.query(
-          `UPDATE room_docs SET position = CASE doc_id ${tmpCases} ELSE position END WHERE room_conversation_id = $1 AND doc_id IN (${placeholders})`,
-          [roomConversationId, ...docIds]
+          `UPDATE room_docs SET position = CASE doc_id ${tmpCases} ELSE position END WHERE room_id = $1 AND doc_id IN (${placeholders})`,
+          [roomId, ...docIds]
         );
         await conn.query(
-          `UPDATE room_docs SET position = CASE doc_id ${finalCases} ELSE position END WHERE room_conversation_id = $1 AND doc_id IN (${placeholders})`,
-          [roomConversationId, ...docIds]
+          `UPDATE room_docs SET position = CASE doc_id ${finalCases} ELSE position END WHERE room_id = $1 AND doc_id IN (${placeholders})`,
+          [roomId, ...docIds]
         );
 
         await conn.query('COMMIT');
@@ -188,7 +188,7 @@ export class RoomDocsRepository extends BaseRepository {
         throw e;
       }
 
-      return this.list(roomConversationId);
+      return this.list(roomId);
     }, 'reorder', 'room_docs');
   }
 }

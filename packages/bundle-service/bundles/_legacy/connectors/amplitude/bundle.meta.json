@@ -1,9 +1,0 @@
-{
-  "name": "Amplitude",
-  "description": "Product intelligence platform for user behavior analytics and growth insights",
-  "version": "1.0.0",
-  "tags": [
-    "connector"
-  ],
-  "kind": "connector"
-}

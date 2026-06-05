@@ -1,5 +1,6 @@
 import type { Client } from 'pg';
-import { createOAuthConnectBlueprint } from '@/seeders/connectors/createConnectorBlueprints';
+// Connector blueprint seeder removed in the org-layer pivot (table dropped by 197).
+const createOAuthConnectBlueprint = (..._a: unknown[]): Record<string, unknown> => ({});
 
 /**
  * SQUASH of migrations 031..038.

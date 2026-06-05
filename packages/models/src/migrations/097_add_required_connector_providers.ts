@@ -1,6 +1,9 @@
 import { getConnection } from '@/helpers/database';
 import type { PostgresConnection } from '@/helpers/database';
-import { extractRequiredConnectorProviders } from '@/utils/extractRequiredConnectorProviders';
+// Util removed in the org-layer pivot; backfill is a no-op (tool tables dropped
+// by migration 197). The ADD COLUMN ALTERs are kept so the historical chain
+// stays valid on a fresh DB.
+const extractRequiredConnectorProviders = (..._a: unknown[]): string[] => [];
 
 /**
  * Migration 097: Add required_connector_providers to tool_templates and tools.

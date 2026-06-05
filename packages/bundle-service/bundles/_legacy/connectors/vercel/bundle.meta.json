@@ -1,9 +1,0 @@
-{
-  "name": "Vercel",
-  "description": "Vercel REST API connector for managing projects, deployments, domains, and environment variables",
-  "version": "1.0.0",
-  "tags": [
-    "connector"
-  ],
-  "kind": "connector"
-}

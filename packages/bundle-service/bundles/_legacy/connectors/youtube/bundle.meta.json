@@ -1,9 +1,0 @@
-{
-  "name": "YouTube",
-  "description": "YouTube Data API v3 connector for social media management. Upload and manage videos, interact with comments, track chann",
-  "version": "1.0.0",
-  "tags": [
-    "social"
-  ],
-  "kind": "connector"
-}

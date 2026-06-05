@@ -1,9 +1,0 @@
-{
-  "name": "Dean",
-  "description": "An agent specialized in managing Google Drive operations including file management, sharing, organization, and collaboration tasks.",
-  "version": "1.0.5",
-  "tags": [
-    "utility"
-  ],
-  "kind": "agent"
-}

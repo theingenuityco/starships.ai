@@ -1,9 +1,0 @@
-{
-  "name": "X (Twitter)",
-  "description": "X (Twitter) API v2 connector with OAuth 2.0 authentication. Supports tweet management, user operations, and search funct",
-  "version": "1.0.0",
-  "tags": [
-    "social"
-  ],
-  "kind": "connector"
-}

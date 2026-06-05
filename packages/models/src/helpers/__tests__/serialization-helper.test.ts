@@ -8,7 +8,6 @@
 import { fromDatabase, toDatabase, fromDatabaseArray } from '@/helpers/serialization-helper';
 import { AgentEntity } from '@/entities/AgentEntity';
 import { UserEntity } from '@/entities/UserEntity';
-import { ConversationEntity } from '@/entities/ConversationEntity';
 import { Expose, Transform } from 'class-transformer';
 import { IsString, Length } from 'class-validator';
 import 'reflect-metadata';
@@ -118,22 +117,22 @@ describe('Serialization Helper', () => {
     it('should work with real entities', () => {
       const agentRecord = {
         id: 'agent-123',
+        starshipId: 'ship-1',
+        slug: 'test-agent',
         name: 'Test Agent',
-        model: 'gpt-4',
-        timeout: 30000,
+        kind: 'claude-code',
+        accessRole: 'contributor',
+        description: 'Test agent',
         createdAt: '2024-01-01T00:00:00.000Z',
         updatedAt: '2024-01-01T00:00:00.000Z',
-        systemPrompt: 'Test agent',
-        state: '{"messages":[], "tools":[]}',
       };
 
       const agent = fromDatabase(AgentEntity, agentRecord);
 
       expect(agent).toBeInstanceOf(AgentEntity);
       expect(agent.name).toBe('Test Agent');
-      expect(agent.systemPrompt).toBe('Test agent');
-      // With exposeAll strategy, JSONB strings remain as strings and need explicit parsing if needed
-      expect(agent.state).toBeDefined();
+      expect(agent.kind).toBe('claude-code');
+      expect(agent.accessRole).toBe('contributor');
     });
 
     it('should throw error for null or undefined data', () => {
@@ -250,22 +249,6 @@ describe('Serialization Helper', () => {
       expect(serialized).toHaveProperty('id');
       expect(serialized).toHaveProperty('name');
       expect(serialized).toHaveProperty('value');
-    });
-
-    it('should work with real entities', () => {
-      const conversation = new ConversationEntity();
-      conversation.id = 'conv-123';
-      conversation.title = 'Test Conversation';
-      conversation.status = 'active';
-      conversation.createdAt = '2024-01-01T00:00:00.000Z';
-
-      const serialized = toDatabase(conversation);
-
-      // Serialized to snake_case for PostgreSQL
-      expect(serialized.id).toBe('conv-123');
-      expect(serialized.title).toBe('Test Conversation');
-      expect(serialized.status).toBe('active');
-      expect(serialized.created_at).toBe('2024-01-01T00:00:00.000Z');
     });
 
     it('should handle null and undefined values', () => {

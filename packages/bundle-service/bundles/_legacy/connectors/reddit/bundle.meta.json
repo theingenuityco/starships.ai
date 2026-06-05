@@ -1,9 +1,0 @@
-{
-  "name": "Reddit",
-  "description": "Connect to Reddit to read posts, submit content, search subreddits, and interact with the Reddit community via the Reddi",
-  "version": "1.0.0",
-  "tags": [
-    "connector"
-  ],
-  "kind": "connector"
-}

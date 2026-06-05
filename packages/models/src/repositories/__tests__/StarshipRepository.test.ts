@@ -513,40 +513,4 @@ describe('StarshipRepository', () => {
       });
     });
   });
-
-  describe('conversation methods', () => {
-    describe('getConversations', () => {
-      it('should get conversations for starship', async () => {
-        const mockConversations = [
-          {
-            id: 'conv-1',
-            starship_id: 'starship-123',
-            title: 'Conv 1',
-            status: 'active',
-            created_at: '2024-01-01T00:00:00.000Z',
-          },
-        ];
-
-        testHelper.mockConnection.query.mockResolvedValue(mockConversations);
-
-        const result = await repository.getConversations('starship-123');
-
-        expect(result).toHaveLength(1);
-      });
-
-      it('should throw error for missing starshipId', async () => {
-        await expect(repository.getConversations('')).rejects.toThrow('Starship ID is required');
-      });
-    });
-
-    describe('getConversationCount', () => {
-      it('should get conversation count', async () => {
-        testHelper.mockConnection.queryOne.mockResolvedValue({ count: '5' });
-
-        const result = await repository.getConversationCount('starship-123');
-
-        expect(result).toBe(5);
-      });
-    });
-  });
 });

@@ -1,9 +1,0 @@
-{
-  "name": "Intercom",
-  "description": "Customer communication platform for conversations, contacts, and support management",
-  "version": "1.0.0",
-  "tags": [
-    "connector"
-  ],
-  "kind": "connector"
-}

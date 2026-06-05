@@ -3,7 +3,7 @@ import type { RoomPinnedTaskBoard } from '@starships/protocol';
 import type { PostgresConnection } from '@/helpers/database';
 
 type DbRow = {
-  room_conversation_id: string;
+  room_id: string;
   board_id: string;
   position: number;
   created_at: string;
@@ -13,7 +13,7 @@ type DbRow = {
 function fromDb(r: DbRow): RoomPinnedTaskBoard {
   return {
     kind: 'task_board',
-    roomConversationId: String(r.room_conversation_id),
+    roomId: String(r.room_id),
     boardId: String(r.board_id),
     position: Number(r.position) || 0,
     createdAt: String(r.created_at),
@@ -26,43 +26,43 @@ export class RoomTaskBoardsRepository extends BaseRepository {
     super('RoomTaskBoardsRepository', connection);
   }
 
-  async list(roomConversationId: string): Promise<RoomPinnedTaskBoard[]> {
+  async list(roomId: string): Promise<RoomPinnedTaskBoard[]> {
     return this.executeWithErrorHandling(async () => {
       const conn = this.getConnection();
       const rows = await conn.query<DbRow>(
-        `SELECT room_conversation_id, board_id, position, created_at, created_by
+        `SELECT room_id, board_id, position, created_at, created_by
            FROM room_task_boards
-          WHERE room_conversation_id = $1
+          WHERE room_id = $1
           ORDER BY position ASC, created_at ASC`,
-        [roomConversationId]
+        [roomId]
       );
       return rows.map(fromDb);
-    }, 'list', 'room_task_boards', roomConversationId);
+    }, 'list', 'room_task_boards', roomId);
   }
 
-  async upsert(args: { roomConversationId: string; boardId: string; position?: number | null; createdBy?: string | null }): Promise<RoomPinnedTaskBoard> {
+  async upsert(args: { roomId: string; boardId: string; position?: number | null; createdBy?: string | null }): Promise<RoomPinnedTaskBoard> {
     return this.executeWithErrorHandling(async () => {
       const conn = this.getConnection();
-      const roomConversationId = String(args.roomConversationId || '').trim();
+      const roomId = String(args.roomId || '').trim();
       const boardId = String(args.boardId || '').trim();
       const createdBy = args.createdBy ?? null;
       const requestedPosition = typeof args.position === 'number' ? Math.max(0, Math.trunc(args.position)) : null;
 
       await conn.query('BEGIN');
       try {
-        await conn.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`room_task_boards:${roomConversationId}`]);
+        await conn.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`room_task_boards:${roomId}`]);
 
         const existing = await conn.queryOne<{ position: number }>(
-          `SELECT position FROM room_task_boards WHERE room_conversation_id = $1 AND board_id = $2`,
-          [roomConversationId, boardId]
+          `SELECT position FROM room_task_boards WHERE room_id = $1 AND board_id = $2`,
+          [roomId, boardId]
         );
 
         if (existing && requestedPosition == null) {
           const row = await conn.queryOne<DbRow>(
-            `SELECT room_conversation_id, board_id, position, created_at, created_by
+            `SELECT room_id, board_id, position, created_at, created_by
                FROM room_task_boards
-              WHERE room_conversation_id = $1 AND board_id = $2`,
-            [roomConversationId, boardId]
+              WHERE room_id = $1 AND board_id = $2`,
+            [roomId, boardId]
           );
           if (!row) throw new Error('Failed to upsert room task board');
           await conn.query('COMMIT');
@@ -78,8 +78,8 @@ export class RoomTaskBoardsRepository extends BaseRepository {
                     await conn.queryOne<{ next_pos: number }>(
                       `SELECT COALESCE(MAX(position) + 1, 0) AS next_pos
                          FROM room_task_boards
-                        WHERE room_conversation_id = $1`,
-                      [roomConversationId]
+                        WHERE room_id = $1`,
+                      [roomId]
                     )
                   )?.next_pos ?? 0
                 );
@@ -87,16 +87,16 @@ export class RoomTaskBoardsRepository extends BaseRepository {
           await conn.query(
             `UPDATE room_task_boards
                 SET position = position + 1
-              WHERE room_conversation_id = $1
+              WHERE room_id = $1
                 AND position >= $2`,
-            [roomConversationId, desired]
+            [roomId, desired]
           );
 
           const inserted = await conn.queryOne<DbRow>(
-            `INSERT INTO room_task_boards (room_conversation_id, board_id, position, created_by)
+            `INSERT INTO room_task_boards (room_id, board_id, position, created_by)
              VALUES ($1, $2, $3, $4)
-             RETURNING room_conversation_id, board_id, position, created_at, created_by`,
-            [roomConversationId, boardId, desired, createdBy]
+             RETURNING room_id, board_id, position, created_at, created_by`,
+            [roomId, boardId, desired, createdBy]
           );
           if (!inserted) throw new Error('Failed to upsert room task board');
           await conn.query('COMMIT');
@@ -110,46 +110,46 @@ export class RoomTaskBoardsRepository extends BaseRepository {
           const tmpRow = await conn.queryOne<{ tmp: number }>(
             `SELECT -(COALESCE(MAX(ABS(position)), 0) + 1) AS tmp
                FROM room_task_boards
-              WHERE room_conversation_id = $1`,
-            [roomConversationId]
+              WHERE room_id = $1`,
+            [roomId]
           );
           const tmp = Number(tmpRow?.tmp ?? -1);
           await conn.query(
-            `UPDATE room_task_boards SET position = $3 WHERE room_conversation_id = $1 AND board_id = $2`,
-            [roomConversationId, boardId, tmp]
+            `UPDATE room_task_boards SET position = $3 WHERE room_id = $1 AND board_id = $2`,
+            [roomId, boardId, tmp]
           );
 
           if (desired < current) {
             await conn.query(
               `UPDATE room_task_boards
                   SET position = position + 1
-                WHERE room_conversation_id = $1
+                WHERE room_id = $1
                   AND position >= $2
                   AND position < $3`,
-              [roomConversationId, desired, current]
+              [roomId, desired, current]
             );
           } else {
             await conn.query(
               `UPDATE room_task_boards
                   SET position = position - 1
-                WHERE room_conversation_id = $1
+                WHERE room_id = $1
                   AND position <= $2
                   AND position > $3`,
-              [roomConversationId, desired, current]
+              [roomId, desired, current]
             );
           }
 
           await conn.query(
-            `UPDATE room_task_boards SET position = $3 WHERE room_conversation_id = $1 AND board_id = $2`,
-            [roomConversationId, boardId, desired]
+            `UPDATE room_task_boards SET position = $3 WHERE room_id = $1 AND board_id = $2`,
+            [roomId, boardId, desired]
           );
         }
 
         const row = await conn.queryOne<DbRow>(
-          `SELECT room_conversation_id, board_id, position, created_at, created_by
+          `SELECT room_id, board_id, position, created_at, created_by
              FROM room_task_boards
-            WHERE room_conversation_id = $1 AND board_id = $2`,
-          [roomConversationId, boardId]
+            WHERE room_id = $1 AND board_id = $2`,
+          [roomId, boardId]
         );
         if (!row) throw new Error('Failed to upsert room task board');
         await conn.query('COMMIT');
@@ -161,12 +161,12 @@ export class RoomTaskBoardsRepository extends BaseRepository {
     }, 'upsert', 'room_task_boards');
   }
 
-  async remove(roomConversationId: string, boardId: string): Promise<boolean> {
+  async remove(roomId: string, boardId: string): Promise<boolean> {
     return this.executeWithErrorHandling(async () => {
       const conn = this.getConnection();
       const result = await conn.queryWithResult(
-        `DELETE FROM room_task_boards WHERE room_conversation_id = $1 AND board_id = $2`,
-        [roomConversationId, boardId]
+        `DELETE FROM room_task_boards WHERE room_id = $1 AND board_id = $2`,
+        [roomId, boardId]
       );
       return (result.rowCount ?? 0) > 0;
     }, 'remove', 'room_task_boards');

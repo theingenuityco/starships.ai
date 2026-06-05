@@ -1,9 +1,0 @@
-{
-  "name": "Felix",
-  "description": "Expert e-commerce agent specializing in Shopify store management including products, orders and page operations",
-  "version": "1.0.4",
-  "tags": [
-    "utility"
-  ],
-  "kind": "agent"
-}

@@ -1,9 +1,0 @@
-{
-  "name": "Thoth",
-  "description": "Expert research agent that combines Wikipedia depth with DuckDuckGo instant answers for comprehensive, accurate information on any topic. ",
-  "version": "1.0.9",
-  "tags": [
-    "analysis"
-  ],
-  "kind": "agent"
-}

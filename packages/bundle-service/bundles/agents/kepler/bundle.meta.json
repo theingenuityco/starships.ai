@@ -1,9 +1,0 @@
-{
-  "name": "Kepler",
-  "description": "Widget-focused agent that builds, renders, and manages widgets (charts/tables/cards) with correct props and clean UI. Minimal analysis; optimized for widget creation and iteration. ",
-  "version": "1.0.8",
-  "tags": [
-    "utility"
-  ],
-  "kind": "agent"
-}

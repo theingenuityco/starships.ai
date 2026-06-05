@@ -23,6 +23,10 @@ export { StarshipDocEntity } from './entities/StarshipDocEntity';
 
 /* Repository exports */
 export { AgentRepository } from './repositories/AgentRepository';
+export { AgentTokenRepository } from './repositories/AgentTokenRepository';
+export { AgentDeviceRepository } from './repositories/AgentDeviceRepository';
+export { AgentDispatchRepository } from './repositories/AgentDispatchRepository';
+export { AgentEventRepository } from './repositories/AgentEventRepository';
 export { PlatformSecretRepository } from './repositories/PlatformSecretRepository';
 export { RoomRepository } from './repositories/RoomRepository';
 export { RoomTablesRepository } from './repositories/RoomTablesRepository';

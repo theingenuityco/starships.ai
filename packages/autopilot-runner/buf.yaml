@@ -1,6 +1,0 @@
-version: v1beta1
-name: buf.build/theingenuityco/autopilot-runner
-deps: []
-build:
-  roots:
-    - src/proto

@@ -15,5 +15,4 @@
   },
   "include": ["src/**/*"],
   "exclude": ["dist"],
-  "references": [{ "path": "../protocol" }, { "path": "../errors" }, { "path": "../definition" }]
 }

@@ -1,244 +1,45 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useParams, useRouter } from 'next/navigation'
-
-import Icon from '@/components/primitives/Icon'
-import AgentAvatar from '@/components/animated/AgentAvatar'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Skeleton } from '@/components/ui/skeleton'
-import { PresenceIndicator } from '@/components/ui/PresenceIndicator'
-import { PageHeader } from '@/components/ui/PageHeader'
-import { BundleServiceModal } from '@/components/bundles/BundleServiceModal'
-
+import { useParams } from 'next/navigation'
 import { useStarshipBySlug } from '@/hooks/useStarships'
-import { useInfiniteStarshipAgents } from '@/hooks/useAgents'
-import { useMessageAttachments } from '@/hooks/useFileUpload'
-import { cn } from '@/lib/utils'
-import { formatAgentDisplayName } from '@/lib/agentDisplay'
-import type { AgentModel } from '@starships/protocol'
+import { useStarshipAgents } from '@/hooks/useAgents'
+import { PageHeader } from '@/components/ui/PageHeader'
 
-const SEARCH_DEBOUNCE_MS = 400
-const PAGE_SIZE = 18
-
-const CTA_BUTTON_CLASS =
-  'h-8 group min-w-[130px] justify-center shrink-0 font-medium transition-all duration-200 border border-transparent text-primary/80 hover:text-primary hover:border-primary/25 hover:bg-primary/10 hover:shadow-sm disabled:text-muted-foreground disabled:hover:text-muted-foreground disabled:hover:border-transparent disabled:hover:bg-transparent disabled:hover:shadow-none'
-const CTA_ICON_CLASS = 'mr-1 h-4 w-4 text-primary/80 group-disabled:text-muted-foreground'
-const LOAD_MORE_BUTTON_CLASS = 'h-7 px-2.5 text-[11px] bg-transparent border-border/60 text-muted-foreground hover:text-foreground hover:bg-muted/40'
-
-export default function AgentsPage(): React.JSX.Element {
-  const router = useRouter()
-  const { slug: slugParam } = useParams<{ slug: string }>()
-  const slug = typeof slugParam === 'string' ? slugParam : ''
-
-  const { data: starship, isLoading: starshipLoading } = useStarshipBySlug(slug, Boolean(slug))
-  const starshipId = starship?.id ? String(starship.id) : ''
-
-  const [bundlesOpen, setBundlesOpen] = useState(false)
-  const [searchValue, setSearchValue] = useState('')
-  const [debouncedQuery, setDebouncedQuery] = useState('')
-
-  useEffect(() => {
-    const t = setTimeout(() => setDebouncedQuery(searchValue.trim()), SEARCH_DEBOUNCE_MS)
-    return () => clearTimeout(t)
-  }, [searchValue])
-
-  const agentsQuery = useInfiniteStarshipAgents(starshipId, Boolean(starshipId), {
-    limit: PAGE_SIZE,
-    order: 'DESC',
-    search: debouncedQuery || undefined,
-  })
-
-  const agents = useMemo(() => {
-    const pages = agentsQuery.data?.pages ?? []
-    return pages.flatMap(p => (Array.isArray(p?.agents) ? p.agents : []))
-  }, [agentsQuery.data])
-
-  const agentAvatarAttachmentIds = useMemo(() => {
-    const ids = agents.map(a => String(a?.avatarAttachmentId || '').trim()).filter(Boolean)
-    return Array.from(new Set(ids))
-  }, [agents])
-
-  const { data: agentAvatarAttachments = [] } = useMessageAttachments(agentAvatarAttachmentIds, starshipId || undefined)
-
-  const agentAvatarUrlById = useMemo(() => {
-    const m = new Map<string, string>()
-    for (const att of agentAvatarAttachments || []) {
-      const id = String((att as any)?.id || '').trim()
-      const url = String((att as any)?.previewUrl || '').trim()
-      if (id && url) m.set(id, url)
-    }
-    return m
-  }, [agentAvatarAttachments])
-
-  const q = debouncedQuery.trim()
-  const isInitialLoading = !q && Boolean(agentsQuery.isLoading)
-  const isSearching = Boolean(q && (agentsQuery.isLoading || (agentsQuery.isFetching && !agentsQuery.isFetchingNextPage)))
-
-  const renderRowSkeleton = useCallback((key: string) => {
-    return (
-      <div key={key} className="rounded-lg border border-border/60 bg-card px-4 py-3 flex items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <div className="flex items-start gap-3">
-            <div className="relative mt-0.5 h-10 w-10 flex-shrink-0">
-              <span className="flex h-10 w-10 items-center justify-center rounded-full ring-1 ring-border/50 bg-muted/10 overflow-hidden">
-                <Skeleton className="h-[22px] w-[22px] rounded-md" />
-              </span>
-              <span className="absolute bottom-0 right-0 translate-x-[22%] translate-y-[6%] z-50 pointer-events-none">
-                <Skeleton className="h-2 w-2 rounded-full ring-2 ring-background outline outline-1 outline-border" />
-              </span>
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2">
-                <Skeleton className="h-4 w-40 max-w-[70%]" />
-              </div>
-              <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
-                <Skeleton className="h-3 w-64 max-w-full" />
-              </div>
-            </div>
-          </div>
-        </div>
-        <div className="flex items-center gap-1 self-center">
-          <Skeleton className="h-8 min-w-[130px] rounded-2xl" />
-        </div>
-      </div>
-    )
-  }, [])
-
-  const renderList = () => {
-    if (starshipLoading || isInitialLoading) {
-      return <div className="space-y-2">{Array.from({ length: 3 }, (_, i) => renderRowSkeleton(`agent-skel-${i}`))}</div>
-    }
-    if (isSearching) {
-      return (
-        <div className="flex items-center justify-center py-10">
-          <p className="text-sm text-muted-foreground text-center">Searching &quot;{q}&quot;…</p>
-        </div>
-      )
-    }
-    if (agents.length === 0) {
-      return (
-        <div className="flex items-center justify-center py-10">
-          <p className="text-sm text-muted-foreground text-center">
-            {debouncedQuery ? `No agents match "${debouncedQuery}".` : 'No agents in this starship yet.'}
-          </p>
-        </div>
-      )
-    }
-
-    return (
-      <div className="space-y-2">
-        {agents.map((a: AgentModel) => {
-          const agentSlug = String(a?.slug || '')
-          const avatarAttachmentId = String(a?.avatarAttachmentId || '').trim()
-          const avatarUrl = avatarAttachmentId ? agentAvatarUrlById.get(avatarAttachmentId) : undefined
-          const avatarSeed = formatAgentDisplayName(a) || String(a?.name || '').trim() || agentSlug || 'Agent'
-          return (
-            <div key={String(a.id)} className="rounded-lg border border-border/60 bg-card px-4 py-3 flex items-start justify-between gap-3">
-              <div className="min-w-0 flex-1" aria-label={formatAgentDisplayName(a) || agentSlug || 'Agent'}>
-                <div className="flex items-start gap-3">
-                  <div className="relative mt-0.5 h-10 w-10 flex-shrink-0">
-                    <span className="flex h-10 w-10 items-center justify-center rounded-full ring-1 ring-border/50 bg-muted/10 overflow-hidden">
-                      <AgentAvatar seed={avatarSeed} imageUrl={avatarUrl} size={40} rounded instanceId={String(a.id)} />
-                    </span>
-                    <PresenceIndicator kind="online" active={true} size="sm" placement="outset" className="translate-x-[22%] translate-y-[6%]" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        className="text-sm font-medium truncate text-foreground hover:underline text-left"
-                        onClick={() => {
-                          if (!agentSlug) return
-                          router.push(`/ship/${slug}/agent/${encodeURIComponent(agentSlug)}`)
-                        }}
-                        title={formatAgentDisplayName(a) || agentSlug}
-                        disabled={!agentSlug}
-                      >
-                        {formatAgentDisplayName(a) || 'Untitled agent'}
-                      </button>
-                    </div>
-                    <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-                      {a?.description ? <span className="truncate">{String(a.description)}</span> : null}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-1 self-center">
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className={CTA_BUTTON_CLASS}
-                  onClick={() => {
-                    if (!agentSlug) return
-                    router.push(`/ship/${slug}/agent/${encodeURIComponent(agentSlug)}`)
-                  }}
-                  disabled={!agentSlug}
-                >
-                  <Icon name="chevron-right" className={CTA_ICON_CLASS} />
-                  Open
-                </Button>
-              </div>
-            </div>
-          )
-        })}
-        {agentsQuery.hasNextPage ? (
-          <div className="flex justify-center pt-4">
-            <Button size="sm" variant="outline" onClick={() => agentsQuery.fetchNextPage()} disabled={agentsQuery.isFetchingNextPage} className={LOAD_MORE_BUTTON_CLASS}>
-              {agentsQuery.isFetchingNextPage ? 'Loading…' : 'Load more agents'}
-            </Button>
-          </div>
-        ) : null}
-      </div>
-    )
-  }
+// External-agent registry. Agents bring their own runtime and connect via the
+// MCP server using a per-agent connection token (minted in settings).
+export default function AgentsPage() {
+  const params = useParams<{ slug: string }>()
+  const slug = params?.slug ?? ''
+  const { data: starship } = useStarshipBySlug(slug, !!slug)
+  const starshipId = starship?.id ?? ''
+  const { data: agents = [], isLoading } = useStarshipAgents(starshipId, !!starshipId)
 
   return (
-    <div className="relative flex flex-col min-h-full min-w-0">
-      <PageHeader
-        icon="bot"
-        title="Agents"
-        actions={
-          <Button type="button" variant="ghost" size="sm" className="h-8 w-8 px-0 text-muted-foreground hover:text-foreground" aria-label="Browse bundles" title="Browse bundles" onClick={() => setBundlesOpen(true)} disabled={!starshipId}>
-            <Icon name="download" className="h-4 w-4" />
-          </Button>
-        }
-      />
-
-      <BundleServiceModal
-        open={bundlesOpen}
-        onOpenChange={setBundlesOpen}
-        starshipId={starshipId}
-        kindFilter={['agent', 'tool']}
-        title="Browse agent bundles"
-        description="Install pre-built agents and tools from the bundle service."
-      />
-
-      <div className="flex-1 min-h-0 overflow-y-visible md:overflow-y-auto px-4 pt-6 pb-8 md:pb-8">
-        <div className={cn('w-full bg-transparent max-w-4xl mx-auto min-h-full flex flex-col')}>
-          <div className="pt-4 pb-8 hidden md:block">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex justify-start" />
-              <div className="w-full sm:w-64">
-                <div className="relative">
-                  <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4 z-10 pointer-events-none" />
-                  <Input
-                    value={searchValue}
-                    onChange={e => setSearchValue(e.target.value)}
-                    placeholder="Search agents"
-                    className="pl-9 h-9 py-1.5 text-[13px] rounded-2xl border-border/60 bg-card shadow-sm"
-                    aria-label="Search agents"
-                  />
-                </div>
+    <div className="flex flex-col gap-4 p-6">
+      <PageHeader title="Agents" />
+      <p className="text-sm text-muted-foreground">
+        Registered external agents. Each agent connects to this workspace via the MCP server using a connection token.
+      </p>
+      {isLoading ? (
+        <p className="text-sm text-muted-foreground">Loading agents…</p>
+      ) : agents.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No agents registered yet.</p>
+      ) : (
+        <ul className="flex flex-col gap-2">
+          {agents.map((agent) => (
+            <li key={agent.id} className="rounded-md border border-border px-4 py-3">
+              <div className="flex items-center justify-between">
+                <span className="font-medium">{agent.name}</span>
+                <span className="text-xs rounded bg-accent px-2 py-0.5 text-muted-foreground">{agent.kind}</span>
               </div>
-            </div>
-          </div>
-
-          {renderList()}
-        </div>
-      </div>
+              <div className="mt-1 text-xs text-muted-foreground">
+                {agent.accessRole}
+                {agent.description ? ` · ${agent.description}` : ''}
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   )
 }

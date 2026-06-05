@@ -26,13 +26,11 @@
     "db-cli": "tsx src/scripts/db-cli.ts",
     "migrate:seeded-template-parents": "tsx src/scripts/migrate-seeded-template-parents.ts",
     "provision:agent-role": "tsx src/scripts/provision-agent-role.ts",
-    "backfill:definitions": "tsx src/scripts/backfill-starship-definitions.ts",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage"
   },
   "dependencies": {
-    "@starships/definition": "workspace:*",
     "@starships/env": "workspace:*",
     "@starships/errors": "workspace:*",
     "@starships/protocol": "workspace:*",

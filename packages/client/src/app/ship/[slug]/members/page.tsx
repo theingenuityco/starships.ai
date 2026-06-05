@@ -553,7 +553,7 @@ export default function MembersPage() {
 
   const renderAgentRow = (a: AgentWithAvatar) => {
     const label = getAgentLabel(a)
-    const categoryMeta = getCategoryMeta(a.category)
+    const categoryMeta = getCategoryMeta((a as any).category)
     const agentSlug = typeof a.slug === 'string' ? a.slug.trim() : ''
     const key = a.id || agentSlug || label.primary
     const avatarAttachmentId = typeof a.avatarAttachmentId === 'string' ? a.avatarAttachmentId.trim() : ''
@@ -566,9 +566,9 @@ export default function MembersPage() {
         avatarUrl={avatarUrl || undefined}
         modelId={modelId}
         statusLabel="Available"
-        roleLabel={typeof a.role === 'string' ? a.role : undefined}
-        category={categoryMeta?.label || (typeof a.category === 'string' ? a.category : undefined)}
-        version={typeof a.version === 'string' ? a.version : undefined}
+        roleLabel={typeof (a as any).role === 'string' ? (a as any).role : undefined}
+        category={categoryMeta?.label || (typeof (a as any).category === 'string' ? (a as any).category : undefined)}
+        version={typeof (a as any).version === 'string' ? (a as any).version : undefined}
         createdAt={typeof a.createdAt === 'string' ? a.createdAt : undefined}
         updatedAt={typeof a.updatedAt === 'string' ? a.updatedAt : undefined}
       />

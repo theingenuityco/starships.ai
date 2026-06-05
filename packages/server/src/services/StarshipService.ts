@@ -2,7 +2,6 @@ import { getRandomStarshipName } from '@/utils/starshipNames';
 import { ConflictError, NotFoundError } from '@starships/errors';
 import {
   AgentRepository,
-  ConnectorRepository,
   StarshipMemberRepository,
   StarshipRepository,
   UserRepository,
@@ -35,18 +34,12 @@ export class StarshipService {
   private agentRepository: AgentRepository;
   private userRepository: UserRepository;
   private starshipMemberRepository: StarshipMemberRepository;
-  private connectorRepository: ConnectorRepository;
 
   constructor() {
     this.starshipRepository = new StarshipRepository();
     this.agentRepository = new AgentRepository();
     this.userRepository = new UserRepository();
     this.starshipMemberRepository = new StarshipMemberRepository();
-    this.connectorRepository = new ConnectorRepository();
-  }
-
-  private async ensureBaselineStarshipToolsAllowed(_starshipId: string): Promise<void> {
-    // Tool template system has been removed; baseline tool seeding is a no-op.
   }
 
   /**
@@ -57,7 +50,7 @@ export class StarshipService {
 
     const defaultEntitlements = { maxAgents: 20, maxConcurrentTurns: 3 };
 
-    const starship = await this.starshipRepository.create({
+    return await this.starshipRepository.create({
       ownerId: data.ownerId,
       name: data.name,
       description: '',
@@ -66,35 +59,6 @@ export class StarshipService {
       maxConcurrentTurns: data.maxConcurrentTurns ?? defaultEntitlements.maxConcurrentTurns,
       status: 'active',
     });
-
-    // Auto-connect the built-in starships connector (platform_jwt — always available).
-    try {
-      await this.connectorRepository.create({
-        starshipId: starship.id,
-        provider: 'starships' as any,
-        status: 'connected',
-        metadata: {},
-      });
-    } catch (err) {
-      logger.error('[StarshipService] Failed to auto-connect starships connector', {
-        starshipId: starship.id,
-        error: err instanceof Error ? err.message : String(err),
-      });
-    }
-
-    // Ensure required baseline tools are deployed and allowed at the starship level.
-    // Best-effort: avoid breaking starship creation if tool seeding/deploy hits a transient issue.
-    try {
-      await this.ensureBaselineStarshipToolsAllowed(starship.id);
-    } catch (err) {
-      logger.error('[StarshipService] Failed to ensure required tools for starship', {
-        starshipId: starship.id,
-        operation: 'ensure_baseline_tools',
-        error: err instanceof Error ? err.message : String(err),
-      });
-    }
-
-    return starship;
   }
 
   /**

@@ -1,7 +1,5 @@
-import type { ApiResponse, TemplateCategory } from '@starships/protocol'
+import type { ApiResponse } from '@starships/protocol'
 import type { ApiError as ApiErrorLike } from '@/lib/error-utils'
-
-import { apiCache, CACHE_KEYS, invalidateAgentCaches } from './cache'
 
 // Custom fetch response wrapper to match axios-like interface
 export interface FetchResponse<T = unknown> {
@@ -364,16 +362,12 @@ api.interceptors.response.use(
   }
 )
 
-// Import Agent and Starship related types from protocol package
+// Import Starship related types from protocol package
 import {
-  AgentModel,
-  CreateAgentRequest,
   CreateStarshipRequest,
-  StarshipAgentsResponse,
   StarshipDetailsResponse,
   StarshipListResponse,
   StarshipResponse,
-  UpdateAgentRequest,
   UpdateStarshipRequest,
   UpdateStarshipStatusRequest,
   type TaskBoardModel,
@@ -391,19 +385,13 @@ import {
 
 // Re-export types for use in other client components
 export type {
-  CreateAgentRequest,
   CreateStarshipRequest,
-  StarshipAgentsResponse,
   StarshipDetailsResponse,
   StarshipListResponse,
   StarshipResponse,
-  UpdateAgentRequest,
   UpdateStarshipRequest,
   UpdateStarshipStatusRequest,
 }
-
-// For compatibility, alias the types
-export type Agent = AgentModel
 
 export interface Message {
   id: string
@@ -428,137 +416,6 @@ export type Starship = StarshipResponse['starship']
 
 // Legacy chat interfaces removed - use ConversationRequest/Response from protocol package
 
-// API functions with caching
-export const agentAPI = {
-  getAll: async (): Promise<Agent[]> => {
-    const cacheKey = CACHE_KEYS.AGENTS_ALL
-    const cached = apiCache.get<Agent[]>(cacheKey)
-    if (cached) {
-      return cached
-    }
-
-    const data = await api.get('/api/v1/agents').then(res => {
-      const agents = extractResponseData<Agent[]>(res)
-
-      return agents
-    })
-    apiCache.set(cacheKey, data)
-    return data
-  },
-
-  // Get agents by starship ID
-  getByStarshipId: async (starshipId: string): Promise<Agent[]> => {
-    const cacheKey = CACHE_KEYS.AGENTS_BY_STARSHIP(starshipId)
-    const cached = apiCache.get<Agent[]>(cacheKey)
-    if (cached) {
-      return cached
-    }
-
-    const data = await api.get(`/api/v1/starships/${starshipId}/agents`).then(res => extractResponseData<Agent[]>(res))
-    apiCache.set(cacheKey, data)
-    return data
-  },
-
-  getById: async (id: string): Promise<Agent> => {
-    const cacheKey = CACHE_KEYS.AGENT_BY_ID(id)
-    const cached = apiCache.get<Agent>(cacheKey)
-    if (cached) {
-      return cached
-    }
-
-    const data = await api.get(`/api/v1/agents/${id}`).then(res => extractResponseData<Agent>(res))
-    apiCache.set(cacheKey, data)
-    return data
-  },
-
-  // CRUD methods with cache invalidation
-  create: async (agent: CreateAgentRequest): Promise<Agent> => {
-    const data = await api.post('/api/v1/agents', agent).then(res => {
-      const agent = extractResponseData<Agent>(res)
-
-      return agent
-    })
-    invalidateAgentCaches()
-    return data
-  },
-
-  update: async (id: string, updates: UpdateAgentRequest): Promise<Agent> => {
-    const data = await api.put(`/api/v1/agents/${id}`, updates).then(res => extractResponseData<Agent>(res))
-    invalidateAgentCaches(id)
-    return data
-  },
-
-  delete: async (id: string): Promise<void> => {
-    await api.delete(`/api/v1/agents/${id}`)
-    invalidateAgentCaches(id)
-  },
-
-  getBySlug: async (starshipId: string, slug: string): Promise<Agent> => {
-    const data = await api.get(`/api/v1/starships/${encodeURIComponent(starshipId)}/agents/${encodeURIComponent(slug)}`).then(res => extractResponseData<Agent>(res))
-    return data
-  },
-
-  // Enhanced query methods with caching
-  getByCategory: async (category: TemplateCategory): Promise<Agent[]> => {
-    const cacheKey = CACHE_KEYS.AGENTS_BY_CATEGORY(category)
-    const cached = apiCache.get<Agent[]>(cacheKey)
-    if (cached) {
-      return cached
-    }
-
-    const data = await api.get(`/api/v1/agents?category=${category}`).then(res => extractResponseData<Agent[]>(res))
-    apiCache.set(cacheKey, data)
-    return data
-  },
-
-  getByAuthor: async (authorId: string): Promise<Agent[]> => {
-    const cacheKey = CACHE_KEYS.AGENTS_BY_AUTHOR(authorId)
-    const cached = apiCache.get<Agent[]>(cacheKey)
-    if (cached) {
-      return cached
-    }
-
-    const data = await api.get(`/api/v1/users/${authorId}/agents`).then(res => extractResponseData<Agent[]>(res))
-    apiCache.set(cacheKey, data)
-    return data
-  },
-
-  getPublic: async (limit: number = 50, offset: number = 0): Promise<Agent[]> => {
-    const cacheKey = CACHE_KEYS.AGENTS_PUBLIC(limit, offset)
-    const cached = apiCache.get<Agent[]>(cacheKey)
-    if (cached) {
-      return cached
-    }
-
-    const data = await api.get(`/api/v1/agents/public?limit=${limit}&offset=${offset}`).then(res => extractResponseData<Agent[]>(res))
-    apiCache.set(cacheKey, data)
-    return data
-  },
-
-  search: async (query: string): Promise<Agent[]> => {
-    const cacheKey = CACHE_KEYS.AGENTS_SEARCH(query)
-    const cached = apiCache.get<Agent[]>(cacheKey)
-    if (cached) {
-      return cached
-    }
-
-    const data = await api.get(`/api/v1/agents/search?q=${encodeURIComponent(query)}`).then(res => extractResponseData<Agent[]>(res))
-    apiCache.set(cacheKey, data, 2 * 60 * 1000) // Cache search results for 2 minutes
-    return data
-  },
-
-  // Get agent analytics
-  getAnalytics: async (id: string): Promise<any> => {
-    const data = await api.get(`/api/v1/agents/${id}/analytics`).then(res => extractResponseData<any>(res))
-    return data
-  },
-
-
-  getAgentsWithUpdates: async (starshipId: string): Promise<Agent[]> => {
-    const data = await api.get(`/api/v1/starships/${starshipId}/agents/with-updates`).then(res => extractResponseData<Agent[]>(res))
-    return data
-  },
-}
 
 export const taskBoardAPI = {
   listBoardsByStarship: async (starshipId: string, args?: { includeArchived?: boolean }): Promise<TaskBoardModel[]> => {

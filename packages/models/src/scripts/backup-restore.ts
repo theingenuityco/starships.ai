@@ -234,7 +234,7 @@ export class BackupManager {
       SELECT 
         (SELECT COUNT(*) FROM users) +
         (SELECT COUNT(*) FROM starships) +
-        (SELECT COUNT(*) FROM agents) +
+        (SELECT COUNT(*) FROM agent_runtimes) +
         (SELECT COUNT(*) FROM conversations) +
         (SELECT COUNT(*) FROM messages) +
         (SELECT COUNT(*) FROM workflows) as total

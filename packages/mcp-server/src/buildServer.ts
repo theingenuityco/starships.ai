@@ -10,12 +10,12 @@ import {
   TaskBoardRepository,
   TaskColumnRepository,
   TaskCardRepository,
-  AgentDispatchRepository,
-  AgentEventRepository,
+  AgentRuntimeDispatchRepository,
+  AgentRuntimeEventRepository,
   type TableRef,
   type StarshipTableRecord,
 } from '@starships/models';
-import type { AgentContext } from './auth';
+import type { AgentRuntimeContext } from './auth';
 
 type ToolResult = { content: Array<{ type: 'text'; text: string }>; isError?: boolean };
 
@@ -27,13 +27,15 @@ function tableRefOf(t: StarshipTableRecord): TableRef {
 }
 
 /**
- * Build a per-request MCP server scoped to one authenticated agent + starship.
- * Reads run against the agent's starship; writes require the `contributor` role.
+ * Build a per-request MCP server scoped to one authenticated runtime + starship.
+ * Reads run against the runtime's starship; writes require that the runtime hosts
+ * a `contributor` persona (see AgentRuntimeContext.canWrite).
  */
-export function buildServer(ctx: AgentContext): McpServer {
+export function buildServer(ctx: AgentRuntimeContext): McpServer {
   const server = new McpServer({ name: 'starship', version: '1.0.0' });
-  const canWrite = ctx.accessRole === 'contributor';
-  const requireWrite = (): ToolResult | null => (canWrite ? null : err('This agent has viewer access; writes are not permitted.'));
+  const canWrite = ctx.canWrite;
+  const requireWrite = (): ToolResult | null =>
+    canWrite ? null : err('This runtime has no contributor persona; writes are not permitted.');
 
   // ---- Tables ----
   server.registerTool('list_tables', { description: "List the starship's structured Tables." }, async () => {
@@ -124,19 +126,20 @@ export function buildServer(ctx: AgentContext): McpServer {
     }
   );
 
-  // ---- Dispatch + status (the agent<->workspace channel) ----
-  server.registerTool('pull_commands', { description: 'Pull commands dispatched to this agent that are not yet acknowledged.' }, async () => {
-    const cmds = await new AgentDispatchRepository().listPendingForAgent(ctx.agentId);
+  // ---- Dispatch + status (the runtime<->workspace channel) ----
+  server.registerTool('pull_commands', { description: 'Pull commands dispatched to personas on this runtime that are not yet acknowledged.' }, async () => {
+    const cmds = await new AgentRuntimeDispatchRepository().listPendingForRuntime(ctx.runtimeId);
     return ok(cmds);
   });
 
   server.registerTool('ack_command', { description: 'Acknowledge a dispatched command.', inputSchema: { dispatchId: z.string() } }, async ({ dispatchId }) => {
-    const d = await new AgentDispatchRepository().markAcked(dispatchId, ctx.agentId);
+    const d = await new AgentRuntimeDispatchRepository().markAcked(dispatchId, ctx.runtimeId);
     if (!d) return err('Dispatch not found or already acknowledged');
     // Record the transition so it shows in the activity log (proof of pickup).
-    await new AgentEventRepository().append({
+    await new AgentRuntimeEventRepository().append({
       starshipId: ctx.starshipId,
-      agentId: ctx.agentId,
+      personaId: d.personaId,
+      runtimeId: ctx.runtimeId,
       dispatchId: d.id,
       cardId: d.cardId ?? null,
       type: 'command_acked',
@@ -146,12 +149,13 @@ export function buildServer(ctx: AgentContext): McpServer {
   });
 
   server.registerTool('complete_command', { description: 'Mark a dispatched command done.', inputSchema: { dispatchId: z.string() } }, async ({ dispatchId }) => {
-    const d = await new AgentDispatchRepository().markDone(dispatchId, ctx.agentId);
+    const d = await new AgentRuntimeDispatchRepository().markDone(dispatchId, ctx.runtimeId);
     if (!d) return err('Dispatch not found');
     // Record the transition so it shows in the activity log (proof of completion).
-    await new AgentEventRepository().append({
+    await new AgentRuntimeEventRepository().append({
       starshipId: ctx.starshipId,
-      agentId: ctx.agentId,
+      personaId: d.personaId,
+      runtimeId: ctx.runtimeId,
       dispatchId: d.id,
       cardId: d.cardId ?? null,
       type: 'command_completed',
@@ -162,9 +166,14 @@ export function buildServer(ctx: AgentContext): McpServer {
 
   server.registerTool(
     'report_status',
-    { description: 'Report this agent\'s status to the workspace activity log.', inputSchema: { status: z.enum(['online', 'busy', 'idle', 'offline']), detail: z.string().optional() } },
+    { description: "Report this runtime's status to the workspace activity log.", inputSchema: { status: z.enum(['online', 'busy', 'idle', 'offline']), detail: z.string().optional() } },
     async ({ status, detail }) => {
-      await new AgentEventRepository().append({ starshipId: ctx.starshipId, agentId: ctx.agentId, type: 'status', payload: { status, detail: detail ?? null } });
+      await new AgentRuntimeEventRepository().append({
+        starshipId: ctx.starshipId,
+        runtimeId: ctx.runtimeId,
+        type: 'status',
+        payload: { status, detail: detail ?? null },
+      });
       return ok({ recorded: true });
     }
   );
@@ -173,9 +182,16 @@ export function buildServer(ctx: AgentContext): McpServer {
     'post_event',
     { description: "Append an event to the workspace activity log. `type` is a lowercase namespaced slug (e.g. 'status', 'note', 'custom:my_event').", inputSchema: { type: z.string().regex(/^[a-z][a-z0-9_:]{0,63}$/, 'type must be a lowercase slug (a-z 0-9 _ :)'), payload: z.record(z.string(), z.unknown()).optional(), cardId: z.string().optional(), dispatchId: z.string().optional() } },
     async ({ type, payload, cardId, dispatchId }) => {
-      const e = await new AgentEventRepository().append({
+      // Attribute the event to the persona behind the dispatch when one is given.
+      let personaId: string | null = null;
+      if (dispatchId) {
+        const d = await new AgentRuntimeDispatchRepository().findById(dispatchId);
+        personaId = d?.personaId ?? null;
+      }
+      const e = await new AgentRuntimeEventRepository().append({
         starshipId: ctx.starshipId,
-        agentId: ctx.agentId,
+        personaId,
+        runtimeId: ctx.runtimeId,
         type,
         payload: payload ?? {},
         cardId: cardId ?? null,

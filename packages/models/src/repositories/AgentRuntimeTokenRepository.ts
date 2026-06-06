@@ -1,11 +1,11 @@
 import { BaseRepository } from './BaseRepository';
-import type { AgentTokenModel } from '@starships/protocol';
+import type { AgentRuntimeTokenModel } from '@starships/protocol';
 import type { PostgresConnection } from '@/helpers/database';
 import { nanoid } from 'nanoid';
 
 type DbRow = {
   id: string;
-  agent_id: string;
+  runtime_id: string;
   starship_id: string;
   token_hash: string;
   name: string | null;
@@ -16,10 +16,10 @@ type DbRow = {
   created_at: string;
 };
 
-function fromDb(r: DbRow): AgentTokenModel {
+function fromDb(r: DbRow): AgentRuntimeTokenModel {
   return {
     id: String(r.id),
-    agentId: String(r.agent_id),
+    runtimeId: String(r.runtime_id),
     starshipId: String(r.starship_id),
     tokenHash: String(r.token_hash),
     name: r.name ?? null,
@@ -31,84 +31,85 @@ function fromDb(r: DbRow): AgentTokenModel {
   };
 }
 
-export class AgentTokenRepository extends BaseRepository {
+/** Connection tokens bound to a runtime (the engine). */
+export class AgentRuntimeTokenRepository extends BaseRepository {
   constructor(connection?: PostgresConnection) {
-    super('AgentTokenRepository', connection);
+    super('AgentRuntimeTokenRepository', connection);
   }
 
   /** Store a minted token (only the sha256 hash; the secret is shown once by the caller). */
   async create(input: {
-    agentId: string;
+    runtimeId: string;
     starshipId: string;
     tokenHash: string;
     name?: string | null;
     expiresAt?: string | null;
     createdByUserId?: string | null;
-  }): Promise<AgentTokenModel> {
+  }): Promise<AgentRuntimeTokenModel> {
     return this.executeWithErrorHandling(
       async () => {
         const conn = this.getConnection();
         const row = await conn.queryOne<DbRow>(
-          `INSERT INTO agent_tokens (id, agent_id, starship_id, token_hash, name, expires_at, created_by_user_id)
+          `INSERT INTO agent_runtime_tokens (id, runtime_id, starship_id, token_hash, name, expires_at, created_by_user_id)
            VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
-          [nanoid(), input.agentId, input.starshipId, input.tokenHash, input.name ?? null, input.expiresAt ?? null, input.createdByUserId ?? null]
+          [nanoid(), input.runtimeId, input.starshipId, input.tokenHash, input.name ?? null, input.expiresAt ?? null, input.createdByUserId ?? null]
         );
-        if (!row) throw new Error('Failed to create agent token');
+        if (!row) throw new Error('Failed to create runtime token');
         return fromDb(row);
       },
       'create',
-      'AgentToken'
+      'AgentRuntimeToken'
     );
   }
 
   /** Resolve an active (non-revoked, non-expired) token by its hash. */
-  async findActiveByHash(tokenHash: string): Promise<AgentTokenModel | null> {
+  async findActiveByHash(tokenHash: string): Promise<AgentRuntimeTokenModel | null> {
     return this.executeWithErrorHandling(
       async () => {
         const conn = this.getConnection();
         const row = await conn.queryOne<DbRow>(
-          `SELECT * FROM agent_tokens
+          `SELECT * FROM agent_runtime_tokens
             WHERE token_hash = $1 AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at > NOW())`,
           [tokenHash]
         );
         return row ? fromDb(row) : null;
       },
       'findActiveByHash',
-      'AgentToken'
+      'AgentRuntimeToken'
     );
   }
 
-  async findById(id: string): Promise<AgentTokenModel | null> {
+  async findById(id: string): Promise<AgentRuntimeTokenModel | null> {
     return this.executeWithErrorHandling(
       async () => {
-        const row = await this.getConnection().queryOne<DbRow>(`SELECT * FROM agent_tokens WHERE id = $1`, [id]);
+        const row = await this.getConnection().queryOne<DbRow>(`SELECT * FROM agent_runtime_tokens WHERE id = $1`, [id]);
         return row ? fromDb(row) : null;
       },
       'findById',
-      'AgentToken',
+      'AgentRuntimeToken',
       id
     );
   }
 
-  async listByStarship(starshipId: string): Promise<AgentTokenModel[]> {
+  async listByStarship(starshipId: string): Promise<AgentRuntimeTokenModel[]> {
     return this.executeWithErrorHandling(
       async () => {
         const conn = this.getConnection();
-        const rows = await conn.query<DbRow>(`SELECT * FROM agent_tokens WHERE starship_id = $1 ORDER BY created_at DESC`, [starshipId]);
+        const rows = await conn.query<DbRow>(`SELECT * FROM agent_runtime_tokens WHERE starship_id = $1 ORDER BY created_at DESC`, [starshipId]);
         return rows.map(fromDb);
       },
       'listByStarship',
-      'AgentToken'
+      'AgentRuntimeToken'
     );
   }
 
   async touchLastUsed(id: string): Promise<void> {
     return this.executeWithErrorHandling(
       async () => {
-        await this.getConnection().query(`UPDATE agent_tokens SET last_used_at = NOW() WHERE id = $1`, [id]);
+        await this.getConnection().query(`UPDATE agent_runtime_tokens SET last_used_at = NOW() WHERE id = $1`, [id]);
       },
       'touchLastUsed',
-      'AgentToken',
+      'AgentRuntimeToken',
       id
     );
   }
@@ -116,11 +117,11 @@ export class AgentTokenRepository extends BaseRepository {
   async revoke(id: string): Promise<boolean> {
     return this.executeWithErrorHandling(
       async () => {
-        const result = await this.getConnection().query(`UPDATE agent_tokens SET revoked_at = NOW() WHERE id = $1 AND revoked_at IS NULL`, [id]);
+        const result = await this.getConnection().query(`UPDATE agent_runtime_tokens SET revoked_at = NOW() WHERE id = $1 AND revoked_at IS NULL`, [id]);
         return (result as unknown as { rowCount?: number })?.rowCount !== 0;
       },
       'revoke',
-      'AgentToken',
+      'AgentRuntimeToken',
       id
     );
   }

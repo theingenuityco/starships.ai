@@ -6,7 +6,7 @@ import { IdSchema, noXSS, XSS_ERROR_MESSAGE } from '@/schemas/common';
 import type { Request, Response } from 'express';
 import { Router } from 'express';
 import { z } from 'zod';
-import { AgentRepository, AgentTokenRepository } from '@starships/models';
+import { AgentRuntimeRepository, AgentRuntimeTokenRepository } from '@starships/models';
 import { createHash, randomBytes } from 'crypto';
 
 const router: Router = Router();
@@ -20,11 +20,19 @@ function mintSecret(): string {
   return `sk-ship-${randomBytes(24).toString('base64url')}`;
 }
 
-function publicToken(t: { id: string; agentId: string; name?: string | null; lastUsedAt?: string | null; expiresAt?: string | null; revokedAt?: string | null; createdAt: string }) {
+function publicToken(t: {
+  id: string;
+  runtimeId: string;
+  name?: string | null;
+  lastUsedAt?: string | null;
+  expiresAt?: string | null;
+  revokedAt?: string | null;
+  createdAt: string;
+}) {
   // Never expose tokenHash.
   return {
     id: t.id,
-    agentId: t.agentId,
+    runtimeId: t.runtimeId,
     name: t.name ?? null,
     lastUsedAt: t.lastUsedAt ?? null,
     expiresAt: t.expiresAt ?? null,
@@ -33,23 +41,23 @@ function publicToken(t: { id: string; agentId: string; name?: string | null; las
   };
 }
 
-// GET /starships/:starshipId/agent-tokens - List tokens (metadata only)
-router.get('/starships/:starshipId/agent-tokens', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+// GET /starships/:starshipId/agent-runtime-tokens - List tokens (metadata only)
+router.get('/starships/:starshipId/agent-runtime-tokens', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const params = validateData(z.object({ starshipId: IdSchema }), req.params, res, 'starship parameter');
     if (!params) return;
     if (!(await verifyStarshipAccess(params.starshipId, req.user!.id, res))) return;
 
-    const tokens = await new AgentTokenRepository().listByStarship(params.starshipId);
+    const tokens = await new AgentRuntimeTokenRepository().listByStarship(params.starshipId);
     sendSuccess(res, tokens.map(publicToken));
   } catch (error) {
-    handleError(error, res, 'listing agent tokens');
+    handleError(error, res, 'listing runtime tokens');
   }
 });
 
-// POST /starships/:starshipId/agent-tokens - Mint a token for an agent (owner only)
+// POST /starships/:starshipId/agent-runtime-tokens - Mint a token for a runtime (owner only)
 // Returns the raw secret ONCE; only its hash is stored.
-router.post('/starships/:starshipId/agent-tokens', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.post('/starships/:starshipId/agent-runtime-tokens', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const params = validateData(z.object({ starshipId: IdSchema }), req.params, res, 'starship parameter');
     if (!params) return;
@@ -57,7 +65,7 @@ router.post('/starships/:starshipId/agent-tokens', jwtAuthMiddleware, async (req
 
     const body = validateData(
       z.object({
-        agentId: IdSchema,
+        runtimeId: IdSchema,
         name: z.string().max(255).refine(noXSS, { message: XSS_ERROR_MESSAGE }).optional(),
         expiresAt: z.string().datetime().optional(),
       }),
@@ -67,16 +75,16 @@ router.post('/starships/:starshipId/agent-tokens', jwtAuthMiddleware, async (req
     );
     if (!body) return;
 
-    // Agent must belong to this starship.
-    const agent = await new AgentRepository().findById(body.agentId);
-    if (!agent || String(agent.starshipId) !== String(params.starshipId)) {
-      sendError(res, 'VALIDATION_ERROR', 'Agent not found in this starship', 400, { agentId: body.agentId });
+    // Runtime must belong to this starship.
+    const runtime = await new AgentRuntimeRepository().findById(body.runtimeId);
+    if (!runtime || String(runtime.starshipId) !== String(params.starshipId)) {
+      sendError(res, 'VALIDATION_ERROR', 'Runtime not found in this starship', 400, { runtimeId: body.runtimeId });
       return;
     }
 
     const secret = mintSecret();
-    const record = await new AgentTokenRepository().create({
-      agentId: body.agentId,
+    const record = await new AgentRuntimeTokenRepository().create({
+      runtimeId: body.runtimeId,
       starshipId: params.starshipId,
       tokenHash: hashToken(secret),
       name: body.name ?? null,
@@ -87,17 +95,17 @@ router.post('/starships/:starshipId/agent-tokens', jwtAuthMiddleware, async (req
     // The secret is returned exactly once.
     sendSuccess(res, { token: secret, record: publicToken(record) }, 201);
   } catch (error) {
-    handleError(error, res, 'minting agent token');
+    handleError(error, res, 'minting runtime token');
   }
 });
 
-// DELETE /agent-tokens/:id - Revoke a token (owner only)
-router.delete('/agent-tokens/:id', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+// DELETE /agent-runtime-tokens/:id - Revoke a token (owner only)
+router.delete('/agent-runtime-tokens/:id', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const params = validateData(z.object({ id: IdSchema }), req.params, res, 'token parameter');
     if (!params) return;
 
-    const repo = new AgentTokenRepository();
+    const repo = new AgentRuntimeTokenRepository();
     const token = await repo.findById(params.id);
     if (!token) {
       sendError(res, 'RESOURCE_NOT_FOUND', 'Token not found', 404, { id: params.id });
@@ -108,7 +116,7 @@ router.delete('/agent-tokens/:id', jwtAuthMiddleware, async (req: Request, res: 
     const revoked = await repo.revoke(params.id);
     sendSuccess(res, { revoked });
   } catch (error) {
-    handleError(error, res, 'revoking agent token');
+    handleError(error, res, 'revoking runtime token');
   }
 });
 

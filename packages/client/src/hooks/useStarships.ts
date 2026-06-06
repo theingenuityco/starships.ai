@@ -20,7 +20,6 @@ export const STARSHIP_QUERY_KEYS = {
   details: () => [...STARSHIP_QUERY_KEYS.all, 'detail'] as const,
   detail: (id: string) => [...STARSHIP_QUERY_KEYS.details(), id] as const,
   byOwner: (ownerId: string) => [...STARSHIP_QUERY_KEYS.all, 'owner', ownerId] as const,
-  agents: (starshipId: string) => [...STARSHIP_QUERY_KEYS.detail(starshipId), 'agents'] as const,
 } as const
 
 /**
@@ -193,22 +192,6 @@ export function useStarshipBySlug(slug: string, enabled: boolean = true) {
     gcTime: 30 * 60 * 1000, // 30 minutes
     refetchOnWindowFocus: false, // Don't refetch when switching between conversations
     refetchOnMount: false, // Use cached data if available
-  })
-}
-
-/**
- * Get starship agents
- */
-export function useStarshipAgents(starshipId: string, enabled: boolean = true) {
-  return useQuery({
-    queryKey: STARSHIP_QUERY_KEYS.agents(starshipId),
-    queryFn: async () => {
-      const response: FetchResponse<ApiResponse<any[]>> = await api.get(`/api/v1/starships/${starshipId}/agents`)
-      return response.data.data
-    },
-    enabled: !!starshipId && enabled,
-    staleTime: 10 * 1000, // 10 seconds
-    gcTime: 2 * 60 * 1000, // 2 minutes
   })
 }
 

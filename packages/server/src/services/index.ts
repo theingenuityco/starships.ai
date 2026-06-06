@@ -1,4 +1,5 @@
-export { AgentService } from './AgentService';
+export { AgentRuntimeService } from './AgentRuntimeService';
+export { AgentPersonaService } from './AgentPersonaService';
 export { EmailService } from './EmailService';
 export { PlatformSecretService } from './PlatformSecretService';
 export { RegistrationOrchestrator } from './RegistrationOrchestrator';

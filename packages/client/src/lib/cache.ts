@@ -66,15 +66,7 @@ export const apiCache = new SimpleCache()
 
 // Cache keys for different API endpoints
 export const CACHE_KEYS = {
-  AGENTS_ALL: 'agents:all',
-  AGENTS_BY_CATEGORY: (category: string) => `agents:category:${category}`,
-  AGENTS_BY_AUTHOR: (authorId: string) => `agents:author:${authorId}`,
-  AGENTS_BY_STARSHIP: (starshipId: string) => `agents:starship:${starshipId}`,
-  AGENTS_PUBLIC: (limit: number, offset: number) => `agents:public:${limit}:${offset}`,
-  AGENTS_SEARCH: (query: string) => `agents:search:${query}`,
-  AGENT_BY_ID: (id: string) => `agent:${id}`,
   STARSHIP_BY_ID: (id: string) => `starship:${id}`,
-  STARSHIP_AGENTS: (id: string) => `starship:${id}:agents`,
   // Template cache keys
   TEMPLATES_ALL: 'templates:all',
   TEMPLATES_BY_CATEGORY: (category: string) => `templates:category:${category}`,
@@ -84,24 +76,6 @@ export const CACHE_KEYS = {
   TEMPLATE_BY_ID: (id: string) => `template:${id}`,
   // NEW: Connector Instance cache keys
   CONNECTOR_INSTANCES_BY_STARSHIP: (starshipId: string) => `connector-instances:starship:${starshipId}`,
-}
-
-// Helper function to invalidate related caches when agents are modified
-export const invalidateAgentCaches = (agentId?: string) => {
-  if (agentId) {
-    apiCache.invalidate(CACHE_KEYS.AGENT_BY_ID(agentId))
-  }
-
-  // Invalidate all agent list caches
-  apiCache.invalidatePattern('^agents:')
-
-  apiCache.invalidatePattern('^starship:.*:agents$')
-
-  // Invalidate starships list cache since agent assignments may have changed
-  apiCache.invalidate('starships:list')
-
-  // Log remaining cache keys for debugging
-  const stats = apiCache.getStats()
 }
 
 // Helper function to invalidate template caches

@@ -18,7 +18,8 @@ import express from 'express';
 import { createServer } from 'http';
 
 // Route imports
-import agentRoutes from '@/routes/agents';
+import agentRuntimeRoutes from '@/routes/agent-runtimes';
+import agentPersonaRoutes from '@/routes/agent-personas';
 import authRoutes from '@/routes/auth';
 import roomRoutes from '@/routes/rooms';
 import starshipRoutes from '@/routes/starships';
@@ -30,7 +31,7 @@ import starshipDocsRoutes from '@/routes/starship-docs';
 import platformSecretRoutes from '@/routes/platform-secrets';
 import starshipInvitesRoutes from '@/routes/starship-invites';
 import presenceRoutes from '@/routes/presence';
-import agentTokenRoutes from '@/routes/agent-tokens';
+import agentTokenRoutes from '@/routes/agent-runtime-tokens';
 import agentDispatchRoutes from '@/routes/agent-dispatch';
 import agentHeartbeatRoutes from '@/routes/agent-heartbeats';
 import setupRoutes from '@/routes/setup';
@@ -105,7 +106,8 @@ app.use(cookieParser());
 app.use('/api/v1', authRoutes); // Authentication routes (public)
 app.use('/api/v1', setupRoutes); // First-run setup routes (public, self-locks after first admin)
 app.use('/api/v1', healthRoutes);
-app.use('/api/v1', agentRoutes);
+app.use('/api/v1', agentRuntimeRoutes);
+app.use('/api/v1', agentPersonaRoutes);
 app.use('/api/v1', roomRoutes);
 app.use('/api/v1', userRoutes);
 app.use('/api/v1', starshipRoutes);

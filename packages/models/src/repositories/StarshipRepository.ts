@@ -1,8 +1,8 @@
-import { AgentEntity } from '@/entities/AgentEntity';
+import { AgentRuntimeEntity } from '@/entities/AgentRuntimeEntity';
 import { StarshipEntity } from '@/entities/StarshipEntity';
 import { fromDatabase, fromDatabaseArray, toDatabase, toEntityInstance } from '@/helpers/serialization-helper';
 import { BaseRepository } from '@/repositories/BaseRepository';
-import type { AgentModel } from '@starships/protocol';
+import type { AgentRuntimeModel } from '@starships/protocol';
 import { StarshipModel } from '@starships/protocol';
 import type { PostgresConnection } from '@/helpers/database';
 
@@ -230,7 +230,7 @@ export class StarshipRepository extends BaseRepository {
     );
   }
 
-  async getDeployedAgents(starshipId: string): Promise<AgentModel[]> {
+  async getDeployedAgents(starshipId: string): Promise<AgentRuntimeModel[]> {
     if (!starshipId) {
       throw new Error('Starship ID is required');
     }
@@ -239,12 +239,12 @@ export class StarshipRepository extends BaseRepository {
       async () => {
         const connection = this.getConnection();
         const result = await connection.query<Record<string, unknown>>(
-          `SELECT a.* FROM agents a 
-         WHERE a.starship_id = $1 AND a.deployed_at IS NOT NULL 
+          `SELECT a.* FROM agent_runtimes a
+         WHERE a.starship_id = $1 AND a.deployed_at IS NOT NULL
          ORDER BY a.name`,
           [starshipId]
         );
-        return fromDatabaseArray(AgentEntity, result);
+        return fromDatabaseArray(AgentRuntimeEntity, result);
       },
       'getDeployedAgents',
       'Agent'
@@ -270,7 +270,7 @@ export class StarshipRepository extends BaseRepository {
         // Check if agent is already deployed
         const connection = this.getConnection();
         const existingDeployment = await connection.queryOne(
-          `SELECT id FROM agents WHERE id = $1 AND starship_id = $2 AND deployed_at IS NOT NULL`,
+          `SELECT id FROM agent_runtimes WHERE id = $1 AND starship_id = $2 AND deployed_at IS NOT NULL`,
           [agentId, starshipId]
         );
 
@@ -280,10 +280,10 @@ export class StarshipRepository extends BaseRepository {
 
         // Deploy agent by updating the agents table
         await connection.query(
-          `UPDATE agents SET 
-         starship_id = $1, 
-         deployed_at = $2, 
-         updated_at = NOW() 
+          `UPDATE agent_runtimes SET
+         starship_id = $1,
+         deployed_at = $2,
+         updated_at = NOW()
          WHERE id = $3`,
           [starshipId, new Date().toISOString(), agentId]
         );

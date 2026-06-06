@@ -1,12 +1,12 @@
 import { getRandomStarshipName } from '@/utils/starshipNames';
 import { ConflictError, NotFoundError } from '@starships/errors';
 import {
-  AgentRepository,
+  AgentRuntimeRepository,
   StarshipMemberRepository,
   StarshipRepository,
   UserRepository,
 } from '@starships/models';
-import type { AgentModel, AuthUser, StarshipModel, UpdateStarshipRequest } from '@starships/protocol';
+import type { AgentRuntimeModel, AuthUser, StarshipModel, UpdateStarshipRequest } from '@starships/protocol';
 import { logger } from '@/utils/logger';
 
 export interface CreateStarshipData {
@@ -18,7 +18,7 @@ export interface CreateStarshipData {
 }
 
 export interface StarshipWithDetails extends StarshipModel {
-  agents: AgentModel[];
+  agents: AgentRuntimeModel[];
   availableSlots: number;
   deployedCount: number;
 }
@@ -31,13 +31,13 @@ export interface StarshipWithDetails extends StarshipModel {
  */
 export class StarshipService {
   private starshipRepository: StarshipRepository;
-  private agentRepository: AgentRepository;
+  private agentRepository: AgentRuntimeRepository;
   private userRepository: UserRepository;
   private starshipMemberRepository: StarshipMemberRepository;
 
   constructor() {
     this.starshipRepository = new StarshipRepository();
-    this.agentRepository = new AgentRepository();
+    this.agentRepository = new AgentRuntimeRepository();
     this.userRepository = new UserRepository();
     this.starshipMemberRepository = new StarshipMemberRepository();
   }
@@ -151,7 +151,7 @@ export class StarshipService {
   /**
    * Get deployed agents for starship
    */
-  async getDeployedAgents(starshipId: string): Promise<AgentModel[]> {
+  async getDeployedAgents(starshipId: string): Promise<AgentRuntimeModel[]> {
     return this.starshipRepository.getDeployedAgents(starshipId);
   }
 

@@ -34,21 +34,18 @@ function truncate(s: string): string {
 function substitute(arg: string, dispatch: AgentRuntimeDispatchModel, promptField: string, sessionId: string): string {
   const prompt = String((dispatch.payload as Record<string, unknown>)?.[promptField] ?? '');
   const persona = dispatch.persona ?? null;
-  return arg
-    .split('{{prompt}}')
-    .join(prompt)
-    .split('{{commandType}}')
-    .join(dispatch.commandType)
-    .split('{{dispatchId}}')
-    .join(dispatch.id)
-    .split('{{sessionId}}')
-    .join(sessionId)
-    .split('{{systemPrompt}}')
-    .join(String(persona?.systemPrompt ?? ''))
-    .split('{{model}}')
-    .join(String(persona?.model ?? ''))
-    .split('{{instructions}}')
-    .join(String(persona?.instructions ?? ''));
+  // Single-pass: each token site is replaced once, so a substituted value that
+  // contains `{{…}}` text is never re-scanned (mirrors agent-desktop engine.ts).
+  const values: Record<string, string> = {
+    '{{prompt}}': prompt,
+    '{{commandType}}': dispatch.commandType,
+    '{{dispatchId}}': dispatch.id,
+    '{{sessionId}}': sessionId,
+    '{{systemPrompt}}': String(persona?.systemPrompt ?? ''),
+    '{{model}}': String(persona?.model ?? ''),
+    '{{instructions}}': String(persona?.instructions ?? ''),
+  };
+  return arg.replace(/\{\{(?:prompt|commandType|dispatchId|sessionId|systemPrompt|model|instructions)\}\}/g, (token) => values[token] ?? token);
 }
 
 /**

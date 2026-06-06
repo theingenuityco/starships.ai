@@ -33,10 +33,10 @@ export class AgentPersonaService {
   private async validatePersonaLimit(starshipId: string): Promise<void> {
     const starship = await this.starshipRepository.findById(starshipId);
     if (!starship) throw new NotFoundError('Starship', starshipId);
-    const current = await this.personaRepository.findByStarship(starshipId);
-    if (current.length >= starship.maxAgents) {
+    const current = await this.personaRepository.countByStarship(starshipId);
+    if (current >= starship.maxAgents) {
       throw new ValidationError(
-        `Persona limit reached. Maximum ${starship.maxAgents} personas allowed per starship. Currently: ${current.length}`
+        `Persona limit reached. Maximum ${starship.maxAgents} personas allowed per starship. Currently: ${current}`
       );
     }
   }

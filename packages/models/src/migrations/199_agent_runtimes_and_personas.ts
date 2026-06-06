@@ -79,6 +79,10 @@ export async function up(client: Client): Promise<void> {
       `ALTER TABLE agent_runtime_dispatches ADD CONSTRAINT agent_runtime_dispatches_persona_id_fkey FOREIGN KEY (persona_id) REFERENCES agent_personas(id) ON DELETE CASCADE`
     );
     await client.query(`CREATE INDEX IF NOT EXISTS idx_agent_runtime_dispatches_persona ON agent_runtime_dispatches(persona_id, created_at)`);
+    // listPendingForRuntime filters on (runtime_id, ack_status) every poll cycle.
+    await client.query(
+      `CREATE INDEX IF NOT EXISTS idx_agent_runtime_dispatches_runtime_pending ON agent_runtime_dispatches(runtime_id, ack_status) WHERE ack_status IN ('pending', 'acked')`
+    );
 
     // 6. Events: agent_id -> runtime_id, add persona_id (nullable; runtime-level events allowed).
     await client.query('ALTER TABLE agent_runtime_events RENAME COLUMN agent_id TO runtime_id');

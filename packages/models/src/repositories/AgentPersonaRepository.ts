@@ -43,6 +43,20 @@ export class AgentPersonaRepository extends BaseRepository {
     );
   }
 
+  async countByStarship(starshipId: string): Promise<number> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const result = await this.getConnection().queryOne<{ count: string }>(
+          'SELECT COUNT(*) as count FROM agent_personas WHERE starship_id = $1',
+          [starshipId]
+        );
+        return result ? parseInt(result.count, 10) : 0;
+      },
+      'countByStarship',
+      'AgentPersona'
+    );
+  }
+
   async findBySlugAndStarship(slug: string, starshipId: string): Promise<AgentPersonaModel | null> {
     return this.executeWithErrorHandling(
       async () => {

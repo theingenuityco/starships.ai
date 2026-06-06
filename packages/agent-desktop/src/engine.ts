@@ -171,7 +171,15 @@ async function executeRun(opts: {
 /** Snapshot a finished run's committed turns as timestamped conversation messages. */
 function committedTurns(dispatchId: string): ConversationMessage[] {
   const at = new Date().toISOString();
-  return (getLiveRun(dispatchId)?.committed ?? []).map((t) => ({ role: t.role, text: t.text, tool: t.tool, at: t.ts ?? at }));
+  const live = getLiveRun(dispatchId);
+  const committed = live?.committed ?? [];
+  // Raw-output runtimes (hermes/openclaw/custom) emit no structured turns, so
+  // `committed` stays empty. Wrap their raw stdout as a single assistant turn so
+  // the conversation isn't left with just the user's prompt and no reply.
+  if (committed.length === 0 && live?.raw.trim()) {
+    return [{ role: 'assistant', text: live.raw.trim(), at }];
+  }
+  return committed.map((t) => ({ role: t.role, text: t.text, tool: t.tool, at: t.ts ?? at }));
 }
 
 /**

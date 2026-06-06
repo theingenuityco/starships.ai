@@ -272,9 +272,12 @@ function patchMeta(id: string, patch: Partial<Pick<ConversationSummary, 'title' 
   const body = bodies.get(id);
   const base = body ? summaryOf(body) : summaries.find((s) => s.id === id);
   if (!base) return;
-  const next = { ...base, ...patch };
-  summaries = summaries.map((s) => (s.id === id ? { ...s, ...patch } : s));
-  if (body) bodies.set(id, { ...body, ...patch });
+  // Bump updatedAt: rewriting the header touches the file's mtime too, so this
+  // keeps the in-memory order in step and floats a renamed thread up in Recents.
+  const ts = iso();
+  const next = { ...base, ...patch, updatedAt: ts };
+  summaries = summaries.map((s) => (s.id === id ? { ...s, ...patch, updatedAt: ts } : s));
+  if (body) bodies.set(id, { ...body, ...patch, updatedAt: ts });
   emit();
   if (isTauri()) void updateConversationMeta(id, headerLine(next)).catch((err) => console.error('[conversations] meta write failed:', err));
 }

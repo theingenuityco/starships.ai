@@ -178,8 +178,12 @@ fn write_store(app: tauri::AppHandle, json: String) -> Result<(), String> {
     if let Some(dir) = path.parent() {
         fs::create_dir_all(dir).map_err(|e| e.to_string())?;
     }
-    fs::write(&path, json).map_err(|e| e.to_string())?;
-    set_owner_only(&path);
+    // Write to a sibling temp file then rename over the target: rename is atomic on
+    // POSIX, so a crash mid-write can't leave store.json truncated or half-written.
+    let tmp = path.with_extension("json.tmp");
+    fs::write(&tmp, &json).map_err(|e| e.to_string())?;
+    set_owner_only(&tmp);
+    fs::rename(&tmp, &path).map_err(|e| e.to_string())?;
     Ok(())
 }
 
@@ -243,13 +247,19 @@ fn read_conversation(app: tauri::AppHandle, id: String) -> Result<Option<String>
 /// so a re-issued create never clobbers an in-progress transcript.
 #[tauri::command]
 fn create_conversation(app: tauri::AppHandle, id: String, header: String) -> Result<(), String> {
+    use std::io::Write;
     let path = conversation_path(&app, &id)?;
-    if path.exists() {
-        return Ok(());
-    }
+    // create_new is atomic: it creates the file only if absent, so a concurrent
+    // create (or a fast webview retry) can't clobber an in-progress transcript.
+    // AlreadyExists is the idempotent no-op case.
+    let mut f = match fs::OpenOptions::new().create_new(true).write(true).open(&path) {
+        Ok(f) => f,
+        Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => return Ok(()),
+        Err(e) => return Err(e.to_string()),
+    };
     let mut line = header.trim().to_string();
     line.push('\n');
-    fs::write(&path, line).map_err(|e| e.to_string())?;
+    f.write_all(line.as_bytes()).map_err(|e| e.to_string())?;
     set_owner_only(&path);
     Ok(())
 }

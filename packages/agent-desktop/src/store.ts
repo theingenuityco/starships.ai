@@ -129,7 +129,7 @@ export async function initStore(): Promise<void> {
 function commit(next: StoreData): void {
   data = next;
   emit();
-  if (isTauri()) writeStoreRaw(JSON.stringify(data)).catch(() => {});
+  if (isTauri()) writeStoreRaw(JSON.stringify(data)).catch((err) => console.error('[store] write failed:', err));
 }
 
 // ---- React binding ----

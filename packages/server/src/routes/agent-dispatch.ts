@@ -36,6 +36,14 @@ router.post('/starships/:starshipId/agent-personas/:personaId/dispatch', jwtAuth
       return;
     }
 
+    // A dispatch is delivered via the runtime's pending queue (filtered by runtime_id).
+    // With no runtime assigned the row would never match a pull and silently queue
+    // forever, so reject up front.
+    if (!persona.runtimeId) {
+      sendError(res, 'VALIDATION_ERROR', 'Persona has no runtime assigned; cannot dispatch', 400, { personaId: persona.id });
+      return;
+    }
+
     // Snapshot the persona's behaviour so the runtime injects it at execution time,
     // and resolve the runtime currently assigned to this persona.
     const personaConfig: PersonaExecutionConfig = {

@@ -14,6 +14,167 @@ body {
   margin: 0;
   background: #0b0d12;
   color: #e6e8ee;
+  /* Claude-desktop UI type: a clean neo-grotesque (Inter where available, native
+     system grotesque otherwise), antialiased, with the slight negative tracking
+     Claude uses throughout. */
   font-family:
-    ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    'Inter Variable', 'Inter', -apple-system, BlinkMacSystemFont, ui-sans-serif, system-ui, 'Segoe UI',
+    'Helvetica Neue', Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  letter-spacing: -0.011em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: 'cv11', 'ss01';
+}
+
+/* Headings carry tighter tracking, matching Claude's display type. */
+h1,
+h2,
+h3,
+h4 {
+  letter-spacing: -0.02em;
+}
+
+/* ---- Claude-style chat prose (assistant turns) ---- */
+.md {
+  font-size: 15px;
+  line-height: 1.7;
+  color: #e8e6e1;
+  word-break: break-word;
+}
+.md > :first-child {
+  margin-top: 0;
+}
+.md > :last-child {
+  margin-bottom: 0;
+}
+.md-p {
+  margin: 0 0 0.85em;
+}
+.md-h {
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.018em;
+  color: #f5f3ee;
+  margin: 1.4em 0 0.6em;
+}
+.md-h1 {
+  font-size: 1.4em;
+}
+.md-h2 {
+  font-size: 1.25em;
+}
+.md-h3 {
+  font-size: 1.1em;
+}
+.md-h4,
+.md-h5,
+.md-h6 {
+  font-size: 1em;
+}
+.md-ul,
+.md-ol {
+  margin: 0 0 0.85em;
+  padding-left: 1.5em;
+}
+.md-ul {
+  list-style: disc;
+}
+.md-ol {
+  list-style: decimal;
+}
+.md-li {
+  margin: 0.2em 0;
+}
+.md-li::marker {
+  color: #8c8a83;
+}
+.md-quote {
+  margin: 0 0 0.85em;
+  padding: 0.1em 0 0.1em 1em;
+  border-left: 2px solid #44423c;
+  color: #c4c1b8;
+}
+.md-hr {
+  border: none;
+  border-top: 1px solid #2c2b28;
+  margin: 1.4em 0;
+}
+.md a {
+  color: #d97757;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.md a:hover {
+  color: #e08c70;
+}
+.md-code-inline {
+  font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 0.86em;
+  background: #1e1e22;
+  border: 1px solid #2c2c31;
+  border-radius: 5px;
+  padding: 0.1em 0.36em;
+}
+.md-pre {
+  position: relative;
+  margin: 0 0 0.95em;
+  background: #0d0d10;
+  border: 1px solid #26262b;
+  border-radius: 12px;
+  overflow: hidden;
+}
+.md-pre code {
+  display: block;
+  overflow-x: auto;
+  padding: 0.85em 1em;
+  font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: #d6d3cb;
+  white-space: pre;
+}
+.md-pre-lang {
+  padding: 0.4em 1em;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: lowercase;
+  color: #8c8a83;
+  background: #141418;
+  border-bottom: 1px solid #26262b;
+}
+
+/* Streaming caret for an in-flight assistant turn. */
+.caret-md {
+  display: inline-block;
+  width: 7px;
+  height: 15px;
+  margin-left: 1px;
+  vertical-align: text-bottom;
+  background: #d97757;
+  border-radius: 1px;
+  animation: blink 1s step-start infinite;
+}
+
+/* Pulsing dot used for "thinking" and the send button while a run is in flight. */
+.dot-pulse {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 9999px;
+  background: currentColor;
+  animation: dotpulse 1s ease-in-out infinite;
+}
+@keyframes dotpulse {
+  0%,
+  100% {
+    opacity: 0.3;
+    transform: scale(0.8);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
 }

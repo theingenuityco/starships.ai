@@ -4,6 +4,7 @@
 import { useSyncExternalStore } from 'react';
 import { isTauri, readStoreRaw, writeStoreRaw } from './tauri';
 import type { PermissionPolicy } from './permissions';
+import type { TurnRole } from './transcript';
 
 export type { PermissionPolicy } from './permissions';
 export { DEFAULT_PERMISSIONS } from './permissions';
@@ -46,6 +47,29 @@ export interface Heartbeat {
   createdAt: string;
 }
 
+/** One persisted turn in a conversation thread. Mirrors a {@link TranscriptTurn}
+ *  plus a timestamp, so threads survive restart independent of the on-disk CLI log. */
+export interface ConversationMessage {
+  role: TurnRole;
+  text: string;
+  /** Tool name, for `tool`/`result` turns. */
+  tool?: string;
+  at: string;
+}
+
+/** A persisted multi-turn chat with one persona. `sessionId` is the CLI session reused
+ *  across turns so follow-ups resume the same context (see engine `runConversationTurn`). */
+export interface Conversation {
+  id: string;
+  personaId: string;
+  title: string;
+  /** Set after the first turn that mints a CLI session; later turns resume it. */
+  sessionId?: string | null;
+  messages: ConversationMessage[];
+  createdAt: string;
+  updatedAt: string;
+}
+
 /** Append-only activity record, grouped into sessions by `dispatchId`. */
 export interface AgentEvent {
   id: string;
@@ -61,12 +85,13 @@ export interface StoreData {
   runtimes: Runtime[];
   personas: Persona[];
   heartbeats: Heartbeat[];
+  conversations: Conversation[];
   events: AgentEvent[];
   /** Set once the first-run onboarding wizard is completed (or skipped). Absent = show it. */
   onboardedAt?: string;
 }
 
-const EMPTY: StoreData = { runtimes: [], personas: [], heartbeats: [], events: [] };
+const EMPTY: StoreData = { runtimes: [], personas: [], heartbeats: [], conversations: [], events: [] };
 
 const uid = () => crypto.randomUUID();
 const now = () => new Date().toISOString();
@@ -81,6 +106,7 @@ function coerce(raw: unknown): StoreData {
     runtimes: Array.isArray(d.runtimes) ? d.runtimes : [],
     personas: Array.isArray(d.personas) ? d.personas : [],
     heartbeats: Array.isArray(d.heartbeats) ? d.heartbeats : [],
+    conversations: Array.isArray(d.conversations) ? d.conversations : [],
     events: Array.isArray(d.events) ? d.events : [],
     onboardedAt: typeof d.onboardedAt === 'string' ? d.onboardedAt : undefined,
   };
@@ -150,6 +176,7 @@ export function deletePersona(id: string): void {
     ...data,
     personas: data.personas.filter((p) => p.id !== id),
     heartbeats: data.heartbeats.filter((h) => h.personaId !== id),
+    conversations: data.conversations.filter((c) => c.personaId !== id),
   });
 }
 
@@ -171,6 +198,33 @@ export function updateHeartbeat(id: string, patch: Partial<Omit<Heartbeat, 'id' 
 }
 export function deleteHeartbeat(id: string): void {
   commit({ ...data, heartbeats: data.heartbeats.filter((h) => h.id !== id) });
+}
+
+// ---- Conversations ----
+export function addConversation(input: { personaId: string; title: string }): Conversation {
+  const c: Conversation = { id: uid(), createdAt: now(), updatedAt: now(), sessionId: null, messages: [], ...input };
+  commit({ ...data, conversations: [...data.conversations, c] });
+  return c;
+}
+/** Append turns to a thread, bump `updatedAt`, and bound the stored history. */
+export function appendConversationMessages(id: string, messages: ConversationMessage[]): void {
+  if (messages.length === 0) return;
+  commit({
+    ...data,
+    conversations: data.conversations.map((c) =>
+      c.id === id ? { ...c, messages: [...c.messages, ...messages].slice(-500), updatedAt: now() } : c
+    ),
+  });
+}
+/** Persist the CLI session id after the first turn so later turns can resume it. */
+export function setConversationSession(id: string, sessionId: string): void {
+  commit({ ...data, conversations: data.conversations.map((c) => (c.id === id ? { ...c, sessionId } : c)) });
+}
+export function updateConversation(id: string, patch: Partial<Pick<Conversation, 'title'>>): void {
+  commit({ ...data, conversations: data.conversations.map((c) => (c.id === id ? { ...c, ...patch } : c)) });
+}
+export function deleteConversation(id: string): void {
+  commit({ ...data, conversations: data.conversations.filter((c) => c.id !== id) });
 }
 
 // ---- Events ----

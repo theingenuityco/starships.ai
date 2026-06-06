@@ -1,24 +1,30 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
+  addConversation,
   addHeartbeat,
   addPersona,
   addRuntime,
+  appendConversationMessages,
+  deleteConversation,
   deleteHeartbeat,
   deletePersona,
   eventsForPersona,
   getStore,
   initStore,
   removeRuntime,
+  updateConversation,
   updateHeartbeat,
   updatePersona,
   useStore,
   type AgentEvent,
+  type Conversation as ConversationRecord,
   type Heartbeat,
   type Persona,
   type Runtime,
   type RuntimeKind,
 } from './store';
-import { runPersona } from './engine';
+import { runConversationTurn, runPersona } from './engine';
+import { Markdown } from './markdown';
 import { detectAgents, hostname, isTauri, readAgentTranscript, type DetectedAgent } from './tauri';
 import { parseClaudeTranscript, type TranscriptTurn, type TurnRole } from './transcript';
 import { Onboarding } from './Onboarding';
@@ -83,9 +89,10 @@ export default function App() {
   return <Dashboard />;
 }
 
-type Tab = 'runtime' | 'personas' | 'heartbeats' | 'activity';
+type Tab = 'chat' | 'runtime' | 'personas' | 'heartbeats' | 'activity';
 
 const TABS: { id: Tab; label: string }[] = [
+  { id: 'chat', label: 'Chat' },
   { id: 'runtime', label: 'Runtimes' },
   { id: 'personas', label: 'Personas' },
   { id: 'heartbeats', label: 'Heartbeats' },
@@ -93,26 +100,421 @@ const TABS: { id: Tab; label: string }[] = [
 ];
 
 function Dashboard() {
-  const [tab, setTab] = useState<Tab>('runtime');
+  const [tab, setTab] = useState<Tab>('chat');
 
+  // App shell: only the nav floats as a rounded panel; the content area fills the
+  // window flush. Stacks on narrow windows, sits side-by-side on wide ones, so
+  // larger windows get more room instead of empty side margins.
   return (
-    <div className="mx-auto flex min-h-full max-w-2xl flex-col gap-4 p-6">
-      <header>
-        <h1 className="text-lg font-semibold">Starship Agent</h1>
-        <div className="muted text-xs">Local agent orchestrator</div>
+    <div className="flex h-full flex-col lg:flex-row">
+      <Sidebar tab={tab} setTab={setTab} />
+
+      <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        {tab === 'chat' ? (
+          <ChatTab />
+        ) : tab === 'runtime' ? (
+          <RuntimeTab />
+        ) : tab === 'personas' ? (
+          <PersonasTab />
+        ) : tab === 'heartbeats' ? (
+          <HeartbeatsTab />
+        ) : (
+          <ActivityTab />
+        )}
+      </main>
+
+      <Style />
+    </div>
+  );
+}
+
+/**
+ * Floating navigation panel: a rounded card that sits inset from the window edges
+ * (the content area beside it stays flush). Horizontal pill row on small screens,
+ * a vertical card on `lg+`. Warm-neutral text + soft rounded selection to match
+ * the chat prose palette.
+ */
+function Sidebar({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void }) {
+  return (
+    <aside className="m-2 flex shrink-0 flex-col gap-3 rounded-2xl border border-[#23232a] bg-[#15161b] p-3 shadow-[0_8px_30px_rgba(0,0,0,0.35)] lg:my-3 lg:ml-3 lg:mr-0 lg:w-56 lg:gap-4 lg:overflow-y-auto">
+      <header className="px-1 pt-0.5">
+        <h1 className="text-[15px] font-medium tracking-tight text-[#f5f3ee]">Starship Agent</h1>
+        <div className="muted hidden text-xs lg:block">Local agent orchestrator</div>
       </header>
 
-      <nav className="flex gap-1 border-b border-zinc-800">
+      <nav className="-mx-1 flex gap-1 overflow-x-auto px-1 lg:mx-0 lg:flex-col lg:gap-0.5 lg:overflow-visible lg:px-0">
         {TABS.map((t) => (
-          <button key={t.id} className={tab === t.id ? 'tab tab-active' : 'tab'} onClick={() => setTab(t.id)}>
+          <button
+            key={t.id}
+            onClick={() => setTab(t.id)}
+            className={`shrink-0 rounded-lg px-3 py-2 text-left text-[13.5px] tracking-tight transition-colors lg:w-full ${
+              tab === t.id ? 'bg-[#26241f] text-[#f5f3ee]' : 'text-[#b3b0a8] hover:bg-[#1b1a17] hover:text-[#e8e6e1]'
+            }`}
+          >
             {t.label}
           </button>
         ))}
       </nav>
+    </aside>
+  );
+}
 
-      {tab === 'runtime' ? <RuntimeTab /> : tab === 'personas' ? <PersonasTab /> : tab === 'heartbeats' ? <HeartbeatsTab /> : <ActivityTab />}
+/**
+ * The standard page shell every tab renders into. Owns the scroll region, padding,
+ * and a centered max-width column, plus an optional title/count/action/description
+ * header — so each tab only supplies its own body and the chrome stays consistent.
+ */
+const PAGE_WIDTHS = {
+  // Full literal class names so Tailwind's scanner picks them up.
+  normal: 'max-w-4xl',
+  narrow: 'max-w-3xl',
+} as const;
 
-      <Style />
+function Page({
+  title,
+  count,
+  description,
+  action,
+  width = 'normal',
+  children,
+}: {
+  title?: string;
+  count?: number;
+  description?: ReactNode;
+  action?: ReactNode;
+  width?: keyof typeof PAGE_WIDTHS;
+  children: ReactNode;
+}) {
+  return (
+    <div className="flex-1 overflow-y-auto px-5 py-5 sm:px-6">
+      <div className={`mx-auto flex w-full flex-col gap-3 ${PAGE_WIDTHS[width]}`}>
+        {title != null ? (
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="section mb-0">
+              {title}
+              {count != null ? ` (${count})` : ''}
+            </h2>
+            {action}
+          </div>
+        ) : null}
+        {description != null ? <p className="muted text-[11px]">{description}</p> : null}
+        {children}
+      </div>
+    </div>
+  );
+}
+
+// ---- Chat tab ----
+
+function ChatTab() {
+  const store = useStore();
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const selected = selectedId ? store.conversations.find((c) => c.id === selectedId) ?? null : null;
+
+  if (selected) {
+    return (
+      <ConversationThread
+        conversation={selected}
+        persona={store.personas.find((p) => p.id === selected.personaId)}
+        onBack={() => setSelectedId(null)}
+      />
+    );
+  }
+
+  const sorted = [...store.conversations].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+  const personaName = (id: string) => store.personas.find((p) => p.id === id)?.name ?? 'Unknown persona';
+
+  return (
+    <Page
+      title="Chats"
+      count={store.conversations.length}
+      description="Chat with a persona in a back-and-forth thread. Each conversation keeps its own session, so follow-ups remember what was said (Claude Code; other runtimes answer each message fresh)."
+    >
+      <NewConversationForm personas={store.personas} onStart={(personaId) => setSelectedId(addConversation({ personaId, title: 'New conversation' }).id)} />
+
+      {sorted.length > 0 ? (
+        <ul className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+          {sorted.map((c) => (
+            <li key={c.id} className="rounded-md border border-zinc-800 p-3">
+              <div className="flex items-center justify-between gap-2">
+                <button className="min-w-0 text-left" onClick={() => setSelectedId(c.id)}>
+                  <div className="truncate text-sm">{c.title}</div>
+                  <div className="muted text-[11px]">
+                    {personaName(c.personaId)} · {c.messages.length} message{c.messages.length === 1 ? '' : 's'} · {timeAgo(c.updatedAt)}
+                  </div>
+                </button>
+                <button className="btn-ghost shrink-0 text-[11px] text-red-400" onClick={() => deleteConversation(c.id)}>
+                  Delete
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="muted text-sm">No conversations yet. Start one above.</p>
+      )}
+    </Page>
+  );
+}
+
+function NewConversationForm({ personas, onStart }: { personas: Persona[]; onStart: (personaId: string) => void }) {
+  const runnable = personas.filter((p) => p.runtimeId);
+  const [personaId, setPersonaId] = useState(runnable[0]?.id ?? '');
+
+  if (personas.length === 0) return <p className="muted text-sm">Create a persona first — a conversation runs on a persona.</p>;
+
+  return (
+    <div className="flex items-end gap-2 rounded-md border border-zinc-800 p-3">
+      <label className="flex flex-1 flex-col gap-1 text-[11px]">
+        <span className="muted">Persona</span>
+        <select className="inp text-xs" value={personaId} onChange={(e) => setPersonaId(e.target.value)}>
+          {runnable.length === 0 ? <option value="">No persona has a runtime</option> : null}
+          {personas.map((p) => (
+            <option key={p.id} value={p.id} disabled={!p.runtimeId}>
+              {p.name}
+              {p.runtimeId ? '' : ' (no runtime)'}
+            </option>
+          ))}
+        </select>
+      </label>
+      <button className="btn text-xs" disabled={!personaId} onClick={() => onStart(personaId)}>
+        New chat
+      </button>
+    </div>
+  );
+}
+
+function ConversationThread({ conversation, persona, onBack }: { conversation: ConversationRecord; persona?: Persona; onBack: () => void }) {
+  const [input, setInput] = useState('');
+  const [running, setRunning] = useState(false);
+  const [activeDispatch, setActiveDispatch] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const live = useLiveRun(activeDispatch);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  const noRuntime = !persona?.runtimeId;
+
+  // Keep the newest content in view as messages land and tokens stream.
+  useEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+  }, [conversation.messages.length, live?.committed.length, live?.streamingText, live?.raw]);
+
+  async function send() {
+    const text = input.trim();
+    if (!text || running || noRuntime) return;
+    setInput('');
+    setError(null);
+    setRunning(true);
+    // Show the user's message right away; the engine appends the agent's turns when it returns.
+    appendConversationMessages(conversation.id, [{ role: 'user', text, at: new Date().toISOString() }]);
+    if (conversation.title === 'New conversation') updateConversation(conversation.id, { title: text.slice(0, 48) });
+    try {
+      const r = await runConversationTurn(conversation.id, text, setActiveDispatch);
+      if (!r.ok) setError(`Run failed${r.exitCode != null ? ` (exit ${r.exitCode})` : ''}`);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setRunning(false);
+      setActiveDispatch(null);
+    }
+  }
+
+  const liveTurns = live?.status === 'running' ? live.committed : [];
+  const items = groupTurns([...conversation.messages, ...liveTurns]);
+  const streaming = live?.status === 'running' ? live.streamingText : '';
+  const rawOnly = live?.status === 'running' && live.raw && live.committed.length === 0 && !live.streamingText ? live.raw : '';
+  const empty = conversation.messages.length === 0 && !running;
+
+  return (
+    <div className="flex h-full flex-col px-5 pb-4 pt-4 sm:px-6">
+      <div className="flex items-center gap-3 pb-2">
+        <button className="btn-ghost shrink-0 text-[11px]" onClick={onBack}>
+          ← All chats
+        </button>
+        <div className="min-w-0">
+          <div className="truncate text-sm">{conversation.title}</div>
+          {persona ? (
+            <div className="muted text-[11px]">
+              {persona.name}
+              {persona.model ? ` · ${persona.model}` : ''}
+            </div>
+          ) : null}
+        </div>
+      </div>
+
+      <div ref={scrollRef} className="flex-1 overflow-y-auto">
+        <div className="mx-auto flex max-w-2xl flex-col gap-6 px-1 py-5">
+          {empty ? <div className="muted py-16 text-center text-sm">Send a message to start the conversation.</div> : null}
+          {items.map((it, i) =>
+            it.kind === 'tool' ? <ToolCard key={i} call={it.call} result={it.result} /> : <ChatMessage key={i} turn={it.turn} />
+          )}
+          {streaming ? <ChatMessage turn={{ role: 'assistant', text: streaming }} streaming /> : null}
+          {rawOnly ? (
+            <pre className="overflow-x-auto whitespace-pre-wrap break-words rounded-xl border border-[#26262b] bg-[#0d0d10] p-3 font-mono text-[11px] leading-relaxed text-[#b9b6ae]">
+              {rawOnly}
+            </pre>
+          ) : null}
+          {running && !live ? (
+            <div className="flex items-center gap-2 text-[13px] text-[#8c8a83]">
+              <span className="dot-pulse" />
+              Thinking…
+            </div>
+          ) : null}
+        </div>
+      </div>
+
+      <div className="mx-auto w-full max-w-2xl pt-2">
+        {noRuntime ? <p className="muted mb-2 text-center text-[11px]">Assign this persona to a runtime (Personas tab) to chat.</p> : null}
+        {error ? <p className="mb-2 text-center text-[11px] text-red-400">{error}</p> : null}
+        <Composer
+          value={input}
+          onChange={setInput}
+          onSend={() => void send()}
+          disabled={noRuntime}
+          running={running}
+          placeholder={noRuntime ? 'Assign a runtime to chat' : `Reply to ${persona?.name ?? 'agent'}…`}
+        />
+        <div className="muted mt-1.5 text-center text-[10px]">Runs locally on your machine. Agents can make mistakes.</div>
+      </div>
+    </div>
+  );
+}
+
+/** One rendered chat turn: user → right bubble, assistant → full-width Markdown prose. */
+function ChatMessage({ turn, streaming }: { turn: TranscriptTurn; streaming?: boolean }) {
+  if (turn.role === 'user') {
+    return (
+      <div className="flex justify-end">
+        <div className="max-w-[85%] whitespace-pre-wrap break-words rounded-2xl rounded-br-md bg-[#2b2a27] px-4 py-2.5 text-[15px] leading-relaxed text-[#f0eee9]">
+          {turn.text}
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className="px-0.5">
+      <Markdown text={turn.text} />
+      {streaming ? <span className="caret-md" /> : null}
+    </div>
+  );
+}
+
+type ChatItem = { kind: 'msg'; turn: TranscriptTurn } | { kind: 'tool'; call: TranscriptTurn; result?: TranscriptTurn };
+
+/** Fold a flat turn list into render items, pairing each tool call with its following result. */
+function groupTurns(turns: TranscriptTurn[]): ChatItem[] {
+  const items: ChatItem[] = [];
+  for (let i = 0; i < turns.length; i++) {
+    const t = turns[i];
+    if (t.role === 'tool') {
+      const next = turns[i + 1];
+      if (next?.role === 'result') {
+        items.push({ kind: 'tool', call: t, result: next });
+        i++;
+      } else {
+        items.push({ kind: 'tool', call: t });
+      }
+    } else if (t.role === 'result') {
+      items.push({ kind: 'tool', call: { role: 'tool', text: '', tool: t.tool ?? 'result' }, result: t });
+    } else {
+      items.push({ kind: 'msg', turn: t });
+    }
+  }
+  return items;
+}
+
+/** A collapsible tool-use card (call + result), styled like Claude's tool pills. */
+function ToolCard({ call, result }: { call: TranscriptTurn; result?: TranscriptTurn }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="overflow-hidden rounded-xl border border-[#26262b] bg-[#121214]">
+      <button
+        className="flex w-full items-center gap-2 px-3 py-2 text-left text-[13px] text-[#c4c1b8] hover:bg-[#17171a]"
+        onClick={() => setOpen((o) => !o)}
+      >
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#d97757" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
+        </svg>
+        <span className="font-medium">{call.tool ?? 'tool'}</span>
+        <span className="ml-auto text-[11px] text-[#6b6a66]">{open ? 'Hide' : 'Details'}</span>
+      </button>
+      {open ? (
+        <div className="space-y-2 border-t border-[#26262b] px-3 py-2.5">
+          {call.text ? (
+            <pre className="overflow-x-auto whitespace-pre-wrap break-words font-mono text-[11px] leading-relaxed text-[#b9b6ae]">{call.text}</pre>
+          ) : null}
+          {result?.text ? (
+            <pre className="overflow-x-auto whitespace-pre-wrap break-words border-t border-[#1f1f23] pt-2 font-mono text-[11px] leading-relaxed text-[#86847d]">
+              {result.text}
+            </pre>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/** Claude-style composer: auto-growing rounded input with a coral circular send button. */
+function Composer({
+  value,
+  onChange,
+  onSend,
+  disabled,
+  running,
+  placeholder,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  onSend: () => void;
+  disabled?: boolean;
+  running?: boolean;
+  placeholder?: string;
+}) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
+  }, [value]);
+
+  const canSend = !disabled && !running && value.trim().length > 0;
+
+  return (
+    <div className="rounded-3xl border border-[#34343a] bg-[#161618] px-2 py-2 shadow-[0_2px_18px_rgba(0,0,0,0.35)] transition-colors focus-within:border-[#52525b]">
+      <textarea
+        ref={ref}
+        rows={1}
+        className="block max-h-[200px] w-full resize-none bg-transparent px-3 py-1.5 text-[15px] leading-relaxed text-[#e8e6e1] outline-none placeholder:text-[#6b6a66]"
+        placeholder={placeholder}
+        value={value}
+        disabled={disabled}
+        onChange={(e) => onChange(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            if (canSend) onSend();
+          }
+        }}
+      />
+      <div className="flex items-center justify-end px-1">
+        <button
+          aria-label="Send"
+          onClick={onSend}
+          disabled={!canSend}
+          className={`flex h-8 w-8 items-center justify-center rounded-full transition-colors ${
+            canSend ? 'bg-[#d97757] text-[#1a120e] hover:bg-[#e08c70]' : 'bg-[#2a2a2e] text-[#6b6a66]'
+          }`}
+        >
+          {running ? (
+            <span className="dot-pulse" />
+          ) : (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 19V5M5 12l7-7 7 7" />
+            </svg>
+          )}
+        </button>
+      </div>
     </div>
   );
 }
@@ -140,21 +542,18 @@ function RuntimeTab() {
   }
 
   return (
-    <div className="flex flex-col gap-5">
-      <section>
-        <h2 className="section">Runtimes ({store.runtimes.length})</h2>
-        {store.runtimes.length === 0 ? (
-          <p className="muted text-sm">No runtimes yet. Add a detected CLI below.</p>
-        ) : (
-          <ul className="flex flex-col gap-2">
-            {store.runtimes.map((r) => (
-              <RuntimeCard key={r.id} runtime={r} onRemove={() => removeRuntime(r.id)} />
-            ))}
-          </ul>
-        )}
-      </section>
+    <Page title="Runtimes" count={store.runtimes.length}>
+      {store.runtimes.length === 0 ? (
+        <p className="muted text-sm">No runtimes yet. Add a detected CLI below.</p>
+      ) : (
+        <ul className="grid gap-2 sm:grid-cols-2">
+          {store.runtimes.map((r) => (
+            <RuntimeCard key={r.id} runtime={r} onRemove={() => removeRuntime(r.id)} />
+          ))}
+        </ul>
+      )}
 
-      <section>
+      <section className="mt-2">
         <h2 className="section">Detected on this machine</h2>
         {!isTauri() ? (
           <p className="muted text-sm">Runtime detection runs in the desktop app.</p>
@@ -163,7 +562,7 @@ function RuntimeTab() {
         ) : detected.length === 0 ? (
           <p className="muted text-sm">No known agent CLIs found on your PATH.</p>
         ) : (
-          <ul className="flex flex-col gap-2">
+          <ul className="grid gap-2 sm:grid-cols-2">
             {detected.map((d) => {
               const exec = execEdits[d.command] ?? d.default_executor;
               return (
@@ -190,7 +589,7 @@ function RuntimeTab() {
           </ul>
         )}
       </section>
-    </div>
+    </Page>
   );
 }
 
@@ -219,16 +618,16 @@ function PersonasTab() {
   const [adding, setAdding] = useState(false);
 
   return (
-    <div className="flex flex-col gap-3">
-      <div className="flex items-center justify-between">
-        <h2 className="section mb-0">Personas ({store.personas.length})</h2>
+    <Page
+      title="Personas"
+      count={store.personas.length}
+      description="An actor (name, model, system prompt) that runs on a runtime. Assign it to a runtime, then run it."
+      action={
         <button className="btn-ghost text-xs" onClick={() => setAdding((v) => !v)}>
           {adding ? 'Cancel' : '+ New persona'}
         </button>
-      </div>
-
-      <p className="muted text-[11px]">An actor (name, model, system prompt) that runs on a runtime. Assign it to a runtime, then run it.</p>
-
+      }
+    >
       {adding ? (
         <NewPersonaForm
           onCreate={(input) => {
@@ -247,7 +646,7 @@ function PersonasTab() {
       ) : (
         <p className="muted text-sm">No personas yet. Create one to give your runtimes an actor to run.</p>
       )}
-    </div>
+    </Page>
   );
 }
 
@@ -497,16 +896,16 @@ function HeartbeatsTab() {
   const personaName = (id: string) => store.personas.find((p) => p.id === id)?.name ?? 'Unknown persona';
 
   return (
-    <div className="flex flex-col gap-3">
-      <div className="flex items-center justify-between">
-        <h2 className="section mb-0">Heartbeats ({store.heartbeats.length})</h2>
+    <Page
+      title="Heartbeats"
+      count={store.heartbeats.length}
+      description="A recurring prompt run against a persona on a schedule. Schedules advance only while this app is open."
+      action={
         <button className="btn-ghost text-xs" disabled={store.personas.length === 0} onClick={() => setAdding((v) => !v)}>
           {adding ? 'Cancel' : '+ New heartbeat'}
         </button>
-      </div>
-
-      <p className="muted text-[11px]">A recurring prompt run against a persona on a schedule. Schedules advance only while this app is open.</p>
-
+      }
+    >
       {store.personas.length === 0 ? <p className="muted text-sm">Create a persona first — heartbeats target a persona.</p> : null}
 
       {adding ? (
@@ -520,7 +919,7 @@ function HeartbeatsTab() {
       ) : null}
 
       {store.heartbeats.length > 0 ? (
-        <ul className="flex flex-col gap-2">
+        <ul className="grid gap-2 sm:grid-cols-2">
           {store.heartbeats.map((h) => (
             <HeartbeatCard
               key={h.id}
@@ -534,7 +933,7 @@ function HeartbeatsTab() {
       ) : store.personas.length > 0 ? (
         <p className="muted text-sm">No heartbeats yet. Add one to run a persona on a schedule.</p>
       ) : null}
-    </div>
+    </Page>
   );
 }
 
@@ -678,10 +1077,11 @@ function ActivityTab() {
   const sessions = groupSessions(store.events);
 
   return (
-    <div className="flex flex-col gap-3">
-      <h2 className="section mb-0">Sessions ({sessions.length})</h2>
-      <p className="muted text-[11px]">Every run, newest first. A session groups the events from one run into a transcript; expand to read it.</p>
-
+    <Page
+      title="Sessions"
+      count={sessions.length}
+      description="Every run, newest first. A session groups the events from one run into a transcript; expand to read it."
+    >
       {sessions.length > 0 ? (
         <ul className="flex flex-col gap-2">
           {sessions.map((s) => (
@@ -696,7 +1096,7 @@ function ActivityTab() {
       ) : (
         <p className="muted text-sm">No activity recorded yet.</p>
       )}
-    </div>
+    </Page>
   );
 }
 

@@ -41,6 +41,7 @@ fn detect_agents_blocking() -> Vec<DetectedAgent> {
         let Ok(path) = which::which(cmd) else { continue };
         let version = Command::new(cmd)
             .arg("--version")
+            .stdin(Stdio::null())
             .output()
             .ok()
             .filter(|o| o.status.success())

@@ -80,6 +80,13 @@ export class HeartbeatScheduler {
             console.error(`[HEARTBEAT] persona ${hb.personaId} for heartbeat ${hb.id} no longer exists; skipping`);
             continue;
           }
+          // A dispatch with runtime_id = NULL never matches markAcked/markDone
+          // (which filter on runtime_id), so it would stay pending forever and the
+          // coalesce guard would deadlock this heartbeat. Skip until a runtime exists.
+          if (!persona.runtimeId) {
+            console.warn(`[HEARTBEAT] persona ${hb.personaId} has no runtime assigned; skipping heartbeat ${hb.id}`);
+            continue;
+          }
 
           const dispatch = await dispatches.create({
             starshipId: hb.starshipId,

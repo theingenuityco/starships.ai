@@ -29,19 +29,20 @@ function tokenize(s: string): string[] {
   return tokens;
 }
 
-/** Resolve `{{…}}` tokens in one arg against the run's prompt + persona. */
+/**
+ * Resolve `{{…}}` tokens in one arg against the run's prompt + persona. Single-pass:
+ * each token site is replaced exactly once, so a substituted value that happens to
+ * contain `{{…}}` text (e.g. a prompt of "what is {{sessionId}}?") is never re-scanned.
+ */
 function substitute(arg: string, prompt: string, sessionId: string, persona: Persona): string {
-  return arg
-    .split('{{prompt}}')
-    .join(prompt)
-    .split('{{sessionId}}')
-    .join(sessionId)
-    .split('{{systemPrompt}}')
-    .join(persona.systemPrompt ?? '')
-    .split('{{model}}')
-    .join(persona.model ?? '')
-    .split('{{instructions}}')
-    .join(persona.instructions ?? '');
+  const values: Record<string, string> = {
+    '{{prompt}}': prompt,
+    '{{sessionId}}': sessionId,
+    '{{systemPrompt}}': persona.systemPrompt ?? '',
+    '{{model}}': persona.model ?? '',
+    '{{instructions}}': persona.instructions ?? '',
+  };
+  return arg.replace(/\{\{(?:prompt|sessionId|systemPrompt|model|instructions)\}\}/g, (token) => values[token] ?? token);
 }
 
 export interface RunOutcome {

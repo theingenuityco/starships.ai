@@ -65,7 +65,7 @@ export default function App() {
         if (new Date(h.nextFireAt).getTime() > nowMs) continue;
         // Advance the schedule first so a long run can't double-fire on the next tick.
         updateHeartbeat(h.id, { lastFiredAt: new Date().toISOString(), nextFireAt: new Date(nowMs + h.intervalSeconds * 1000).toISOString() });
-        void runPersona(h.personaId, h.prompt).catch(() => {});
+        void runPersona(h.personaId, h.prompt).catch((err) => console.error('[heartbeat] run failed for', h.id, ':', err));
       }
     };
     const id = setInterval(tick, SCHEDULER_TICK_MS);

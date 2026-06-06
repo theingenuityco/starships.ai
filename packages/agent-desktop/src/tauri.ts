@@ -1,5 +1,6 @@
 // Bindings for the Rust commands exposed by the Tauri shell (src-tauri/src/lib.rs).
 import { Channel, invoke } from '@tauri-apps/api/core';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import { hostname as osHostname } from '@tauri-apps/plugin-os';
 
 export interface DetectedAgent {
@@ -50,3 +51,25 @@ export async function hostname(): Promise<string> {
 
 /** Whether we're running inside the Tauri shell (vs plain `vite dev` in a browser). */
 export const isTauri = (): boolean => typeof (window as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__ !== 'undefined';
+
+/** Current macOS fullscreen state (lights hide in fullscreen); false outside Tauri. */
+export async function isFullscreen(): Promise<boolean> {
+  try {
+    return await getCurrentWindow().isFullscreen();
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Subscribe to fullscreen changes. Re-checks on every window resize (entering or
+ * leaving macOS fullscreen resizes the window). Returns an unlisten function.
+ */
+export async function watchFullscreen(cb: (fullscreen: boolean) => void): Promise<() => void> {
+  try {
+    const win = getCurrentWindow();
+    return await win.onResized(async () => cb(await win.isFullscreen()));
+  } catch {
+    return () => {};
+  }
+}

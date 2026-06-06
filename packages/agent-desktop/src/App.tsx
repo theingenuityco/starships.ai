@@ -25,7 +25,7 @@ import {
 } from './store';
 import { runConversationTurn, runPersona } from './engine';
 import { Markdown } from './markdown';
-import { detectAgents, hostname, isTauri, readAgentTranscript, type DetectedAgent } from './tauri';
+import { detectAgents, hostname, isFullscreen, isTauri, readAgentTranscript, watchFullscreen, type DetectedAgent } from './tauri';
 import { parseClaudeTranscript, type TranscriptTurn, type TurnRole } from './transcript';
 import { Onboarding } from './Onboarding';
 import { COMMON_TOOLS, DEFAULT_PERMISSIONS, SUPPORTS_ALLOWLIST, type PermissionPolicy } from './permissions';
@@ -112,21 +112,61 @@ export function TitleBar() {
   return <div data-tauri-drag-region className="h-9 shrink-0" />;
 }
 
+/** Tracks macOS fullscreen, where the traffic lights are hidden and their
+ *  reserved space can be reclaimed. Always false outside the Tauri shell. */
+function useFullscreen(): boolean {
+  const [fullscreen, setFullscreen] = useState(false);
+  useEffect(() => {
+    if (!isTauri()) return;
+    let unlisten: (() => void) | undefined;
+    void isFullscreen().then(setFullscreen);
+    void watchFullscreen(setFullscreen).then((u) => {
+      unlisten = u;
+    });
+    return () => unlisten?.();
+  }, []);
+  return fullscreen;
+}
+
 function Dashboard() {
   const [tab, setTab] = useState<Tab>('chat');
+  const [collapsed, setCollapsed] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [chatSelection, setChatSelection] = useState<string | null>(null);
+  const fullscreen = useFullscreen();
+
+  // ⌘K / Ctrl+K opens the search palette from anywhere.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setSearchOpen(true);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  const openConversation = (id: string) => {
+    setChatSelection(id);
+    setTab('chat');
+    setSearchOpen(false);
+  };
 
   // App shell: a floating nav sidebar beside a flush content area. There's no
   // separate title band — the macOS traffic lights overlay the sidebar's own top
-  // inset (Claude-style), so the nav sits right under them with no empty gap. Both
-  // the sidebar inset and the content's top strip are draggable to move the window.
+  // inset (Claude-style), so the nav sits right under them with no empty gap. The
+  // sidebar collapses; its top toolbar and the content strip stay draggable.
   return (
     <div className="flex h-full">
-      <Sidebar tab={tab} setTab={setTab} />
+      {collapsed ? null : (
+        <Sidebar tab={tab} setTab={setTab} fullscreen={fullscreen} onCollapse={() => setCollapsed(true)} onSearch={() => setSearchOpen(true)} />
+      )}
 
       <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-        <div data-tauri-drag-region className="h-6 shrink-0" />
+        <TopStrip collapsed={collapsed} fullscreen={fullscreen} onExpand={() => setCollapsed(false)} onSearch={() => setSearchOpen(true)} />
         {tab === 'chat' ? (
-          <ChatTab />
+          <ChatTab selectedId={chatSelection} onSelect={setChatSelection} />
         ) : tab === 'runtime' ? (
           <RuntimeTab />
         ) : tab === 'personas' ? (
@@ -137,6 +177,17 @@ function Dashboard() {
           <ActivityTab />
         )}
       </main>
+
+      {searchOpen ? (
+        <SearchPalette
+          onClose={() => setSearchOpen(false)}
+          onOpenConversation={openConversation}
+          onGoTab={(t) => {
+            setTab(t);
+            setSearchOpen(false);
+          }}
+        />
+      ) : null}
 
       <Style />
     </div>
@@ -189,12 +240,38 @@ function TabIcon({ id }: { id: Tab }) {
  * floating corner. Compact icon + label rows with a soft rounded selection,
  * matching the Claude-desktop sidebar; narrows on small windows.
  */
-function Sidebar({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void }) {
+function Sidebar({
+  tab,
+  setTab,
+  fullscreen,
+  onCollapse,
+  onSearch,
+}: {
+  tab: Tab;
+  setTab: (t: Tab) => void;
+  fullscreen: boolean;
+  onCollapse: () => void;
+  onSearch: () => void;
+}) {
   return (
-    <aside className="m-1.5 flex w-44 shrink-0 flex-col overflow-y-auto rounded-lg border border-(--color-border) bg-(--color-bg-elev) p-2 shadow-[0_8px_30px_rgba(0,0,0,0.35)] sm:w-52 lg:my-2 lg:ml-2 lg:mr-0 lg:w-60">
-      {/* Top inset the traffic lights overlay; draggable so the window still moves. */}
-      <div data-tauri-drag-region className="h-7 shrink-0" />
-      <nav className="flex flex-col gap-0.5">
+    <aside className="m-1.5 flex w-44 shrink-0 flex-col overflow-y-auto rounded-lg border border-(--color-border) bg-(--color-bg-elev) px-2 pb-2 pt-1 shadow-[0_8px_30px_rgba(0,0,0,0.35)] sm:w-52 lg:mr-0 lg:w-60">
+      {/* Top toolbar: a drag spacer the traffic lights overlay, then the collapse
+          and search controls — like Claude's sidebar header. Top inset is m-1.5 +
+          pt-1 = 10px; left inset is m-1.5 + px-2 = 14px, so the spacer width (w-16)
+          places the buttons at window-x 78; the content strip mirrors both. */}
+      <div className="flex h-7 shrink-0 items-center gap-0.5">
+        {/* Reserve room for the traffic lights — unless fullscreen, where they hide
+            and the controls cascade left into that space. */}
+        <div data-tauri-drag-region className={`h-full shrink-0 ${fullscreen ? 'w-0' : 'w-16'}`} />
+        <IconButton title="Collapse sidebar" onClick={onCollapse}>
+          <SidebarIcon />
+        </IconButton>
+        <IconButton title="Search (⌘K)" onClick={onSearch}>
+          <SearchIcon />
+        </IconButton>
+        <div data-tauri-drag-region className="h-full flex-1" />
+      </div>
+      <nav className="mt-3 flex flex-col gap-0.5">
         {TABS.map((t) => (
           <button
             key={t.id}
@@ -209,6 +286,183 @@ function Sidebar({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void }) {
         ))}
       </nav>
     </aside>
+  );
+}
+
+/** Small square icon button used in the sidebar/content toolbars. */
+function IconButton({ title, onClick, children }: { title: string; onClick: () => void; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      title={title}
+      aria-label={title}
+      onClick={onClick}
+      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-(--color-fg-muted) transition-colors hover:bg-(--color-accent-soft) hover:text-(--color-fg)"
+    >
+      {children}
+    </button>
+  );
+}
+
+function SidebarIcon() {
+  return (
+    <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="3" width="18" height="18" rx="2" />
+      <line x1="9" y1="3" x2="9" y2="21" />
+    </svg>
+  );
+}
+
+function SearchIcon() {
+  return (
+    <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="11" cy="11" r="7" />
+      <line x1="21" y1="21" x2="16.65" y2="16.65" />
+    </svg>
+  );
+}
+
+/**
+ * Draggable strip above the content area. The top pad mirrors the sidebar's
+ * margin + padding so this row lines up vertically with the sidebar's toolbar (and
+ * the overlaid traffic lights) in both states. When the sidebar is collapsed it
+ * also carries the expand + search controls, offset horizontally past the lights
+ * to the same x as the sidebar's controls.
+ */
+function TopStrip({
+  collapsed,
+  fullscreen,
+  onExpand,
+  onSearch,
+}: {
+  collapsed: boolean;
+  fullscreen: boolean;
+  onExpand: () => void;
+  onSearch: () => void;
+}) {
+  return (
+    <div className="flex shrink-0 flex-col">
+      {/* Top pad = sidebar's 10px top inset (m-1.5 + pt-1), so this row sits at the
+          same window-y as the sidebar toolbar and the traffic lights. */}
+      <div data-tauri-drag-region className="h-2.5 w-full" />
+      <div className="flex h-7 items-center gap-0.5">
+        {collapsed ? (
+          <>
+            {/* 78px = sidebar inset (14) + sidebar spacer (w-16 = 64); collapses to
+                a left edge when fullscreen hides the traffic lights. */}
+            <div data-tauri-drag-region className={`h-full shrink-0 ${fullscreen ? 'w-2' : 'w-[78px]'}`} />
+            <IconButton title="Expand sidebar" onClick={onExpand}>
+              <SidebarIcon />
+            </IconButton>
+            <IconButton title="Search (⌘K)" onClick={onSearch}>
+              <SearchIcon />
+            </IconButton>
+            <div data-tauri-drag-region className="h-full flex-1" />
+          </>
+        ) : (
+          <div data-tauri-drag-region className="h-full w-full" />
+        )}
+      </div>
+    </div>
+  );
+}
+
+type SearchResult = { kind: 'chat' | 'tab'; id: string; label: string; sub: string };
+
+/**
+ * Command palette (⌘K): fuzzy-ish search across conversations and pages. Selecting
+ * a conversation opens it in the Chat tab; selecting a page navigates there.
+ */
+function SearchPalette({
+  onClose,
+  onOpenConversation,
+  onGoTab,
+}: {
+  onClose: () => void;
+  onOpenConversation: (id: string) => void;
+  onGoTab: (t: Tab) => void;
+}) {
+  const store = useStore();
+  const [q, setQ] = useState('');
+  const [active, setActive] = useState(0);
+  const personaName = (id: string) => store.personas.find((p) => p.id === id)?.name ?? 'Unknown persona';
+  const ql = q.trim().toLowerCase();
+
+  const convoResults: SearchResult[] = [...store.conversations]
+    .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+    .filter((c) => !ql || c.title.toLowerCase().includes(ql) || personaName(c.personaId).toLowerCase().includes(ql))
+    .slice(0, 8)
+    .map((c) => ({ kind: 'chat', id: c.id, label: c.title, sub: personaName(c.personaId) }));
+
+  const tabResults: SearchResult[] = TABS.filter((t) => !ql || t.label.toLowerCase().includes(ql)).map((t) => ({
+    kind: 'tab',
+    id: t.id,
+    label: t.label,
+    sub: 'Page',
+  }));
+
+  const results = [...convoResults, ...tabResults];
+  const clamped = Math.min(active, Math.max(0, results.length - 1));
+
+  const choose = (r: SearchResult | undefined) => {
+    if (!r) return;
+    if (r.kind === 'chat') onOpenConversation(r.id);
+    else onGoTab(r.id as Tab);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 p-4 pt-[12vh]" onClick={onClose}>
+      <div
+        className="w-full max-w-lg overflow-hidden rounded-xl border border-(--color-border) bg-(--color-bg-elev) shadow-[0_20px_60px_rgba(0,0,0,0.5)]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <input
+          autoFocus
+          value={q}
+          onChange={(e) => {
+            setQ(e.target.value);
+            setActive(0);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'ArrowDown') {
+              e.preventDefault();
+              setActive((a) => Math.min(a + 1, results.length - 1));
+            } else if (e.key === 'ArrowUp') {
+              e.preventDefault();
+              setActive((a) => Math.max(a - 1, 0));
+            } else if (e.key === 'Enter') {
+              e.preventDefault();
+              choose(results[clamped]);
+            } else if (e.key === 'Escape') {
+              e.preventDefault();
+              onClose();
+            }
+          }}
+          placeholder="Search chats and pages…"
+          className="w-full border-b border-(--color-border) bg-transparent px-4 py-3 text-sm text-(--color-fg) outline-none placeholder:text-(--color-fg-subtle)"
+        />
+        {results.length > 0 ? (
+          <ul className="max-h-80 overflow-y-auto p-1.5">
+            {results.map((r, i) => (
+              <li key={`${r.kind}:${r.id}`}>
+                <button
+                  onMouseEnter={() => setActive(i)}
+                  onClick={() => choose(r)}
+                  className={`flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-[13px] ${
+                    i === clamped ? 'bg-(--color-accent-soft) text-(--color-fg)' : 'text-(--color-fg-muted)'
+                  }`}
+                >
+                  <span className="truncate">{r.label}</span>
+                  <span className="ml-auto shrink-0 text-[11px] text-(--color-fg-subtle)">{r.sub}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <div className="muted px-4 py-6 text-center text-[13px]">No matches.</div>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -259,9 +513,8 @@ function Page({
 
 // ---- Chat tab ----
 
-function ChatTab() {
+function ChatTab({ selectedId, onSelect }: { selectedId: string | null; onSelect: (id: string | null) => void }) {
   const store = useStore();
-  const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected = selectedId ? store.conversations.find((c) => c.id === selectedId) ?? null : null;
 
   if (selected) {
@@ -269,7 +522,7 @@ function ChatTab() {
       <ConversationThread
         conversation={selected}
         persona={store.personas.find((p) => p.id === selected.personaId)}
-        onBack={() => setSelectedId(null)}
+        onBack={() => onSelect(null)}
       />
     );
   }
@@ -283,14 +536,14 @@ function ChatTab() {
       count={store.conversations.length}
       description="Chat with a persona in a back-and-forth thread. Each conversation keeps its own session, so follow-ups remember what was said (Claude Code; other runtimes answer each message fresh)."
     >
-      <NewConversationForm personas={store.personas} onStart={(personaId) => setSelectedId(addConversation({ personaId, title: 'New conversation' }).id)} />
+      <NewConversationForm personas={store.personas} onStart={(personaId) => onSelect(addConversation({ personaId, title: 'New conversation' }).id)} />
 
       {sorted.length > 0 ? (
         <ul className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
           {sorted.map((c) => (
             <li key={c.id} className="rounded-md border border-(--color-border) p-3">
               <div className="flex items-center justify-between gap-2">
-                <button className="min-w-0 text-left" onClick={() => setSelectedId(c.id)}>
+                <button className="min-w-0 text-left" onClick={() => onSelect(c.id)}>
                   <div className="truncate text-sm">{c.title}</div>
                   <div className="muted text-[11px]">
                     {personaName(c.personaId)} · {c.messages.length} message{c.messages.length === 1 ? '' : 's'} · {timeAgo(c.updatedAt)}

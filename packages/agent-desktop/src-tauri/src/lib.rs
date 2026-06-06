@@ -263,6 +263,12 @@ fn append_conversation(app: tauri::AppHandle, id: String, lines: Vec<String>) ->
 
 /// Replace a thread's header line (rename, or session id set after turn 1). Rare,
 /// so rewriting the small file is fine; turn appends stay a pure append.
+///
+/// NOTE: this read-modify-write is NOT atomic with `append_conversation`. If an
+/// append lands between the read and the write here, those turns are overwritten.
+/// The webview serialises meta updates so they only run after a run completes (no
+/// append in flight), which holds today — but if that invariant is relaxed, this
+/// needs a per-id lock (e.g. a `DashMap<String, Mutex<()>>`) or a meta sidecar.
 #[tauri::command]
 fn update_conversation_meta(app: tauri::AppHandle, id: String, header: String) -> Result<(), String> {
     let path = conversation_path(&app, &id)?;
@@ -317,7 +323,7 @@ fn read_events(app: tauri::AppHandle) -> String {
 fn read_agent_transcript(app: tauri::AppHandle, session_id: String) -> Result<Option<String>, String> {
     // The id becomes a filename, so refuse anything that isn't UUID-shaped
     // (defends against `..`/path separators reaching the join below).
-    if session_id.is_empty() || !session_id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-') {
+    if !valid_id(&session_id) {
         return Err("invalid session id".into());
     }
     let home = app.path().home_dir().map_err(|e| e.to_string())?;

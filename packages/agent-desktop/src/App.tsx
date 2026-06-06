@@ -156,6 +156,8 @@ function Dashboard() {
 
   const openConversation = (id: string) => {
     setChatSelection(id);
+    // Drop any not-yet-sent New-page draft so it can't auto-send into this thread.
+    setPendingMessage(null);
     setTab('new');
     setSearchOpen(false);
   };
@@ -179,6 +181,8 @@ function Dashboard() {
   // Navigate to a page: drop any open conversation so the page (not a thread) shows.
   const goTab = (t: Tab) => {
     setChatSelection(null);
+    // Also drop a pending New-page draft, so navigating away can't auto-send it later.
+    setPendingMessage(null);
     setTab(t);
   };
 
@@ -850,12 +854,16 @@ function ConversationThread({
 
   // A conversation started from the New page carries its first message; send it
   // once on mount (this component is keyed by id, so it mounts fresh per thread).
+  // The mount-time values are captured in refs so the effect reads only stable
+  // refs — no changing props in scope, so the empty dep list is unambiguous.
   const sentPending = useRef(false);
+  const pendingRef = useRef(pendingMessage);
+  const consumePendingRef = useRef(onConsumePending);
   useEffect(() => {
-    if (sentPending.current || !pendingMessage) return;
+    if (sentPending.current || !pendingRef.current) return;
     sentPending.current = true;
-    onConsumePending?.();
-    void send(pendingMessage);
+    consumePendingRef.current?.();
+    void send(pendingRef.current);
   }, []);
 
   async function send(textArg?: string) {

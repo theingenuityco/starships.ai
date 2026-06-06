@@ -49,6 +49,9 @@ export interface Conversation extends ConversationSummary {
 /** Bump when the on-disk line shapes change in a non-backward-compatible way. */
 const SCHEMA_V = 1;
 
+/** Turn roles we accept off disk; anything else is treated as a corrupt line. */
+const VALID_ROLES: ReadonlySet<string> = new Set<TurnRole>(['user', 'assistant', 'tool', 'result']);
+
 const uid = () => crypto.randomUUID();
 const iso = () => new Date().toISOString();
 const summaryOf = (c: Conversation): ConversationSummary => ({
@@ -135,6 +138,9 @@ function parseConversation(jsonl: string, updatedAt: string): Conversation | nul
     try {
       const o = JSON.parse(line) as Partial<MessageLine>;
       if (o.type !== 'message' || typeof o.text !== 'string' || typeof o.role !== 'string') continue;
+      // Reject unknown roles rather than casting them through — downstream render
+      // code switches on role and would silently mishandle a bad value.
+      if (!VALID_ROLES.has(o.role)) continue;
       const m: ConversationMessage = { role: o.role as TurnRole, text: o.text, at: typeof o.at === 'string' ? o.at : updatedAt };
       if (typeof o.tool === 'string') m.tool = o.tool;
       messages.push(m);
@@ -169,7 +175,8 @@ export async function initConversations(): Promise<void> {
   try {
     const raw = await listConversations();
     summaries = raw
-      .map((r) => parseHeader(r.header, new Date(r.updated_at_ms || Date.now()).toISOString()))
+      // mtime is 0 when unavailable; fall back to now rather than the Unix epoch.
+      .map((r) => parseHeader(r.header, new Date(r.updated_at_ms > 0 ? r.updated_at_ms : Date.now()).toISOString()))
       .filter((s): s is ConversationSummary => s !== null);
   } catch {
     summaries = [];

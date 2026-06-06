@@ -23,7 +23,6 @@ import {
   appendConversationMessages,
   deleteConversation,
   initConversations,
-  updateConversationTitle,
   useConversation,
   useConversations,
   type Conversation as ConversationRecord,
@@ -874,7 +873,6 @@ function ConversationThread({
     setRunning(true);
     // Show the user's message right away; the engine appends the agent's turns when it returns.
     appendConversationMessages(conversation.id, [{ role: 'user', text, at: new Date().toISOString() }]);
-    if (conversation.title === 'New conversation') updateConversationTitle(conversation.id, text.slice(0, 48));
     try {
       const r = await runConversationTurn(conversation.id, text, setActiveDispatch);
       if (!r.ok) setError(`Run failed${r.exitCode != null ? ` (exit ${r.exitCode})` : ''}`);

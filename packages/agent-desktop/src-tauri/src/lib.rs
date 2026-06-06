@@ -257,10 +257,13 @@ fn create_conversation(app: tauri::AppHandle, id: String, header: String) -> Res
         Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => return Ok(()),
         Err(e) => return Err(e.to_string()),
     };
+    // Lock down to 0600 before any content is written — the file is created at the
+    // process umask (often 0644), so tightening first means the header is never
+    // world-readable, even momentarily.
+    set_owner_only(&path);
     let mut line = header.trim().to_string();
     line.push('\n');
     f.write_all(line.as_bytes()).map_err(|e| e.to_string())?;
-    set_owner_only(&path);
     Ok(())
 }
 

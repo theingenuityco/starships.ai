@@ -1,28 +1,33 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
-  addConversation,
   addHeartbeat,
   addPersona,
   addRuntime,
-  appendConversationMessages,
-  deleteConversation,
   deleteHeartbeat,
   deletePersona,
   eventsForPersona,
   getStore,
   initStore,
   removeRuntime,
-  updateConversation,
   updateHeartbeat,
   updatePersona,
   useStore,
   type AgentEvent,
-  type Conversation as ConversationRecord,
   type Heartbeat,
   type Persona,
   type Runtime,
   type RuntimeKind,
 } from './store';
+import {
+  addConversation,
+  appendConversationMessages,
+  deleteConversation,
+  initConversations,
+  updateConversationTitle,
+  useConversation,
+  useConversations,
+  type Conversation as ConversationRecord,
+} from './conversations';
 import { runConversationTurn, runPersona } from './engine';
 import { Markdown } from './markdown';
 import { detectAgents, hostname, isFullscreen, isTauri, readAgentTranscript, watchFullscreen, type DetectedAgent } from './tauri';
@@ -50,7 +55,7 @@ export default function App() {
   useEffect(() => {
     if (started.current) return;
     started.current = true;
-    initStore().finally(() => setBooting(false));
+    Promise.all([initStore(), initConversations()]).finally(() => setBooting(false));
   }, []);
 
   // In-app heartbeat scheduler: fire any due, enabled heartbeats. Because this
@@ -92,10 +97,10 @@ export default function App() {
   return <Dashboard />;
 }
 
-type Tab = 'chat' | 'runtime' | 'personas' | 'heartbeats' | 'activity';
+type Tab = 'new' | 'runtime' | 'personas' | 'heartbeats' | 'activity';
 
 const TABS: { id: Tab; label: string }[] = [
-  { id: 'chat', label: 'Chat' },
+  { id: 'new', label: 'New chat' },
   { id: 'runtime', label: 'Runtimes' },
   { id: 'personas', label: 'Personas' },
   { id: 'heartbeats', label: 'Heartbeats' },
@@ -129,10 +134,12 @@ function useFullscreen(): boolean {
 }
 
 function Dashboard() {
-  const [tab, setTab] = useState<Tab>('chat');
+  const [tab, setTab] = useState<Tab>('new');
   const [collapsed, setCollapsed] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [chatSelection, setChatSelection] = useState<string | null>(null);
+  // A first message typed on the New page, handed to the freshly-created thread to auto-send.
+  const [pendingMessage, setPendingMessage] = useState<string | null>(null);
   const fullscreen = useFullscreen();
 
   // ⌘K / Ctrl+K opens the search palette from anywhere.
@@ -149,8 +156,41 @@ function Dashboard() {
 
   const openConversation = (id: string) => {
     setChatSelection(id);
-    setTab('chat');
+    // Drop any not-yet-sent New-page draft so it can't auto-send into this thread.
+    setPendingMessage(null);
+    setTab('new');
     setSearchOpen(false);
+  };
+
+  // New chat: drop any selection and land on the New page (the bare composer).
+  const newChat = () => {
+    setChatSelection(null);
+    setPendingMessage(null);
+    setTab('new');
+  };
+
+  // Send the first message from the New page: create the thread, then hand the
+  // text to it as a pending message so it auto-sends once it mounts.
+  const startConversation = (personaId: string, text: string) => {
+    const conv = addConversation({ personaId, title: text.slice(0, 48) || 'New conversation' });
+    setPendingMessage(text);
+    setChatSelection(conv.id);
+    setTab('new');
+  };
+
+  // Navigate to a page: drop any open conversation so the page (not a thread) shows.
+  const goTab = (t: Tab) => {
+    setChatSelection(null);
+    // Also drop a pending New-page draft, so navigating away can't auto-send it later.
+    setPendingMessage(null);
+    setTab(t);
+  };
+
+  // Deleting the open conversation must clear the selection, or the chat pane
+  // would sit forever on "Loading conversation…" for a thread that's gone.
+  const removeConversation = (id: string) => {
+    deleteConversation(id);
+    if (chatSelection === id) setChatSelection(null);
   };
 
   // App shell: a floating nav sidebar beside a flush content area. There's no
@@ -160,13 +200,37 @@ function Dashboard() {
   return (
     <div className="flex h-full">
       {collapsed ? null : (
-        <Sidebar tab={tab} setTab={setTab} fullscreen={fullscreen} onCollapse={() => setCollapsed(true)} onSearch={() => setSearchOpen(true)} />
+        <Sidebar
+          tab={tab}
+          setTab={goTab}
+          selectedChatId={chatSelection}
+          onOpenConversation={openConversation}
+          onNewChat={newChat}
+          onDeleteConversation={removeConversation}
+          fullscreen={fullscreen}
+          onCollapse={() => setCollapsed(true)}
+          onSearch={() => setSearchOpen(true)}
+        />
       )}
 
       <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <TopStrip collapsed={collapsed} fullscreen={fullscreen} onExpand={() => setCollapsed(false)} onSearch={() => setSearchOpen(true)} />
-        {tab === 'chat' ? (
-          <ChatTab selectedId={chatSelection} onSelect={setChatSelection} />
+        {chatSelection ? (
+          <ChatTab
+            selectedId={chatSelection}
+            onSelect={setChatSelection}
+            onStart={startConversation}
+            pendingMessage={pendingMessage}
+            onConsumePending={() => setPendingMessage(null)}
+          />
+        ) : tab === 'new' ? (
+          <ChatTab
+            selectedId={null}
+            onSelect={setChatSelection}
+            onStart={startConversation}
+            pendingMessage={null}
+            onConsumePending={() => setPendingMessage(null)}
+          />
         ) : tab === 'runtime' ? (
           <RuntimeTab />
         ) : tab === 'personas' ? (
@@ -183,7 +247,7 @@ function Dashboard() {
           onClose={() => setSearchOpen(false)}
           onOpenConversation={openConversation}
           onGoTab={(t) => {
-            setTab(t);
+            goTab(t);
             setSearchOpen(false);
           }}
         />
@@ -197,7 +261,12 @@ function Dashboard() {
 /** Compact line icon for each nav tab (feather-style, inherits text color). */
 function TabIcon({ id }: { id: Tab }) {
   const paths: Record<Tab, ReactNode> = {
-    chat: <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />,
+    new: (
+      <>
+        <path d="M12 20h9" />
+        <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z" />
+      </>
+    ),
     runtime: (
       <>
         <polyline points="4 17 10 11 4 5" />
@@ -220,7 +289,7 @@ function TabIcon({ id }: { id: Tab }) {
   };
   return (
     <svg
-      className="h-4 w-4 shrink-0 opacity-80"
+      className="h-3.5 w-3.5 shrink-0 opacity-80"
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
@@ -243,18 +312,31 @@ function TabIcon({ id }: { id: Tab }) {
 function Sidebar({
   tab,
   setTab,
+  selectedChatId,
+  onOpenConversation,
+  onNewChat,
+  onDeleteConversation,
   fullscreen,
   onCollapse,
   onSearch,
 }: {
   tab: Tab;
   setTab: (t: Tab) => void;
+  selectedChatId: string | null;
+  onOpenConversation: (id: string) => void;
+  onNewChat: () => void;
+  onDeleteConversation: (id: string) => void;
   fullscreen: boolean;
   onCollapse: () => void;
   onSearch: () => void;
 }) {
+  const store = useStore();
+  const conversations = useConversations();
+  const recents = [...conversations].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+  const personaName = (id: string) => store.personas.find((p) => p.id === id)?.name ?? 'Unknown persona';
+
   return (
-    <aside className="m-1.5 flex w-44 shrink-0 flex-col overflow-y-auto rounded-lg border border-(--color-border) bg-(--color-bg-elev) px-2 pb-2 pt-1 shadow-[0_8px_30px_rgba(0,0,0,0.35)] sm:w-52 lg:mr-0 lg:w-60">
+    <aside className="m-1.5 flex w-52 shrink-0 flex-col overflow-hidden rounded-lg border border-(--color-border) bg-(--color-bg-elev) px-2 pb-2 pt-1 shadow-[0_8px_30px_rgba(0,0,0,0.35)] sm:w-60 lg:mr-0 lg:w-72">
       {/* Top toolbar: a drag spacer the traffic lights overlay, then the collapse
           and search controls — like Claude's sidebar header. Top inset is m-1.5 +
           pt-1 = 10px; left inset is m-1.5 + px-2 = 14px, so the spacer width (w-16)
@@ -271,20 +353,82 @@ function Sidebar({
         </IconButton>
         <div data-tauri-drag-region className="h-full flex-1" />
       </div>
-      <nav className="mt-3 flex flex-col gap-0.5">
-        {TABS.map((t) => (
-          <button
-            key={t.id}
-            onClick={() => setTab(t.id)}
-            className={`flex w-full shrink-0 items-center gap-2.5 rounded-md px-2.5 py-1 text-left text-[13px] tracking-tight transition-colors ${
-              tab === t.id ? 'bg-(--color-accent-soft) text-(--color-fg)' : 'text-(--color-fg-muted) hover:bg-(--color-accent-soft) hover:text-(--color-fg)'
-            }`}
-          >
-            <TabIcon id={t.id} />
-            {t.label}
-          </button>
-        ))}
+      <nav className="mt-3 flex shrink-0 flex-col gap-0.5">
+        {TABS.map((t) => {
+          // "New chat" is active only when no conversation is open; otherwise the
+          // open thread owns the highlight (in the Recents list below).
+          const active = t.id === 'new' ? tab === 'new' && !selectedChatId : tab === t.id;
+          return (
+            <button
+              key={t.id}
+              onClick={() => (t.id === 'new' ? onNewChat() : setTab(t.id))}
+              className={`flex w-full shrink-0 items-center gap-2.5 rounded-md px-2.5 py-1 text-left text-[13px] tracking-tight transition-colors ${
+                active ? 'bg-(--color-accent-soft) text-(--color-fg)' : 'text-(--color-fg-muted) hover:bg-(--color-accent-soft) hover:text-(--color-fg)'
+              }`}
+            >
+              <TabIcon id={t.id} />
+              {t.label}
+            </button>
+          );
+        })}
       </nav>
+
+      {/* Recents: the conversation history lives here (Claude-desktop style), not on
+          the chat page. The list owns the only scroll region so the nav stays put. */}
+      <div className="mt-4 flex min-h-0 flex-1 flex-col">
+        <div className="flex shrink-0 items-center justify-between pb-1 pl-2.5 pr-1">
+          <span className="text-[10px] font-medium uppercase tracking-wide text-(--color-fg-muted)">Recents</span>
+          <button
+            type="button"
+            title="New chat"
+            aria-label="New chat"
+            onClick={onNewChat}
+            className="flex h-5 w-5 items-center justify-center rounded text-(--color-fg-muted) transition-colors hover:bg-(--color-accent-soft) hover:text-(--color-fg)"
+          >
+            <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+          </button>
+        </div>
+        <div className="-mr-1 flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto pr-1">
+          {recents.length === 0 ? (
+            <p className="px-2.5 py-1 text-[11px] text-(--color-fg-muted)">No chats yet.</p>
+          ) : (
+            recents.map((c) => {
+              const isActive = selectedChatId === c.id;
+              return (
+                <div key={c.id} className="group/chat relative">
+                  <button
+                    onClick={() => onOpenConversation(c.id)}
+                    title={`${c.title} · ${personaName(c.personaId)}`}
+                    className={`flex w-full items-center gap-2.5 rounded-md px-2.5 py-1 text-left text-[13px] tracking-tight transition-colors ${
+                      isActive ? 'bg-(--color-accent-soft) text-(--color-fg)' : 'text-(--color-fg-muted) hover:bg-(--color-accent-soft) hover:text-(--color-fg)'
+                    }`}
+                  >
+                    <svg className="h-2 w-2 shrink-0 opacity-80" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                      <circle cx="12" cy="12" r="9" />
+                    </svg>
+                    <span className="truncate pr-5">{c.title}</span>
+                  </button>
+                  <button
+                    type="button"
+                    title="Delete chat"
+                    aria-label="Delete chat"
+                    onClick={() => onDeleteConversation(c.id)}
+                    className="absolute right-1 top-1/2 hidden h-5 w-5 -translate-y-1/2 items-center justify-center rounded text-(--color-fg-muted) transition-colors hover:bg-(--color-accent-soft) hover:text-red-400 group-hover/chat:flex"
+                  >
+                    <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="18" y1="6" x2="6" y2="18" />
+                      <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                  </button>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
     </aside>
   );
 }
@@ -383,12 +527,13 @@ function SearchPalette({
   onGoTab: (t: Tab) => void;
 }) {
   const store = useStore();
+  const conversations = useConversations();
   const [q, setQ] = useState('');
   const [active, setActive] = useState(0);
   const personaName = (id: string) => store.personas.find((p) => p.id === id)?.name ?? 'Unknown persona';
   const ql = q.trim().toLowerCase();
 
-  const convoResults: SearchResult[] = [...store.conversations]
+  const convoResults: SearchResult[] = [...conversations]
     .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
     .filter((c) => !ql || c.title.toLowerCase().includes(ql) || personaName(c.personaId).toLowerCase().includes(ql))
     .slice(0, 8)
@@ -513,84 +658,186 @@ function Page({
 
 // ---- Chat tab ----
 
-function ChatTab({ selectedId, onSelect }: { selectedId: string | null; onSelect: (id: string | null) => void }) {
+function ChatTab({
+  selectedId,
+  onSelect,
+  onStart,
+  pendingMessage,
+  onConsumePending,
+}: {
+  selectedId: string | null;
+  onSelect: (id: string | null) => void;
+  onStart: (personaId: string, text: string) => void;
+  pendingMessage: string | null;
+  onConsumePending: () => void;
+}) {
   const store = useStore();
-  const selected = selectedId ? store.conversations.find((c) => c.id === selectedId) ?? null : null;
+  const selected = useConversation(selectedId);
 
-  if (selected) {
+  if (selectedId) {
+    if (!selected) return <Page title="Chat"><p className="muted text-sm">Loading conversation…</p></Page>;
     return (
       <ConversationThread
+        key={selected.id}
         conversation={selected}
         persona={store.personas.find((p) => p.id === selected.personaId)}
         onBack={() => onSelect(null)}
+        pendingMessage={pendingMessage}
+        onConsumePending={onConsumePending}
       />
     );
   }
 
-  const sorted = [...store.conversations].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
-  const personaName = (id: string) => store.personas.find((p) => p.id === id)?.name ?? 'Unknown persona';
-
-  return (
-    <Page
-      title="Chats"
-      count={store.conversations.length}
-      description="Chat with a persona in a back-and-forth thread. Each conversation keeps its own session, so follow-ups remember what was said (Claude Code; other runtimes answer each message fresh)."
-    >
-      <NewConversationForm personas={store.personas} onStart={(personaId) => onSelect(addConversation({ personaId, title: 'New conversation' }).id)} />
-
-      {sorted.length > 0 ? (
-        <ul className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-          {sorted.map((c) => (
-            <li key={c.id} className="rounded-md border border-(--color-border) p-3">
-              <div className="flex items-center justify-between gap-2">
-                <button className="min-w-0 text-left" onClick={() => onSelect(c.id)}>
-                  <div className="truncate text-sm">{c.title}</div>
-                  <div className="muted text-[11px]">
-                    {personaName(c.personaId)} · {c.messages.length} message{c.messages.length === 1 ? '' : 's'} · {timeAgo(c.updatedAt)}
-                  </div>
-                </button>
-                <button className="btn-ghost shrink-0 text-[11px] text-red-400" onClick={() => deleteConversation(c.id)}>
-                  Delete
-                </button>
-              </div>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="muted text-sm">No conversations yet. Start one above.</p>
-      )}
-    </Page>
-  );
+  return <NewChatPage personas={store.personas} onStart={onStart} />;
 }
 
-function NewConversationForm({ personas, onStart }: { personas: Persona[]; onStart: (personaId: string) => void }) {
+/**
+ * The New page: a bare composer (Claude-style) that starts a conversation on the
+ * first send. A persona must back every conversation, so a compact persona picker
+ * sits under the input rather than a separate "create" step.
+ */
+function NewChatPage({ personas, onStart }: { personas: Persona[]; onStart: (personaId: string, text: string) => void }) {
   const runnable = personas.filter((p) => p.runtimeId);
-  const [personaId, setPersonaId] = useState(runnable[0]?.id ?? '');
+  const [personaId, setPersonaId] = useState(runnable[0]?.id ?? personas[0]?.id ?? '');
+  const [input, setInput] = useState('');
+  const persona = personas.find((p) => p.id === personaId);
+  const noRuntime = !persona?.runtimeId;
 
-  if (personas.length === 0) return <p className="muted text-sm">Create a persona first — a conversation runs on a persona.</p>;
+  function send() {
+    const text = input.trim();
+    if (!text || noRuntime) return;
+    setInput('');
+    onStart(personaId, text);
+  }
+
+  if (personas.length === 0) {
+    return (
+      <div className="flex min-h-0 flex-1 flex-col px-5 pb-4 pt-4 sm:px-6">
+        <p className="muted m-auto text-center text-sm">Create a persona first — a conversation runs on a persona.</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="flex items-end gap-2 rounded-md border border-(--color-border) p-3">
-      <label className="flex flex-1 flex-col gap-1 text-[11px]">
-        <span className="muted">Persona</span>
-        <select className="inp text-xs" value={personaId} onChange={(e) => setPersonaId(e.target.value)}>
-          {runnable.length === 0 ? <option value="">No persona has a runtime</option> : null}
-          {personas.map((p) => (
-            <option key={p.id} value={p.id} disabled={!p.runtimeId}>
-              {p.name}
-              {p.runtimeId ? '' : ' (no runtime)'}
-            </option>
-          ))}
-        </select>
-      </label>
-      <button className="btn text-xs" disabled={!personaId} onClick={() => onStart(personaId)}>
-        New chat
-      </button>
+    <div className="flex min-h-0 flex-1 flex-col px-5 pb-8 pt-4 sm:px-6">
+      {/* Filler so the composer docks to the bottom; the prompt sits in the gap. */}
+      <div className="flex flex-1 items-center justify-center">
+        <h2 className="text-lg tracking-tight text-(--color-fg)">What can I help with?</h2>
+      </div>
+
+      {/* Composer pinned to the bottom — single line that grows with its content.
+          The persona picker floats over its top-left corner. */}
+      <div className="relative mx-auto w-full max-w-4xl">
+        <PersonaSelect personas={personas} personaId={personaId} onChange={setPersonaId} className="absolute -top-2.5 left-0 z-10" />
+        <Composer
+          value={input}
+          onChange={setInput}
+          onSend={send}
+          disabled={noRuntime}
+          placeholder={noRuntime ? 'Assign a runtime to chat' : `Message ${persona?.name ?? 'agent'}…`}
+        />
+        {noRuntime ? (
+          <p className="muted mt-2 text-center text-[11px]">Assign this persona to a runtime (Personas tab) to chat.</p>
+        ) : null}
+      </div>
     </div>
   );
 }
 
-function ConversationThread({ conversation, persona, onBack }: { conversation: ConversationRecord; persona?: Persona; onBack: () => void }) {
+/**
+ * Custom persona picker (replaces the native <select>): a compact pill whose menu
+ * opens upward, so it can float over the top-left of the composer it belongs to.
+ */
+function PersonaSelect({
+  personas,
+  personaId,
+  onChange,
+  className,
+}: {
+  personas: Persona[];
+  personaId: string;
+  onChange: (id: string) => void;
+  className?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const current = personas.find((p) => p.id === personaId);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    window.addEventListener('mousedown', onDown);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('mousedown', onDown);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
+  return (
+    <div ref={ref} className={`relative ${className ?? ''}`}>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="flex items-center gap-1.5 rounded border border-(--color-border) bg-(--color-bg-elev) px-1.5 py-0.5 text-[11px] text-(--color-fg-muted) shadow-[0_2px_12px_rgba(0,0,0,0.35)] transition-colors hover:border-(--color-border-strong) hover:text-(--color-fg)"
+      >
+        <svg className="h-3 w-3 shrink-0 opacity-80" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+          <circle cx="12" cy="7" r="4" />
+        </svg>
+        <span className="max-w-[160px] truncate">{current?.name ?? 'Select persona'}</span>
+      </button>
+      {open ? (
+        <div className="absolute bottom-full left-0 z-20 mb-1.5 max-h-64 w-52 overflow-y-auto rounded-lg border border-(--color-border) bg-(--color-bg-elev) p-0.5 shadow-[0_8px_30px_rgba(0,0,0,0.4)]">
+          {personas.map((p) => {
+            const active = p.id === personaId;
+            return (
+              <button
+                key={p.id}
+                type="button"
+                disabled={!p.runtimeId}
+                onClick={() => {
+                  onChange(p.id);
+                  setOpen(false);
+                }}
+                className={`flex w-full items-center gap-2 rounded px-2 py-1 text-left text-[12px] transition-colors ${
+                  active ? 'bg-(--color-accent-soft) text-(--color-fg)' : 'text-(--color-fg-muted) hover:bg-(--color-accent-soft) hover:text-(--color-fg)'
+                } ${p.runtimeId ? '' : 'cursor-not-allowed opacity-50'}`}
+              >
+                <span className="min-w-0 flex-1 truncate">{p.name}</span>
+                {p.runtimeId ? null : <span className="shrink-0 text-[10px] text-(--color-fg-subtle)">no runtime</span>}
+                {active ? (
+                  <svg className="h-3.5 w-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                ) : null}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function ConversationThread({
+  conversation,
+  persona,
+  onBack,
+  pendingMessage,
+  onConsumePending,
+}: {
+  conversation: ConversationRecord;
+  persona?: Persona;
+  onBack: () => void;
+  pendingMessage?: string | null;
+  onConsumePending?: () => void;
+}) {
   const [input, setInput] = useState('');
   const [running, setRunning] = useState(false);
   const [activeDispatch, setActiveDispatch] = useState<string | null>(null);
@@ -605,15 +852,29 @@ function ConversationThread({ conversation, persona, onBack }: { conversation: C
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [conversation.messages.length, live?.committed.length, live?.streamingText, live?.raw]);
 
-  async function send() {
-    const text = input.trim();
+  // A conversation started from the New page carries its first message; send it
+  // once on mount (this component is keyed by id, so it mounts fresh per thread).
+  // The mount-time values are captured in refs so the effect reads only stable
+  // refs — no changing props in scope, so the empty dep list is unambiguous.
+  const sentPending = useRef(false);
+  const pendingRef = useRef(pendingMessage);
+  const consumePendingRef = useRef(onConsumePending);
+  useEffect(() => {
+    if (sentPending.current || !pendingRef.current) return;
+    sentPending.current = true;
+    consumePendingRef.current?.();
+    void send(pendingRef.current);
+  }, []);
+
+  async function send(textArg?: string) {
+    const text = (textArg ?? input).trim();
     if (!text || running || noRuntime) return;
-    setInput('');
+    if (textArg == null) setInput('');
     setError(null);
     setRunning(true);
     // Show the user's message right away; the engine appends the agent's turns when it returns.
     appendConversationMessages(conversation.id, [{ role: 'user', text, at: new Date().toISOString() }]);
-    if (conversation.title === 'New conversation') updateConversation(conversation.id, { title: text.slice(0, 48) });
+    if (conversation.title === 'New conversation') updateConversationTitle(conversation.id, text.slice(0, 48));
     try {
       const r = await runConversationTurn(conversation.id, text, setActiveDispatch);
       if (!r.ok) setError(`Run failed${r.exitCode != null ? ` (exit ${r.exitCode})` : ''}`);
@@ -632,10 +893,10 @@ function ConversationThread({ conversation, persona, onBack }: { conversation: C
   const empty = conversation.messages.length === 0 && !running;
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col px-5 pb-4 pt-4 sm:px-6">
+    <div className="flex min-h-0 flex-1 flex-col px-5 pb-8 pt-4 sm:px-6">
       <div className="flex items-center gap-3 pb-2">
         <button className="btn-ghost shrink-0 text-[11px]" onClick={onBack}>
-          ← All chats
+          ← New chat
         </button>
         <div className="min-w-0">
           <div className="truncate text-sm">{conversation.title}</div>
@@ -649,7 +910,7 @@ function ConversationThread({ conversation, persona, onBack }: { conversation: C
       </div>
 
       <div ref={scrollRef} className="flex-1 overflow-y-auto">
-        <div className="mx-auto flex max-w-2xl flex-col gap-6 px-1 py-5">
+        <div className="mx-auto flex max-w-4xl flex-col gap-6 px-1 py-5">
           {empty ? <div className="muted py-16 text-center text-sm">Send a message to start the conversation.</div> : null}
           {items.map((it, i) =>
             it.kind === 'tool' ? <ToolCard key={i} call={it.call} result={it.result} /> : <ChatMessage key={i} turn={it.turn} />
@@ -669,7 +930,7 @@ function ConversationThread({ conversation, persona, onBack }: { conversation: C
         </div>
       </div>
 
-      <div className="mx-auto w-full max-w-2xl pt-2">
+      <div className="mx-auto w-full max-w-4xl pt-2">
         {noRuntime ? <p className="muted mb-2 text-center text-[11px]">Assign this persona to a runtime (Personas tab) to chat.</p> : null}
         {error ? <p className="mb-2 text-center text-[11px] text-red-400">{error}</p> : null}
         <Composer
@@ -680,7 +941,6 @@ function ConversationThread({ conversation, persona, onBack }: { conversation: C
           running={running}
           placeholder={noRuntime ? 'Assign a runtime to chat' : `Reply to ${persona?.name ?? 'agent'}…`}
         />
-        <div className="muted mt-1.5 text-center text-[10px]">Runs locally on your machine. Agents can make mistakes.</div>
       </div>
     </div>
   );
@@ -787,11 +1047,11 @@ function Composer({
   const canSend = !disabled && !running && value.trim().length > 0;
 
   return (
-    <div className="rounded-3xl border border-(--color-border) bg-(--color-bg-soft) px-2 py-2 shadow-[0_2px_18px_rgba(0,0,0,0.35)] transition-colors focus-within:border-(--color-border-strong)">
+    <div className="flex items-end gap-1 rounded-lg border border-(--color-border) bg-(--color-bg-elev) px-2 py-2 shadow-[0_2px_18px_rgba(0,0,0,0.35)] transition-colors focus-within:border-(--color-border-strong)">
       <textarea
         ref={ref}
         rows={1}
-        className="block max-h-[200px] w-full resize-none bg-transparent px-3 py-1.5 text-[15px] leading-relaxed text-(--color-fg) outline-none placeholder:text-(--color-fg-subtle)"
+        className="block max-h-[200px] min-w-0 flex-1 resize-none bg-transparent px-2.5 py-1.5 text-[14px] leading-normal text-(--color-fg) outline-none placeholder:text-(--color-fg-subtle)"
         placeholder={placeholder}
         value={value}
         disabled={disabled}
@@ -803,24 +1063,22 @@ function Composer({
           }
         }}
       />
-      <div className="flex items-center justify-end px-1">
-        <button
-          aria-label="Send"
-          onClick={onSend}
-          disabled={!canSend}
-          className={`flex h-8 w-8 items-center justify-center rounded-full transition-colors ${
-            canSend ? 'bg-(--color-accent) text-(--color-bg) hover:bg-(--color-accent-strong)' : 'bg-(--color-bg-soft) text-(--color-fg-subtle)'
-          }`}
-        >
-          {running ? (
-            <span className="dot-pulse" />
-          ) : (
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 19V5M5 12l7-7 7 7" />
-            </svg>
-          )}
-        </button>
-      </div>
+      <button
+        aria-label="Send"
+        onClick={onSend}
+        disabled={!canSend}
+        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors ${
+          canSend ? 'bg-(--color-accent) text-(--color-bg) hover:bg-(--color-accent-strong)' : 'bg-(--color-bg-soft) text-(--color-fg-subtle)'
+        }`}
+      >
+        {running ? (
+          <span className="dot-pulse" />
+        ) : (
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 19V5M5 12l7-7 7 7" />
+          </svg>
+        )}
+      </button>
     </div>
   );
 }

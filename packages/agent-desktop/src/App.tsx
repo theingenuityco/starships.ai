@@ -115,29 +115,28 @@ export function TitleBar() {
 function Dashboard() {
   const [tab, setTab] = useState<Tab>('chat');
 
-  // App shell: a draggable title strip on top (window controls overlay it), then
-  // a floating nav panel beside a flush content area. Stacks on narrow windows,
-  // sits side-by-side on wide ones, so larger windows get more room.
+  // App shell: a floating nav sidebar beside a flush content area. There's no
+  // separate title band — the macOS traffic lights overlay the sidebar's own top
+  // inset (Claude-style), so the nav sits right under them with no empty gap. Both
+  // the sidebar inset and the content's top strip are draggable to move the window.
   return (
-    <div className="flex h-full flex-col">
-      <TitleBar />
-      <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
-        <Sidebar tab={tab} setTab={setTab} />
+    <div className="flex h-full">
+      <Sidebar tab={tab} setTab={setTab} />
 
-        <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-          {tab === 'chat' ? (
-            <ChatTab />
-          ) : tab === 'runtime' ? (
-            <RuntimeTab />
-          ) : tab === 'personas' ? (
-            <PersonasTab />
-          ) : tab === 'heartbeats' ? (
-            <HeartbeatsTab />
-          ) : (
-            <ActivityTab />
-          )}
-        </main>
-      </div>
+      <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        <div data-tauri-drag-region className="h-6 shrink-0" />
+        {tab === 'chat' ? (
+          <ChatTab />
+        ) : tab === 'runtime' ? (
+          <RuntimeTab />
+        ) : tab === 'personas' ? (
+          <PersonasTab />
+        ) : tab === 'heartbeats' ? (
+          <HeartbeatsTab />
+        ) : (
+          <ActivityTab />
+        )}
+      </main>
 
       <Style />
     </div>
@@ -184,20 +183,23 @@ function TabIcon({ id }: { id: Tab }) {
 }
 
 /**
- * Floating navigation panel: a rounded card that sits inset from the window edges
- * (the content area beside it stays flush). Compact icon + label rows with a soft
- * rounded selection, matching the Claude-desktop sidebar. Horizontal row on small
- * screens, a vertical list on `lg+`.
+ * Floating navigation sidebar: a rounded card inset from the window edges. The
+ * macOS traffic lights are repositioned (see `trafficLightPosition` in
+ * tauri.conf.json) to sit inside its draggable top inset, so they don't clip the
+ * floating corner. Compact icon + label rows with a soft rounded selection,
+ * matching the Claude-desktop sidebar; narrows on small windows.
  */
 function Sidebar({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void }) {
   return (
-    <aside className="m-1.5 flex shrink-0 flex-col rounded-lg border border-(--color-border) bg-(--color-bg-elev) p-2 shadow-[0_8px_30px_rgba(0,0,0,0.35)] lg:my-2 lg:ml-2 lg:mr-0 lg:w-60 lg:overflow-y-auto">
-      <nav className="flex gap-0.5 overflow-x-auto lg:flex-col lg:overflow-visible">
+    <aside className="m-1.5 flex w-44 shrink-0 flex-col overflow-y-auto rounded-lg border border-(--color-border) bg-(--color-bg-elev) p-2 shadow-[0_8px_30px_rgba(0,0,0,0.35)] sm:w-52 lg:my-2 lg:ml-2 lg:mr-0 lg:w-60">
+      {/* Top inset the traffic lights overlay; draggable so the window still moves. */}
+      <div data-tauri-drag-region className="h-7 shrink-0" />
+      <nav className="flex flex-col gap-0.5">
         {TABS.map((t) => (
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
-            className={`flex shrink-0 items-center gap-2.5 rounded-md px-2.5 py-1 text-left text-[13px] tracking-tight transition-colors lg:w-full ${
+            className={`flex w-full shrink-0 items-center gap-2.5 rounded-md px-2.5 py-1 text-left text-[13px] tracking-tight transition-colors ${
               tab === t.id ? 'bg-(--color-accent-soft) text-(--color-fg)' : 'text-(--color-fg-muted) hover:bg-(--color-accent-soft) hover:text-(--color-fg)'
             }`}
           >
@@ -377,7 +379,7 @@ function ConversationThread({ conversation, persona, onBack }: { conversation: C
   const empty = conversation.messages.length === 0 && !running;
 
   return (
-    <div className="flex h-full flex-col px-5 pb-4 pt-4 sm:px-6">
+    <div className="flex min-h-0 flex-1 flex-col px-5 pb-4 pt-4 sm:px-6">
       <div className="flex items-center gap-3 pb-2">
         <button className="btn-ghost shrink-0 text-[11px]" onClick={onBack}>
           ← All chats

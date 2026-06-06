@@ -128,29 +128,64 @@ function Dashboard() {
   );
 }
 
+/** Compact line icon for each nav tab (feather-style, inherits text color). */
+function TabIcon({ id }: { id: Tab }) {
+  const paths: Record<Tab, ReactNode> = {
+    chat: <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />,
+    runtime: (
+      <>
+        <polyline points="4 17 10 11 4 5" />
+        <line x1="12" y1="19" x2="20" y2="19" />
+      </>
+    ),
+    personas: (
+      <>
+        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+        <circle cx="12" cy="7" r="4" />
+      </>
+    ),
+    heartbeats: <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />,
+    activity: (
+      <>
+        <circle cx="12" cy="12" r="10" />
+        <polyline points="12 6 12 12 16 14" />
+      </>
+    ),
+  };
+  return (
+    <svg
+      className="h-4 w-4 shrink-0 opacity-80"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      {paths[id]}
+    </svg>
+  );
+}
+
 /**
  * Floating navigation panel: a rounded card that sits inset from the window edges
- * (the content area beside it stays flush). Horizontal pill row on small screens,
- * a vertical card on `lg+`. Warm-neutral text + soft rounded selection to match
- * the chat prose palette.
+ * (the content area beside it stays flush). Compact icon + label rows with a soft
+ * rounded selection, matching the Claude-desktop sidebar. Horizontal row on small
+ * screens, a vertical list on `lg+`.
  */
 function Sidebar({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void }) {
   return (
-    <aside className="m-2 flex shrink-0 flex-col gap-3 rounded-2xl border border-[#23232a] bg-[#15161b] p-3 shadow-[0_8px_30px_rgba(0,0,0,0.35)] lg:my-3 lg:ml-3 lg:mr-0 lg:w-56 lg:gap-4 lg:overflow-y-auto">
-      <header className="px-1 pt-0.5">
-        <h1 className="text-[15px] font-medium tracking-tight text-[#f5f3ee]">Starship Agent</h1>
-        <div className="muted hidden text-xs lg:block">Local agent orchestrator</div>
-      </header>
-
-      <nav className="-mx-1 flex gap-1 overflow-x-auto px-1 lg:mx-0 lg:flex-col lg:gap-0.5 lg:overflow-visible lg:px-0">
+    <aside className="m-1.5 flex shrink-0 flex-col rounded-lg border border-(--color-border) bg-(--color-bg-elev) p-2 shadow-[0_8px_30px_rgba(0,0,0,0.35)] lg:my-2 lg:ml-2 lg:mr-0 lg:w-60 lg:overflow-y-auto">
+      <nav className="flex gap-0.5 overflow-x-auto lg:flex-col lg:overflow-visible">
         {TABS.map((t) => (
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
-            className={`shrink-0 rounded-lg px-3 py-2 text-left text-[13.5px] tracking-tight transition-colors lg:w-full ${
-              tab === t.id ? 'bg-[#26241f] text-[#f5f3ee]' : 'text-[#b3b0a8] hover:bg-[#1b1a17] hover:text-[#e8e6e1]'
+            className={`flex shrink-0 items-center gap-2.5 rounded-md px-2.5 py-1 text-left text-[13px] tracking-tight transition-colors lg:w-full ${
+              tab === t.id ? 'bg-(--color-accent-soft) text-(--color-fg)' : 'text-(--color-fg-muted) hover:bg-(--color-accent-soft) hover:text-(--color-fg)'
             }`}
           >
+            <TabIcon id={t.id} />
             {t.label}
           </button>
         ))}
@@ -235,7 +270,7 @@ function ChatTab() {
       {sorted.length > 0 ? (
         <ul className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
           {sorted.map((c) => (
-            <li key={c.id} className="rounded-md border border-zinc-800 p-3">
+            <li key={c.id} className="rounded-md border border-(--color-border) p-3">
               <div className="flex items-center justify-between gap-2">
                 <button className="min-w-0 text-left" onClick={() => setSelectedId(c.id)}>
                   <div className="truncate text-sm">{c.title}</div>
@@ -264,7 +299,7 @@ function NewConversationForm({ personas, onStart }: { personas: Persona[]; onSta
   if (personas.length === 0) return <p className="muted text-sm">Create a persona first — a conversation runs on a persona.</p>;
 
   return (
-    <div className="flex items-end gap-2 rounded-md border border-zinc-800 p-3">
+    <div className="flex items-end gap-2 rounded-md border border-(--color-border) p-3">
       <label className="flex flex-1 flex-col gap-1 text-[11px]">
         <span className="muted">Persona</span>
         <select className="inp text-xs" value={personaId} onChange={(e) => setPersonaId(e.target.value)}>
@@ -350,12 +385,12 @@ function ConversationThread({ conversation, persona, onBack }: { conversation: C
           )}
           {streaming ? <ChatMessage turn={{ role: 'assistant', text: streaming }} streaming /> : null}
           {rawOnly ? (
-            <pre className="overflow-x-auto whitespace-pre-wrap break-words rounded-xl border border-[#26262b] bg-[#0d0d10] p-3 font-mono text-[11px] leading-relaxed text-[#b9b6ae]">
+            <pre className="overflow-x-auto whitespace-pre-wrap break-words rounded-xl border border-(--color-border) bg-(--color-bg-elev) p-3 font-mono text-[11px] leading-relaxed text-(--color-fg-muted)">
               {rawOnly}
             </pre>
           ) : null}
           {running && !live ? (
-            <div className="flex items-center gap-2 text-[13px] text-[#8c8a83]">
+            <div className="flex items-center gap-2 text-[13px] text-(--color-fg-muted)">
               <span className="dot-pulse" />
               Thinking…
             </div>
@@ -385,7 +420,7 @@ function ChatMessage({ turn, streaming }: { turn: TranscriptTurn; streaming?: bo
   if (turn.role === 'user') {
     return (
       <div className="flex justify-end">
-        <div className="max-w-[85%] whitespace-pre-wrap break-words rounded-2xl rounded-br-md bg-[#2b2a27] px-4 py-2.5 text-[15px] leading-relaxed text-[#f0eee9]">
+        <div className="max-w-[85%] whitespace-pre-wrap break-words rounded-2xl rounded-br-md bg-(--color-accent-soft) px-4 py-2.5 text-[15px] leading-relaxed text-(--color-fg)">
           {turn.text}
         </div>
       </div>
@@ -427,24 +462,24 @@ function groupTurns(turns: TranscriptTurn[]): ChatItem[] {
 function ToolCard({ call, result }: { call: TranscriptTurn; result?: TranscriptTurn }) {
   const [open, setOpen] = useState(false);
   return (
-    <div className="overflow-hidden rounded-xl border border-[#26262b] bg-[#121214]">
+    <div className="overflow-hidden rounded-xl border border-(--color-border) bg-(--color-bg-elev)">
       <button
-        className="flex w-full items-center gap-2 px-3 py-2 text-left text-[13px] text-[#c4c1b8] hover:bg-[#17171a]"
+        className="flex w-full items-center gap-2 px-3 py-2 text-left text-[13px] text-(--color-fg-muted) hover:bg-(--color-bg-soft)"
         onClick={() => setOpen((o) => !o)}
       >
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#d97757" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
         </svg>
         <span className="font-medium">{call.tool ?? 'tool'}</span>
-        <span className="ml-auto text-[11px] text-[#6b6a66]">{open ? 'Hide' : 'Details'}</span>
+        <span className="ml-auto text-[11px] text-(--color-fg-subtle)">{open ? 'Hide' : 'Details'}</span>
       </button>
       {open ? (
-        <div className="space-y-2 border-t border-[#26262b] px-3 py-2.5">
+        <div className="space-y-2 border-t border-(--color-border) px-3 py-2.5">
           {call.text ? (
-            <pre className="overflow-x-auto whitespace-pre-wrap break-words font-mono text-[11px] leading-relaxed text-[#b9b6ae]">{call.text}</pre>
+            <pre className="overflow-x-auto whitespace-pre-wrap break-words font-mono text-[11px] leading-relaxed text-(--color-fg-muted)">{call.text}</pre>
           ) : null}
           {result?.text ? (
-            <pre className="overflow-x-auto whitespace-pre-wrap break-words border-t border-[#1f1f23] pt-2 font-mono text-[11px] leading-relaxed text-[#86847d]">
+            <pre className="overflow-x-auto whitespace-pre-wrap break-words border-t border-(--color-border) pt-2 font-mono text-[11px] leading-relaxed text-(--color-fg-muted)">
               {result.text}
             </pre>
           ) : null}
@@ -481,11 +516,11 @@ function Composer({
   const canSend = !disabled && !running && value.trim().length > 0;
 
   return (
-    <div className="rounded-3xl border border-[#34343a] bg-[#161618] px-2 py-2 shadow-[0_2px_18px_rgba(0,0,0,0.35)] transition-colors focus-within:border-[#52525b]">
+    <div className="rounded-3xl border border-(--color-border) bg-(--color-bg-soft) px-2 py-2 shadow-[0_2px_18px_rgba(0,0,0,0.35)] transition-colors focus-within:border-(--color-border-strong)">
       <textarea
         ref={ref}
         rows={1}
-        className="block max-h-[200px] w-full resize-none bg-transparent px-3 py-1.5 text-[15px] leading-relaxed text-[#e8e6e1] outline-none placeholder:text-[#6b6a66]"
+        className="block max-h-[200px] w-full resize-none bg-transparent px-3 py-1.5 text-[15px] leading-relaxed text-(--color-fg) outline-none placeholder:text-(--color-fg-subtle)"
         placeholder={placeholder}
         value={value}
         disabled={disabled}
@@ -503,7 +538,7 @@ function Composer({
           onClick={onSend}
           disabled={!canSend}
           className={`flex h-8 w-8 items-center justify-center rounded-full transition-colors ${
-            canSend ? 'bg-[#d97757] text-[#1a120e] hover:bg-[#e08c70]' : 'bg-[#2a2a2e] text-[#6b6a66]'
+            canSend ? 'bg-(--color-accent) text-(--color-bg) hover:bg-(--color-accent-strong)' : 'bg-(--color-bg-soft) text-(--color-fg-subtle)'
           }`}
         >
           {running ? (
@@ -566,7 +601,7 @@ function RuntimeTab() {
             {detected.map((d) => {
               const exec = execEdits[d.command] ?? d.default_executor;
               return (
-                <li key={d.command} className="rounded-md border border-zinc-800 p-3">
+                <li key={d.command} className="rounded-md border border-(--color-border) p-3">
                   <div className="flex items-center justify-between gap-2">
                     <div className="min-w-0">
                       <div className="text-sm">
@@ -595,7 +630,7 @@ function RuntimeTab() {
 
 function RuntimeCard({ runtime, onRemove }: { runtime: Runtime; onRemove: () => void }) {
   return (
-    <li className="rounded-md border border-zinc-800 p-3">
+    <li className="rounded-md border border-(--color-border) p-3">
       <div className="flex items-center justify-between gap-2">
         <div className="min-w-0">
           <div className="text-sm">
@@ -661,7 +696,7 @@ function NewPersonaForm({
   const [permissions, setPermissions] = useState<PermissionPolicy>(DEFAULT_PERMISSIONS);
 
   return (
-    <div className="mt-2 flex flex-col gap-2 rounded-md border border-zinc-800 p-2">
+    <div className="mt-2 flex flex-col gap-2 rounded-md border border-(--color-border) p-2">
       <input className="inp text-xs" placeholder="Persona name" value={name} onChange={(e) => setName(e.target.value)} autoFocus />
       <input className="inp text-xs" placeholder="Model (optional, e.g. claude-opus-4-8)" value={model} onChange={(e) => setModel(e.target.value)} />
       <textarea
@@ -788,7 +823,7 @@ function PersonaCard({ persona, runtimes }: { persona: Persona; runtimes: Runtim
   }
 
   return (
-    <li className="rounded-md border border-zinc-800 p-3">
+    <li className="rounded-md border border-(--color-border) p-3">
       <div className="flex items-center justify-between gap-2">
         <button className="min-w-0 text-left" onClick={() => setOpen((v) => !v)}>
           <div className="truncate text-sm">
@@ -950,7 +985,7 @@ function NewHeartbeatForm({
   const [intervalSeconds, setIntervalSeconds] = useState(300);
 
   return (
-    <div className="flex flex-col gap-2 rounded-md border border-zinc-800 p-3">
+    <div className="flex flex-col gap-2 rounded-md border border-(--color-border) p-3">
       <label className="flex flex-col gap-1 text-[11px]">
         <span className="muted">Persona</span>
         <select className="inp text-xs" value={personaId} onChange={(e) => setPersonaId(e.target.value)}>
@@ -1003,7 +1038,7 @@ function HeartbeatCard({
 }) {
   const h = heartbeat;
   return (
-    <li className="rounded-md border border-zinc-800 p-3">
+    <li className="rounded-md border border-(--color-border) p-3">
       <div className="flex items-center justify-between gap-2">
         <div className="min-w-0">
           <div className="truncate text-sm">
@@ -1151,13 +1186,13 @@ function SessionCard({ session, personaName, runtimeName }: { session: RunSessio
   }
 
   return (
-    <li className="rounded-md border border-zinc-800 p-3">
+    <li className="rounded-md border border-(--color-border) p-3">
       <button className="flex w-full items-center justify-between gap-2 text-left" onClick={toggle}>
         <div className="min-w-0">
           <div className="truncate text-sm">
             {title}
             {personaName ? <span className="muted text-[11px]"> · {personaName}</span> : null}
-            {hasTranscript ? <span className="text-[11px] text-emerald-500"> · transcript</span> : null}
+            {hasTranscript ? <span className="text-[11px] text-(--color-success)"> · transcript</span> : null}
           </div>
           <div className="muted text-[11px]">
             {session.events.length} event{session.events.length === 1 ? '' : 's'}
@@ -1168,7 +1203,7 @@ function SessionCard({ session, personaName, runtimeName }: { session: RunSessio
       </button>
 
       {open ? (
-        <div className="mt-2 border-t border-zinc-800 pt-2">
+        <div className="mt-2 border-t border-(--color-border) pt-2">
           {live ? (
             <LiveConversation run={live} />
           ) : hasTranscript ? (
@@ -1185,7 +1220,7 @@ function SessionCard({ session, personaName, runtimeName }: { session: RunSessio
             )
           ) : null}
 
-          <div className={hasTranscript ? 'mt-3 border-t border-zinc-800 pt-2' : ''}>
+          <div className={hasTranscript ? 'mt-3 border-t border-(--color-border) pt-2' : ''}>
             {hasTranscript ? <div className="section">Events</div> : null}
             <ol className="flex flex-col gap-1.5">
               {session.events.map((e) => {
@@ -1194,12 +1229,12 @@ function SessionCard({ session, personaName, runtimeName }: { session: RunSessio
                 return (
                   <li key={e.id} className="flex flex-col gap-0.5">
                     <div className="flex items-center justify-between gap-2 text-[11px]">
-                      <span className={`truncate font-mono ${failed ? 'text-red-400' : 'text-zinc-300'}`}>{e.type}</span>
+                      <span className={`truncate font-mono ${failed ? 'text-red-400' : 'text-(--color-fg)'}`}>{e.type}</span>
                       <span className="muted shrink-0">{timeAgo(e.createdAt)}</span>
                     </div>
                     {detail ? (
                       <pre
-                        className={`overflow-x-auto whitespace-pre-wrap break-words rounded bg-zinc-900/70 px-2 py-1 text-[10px] leading-relaxed ${failed ? 'text-red-300' : 'text-zinc-400'}`}
+                        className={`overflow-x-auto whitespace-pre-wrap break-words rounded bg-(--color-bg-soft) px-2 py-1 text-[10px] leading-relaxed ${failed ? 'text-red-300' : 'text-(--color-fg-muted)'}`}
                       >
                         {detail}
                       </pre>
@@ -1216,10 +1251,10 @@ function SessionCard({ session, personaName, runtimeName }: { session: RunSessio
 }
 
 const TURN_META: Record<TurnRole, { label: string; cls: string }> = {
-  user: { label: 'User', cls: 'text-zinc-300' },
-  assistant: { label: 'Assistant', cls: 'text-blue-300' },
-  tool: { label: 'Tool', cls: 'text-amber-300' },
-  result: { label: 'Result', cls: 'text-zinc-500' },
+  user: { label: 'User', cls: 'text-(--color-fg)' },
+  assistant: { label: 'Assistant', cls: 'text-(--color-fg)' },
+  tool: { label: 'Tool', cls: 'text-(--color-warn)' },
+  result: { label: 'Result', cls: 'text-(--color-fg-subtle)' },
 };
 
 function TurnRow({ turn, streaming }: { turn: TranscriptTurn; streaming?: boolean }) {
@@ -1231,7 +1266,7 @@ function TurnRow({ turn, streaming }: { turn: TranscriptTurn; streaming?: boolea
         <span className={meta.cls}>{meta.label}</span>
         {turn.tool && turn.role === 'tool' ? <span className="muted"> · {turn.tool}</span> : null}
       </div>
-      <div className={`whitespace-pre-wrap break-words text-[11px] leading-relaxed ${mono ? 'font-mono text-zinc-400' : 'text-zinc-200'}`}>
+      <div className={`whitespace-pre-wrap break-words text-[11px] leading-relaxed ${mono ? 'font-mono text-(--color-fg-muted)' : 'text-(--color-fg)'}`}>
         {turn.text}
         {streaming ? <span className="caret" /> : null}
       </div>
@@ -1262,7 +1297,7 @@ function Conversation({
   const empty = committed.length === 0 && !streamingText && !raw;
 
   return (
-    <div ref={ref} className="max-h-96 overflow-auto rounded-md border border-zinc-800 bg-zinc-900/40 p-2">
+    <div ref={ref} className="max-h-96 overflow-auto rounded-md border border-(--color-border) bg-(--color-bg-soft) p-2">
       {committed.length > 0 ? (
         <ol className="flex flex-col gap-2">
           {committed.map((t, i) => (
@@ -1275,7 +1310,7 @@ function Conversation({
           <TurnRow turn={{ role: 'assistant', text: streamingText }} streaming={running} />
         </ol>
       ) : null}
-      {raw ? <pre className="mt-2 overflow-x-auto whitespace-pre-wrap break-words font-mono text-[10px] leading-relaxed text-zinc-400">{raw}</pre> : null}
+      {raw ? <pre className="mt-2 overflow-x-auto whitespace-pre-wrap break-words font-mono text-[10px] leading-relaxed text-(--color-fg-muted)">{raw}</pre> : null}
       {empty ? <div className="muted text-[11px]">{running ? 'Starting…' : 'No output.'}</div> : null}
     </div>
   );
@@ -1315,17 +1350,18 @@ function timeUntil(iso: string): string {
 export function Style() {
   return (
     <style>{`
-      .inp { background:#18181b; border:1px solid #3f3f46; border-radius:6px; padding:8px 10px; color:#e6e8ee; outline:none; }
-      .inp:focus { border-color:#3b82f6; }
-      .btn { background:#2563eb; color:#fff; border-radius:6px; padding:8px 14px; font-size:13px; }
-      .btn:hover { background:#1d4ed8; } .btn:disabled { opacity:.5; }
-      .btn-ghost { color:#a1a1aa; border-radius:6px; padding:6px 12px; font-size:13px; } .btn-ghost:hover { color:#e4e4e7; }
-      .muted { color:#71717a; }
-      .section { font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:#71717a; margin-bottom:8px; }
-      .tab { padding:8px 12px; font-size:13px; color:#a1a1aa; border-bottom:2px solid transparent; margin-bottom:-1px; }
-      .tab:hover { color:#e4e4e7; }
-      .tab-active { color:#e6e8ee; border-bottom-color:#3b82f6; }
-      .caret { display:inline-block; width:6px; height:12px; margin-left:2px; vertical-align:text-bottom; background:#3b82f6; animation:blink 1s step-start infinite; }
+      .inp { background:var(--color-bg-soft); border:1px solid var(--color-border); border-radius:var(--radius-button); padding:8px 10px; color:var(--color-fg); outline:none; }
+      .inp:focus { border-color:var(--color-border-strong); }
+      .inp::placeholder { color:var(--color-fg-subtle); }
+      .btn { background:var(--color-accent); color:var(--color-bg); border-radius:var(--radius-button); padding:8px 14px; font-size:13px; font-weight:500; }
+      .btn:hover { background:var(--color-accent-strong); } .btn:disabled { opacity:.5; }
+      .btn-ghost { color:var(--color-fg-muted); border-radius:var(--radius-button); padding:6px 12px; font-size:13px; } .btn-ghost:hover { color:var(--color-fg); }
+      .muted { color:var(--color-fg-muted); }
+      .section { font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--color-fg-subtle); margin-bottom:8px; }
+      .tab { padding:8px 12px; font-size:13px; color:var(--color-fg-muted); border-bottom:2px solid transparent; margin-bottom:-1px; }
+      .tab:hover { color:var(--color-fg); }
+      .tab-active { color:var(--color-fg); border-bottom-color:var(--color-accent); }
+      .caret { display:inline-block; width:6px; height:12px; margin-left:2px; vertical-align:text-bottom; background:var(--color-accent); animation:blink 1s step-start infinite; }
       @keyframes blink { 50% { opacity:0; } }
     `}</style>
   );

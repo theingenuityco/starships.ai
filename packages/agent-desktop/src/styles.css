@@ -1,5 +1,26 @@
 @import 'tailwindcss';
 
+/* Shared design tokens — kept in lockstep with the landing site's palette
+   (packages/landing/app/globals.css) so the desktop app reads as the same product. */
+@theme {
+  --color-bg: #07080b;
+  --color-bg-elev: #0d0f14;
+  --color-bg-soft: #11141b;
+  --color-border: #1f242e;
+  --color-border-strong: #2a303d;
+  --color-fg: #e7ecf3;
+  --color-fg-muted: #9aa3b2;
+  --color-fg-subtle: #6c7585;
+  --color-accent: #f3f5fa;
+  --color-accent-soft: rgba(231, 236, 243, 0.08);
+  --color-accent-strong: #ffffff;
+  --color-success: #4ade80;
+  --color-warn: #fbbf24;
+
+  --radius-card: 14px;
+  --radius-button: 10px;
+}
+
 :root {
   color-scheme: dark;
 }
@@ -12,11 +33,10 @@ body,
 
 body {
   margin: 0;
-  background: #0b0d12;
-  color: #e6e8ee;
-  /* Claude-desktop UI type: a clean neo-grotesque (Inter where available, native
-     system grotesque otherwise), antialiased, with the slight negative tracking
-     Claude uses throughout. */
+  background: var(--color-bg);
+  color: var(--color-fg);
+  /* Inter (bundled/self-hosted), antialiased, with the slight negative tracking
+     the landing site uses throughout. */
   font-family:
     'Inter Variable', 'Inter', -apple-system, BlinkMacSystemFont, ui-sans-serif, system-ui, 'Segoe UI',
     'Helvetica Neue', Arial, sans-serif;
@@ -27,6 +47,11 @@ body {
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
   font-feature-settings: 'cv11', 'ss01';
+}
+
+::selection {
+  background: var(--color-accent-soft);
+  color: var(--color-fg);
 }
 
 /* Headings carry tighter tracking, matching Claude's display type. */
@@ -41,7 +66,7 @@ h4 {
 .md {
   font-size: 15px;
   line-height: 1.7;
-  color: #e8e6e1;
+  color: var(--color-fg);
   word-break: break-word;
 }
 .md > :first-child {
@@ -57,7 +82,7 @@ h4 {
   font-weight: 600;
   line-height: 1.3;
   letter-spacing: -0.018em;
-  color: #f5f3ee;
+  color: var(--color-fg);
   margin: 1.4em 0 0.6em;
 }
 .md-h1 {
@@ -89,40 +114,40 @@ h4 {
   margin: 0.2em 0;
 }
 .md-li::marker {
-  color: #8c8a83;
+  color: var(--color-fg-subtle);
 }
 .md-quote {
   margin: 0 0 0.85em;
   padding: 0.1em 0 0.1em 1em;
-  border-left: 2px solid #44423c;
-  color: #c4c1b8;
+  border-left: 2px solid var(--color-border);
+  color: var(--color-fg-muted);
 }
 .md-hr {
   border: none;
-  border-top: 1px solid #2c2b28;
+  border-top: 1px solid var(--color-border);
   margin: 1.4em 0;
 }
 .md a {
-  color: #d97757;
+  color: var(--color-fg);
   text-decoration: underline;
   text-underline-offset: 2px;
 }
 .md a:hover {
-  color: #e08c70;
+  color: var(--color-accent-strong);
 }
 .md-code-inline {
   font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
   font-size: 0.86em;
-  background: #1e1e22;
-  border: 1px solid #2c2c31;
+  background: var(--color-bg-soft);
+  border: 1px solid var(--color-border);
   border-radius: 5px;
   padding: 0.1em 0.36em;
 }
 .md-pre {
   position: relative;
   margin: 0 0 0.95em;
-  background: #0d0d10;
-  border: 1px solid #26262b;
+  background: var(--color-bg-elev);
+  border: 1px solid var(--color-border);
   border-radius: 12px;
   overflow: hidden;
 }
@@ -133,7 +158,7 @@ h4 {
   font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
   font-size: 12.5px;
   line-height: 1.6;
-  color: #d6d3cb;
+  color: var(--color-fg);
   white-space: pre;
 }
 .md-pre-lang {
@@ -141,9 +166,9 @@ h4 {
   font-size: 11px;
   letter-spacing: 0.04em;
   text-transform: lowercase;
-  color: #8c8a83;
-  background: #141418;
-  border-bottom: 1px solid #26262b;
+  color: var(--color-fg-subtle);
+  background: var(--color-bg-soft);
+  border-bottom: 1px solid var(--color-border);
 }
 
 /* Streaming caret for an in-flight assistant turn. */
@@ -153,7 +178,7 @@ h4 {
   height: 15px;
   margin-left: 1px;
   vertical-align: text-bottom;
-  background: #d97757;
+  background: var(--color-accent);
   border-radius: 1px;
   animation: blink 1s step-start infinite;
 }

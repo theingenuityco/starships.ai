@@ -36,7 +36,7 @@ export function Onboarding() {
         </button>
       </header>
 
-      <div className="rounded-md border border-zinc-800 p-4">
+      <div className="rounded-md border border-(--color-border) p-4">
         {step === 'welcome' ? (
           <WelcomeStep onNext={() => go('runtime')} />
         ) : step === 'runtime' ? (
@@ -126,7 +126,7 @@ function RuntimeStep({ onConnected, onBack, onNext }: { onConnected: (id: string
               const exec = execEdits[d.command] ?? d.default_executor;
               const already = store.runtimes.some((r) => r.executor === exec);
               return (
-                <li key={d.command} className="rounded-md border border-zinc-800 p-3">
+                <li key={d.command} className="rounded-md border border-(--color-border) p-3">
                   <div className="flex items-center justify-between gap-2">
                     <div className="min-w-0">
                       <div className="text-sm">
@@ -164,7 +164,7 @@ function RuntimeStep({ onConnected, onBack, onNext }: { onConnected: (id: string
       </p>
 
       {hasRuntime ? (
-        <p className="text-xs text-green-400">
+        <p className="text-xs text-(--color-success)">
           {store.runtimes.length} runtime{store.runtimes.length > 1 ? 's' : ''} connected.
         </p>
       ) : null}
@@ -186,7 +186,7 @@ function ManualRuntimeForm({ onAdd }: { onAdd: (id: string) => void }) {
   }
 
   return (
-    <div className="flex flex-col gap-2 rounded-md border border-zinc-800 p-2">
+    <div className="flex flex-col gap-2 rounded-md border border-(--color-border) p-2">
       <select className="inp text-xs" value={kind} onChange={(e) => setKind(e.target.value as RuntimeKind)}>
         {RUNTIME_KINDS.map((k) => (
           <option key={k} value={k}>
@@ -248,14 +248,14 @@ function PersonaStep({
       </div>
 
       {created ? (
-        <div className="rounded-md border border-zinc-800 p-3 text-sm">
-          <div className="text-green-400">Created “{created.name}”.</div>
+        <div className="rounded-md border border-(--color-border) p-3 text-sm">
+          <div className="text-(--color-success)">Created “{created.name}”.</div>
           <div className="muted text-[11px]">
             {created.model ? `${created.model} · ` : ''}assigned to its runtime. You can edit it later in the Personas tab.
           </div>
         </div>
       ) : (
-        <div className="flex flex-col gap-2 rounded-md border border-zinc-800 p-2">
+        <div className="flex flex-col gap-2 rounded-md border border-(--color-border) p-2">
           <input className="inp text-xs" placeholder="Persona name" value={name} onChange={(e) => setName(e.target.value)} autoFocus />
           <input
             className="inp text-xs"
@@ -327,8 +327,8 @@ function TestStep({ personaId, onBack, onNext }: { personaId: string | null; onB
       </button>
 
       {outcome ? (
-        <div className="rounded-md border border-zinc-800 p-3 text-xs">
-          <div className={outcome.ok ? 'text-green-400' : 'text-red-400'}>{outcome.summary}</div>
+        <div className="rounded-md border border-(--color-border) p-3 text-xs">
+          <div className={outcome.ok ? 'text-(--color-success)' : 'text-red-400'}>{outcome.summary}</div>
           {outcome.snippet ? <pre className="muted mt-2 max-h-40 overflow-auto whitespace-pre-wrap font-mono">{outcome.snippet}</pre> : null}
           {!outcome.ok ? (
             <div className="muted mt-2">A failed run is often just an unauthenticated CLI. You can still finish setup.</div>
@@ -344,12 +344,12 @@ function TestStep({ personaId, onBack, onNext }: { personaId: string | null; onB
 function DoneStep({ onFinish }: { onFinish: () => void }) {
   return (
     <div className="flex flex-col gap-3">
-      <h2 className="text-base font-medium text-green-400">You&apos;re set up</h2>
+      <h2 className="text-base font-medium text-(--color-success)">You&apos;re set up</h2>
       <p className="muted text-sm">Your runtime and persona are ready. From the dashboard you can:</p>
       <ul className="muted flex flex-col gap-1 text-sm">
-        <li>· <span className="text-zinc-300">Personas</span> — run a persona on demand or tweak its prompt.</li>
-        <li>· <span className="text-zinc-300">Heartbeats</span> — schedule a persona to run on a recurring interval.</li>
-        <li>· <span className="text-zinc-300">Activity</span> — review every run and its transcript.</li>
+        <li>· <span className="text-(--color-fg)">Personas</span> — run a persona on demand or tweak its prompt.</li>
+        <li>· <span className="text-(--color-fg)">Heartbeats</span> — schedule a persona to run on a recurring interval.</li>
+        <li>· <span className="text-(--color-fg)">Activity</span> — review every run and its transcript.</li>
       </ul>
       <button className="btn self-start" onClick={onFinish}>
         Open dashboard
@@ -370,7 +370,7 @@ function Nav({
   nextLabel: string;
 }) {
   return (
-    <div className="flex items-center justify-between border-t border-zinc-800 pt-3">
+    <div className="flex items-center justify-between border-t border-(--color-border) pt-3">
       <button className="btn-ghost text-xs" onClick={onBack}>
         Back
       </button>

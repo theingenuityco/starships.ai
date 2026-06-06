@@ -3,16 +3,13 @@
 // direct, in-app call to the Rust `run_agent` command.
 import { Channel } from '@tauri-apps/api/core';
 import { runAgent, type StreamMsg } from './tauri';
+import { addEvent, getStore, type Persona, type Runtime, type RuntimeKind } from './store';
 import {
-  addEvent,
   appendConversationMessages,
-  getStore,
+  getConversationSummary,
   setConversationSession,
   type ConversationMessage,
-  type Persona,
-  type Runtime,
-  type RuntimeKind,
-} from './store';
+} from './conversations';
 import { DEFAULT_PERMISSIONS, permissionArgs, streamArgs } from './permissions';
 import { appendRaw, applyLiveUpdate, finishLiveRun, getLiveRun, lastAssistantText, startLiveRun } from './liveRuns';
 import { parseClaudeStreamLine, parseCodexStreamLine } from './transcript';
@@ -206,7 +203,7 @@ export async function runConversationTurn(
   onDispatch?: (dispatchId: string) => void
 ): Promise<RunOutcome> {
   const store = getStore();
-  const convo = store.conversations.find((c) => c.id === conversationId);
+  const convo = getConversationSummary(conversationId);
   if (!convo) throw new Error('Conversation not found');
   const persona = store.personas.find((p) => p.id === convo.personaId);
   if (!persona) throw new Error('Persona not found');

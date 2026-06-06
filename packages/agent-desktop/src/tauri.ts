@@ -32,10 +32,37 @@ export const detectAgents = () => invoke<DetectedAgent[]>('detect_agents');
 export const runAgent = (args: { command: string; args: string[]; env: Record<string, string>; onEvent: Channel<StreamMsg> }) =>
   invoke<RunResult>('run_agent', args);
 
-// Local state lives in a Rust-managed 0600 file (not the webview's localStorage)
-// so anything sensitive in it stays out of reach of in-page script.
+// Local state lives in Rust-managed 0600 files under the app-data dir (not the
+// webview's localStorage) so anything sensitive stays out of reach of in-page
+// script. Config (runtimes/personas/heartbeats) is one JSON blob; conversations
+// and events are append-only JSONL (see src-tauri lib.rs).
 export const readStoreRaw = () => invoke<string>('read_store');
 export const writeStoreRaw = (json: string) => invoke<void>('write_store', { json });
+
+/** A thread's filename id + raw header JSONL line + file mtime, for the sidebar list. */
+export interface ConversationHeaderRaw {
+  id: string;
+  header: string;
+  updated_at_ms: number;
+}
+
+/** List threads cheaply (first/header line of each file only). */
+export const listConversations = () => invoke<ConversationHeaderRaw[]>('list_conversations');
+/** Full JSONL for one thread (header + turns), or null if it doesn't exist yet. */
+export const readConversation = (id: string) => invoke<string | null>('read_conversation', { id });
+/** Create a thread file with its header line (idempotent). */
+export const createConversation = (id: string, header: string) => invoke<void>('create_conversation', { id, header });
+/** Append already-serialized turn lines to a thread (pure append). */
+export const appendConversation = (id: string, lines: string[]) => invoke<void>('append_conversation', { id, lines });
+/** Replace a thread's header line (rename / session id set). */
+export const updateConversationMeta = (id: string, header: string) => invoke<void>('update_conversation_meta', { id, header });
+/** Delete a thread file. */
+export const deleteConversationFile = (id: string) => invoke<void>('delete_conversation', { id });
+
+/** Append one serialized event line to the activity log. */
+export const appendEvent = (line: string) => invoke<void>('append_event', { line });
+/** Full events JSONL (empty string when absent). */
+export const readEventsRaw = () => invoke<string>('read_events');
 
 /** Raw JSONL of a CLI run's transcript by session id, or null if none on disk. */
 export const readAgentTranscript = (sessionId: string) => invoke<string | null>('read_agent_transcript', { sessionId });

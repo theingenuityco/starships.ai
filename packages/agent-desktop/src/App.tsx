@@ -1,28 +1,33 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
-  addConversation,
   addHeartbeat,
   addPersona,
   addRuntime,
-  appendConversationMessages,
-  deleteConversation,
   deleteHeartbeat,
   deletePersona,
   eventsForPersona,
   getStore,
   initStore,
   removeRuntime,
-  updateConversation,
   updateHeartbeat,
   updatePersona,
   useStore,
   type AgentEvent,
-  type Conversation as ConversationRecord,
   type Heartbeat,
   type Persona,
   type Runtime,
   type RuntimeKind,
 } from './store';
+import {
+  addConversation,
+  appendConversationMessages,
+  deleteConversation,
+  initConversations,
+  updateConversationTitle,
+  useConversation,
+  useConversations,
+  type Conversation as ConversationRecord,
+} from './conversations';
 import { runConversationTurn, runPersona } from './engine';
 import { Markdown } from './markdown';
 import { detectAgents, hostname, isFullscreen, isTauri, readAgentTranscript, watchFullscreen, type DetectedAgent } from './tauri';
@@ -50,7 +55,7 @@ export default function App() {
   useEffect(() => {
     if (started.current) return;
     started.current = true;
-    initStore().finally(() => setBooting(false));
+    Promise.all([initStore(), initConversations()]).finally(() => setBooting(false));
   }, []);
 
   // In-app heartbeat scheduler: fire any due, enabled heartbeats. Because this
@@ -383,12 +388,13 @@ function SearchPalette({
   onGoTab: (t: Tab) => void;
 }) {
   const store = useStore();
+  const conversations = useConversations();
   const [q, setQ] = useState('');
   const [active, setActive] = useState(0);
   const personaName = (id: string) => store.personas.find((p) => p.id === id)?.name ?? 'Unknown persona';
   const ql = q.trim().toLowerCase();
 
-  const convoResults: SearchResult[] = [...store.conversations]
+  const convoResults: SearchResult[] = [...conversations]
     .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
     .filter((c) => !ql || c.title.toLowerCase().includes(ql) || personaName(c.personaId).toLowerCase().includes(ql))
     .slice(0, 8)
@@ -515,9 +521,11 @@ function Page({
 
 function ChatTab({ selectedId, onSelect }: { selectedId: string | null; onSelect: (id: string | null) => void }) {
   const store = useStore();
-  const selected = selectedId ? store.conversations.find((c) => c.id === selectedId) ?? null : null;
+  const conversations = useConversations();
+  const selected = useConversation(selectedId);
 
-  if (selected) {
+  if (selectedId) {
+    if (!selected) return <Page title="Chat"><p className="muted text-sm">Loading conversation…</p></Page>;
     return (
       <ConversationThread
         conversation={selected}
@@ -527,13 +535,13 @@ function ChatTab({ selectedId, onSelect }: { selectedId: string | null; onSelect
     );
   }
 
-  const sorted = [...store.conversations].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+  const sorted = [...conversations].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
   const personaName = (id: string) => store.personas.find((p) => p.id === id)?.name ?? 'Unknown persona';
 
   return (
     <Page
       title="Chats"
-      count={store.conversations.length}
+      count={conversations.length}
       description="Chat with a persona in a back-and-forth thread. Each conversation keeps its own session, so follow-ups remember what was said (Claude Code; other runtimes answer each message fresh)."
     >
       <NewConversationForm personas={store.personas} onStart={(personaId) => onSelect(addConversation({ personaId, title: 'New conversation' }).id)} />
@@ -546,7 +554,7 @@ function ChatTab({ selectedId, onSelect }: { selectedId: string | null; onSelect
                 <button className="min-w-0 text-left" onClick={() => onSelect(c.id)}>
                   <div className="truncate text-sm">{c.title}</div>
                   <div className="muted text-[11px]">
-                    {personaName(c.personaId)} · {c.messages.length} message{c.messages.length === 1 ? '' : 's'} · {timeAgo(c.updatedAt)}
+                    {personaName(c.personaId)} · {timeAgo(c.updatedAt)}
                   </div>
                 </button>
                 <button className="btn-ghost shrink-0 text-[11px] text-red-400" onClick={() => deleteConversation(c.id)}>
@@ -613,7 +621,7 @@ function ConversationThread({ conversation, persona, onBack }: { conversation: C
     setRunning(true);
     // Show the user's message right away; the engine appends the agent's turns when it returns.
     appendConversationMessages(conversation.id, [{ role: 'user', text, at: new Date().toISOString() }]);
-    if (conversation.title === 'New conversation') updateConversation(conversation.id, { title: text.slice(0, 48) });
+    if (conversation.title === 'New conversation') updateConversationTitle(conversation.id, text.slice(0, 48));
     try {
       const r = await runConversationTurn(conversation.id, text, setActiveDispatch);
       if (!r.ok) setError(`Run failed${r.exitCode != null ? ` (exit ${r.exitCode})` : ''}`);

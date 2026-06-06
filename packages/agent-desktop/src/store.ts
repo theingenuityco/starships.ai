@@ -1,10 +1,15 @@
-// Local, single-user state for the desktop app. Everything lives in one JSON
-// blob persisted to a Rust-managed 0600 file (see src-tauri read_store/write_store).
-// No server, no auth: this app is the source of truth.
+// Local, single-user config + activity state for the desktop app. No server, no
+// auth: this app is the source of truth.
+//
+// Persistence is split by access pattern (see src-tauri lib.rs):
+//   - Config (runtimes/personas/heartbeats/onboarding) is a small JSON blob in
+//     `store.json`, fully rewritten on each change (read_store/write_store).
+//   - The activity log is append-only JSONL in `events.jsonl` (append_event).
+//   - Conversations live one-file-per-thread; see ./conversations.
 import { useSyncExternalStore } from 'react';
-import { isTauri, readStoreRaw, writeStoreRaw } from './tauri';
+import { appendEvent, isTauri, readEventsRaw, readStoreRaw, writeStoreRaw } from './tauri';
+import { deleteConversationsForPersona } from './conversations';
 import type { PermissionPolicy } from './permissions';
-import type { TurnRole } from './transcript';
 
 export type { PermissionPolicy } from './permissions';
 export { DEFAULT_PERMISSIONS } from './permissions';
@@ -47,29 +52,6 @@ export interface Heartbeat {
   createdAt: string;
 }
 
-/** One persisted turn in a conversation thread. Mirrors a {@link TranscriptTurn}
- *  plus a timestamp, so threads survive restart independent of the on-disk CLI log. */
-export interface ConversationMessage {
-  role: TurnRole;
-  text: string;
-  /** Tool name, for `tool`/`result` turns. */
-  tool?: string;
-  at: string;
-}
-
-/** A persisted multi-turn chat with one persona. `sessionId` is the CLI session reused
- *  across turns so follow-ups resume the same context (see engine `runConversationTurn`). */
-export interface Conversation {
-  id: string;
-  personaId: string;
-  title: string;
-  /** Set after the first turn that mints a CLI session; later turns resume it. */
-  sessionId?: string | null;
-  messages: ConversationMessage[];
-  createdAt: string;
-  updatedAt: string;
-}
-
 /** Append-only activity record, grouped into sessions by `dispatchId`. */
 export interface AgentEvent {
   id: string;
@@ -81,17 +63,25 @@ export interface AgentEvent {
   createdAt: string;
 }
 
+/** In-memory app state. `events` is loaded from `events.jsonl`; the rest is the
+ *  `store.json` config blob. Conversations are not held here (see ./conversations). */
 export interface StoreData {
   runtimes: Runtime[];
   personas: Persona[];
   heartbeats: Heartbeat[];
-  conversations: Conversation[];
   events: AgentEvent[];
   /** Set once the first-run onboarding wizard is completed (or skipped). Absent = show it. */
   onboardedAt?: string;
 }
 
-const EMPTY: StoreData = { runtimes: [], personas: [], heartbeats: [], conversations: [], events: [] };
+/** The persisted-to-`store.json` subset (everything except the append-only event log). */
+type ConfigData = Omit<StoreData, 'events'>;
+
+/** Bump when `store.json` / event-line shapes change incompatibly. Persisted for
+ *  forward-looking migrations; we don't migrate anything yet. */
+const SCHEMA_VERSION = 1;
+
+const EMPTY: StoreData = { runtimes: [], personas: [], heartbeats: [], events: [] };
 
 const uid = () => crypto.randomUUID();
 const now = () => new Date().toISOString();
@@ -100,36 +90,71 @@ let data: StoreData = EMPTY;
 const listeners = new Set<() => void>();
 const emit = () => listeners.forEach((l) => l());
 
-function coerce(raw: unknown): StoreData {
-  const d = (raw ?? {}) as Partial<StoreData>;
+function coerceConfig(raw: unknown): ConfigData {
+  const d = (raw ?? {}) as Partial<ConfigData>;
   return {
     runtimes: Array.isArray(d.runtimes) ? d.runtimes : [],
     personas: Array.isArray(d.personas) ? d.personas : [],
     heartbeats: Array.isArray(d.heartbeats) ? d.heartbeats : [],
-    conversations: Array.isArray(d.conversations) ? d.conversations : [],
-    events: Array.isArray(d.events) ? d.events : [],
     onboardedAt: typeof d.onboardedAt === 'string' ? d.onboardedAt : undefined,
   };
 }
 
-/** Load persisted state into memory. No-op shape outside Tauri (vite dev). */
+/** Parse the append-only event log; skip unparseable / forward-compat lines. */
+function parseEvents(raw: string): AgentEvent[] {
+  const out: AgentEvent[] = [];
+  for (const line of raw.split('\n')) {
+    const t = line.trim();
+    if (!t) continue;
+    try {
+      const e = JSON.parse(t) as AgentEvent;
+      if (e && typeof e.id === 'string' && typeof e.type === 'string') out.push(e);
+    } catch {
+      // skip
+    }
+  }
+  return out;
+}
+
+/** Load persisted config + events into memory. No-op shape outside Tauri (vite dev). */
 export async function initStore(): Promise<void> {
   if (!isTauri()) {
     data = EMPTY;
     return;
   }
+  let config: ConfigData = coerceConfig({});
+  let events: AgentEvent[] = [];
   try {
-    data = coerce(JSON.parse(await readStoreRaw()));
+    config = coerceConfig(JSON.parse(await readStoreRaw()));
   } catch {
-    data = EMPTY;
+    // keep defaults
   }
+  try {
+    events = parseEvents(await readEventsRaw());
+  } catch {
+    // keep defaults
+  }
+  data = { ...config, events };
   emit();
+}
+
+/** Persist the config subset (not events — those append independently). */
+function persistConfig(): void {
+  if (!isTauri()) return;
+  const config = {
+    schemaVersion: SCHEMA_VERSION,
+    runtimes: data.runtimes,
+    personas: data.personas,
+    heartbeats: data.heartbeats,
+    onboardedAt: data.onboardedAt,
+  };
+  writeStoreRaw(JSON.stringify(config)).catch((err) => console.error('[store] write failed:', err));
 }
 
 function commit(next: StoreData): void {
   data = next;
   emit();
-  if (isTauri()) writeStoreRaw(JSON.stringify(data)).catch((err) => console.error('[store] write failed:', err));
+  persistConfig();
 }
 
 // ---- React binding ----
@@ -176,8 +201,9 @@ export function deletePersona(id: string): void {
     ...data,
     personas: data.personas.filter((p) => p.id !== id),
     heartbeats: data.heartbeats.filter((h) => h.personaId !== id),
-    conversations: data.conversations.filter((c) => c.personaId !== id),
   });
+  // Conversations are stored separately (one file per thread) — cascade the delete.
+  deleteConversationsForPersona(id);
 }
 
 // ---- Heartbeats ----
@@ -200,39 +226,13 @@ export function deleteHeartbeat(id: string): void {
   commit({ ...data, heartbeats: data.heartbeats.filter((h) => h.id !== id) });
 }
 
-// ---- Conversations ----
-export function addConversation(input: { personaId: string; title: string }): Conversation {
-  const c: Conversation = { id: uid(), createdAt: now(), updatedAt: now(), sessionId: null, messages: [], ...input };
-  commit({ ...data, conversations: [...data.conversations, c] });
-  return c;
-}
-/** Append turns to a thread, bump `updatedAt`, and bound the stored history. */
-export function appendConversationMessages(id: string, messages: ConversationMessage[]): void {
-  if (messages.length === 0) return;
-  commit({
-    ...data,
-    conversations: data.conversations.map((c) =>
-      c.id === id ? { ...c, messages: [...c.messages, ...messages].slice(-500), updatedAt: now() } : c
-    ),
-  });
-}
-/** Persist the CLI session id after the first turn so later turns can resume it. */
-export function setConversationSession(id: string, sessionId: string): void {
-  commit({ ...data, conversations: data.conversations.map((c) => (c.id === id ? { ...c, sessionId } : c)) });
-}
-export function updateConversation(id: string, patch: Partial<Pick<Conversation, 'title'>>): void {
-  commit({ ...data, conversations: data.conversations.map((c) => (c.id === id ? { ...c, ...patch } : c)) });
-}
-export function deleteConversation(id: string): void {
-  commit({ ...data, conversations: data.conversations.filter((c) => c.id !== id) });
-}
-
 // ---- Events ----
+/** Record one activity event: append it to memory + `events.jsonl` (no rewrite). */
 export function addEvent(input: Omit<AgentEvent, 'id' | 'createdAt'>): AgentEvent {
   const e: AgentEvent = { id: uid(), createdAt: now(), ...input };
-  // Keep the log bounded — most recent first in storage is unnecessary; we cap total.
-  const events = [...data.events, e].slice(-500);
-  commit({ ...data, events });
+  data = { ...data, events: [...data.events, e] };
+  emit();
+  if (isTauri()) appendEvent(JSON.stringify(e)).catch((err) => console.error('[store] event write failed:', err));
   return e;
 }
 export const eventsForPersona = (personaId: string): AgentEvent[] => data.events.filter((e) => e.personaId === personaId);

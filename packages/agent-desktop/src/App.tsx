@@ -76,9 +76,12 @@ export default function App() {
 
   if (booting) {
     return (
-      <div className="mx-auto flex min-h-full max-w-md flex-col justify-center gap-4 p-6">
-        <h1 className="text-xl font-semibold">Starship Agent</h1>
-        <p className="muted">Starting…</p>
+      <div className="flex min-h-full flex-col">
+        <TitleBar />
+        <div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center gap-4 p-6">
+          <h1 className="text-xl font-semibold">Starship Agent</h1>
+          <p className="muted">Starting…</p>
+        </div>
         <Style />
       </div>
     );
@@ -99,29 +102,42 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'activity', label: 'Activity' },
 ];
 
+/**
+ * Stands in for the native title bar: a draggable strip that keeps the window
+ * movable while the macOS traffic lights sit inside the app (the window uses
+ * `titleBarStyle: Overlay`), the way Claude's desktop app does. The height clears
+ * the overlaid window controls so app content never hides behind them.
+ */
+export function TitleBar() {
+  return <div data-tauri-drag-region className="h-9 shrink-0" />;
+}
+
 function Dashboard() {
   const [tab, setTab] = useState<Tab>('chat');
 
-  // App shell: only the nav floats as a rounded panel; the content area fills the
-  // window flush. Stacks on narrow windows, sits side-by-side on wide ones, so
-  // larger windows get more room instead of empty side margins.
+  // App shell: a draggable title strip on top (window controls overlay it), then
+  // a floating nav panel beside a flush content area. Stacks on narrow windows,
+  // sits side-by-side on wide ones, so larger windows get more room.
   return (
-    <div className="flex h-full flex-col lg:flex-row">
-      <Sidebar tab={tab} setTab={setTab} />
+    <div className="flex h-full flex-col">
+      <TitleBar />
+      <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
+        <Sidebar tab={tab} setTab={setTab} />
 
-      <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-        {tab === 'chat' ? (
-          <ChatTab />
-        ) : tab === 'runtime' ? (
-          <RuntimeTab />
-        ) : tab === 'personas' ? (
-          <PersonasTab />
-        ) : tab === 'heartbeats' ? (
-          <HeartbeatsTab />
-        ) : (
-          <ActivityTab />
-        )}
-      </main>
+        <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+          {tab === 'chat' ? (
+            <ChatTab />
+          ) : tab === 'runtime' ? (
+            <RuntimeTab />
+          ) : tab === 'personas' ? (
+            <PersonasTab />
+          ) : tab === 'heartbeats' ? (
+            <HeartbeatsTab />
+          ) : (
+            <ActivityTab />
+          )}
+        </main>
+      </div>
 
       <Style />
     </div>

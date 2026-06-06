@@ -4,7 +4,7 @@
 // `onboardedAt` in the store so this never shows again. No server, no login: every
 // step reuses the same local mutations the dashboard does.
 import { useEffect, useState } from 'react';
-import { Style, kindLabel } from './App';
+import { Style, TitleBar, kindLabel } from './App';
 import { addPersona, addRuntime, completeOnboarding, eventsForPersona, useStore, type RuntimeKind } from './store';
 import { runPersona } from './engine';
 import { detectAgents, hostname, isTauri, type DetectedAgent } from './tauri';
@@ -25,35 +25,38 @@ export function Onboarding() {
   const go = (s: Step) => setStep(s);
 
   return (
-    <div className="mx-auto flex min-h-full max-w-xl flex-col gap-4 p-6">
-      <header className="flex items-center justify-between">
-        <div>
-          <h1 className="text-lg font-semibold">Welcome to Starship Agent</h1>
-          <div className="muted text-xs">Step {idx + 1} of {STEPS.length}</div>
-        </div>
-        <button className="btn-ghost text-xs" onClick={completeOnboarding}>
-          Skip setup
-        </button>
-      </header>
+    <div className="flex min-h-full flex-col">
+      <TitleBar />
+      <div className="mx-auto flex w-full max-w-xl flex-1 flex-col gap-4 px-6 pb-6">
+        <header className="flex items-center justify-between">
+          <div>
+            <h1 className="text-lg font-semibold">Welcome to Starship Agent</h1>
+            <div className="muted text-xs">Step {idx + 1} of {STEPS.length}</div>
+          </div>
+          <button className="btn-ghost text-xs" onClick={completeOnboarding}>
+            Skip setup
+          </button>
+        </header>
 
-      <div className="rounded-md border border-(--color-border) p-4">
-        {step === 'welcome' ? (
-          <WelcomeStep onNext={() => go('runtime')} />
-        ) : step === 'runtime' ? (
-          <RuntimeStep onConnected={setRuntimeId} onBack={() => go('welcome')} onNext={() => go('persona')} />
-        ) : step === 'persona' ? (
-          <PersonaStep
-            runtimeId={runtimeId}
-            createdId={personaId}
-            onCreated={setPersonaId}
-            onBack={() => go('runtime')}
-            onNext={() => go('test')}
-          />
-        ) : step === 'test' ? (
-          <TestStep personaId={personaId} onBack={() => go('persona')} onNext={() => go('done')} />
-        ) : (
-          <DoneStep onFinish={completeOnboarding} />
-        )}
+        <div className="rounded-md border border-(--color-border) p-4">
+          {step === 'welcome' ? (
+            <WelcomeStep onNext={() => go('runtime')} />
+          ) : step === 'runtime' ? (
+            <RuntimeStep onConnected={setRuntimeId} onBack={() => go('welcome')} onNext={() => go('persona')} />
+          ) : step === 'persona' ? (
+            <PersonaStep
+              runtimeId={runtimeId}
+              createdId={personaId}
+              onCreated={setPersonaId}
+              onBack={() => go('runtime')}
+              onNext={() => go('test')}
+            />
+          ) : step === 'test' ? (
+            <TestStep personaId={personaId} onBack={() => go('persona')} onNext={() => go('done')} />
+          ) : (
+            <DoneStep onFinish={completeOnboarding} />
+          )}
+        </div>
       </div>
 
       <Style />

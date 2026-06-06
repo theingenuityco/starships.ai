@@ -292,19 +292,26 @@ fn update_conversation_meta(app: tauri::AppHandle, id: String, header: String) -
     }
     let mut out = lines.join("\n");
     out.push('\n');
-    fs::write(&path, out).map_err(|e| e.to_string())?;
-    set_owner_only(&path);
+    // Temp file + atomic rename (same as write_store) so a crash mid-write can't
+    // leave the conversation truncated or empty.
+    let tmp = path.with_extension("jsonl.tmp");
+    fs::write(&tmp, out).map_err(|e| e.to_string())?;
+    set_owner_only(&tmp);
+    fs::rename(&tmp, &path).map_err(|e| e.to_string())?;
     Ok(())
 }
 
-/// Delete a thread file.
+/// Delete a thread file. Idempotent: a missing file is a no-op.
 #[tauri::command]
 fn delete_conversation(app: tauri::AppHandle, id: String) -> Result<(), String> {
     let path = conversation_path(&app, &id)?;
-    if path.exists() {
-        fs::remove_file(&path).map_err(|e| e.to_string())?;
+    // Match NotFound directly rather than pre-checking exists() — atomic, and a
+    // concurrent delete between the two can't surface a spurious error.
+    match fs::remove_file(&path) {
+        Ok(()) => Ok(()),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(e) => Err(e.to_string()),
     }
-    Ok(())
 }
 
 /// Append one serialized event line to the activity log.

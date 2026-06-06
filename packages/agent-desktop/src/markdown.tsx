@@ -13,7 +13,9 @@ function safeHref(url: string): string | null {
 function parseInline(text: string, keyBase = ''): ReactNode[] {
   const nodes: ReactNode[] = [];
   // Earliest-match wins; alternatives ordered so `**` beats `*`, `__` beats `_`.
-  const re = /(`[^`]+`)|(\*\*[\s\S]+?\*\*)|(__[\s\S]+?__)|(\*[^*\n]+?\*)|(_[^_\n]+?_)|(~~[\s\S]+?~~)|(\[[^\]]+\]\([^)\s]+\))/;
+  // Inner classes exclude the delimiter (and newline for strike) so a span can't
+  // run across block boundaries — e.g. two stray `**` paragraphs apart joining.
+  const re = /(`[^`]+`)|(\*\*[^*]+?\*\*)|(__[^_]+?__)|(\*[^*\n]+?\*)|(_[^_\n]+?_)|(~~[^\n]+?~~)|(\[[^\]]+\]\([^)\s]+\))/;
   let rest = text;
   let i = 0;
   while (rest.length) {

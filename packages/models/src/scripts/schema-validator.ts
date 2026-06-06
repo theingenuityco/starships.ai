@@ -83,7 +83,7 @@ export class SchemaValidator {
         AND tc.table_schema = 'public'
       `);
 
-      const expectedTables = ['users', 'starships', 'agents', 'conversations', 'messages', 'workflows'];
+      const expectedTables = ['users', 'starships', 'agent_runtimes', 'conversations', 'messages', 'workflows'];
       const missingPks = expectedTables.filter((table) => !primaryKeys.some((pk) => pk.table_name === table));
 
       results.push({
@@ -236,7 +236,7 @@ export class SchemaValidator {
       // Check for agents without starships (if starship_id is required)
       const orphanedAgents = await this.connection.query<{ count: string }>(`
         SELECT COUNT(*) as count
-        FROM agents a
+        FROM agent_runtimes a
         LEFT JOIN starships s ON a.starship_id = s.id
         WHERE a.starship_id IS NOT NULL AND s.id IS NULL
       `);

@@ -1,57 +1,37 @@
 /**
- * Agent connectivity + dispatch types.
+ * Agent dispatch types.
  *
- * Supporting types for external agents connecting to a starship: device/presence
- * records, connection tokens, the command-dispatch envelope, and the append-only
- * activity log.
+ * The work + activity channel between a starship and the personas running on its
+ * agent runtimes. Work (dispatches, heartbeats) targets a persona; whatever
+ * runtime that persona is currently assigned to executes it. Events are the
+ * append-only activity log, attributed to both the persona (actor) and the
+ * runtime (engine) that produced them.
  */
 
-export type AgentConnectionStatus = 'online' | 'busy' | 'idle' | 'offline';
-
-export interface AgentDeviceModel {
-  id: string;
-  agentId: string;
-  deviceLabel?: string | null;
-  platform?: string | null;
-  lastSeenAt?: string | null;
-  connectionStatus: AgentConnectionStatus;
-  createdAt: string;
-}
-
-/**
- * A connection token for an external agent. The raw secret (`sk-ship-…`) is
- * shown once at mint time; only its sha256 hash is stored.
- */
-export interface AgentTokenModel {
-  id: string;
-  agentId: string;
-  starshipId: string;
-  /** sha256 hex of the opaque secret. Never the secret itself. */
-  tokenHash: string;
-  name?: string | null;
-  lastUsedAt?: string | null;
-  expiresAt?: string | null;
-  revokedAt?: string | null;
-  createdByUserId?: string | null;
-  createdAt: string;
-}
+import type { PersonaExecutionConfig } from './agent-persona';
 
 export type DispatchDeliveryStatus = 'dispatched' | 'delivered' | 'failed';
 export type DispatchAckStatus = 'pending' | 'acked' | 'done' | 'cancelled';
 
 /**
- * A command dispatched to an agent. May reference a task card when the work is
- * human-visible, or carry a free-form payload for ad-hoc commands.
+ * A command dispatched to a persona. May reference a task card when the work is
+ * human-visible, or carry a free-form payload for ad-hoc commands. The runtime
+ * that executes it is resolved from the persona's assignment at creation time.
  */
-export interface AgentDispatchModel {
+export interface AgentRuntimeDispatchModel {
   id: string;
   starshipId: string;
-  agentId: string;
+  /** Target persona (the actor). */
+  personaId: string;
+  /** Runtime resolved to execute this dispatch. Null while the persona is unassigned. */
+  runtimeId?: string | null;
   cardId?: string | null;
-  /** Set when this dispatch was created by a recurring heartbeat (see AgentHeartbeatModel). */
+  /** Set when this dispatch was created by a recurring heartbeat. */
   heartbeatId?: string | null;
   commandType: string;
   payload: Record<string, unknown>;
+  /** Persona behaviour snapshot to inject at execution time. */
+  persona?: PersonaExecutionConfig | null;
   deliveryStatus: DispatchDeliveryStatus;
   ackStatus: DispatchAckStatus;
   createdAt: string;
@@ -60,21 +40,19 @@ export interface AgentDispatchModel {
 }
 
 /**
- * A recurring heartbeat that periodically dispatches a command to an agent. The
+ * A recurring heartbeat that periodically dispatches a command to a persona. The
  * server's in-process scheduler fires each enabled heartbeat every
- * `intervalSeconds`, creating an `AgentDispatchModel` the agent picks up on its
- * next `pull_commands`.
+ * `intervalSeconds`, creating an {@link AgentRuntimeDispatchModel} the assigned
+ * runtime picks up on its next `pull_commands`.
  */
-export interface AgentHeartbeatModel {
+export interface AgentRuntimeHeartbeatModel {
   id: string;
   starshipId: string;
-  agentId: string;
+  /** Target persona for the recurring dispatch. */
+  personaId: string;
   name?: string | null;
-  /** Command type stamped on each dispatch this heartbeat creates. */
   commandType: string;
-  /** Payload stamped on each dispatch this heartbeat creates. */
   payload: Record<string, unknown>;
-  /** How often to fire, in seconds. */
   intervalSeconds: number;
   enabled: boolean;
   lastFiredAt?: string | null;
@@ -85,10 +63,13 @@ export interface AgentHeartbeatModel {
 }
 
 /** Append-only activity record (the audit trail; not chat). */
-export interface AgentEventModel {
+export interface AgentRuntimeEventModel {
   id: string;
   starshipId: string;
-  agentId: string;
+  /** Persona the event is attributed to (the actor). Null for runtime-level events. */
+  personaId?: string | null;
+  /** Runtime that produced the event (the engine). */
+  runtimeId?: string | null;
   dispatchId?: string | null;
   cardId?: string | null;
   type: string;

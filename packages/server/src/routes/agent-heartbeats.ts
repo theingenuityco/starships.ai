@@ -6,7 +6,7 @@ import { IdSchema, noXSS, XSS_ERROR_MESSAGE } from '@/schemas/common';
 import type { Request, Response } from 'express';
 import { Router } from 'express';
 import { z } from 'zod';
-import { AgentRepository, AgentHeartbeatRepository } from '@starships/models';
+import { AgentPersonaRepository, AgentRuntimeHeartbeatRepository } from '@starships/models';
 
 const router: Router = Router();
 
@@ -17,30 +17,30 @@ const MAX_INTERVAL_SECONDS = 30 * 24 * 60 * 60; // 30 days
 const commandTypeSchema = z.string().min(1).max(64).refine(noXSS, { message: XSS_ERROR_MESSAGE });
 const intervalSchema = z.coerce.number().int().min(MIN_INTERVAL_SECONDS).max(MAX_INTERVAL_SECONDS);
 
-// GET /starships/:starshipId/agents/:agentId/heartbeats - List an agent's heartbeats
-router.get('/starships/:starshipId/agents/:agentId/heartbeats', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+// GET /starships/:starshipId/agent-personas/:personaId/heartbeats - List a persona's heartbeats
+router.get('/starships/:starshipId/agent-personas/:personaId/heartbeats', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
-    const params = validateData(z.object({ starshipId: IdSchema, agentId: IdSchema }), req.params, res, 'heartbeat parameters');
+    const params = validateData(z.object({ starshipId: IdSchema, personaId: IdSchema }), req.params, res, 'heartbeat parameters');
     if (!params) return;
     if (!(await verifyStarshipAccess(params.starshipId, req.user!.id, res))) return;
 
-    const agent = await new AgentRepository().findById(params.agentId);
-    if (!agent || String(agent.starshipId) !== String(params.starshipId)) {
-      sendError(res, 'VALIDATION_ERROR', 'Agent not found in this starship', 400, { agentId: params.agentId });
+    const persona = await new AgentPersonaRepository().findById(params.personaId);
+    if (!persona || String(persona.starshipId) !== String(params.starshipId)) {
+      sendError(res, 'VALIDATION_ERROR', 'Persona not found in this starship', 400, { personaId: params.personaId });
       return;
     }
 
-    const heartbeats = await new AgentHeartbeatRepository().listByAgent(params.agentId);
+    const heartbeats = await new AgentRuntimeHeartbeatRepository().listByPersona(params.personaId);
     sendSuccess(res, heartbeats);
   } catch (error) {
-    handleError(error, res, 'listing agent heartbeats');
+    handleError(error, res, 'listing persona heartbeats');
   }
 });
 
-// POST /starships/:starshipId/agents/:agentId/heartbeats - Create a heartbeat (owner only)
-router.post('/starships/:starshipId/agents/:agentId/heartbeats', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+// POST /starships/:starshipId/agent-personas/:personaId/heartbeats - Create a heartbeat (owner only)
+router.post('/starships/:starshipId/agent-personas/:personaId/heartbeats', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
-    const params = validateData(z.object({ starshipId: IdSchema, agentId: IdSchema }), req.params, res, 'heartbeat parameters');
+    const params = validateData(z.object({ starshipId: IdSchema, personaId: IdSchema }), req.params, res, 'heartbeat parameters');
     if (!params) return;
     if (!(await verifyStarshipOwnerAccess(params.starshipId, req.user!.id, res))) return;
 
@@ -58,15 +58,15 @@ router.post('/starships/:starshipId/agents/:agentId/heartbeats', jwtAuthMiddlewa
     );
     if (!body) return;
 
-    const agent = await new AgentRepository().findById(params.agentId);
-    if (!agent || String(agent.starshipId) !== String(params.starshipId)) {
-      sendError(res, 'VALIDATION_ERROR', 'Agent not found in this starship', 400, { agentId: params.agentId });
+    const persona = await new AgentPersonaRepository().findById(params.personaId);
+    if (!persona || String(persona.starshipId) !== String(params.starshipId)) {
+      sendError(res, 'VALIDATION_ERROR', 'Persona not found in this starship', 400, { personaId: params.personaId });
       return;
     }
 
-    const heartbeat = await new AgentHeartbeatRepository().create({
+    const heartbeat = await new AgentRuntimeHeartbeatRepository().create({
       starshipId: params.starshipId,
-      agentId: params.agentId,
+      personaId: params.personaId,
       name: body.name ?? null,
       commandType: body.commandType,
       payload: body.payload ?? {},
@@ -76,17 +76,17 @@ router.post('/starships/:starshipId/agents/:agentId/heartbeats', jwtAuthMiddlewa
     });
     sendSuccess(res, heartbeat, 201);
   } catch (error) {
-    handleError(error, res, 'creating agent heartbeat');
+    handleError(error, res, 'creating persona heartbeat');
   }
 });
 
-// PUT /agent-heartbeats/:id - Update a heartbeat (owner only)
-router.put('/agent-heartbeats/:id', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+// PUT /agent-runtime-heartbeats/:id - Update a heartbeat (owner only)
+router.put('/agent-runtime-heartbeats/:id', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const params = validateData(z.object({ id: IdSchema }), req.params, res, 'heartbeat parameter');
     if (!params) return;
 
-    const repo = new AgentHeartbeatRepository();
+    const repo = new AgentRuntimeHeartbeatRepository();
     const existing = await repo.findById(params.id);
     if (!existing) {
       sendError(res, 'RESOURCE_NOT_FOUND', 'Heartbeat not found', 404, { id: params.id });
@@ -111,17 +111,17 @@ router.put('/agent-heartbeats/:id', jwtAuthMiddleware, async (req: Request, res:
     const updated = await repo.update(params.id, body);
     sendSuccess(res, updated);
   } catch (error) {
-    handleError(error, res, 'updating agent heartbeat');
+    handleError(error, res, 'updating persona heartbeat');
   }
 });
 
-// DELETE /agent-heartbeats/:id - Delete a heartbeat (owner only)
-router.delete('/agent-heartbeats/:id', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+// DELETE /agent-runtime-heartbeats/:id - Delete a heartbeat (owner only)
+router.delete('/agent-runtime-heartbeats/:id', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const params = validateData(z.object({ id: IdSchema }), req.params, res, 'heartbeat parameter');
     if (!params) return;
 
-    const repo = new AgentHeartbeatRepository();
+    const repo = new AgentRuntimeHeartbeatRepository();
     const existing = await repo.findById(params.id);
     if (!existing) {
       sendError(res, 'RESOURCE_NOT_FOUND', 'Heartbeat not found', 404, { id: params.id });
@@ -132,7 +132,7 @@ router.delete('/agent-heartbeats/:id', jwtAuthMiddleware, async (req: Request, r
     const deleted = await repo.delete(params.id);
     sendSuccess(res, { deleted });
   } catch (error) {
-    handleError(error, res, 'deleting agent heartbeat');
+    handleError(error, res, 'deleting persona heartbeat');
   }
 });
 

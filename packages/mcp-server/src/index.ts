@@ -11,7 +11,7 @@ import rateLimit from 'express-rate-limit';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { getEnvConfig } from '@starships/env';
 import { createConnection } from '@starships/models';
-import { resolveAgentContext } from './auth';
+import { resolveRuntimeContext } from './auth';
 import { buildServer } from './buildServer';
 
 const config = getEnvConfig();
@@ -43,9 +43,9 @@ app.get('/health', (_req: Request, res: Response) => {
 });
 
 app.post('/mcp', mcpLimiter, async (req: Request, res: Response): Promise<void> => {
-  const ctx = await resolveAgentContext(req.headers.authorization);
+  const ctx = await resolveRuntimeContext(req.headers.authorization);
   if (!ctx) {
-    res.status(401).json({ error: 'Invalid or missing agent token' });
+    res.status(401).json({ error: 'Invalid or missing runtime token' });
     return;
   }
   try {

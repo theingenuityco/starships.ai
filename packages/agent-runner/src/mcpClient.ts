@@ -1,6 +1,6 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
-import type { AgentDispatchModel, AgentConnectionStatus } from '@starships/protocol';
+import type { AgentRuntimeDispatchModel, AgentConnectionStatus } from '@starships/protocol';
 
 /** Shape returned by the server's `ok()` helper: text content holding JSON. */
 type ToolResult = { content?: Array<{ type: string; text?: string }>; isError?: boolean };
@@ -68,16 +68,16 @@ export class StarshipMcpClient {
     return parseToolResult<T>(result);
   }
 
-  pullCommands(): Promise<AgentDispatchModel[]> {
-    return this.call<AgentDispatchModel[]>('pull_commands');
+  pullCommands(): Promise<AgentRuntimeDispatchModel[]> {
+    return this.call<AgentRuntimeDispatchModel[]>('pull_commands');
   }
 
-  ack(dispatchId: string): Promise<AgentDispatchModel> {
-    return this.call<AgentDispatchModel>('ack_command', { dispatchId });
+  ack(dispatchId: string): Promise<AgentRuntimeDispatchModel> {
+    return this.call<AgentRuntimeDispatchModel>('ack_command', { dispatchId });
   }
 
-  complete(dispatchId: string): Promise<AgentDispatchModel> {
-    return this.call<AgentDispatchModel>('complete_command', { dispatchId });
+  complete(dispatchId: string): Promise<AgentRuntimeDispatchModel> {
+    return this.call<AgentRuntimeDispatchModel>('complete_command', { dispatchId });
   }
 
   reportStatus(status: AgentConnectionStatus, detail?: string): Promise<{ recorded: boolean }> {

@@ -4,9 +4,7 @@ import Icon from '@/components/primitives/Icon'
 
 import React from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
-import { useStarshipAgents } from '@/hooks/useAgents'
 import { cn } from '@/lib/utils'
 import { Outfit } from 'next/font/google'
 
@@ -19,11 +17,6 @@ export interface ShipHeroProps {
 const heroHeadingFont = Outfit({ subsets: ['latin'], weight: ['600', '700'] })
 
 export function ShipHero({ slug, starshipId, className }: ShipHeroProps): React.JSX.Element {
-  const router = useRouter()
-  const { data: agents = [] } = useStarshipAgents(starshipId || '', !!starshipId)
-
-  const gaiaAgent = Array.isArray(agents) ? agents.find(a => (a?.name || '').toLowerCase().includes('gaia')) || null : null
-  const gaiaAgentId = gaiaAgent?.id || null
   return (
     <section aria-labelledby="ship-hero" className={cn('relative overflow-hidden rounded-2xl frosted-glass-card shadow-frosted-lg border border-border/80 p-7 md:p-8', className)}>
       {/* Decorative gradient overlay */}
@@ -70,7 +63,7 @@ export function ShipHero({ slug, starshipId, className }: ShipHeroProps): React.
         {/* Gaia-focused actions */}
         <div className="flex flex-col items-stretch gap-3 sm:w-64">
           <Button asChild size="lg" disabled={!starshipId} className="whitespace-nowrap">
-            <Link href={gaiaAgentId ? `/ship/${encodeURIComponent(slug)}/rooms/lobby?agentId=${encodeURIComponent(String(gaiaAgentId))}` : `/ship/${encodeURIComponent(slug)}`}>
+            <Link href={`/ship/${encodeURIComponent(slug)}`}>
               <Icon name="sparkles" className="h-5 w-5" />
               <span className="ml-1">Create with Gaia</span>
             </Link>

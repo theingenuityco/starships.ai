@@ -1,12 +1,12 @@
 import { BaseRepository } from './BaseRepository';
-import type { AgentHeartbeatModel } from '@starships/protocol';
+import type { AgentRuntimeHeartbeatModel } from '@starships/protocol';
 import type { PostgresConnection } from '@/helpers/database';
 import { nanoid } from 'nanoid';
 
 type DbRow = {
   id: string;
   starship_id: string;
-  agent_id: string;
+  persona_id: string;
   name: string | null;
   command_type: string;
   payload: unknown;
@@ -19,11 +19,11 @@ type DbRow = {
   updated_at: string;
 };
 
-function fromDb(r: DbRow): AgentHeartbeatModel {
+function fromDb(r: DbRow): AgentRuntimeHeartbeatModel {
   return {
     id: String(r.id),
     starshipId: String(r.starship_id),
-    agentId: String(r.agent_id),
+    personaId: String(r.persona_id),
     name: r.name ?? null,
     commandType: String(r.command_type),
     payload: (typeof r.payload === 'object' && r.payload !== null ? r.payload : {}) as Record<string, unknown>,
@@ -37,35 +37,35 @@ function fromDb(r: DbRow): AgentHeartbeatModel {
   };
 }
 
-export class AgentHeartbeatRepository extends BaseRepository {
+export class AgentRuntimeHeartbeatRepository extends BaseRepository {
   constructor(connection?: PostgresConnection) {
-    super('AgentHeartbeatRepository', connection);
+    super('AgentRuntimeHeartbeatRepository', connection);
   }
 
   async create(input: {
     starshipId: string;
-    agentId: string;
+    personaId: string;
     name?: string | null;
     commandType: string;
     payload?: Record<string, unknown>;
     intervalSeconds: number;
     enabled?: boolean;
     createdByUserId?: string | null;
-  }): Promise<AgentHeartbeatModel> {
+  }): Promise<AgentRuntimeHeartbeatModel> {
     return this.executeWithErrorHandling(
       async () => {
         const row = await this.getConnection().queryOne<DbRow>(
           // $7 (interval_seconds column) and $10 (interval math) are passed
           // separately: reusing one param across an integer column and an
           // interval multiplication makes Postgres deduce conflicting types.
-          `INSERT INTO agent_heartbeats
-             (id, starship_id, agent_id, name, command_type, payload, interval_seconds, enabled, next_fire_at, created_by_user_id)
+          `INSERT INTO agent_runtime_heartbeats
+             (id, starship_id, persona_id, name, command_type, payload, interval_seconds, enabled, next_fire_at, created_by_user_id)
            VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7,$8, NOW() + ($10 * interval '1 second'), $9)
            RETURNING *`,
           [
             nanoid(),
             input.starshipId,
-            input.agentId,
+            input.personaId,
             input.name ?? null,
             input.commandType,
             JSON.stringify(input.payload ?? {}),
@@ -79,33 +79,33 @@ export class AgentHeartbeatRepository extends BaseRepository {
         return fromDb(row);
       },
       'create',
-      'AgentHeartbeat'
+      'AgentRuntimeHeartbeat'
     );
   }
 
-  async findById(id: string): Promise<AgentHeartbeatModel | null> {
+  async findById(id: string): Promise<AgentRuntimeHeartbeatModel | null> {
     return this.executeWithErrorHandling(
       async () => {
-        const row = await this.getConnection().queryOne<DbRow>(`SELECT * FROM agent_heartbeats WHERE id = $1`, [id]);
+        const row = await this.getConnection().queryOne<DbRow>(`SELECT * FROM agent_runtime_heartbeats WHERE id = $1`, [id]);
         return row ? fromDb(row) : null;
       },
       'findById',
-      'AgentHeartbeat',
+      'AgentRuntimeHeartbeat',
       id
     );
   }
 
-  async listByAgent(agentId: string): Promise<AgentHeartbeatModel[]> {
+  async listByPersona(personaId: string): Promise<AgentRuntimeHeartbeatModel[]> {
     return this.executeWithErrorHandling(
       async () => {
         const rows = await this.getConnection().query<DbRow>(
-          `SELECT * FROM agent_heartbeats WHERE agent_id = $1 ORDER BY created_at DESC`,
-          [agentId]
+          `SELECT * FROM agent_runtime_heartbeats WHERE persona_id = $1 ORDER BY created_at DESC`,
+          [personaId]
         );
         return rows.map(fromDb);
       },
-      'listByAgent',
-      'AgentHeartbeat'
+      'listByPersona',
+      'AgentRuntimeHeartbeat'
     );
   }
 
@@ -122,7 +122,7 @@ export class AgentHeartbeatRepository extends BaseRepository {
       intervalSeconds?: number;
       enabled?: boolean;
     }
-  ): Promise<AgentHeartbeatModel | null> {
+  ): Promise<AgentRuntimeHeartbeatModel | null> {
     return this.executeWithErrorHandling(
       async () => {
         const sets: string[] = [];
@@ -157,13 +157,13 @@ export class AgentHeartbeatRepository extends BaseRepository {
         sets.push(`updated_at = NOW()`);
 
         const row = await this.getConnection().queryOne<DbRow>(
-          `UPDATE agent_heartbeats SET ${sets.join(', ')} WHERE id = $${i} RETURNING *`,
+          `UPDATE agent_runtime_heartbeats SET ${sets.join(', ')} WHERE id = $${i} RETURNING *`,
           [...values, id]
         );
         return row ? fromDb(row) : null;
       },
       'update',
-      'AgentHeartbeat',
+      'AgentRuntimeHeartbeat',
       id
     );
   }
@@ -171,11 +171,11 @@ export class AgentHeartbeatRepository extends BaseRepository {
   async delete(id: string): Promise<boolean> {
     return this.executeWithErrorHandling(
       async () => {
-        const result = await this.getConnection().query(`DELETE FROM agent_heartbeats WHERE id = $1`, [id]);
+        const result = await this.getConnection().query(`DELETE FROM agent_runtime_heartbeats WHERE id = $1`, [id]);
         return (result as unknown as { rowCount?: number })?.rowCount !== 0;
       },
       'delete',
-      'AgentHeartbeat',
+      'AgentRuntimeHeartbeat',
       id
     );
   }
@@ -184,18 +184,14 @@ export class AgentHeartbeatRepository extends BaseRepository {
    * Atomically claim the heartbeats that are due to fire and advance each one's
    * `next_fire_at` a full interval out from now, all in a single transaction.
    * `FOR UPDATE SKIP LOCKED` plus the in-transaction advance means a concurrent
-   * tick (or a second server instance) never re-claims the same beat, and the
-   * lock is released as soon as the claim commits.
-   *
-   * Side effects (creating dispatches) happen after this returns: the returned
-   * rows are already scheduled forward, so a failure there only drops one beat.
+   * tick (or a second server instance) never re-claims the same beat.
    */
-  async claimDue(limit = 100): Promise<AgentHeartbeatModel[]> {
+  async claimDue(limit = 100): Promise<AgentRuntimeHeartbeatModel[]> {
     return this.executeWithErrorHandling(
       async () => {
         return this.getConnection().transaction(async (client) => {
           const { rows } = await client.query<DbRow>(
-            `SELECT * FROM agent_heartbeats
+            `SELECT * FROM agent_runtime_heartbeats
               WHERE enabled AND next_fire_at <= NOW()
               ORDER BY next_fire_at ASC
               LIMIT $1
@@ -204,7 +200,7 @@ export class AgentHeartbeatRepository extends BaseRepository {
           );
           if (rows.length === 0) return [];
           await client.query(
-            `UPDATE agent_heartbeats
+            `UPDATE agent_runtime_heartbeats
                 SET last_fired_at = NOW(),
                     next_fire_at = NOW() + (interval_seconds * interval '1 second')
               WHERE id = ANY($1)`,
@@ -214,7 +210,7 @@ export class AgentHeartbeatRepository extends BaseRepository {
         });
       },
       'claimDue',
-      'AgentHeartbeat'
+      'AgentRuntimeHeartbeat'
     );
   }
 }

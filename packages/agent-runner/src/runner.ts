@@ -1,5 +1,5 @@
 import { EventEmitter } from 'node:events';
-import type { AgentConnectionStatus, AgentDispatchModel } from '@starships/protocol';
+import type { AgentConnectionStatus, AgentRuntimeDispatchModel } from '@starships/protocol';
 import type { RunnerConfig } from './config';
 import { StarshipMcpClient } from './mcpClient';
 import { runDispatch, type ExecutionResult } from './executor';
@@ -158,7 +158,7 @@ export class Runner extends EventEmitter {
     this.patch({ recent });
   }
 
-  private async processOne(dispatch: AgentDispatchModel): Promise<void> {
+  private async processOne(dispatch: AgentRuntimeDispatchModel): Promise<void> {
     this.inFlight += 1;
     try {
       await this.client.ack(dispatch.id);
@@ -168,10 +168,14 @@ export class Runner extends EventEmitter {
       const result: ExecutionResult = await runDispatch(this.config.executor, dispatch, this.abort.signal);
       const ok = result.exitCode === 0 && !result.timedOut;
 
+      // The session id (when present) lets clients locate the CLI's on-disk
+      // transcript for this run.
+      const sessionFields = result.sessionId ? { sessionId: result.sessionId } : {};
+
       if (ok) {
         await this.client.postEvent(
           'command_output',
-          { exitCode: result.exitCode, durationMs: result.durationMs, output: result.stdout.slice(0, 2000) },
+          { exitCode: result.exitCode, durationMs: result.durationMs, output: result.stdout.slice(0, 2000), ...sessionFields },
           { dispatchId: dispatch.id }
         );
         this.log('info', `✓ ${dispatch.commandType} done in ${result.durationMs}ms`);
@@ -183,6 +187,7 @@ export class Runner extends EventEmitter {
             timedOut: result.timedOut,
             durationMs: result.durationMs,
             error: result.stderr.slice(0, 2000),
+            ...sessionFields,
           },
           { dispatchId: dispatch.id }
         );

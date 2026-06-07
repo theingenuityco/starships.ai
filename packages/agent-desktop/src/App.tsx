@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useSmoothedText } from './useSmoothedText';
 import {
   addHeartbeat,
   addPersona,
@@ -846,9 +847,30 @@ function ConversationThread({
 
   const noRuntime = !persona?.runtimeId;
 
-  // Keep the newest content in view as messages land and tokens stream.
+  // Track whether the user is pinned to the bottom; if they scroll up to read
+  // back, we stop yanking them down on every new token.
+  const pinnedRef = useRef(true);
   useEffect(() => {
-    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    const el = scrollRef.current;
+    if (!el) return;
+    const onScroll = () => {
+      pinnedRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    };
+    el.addEventListener('scroll', onScroll, { passive: true });
+    return () => el.removeEventListener('scroll', onScroll);
+  }, []);
+
+  // Keep the newest content in view as messages land and tokens stream — but only
+  // when pinned, and coalesced into a single rAF write so streaming doesn't force
+  // a synchronous layout on every token.
+  useEffect(() => {
+    if (!pinnedRef.current) return;
+    const el = scrollRef.current;
+    if (!el) return;
+    const id = requestAnimationFrame(() => {
+      el.scrollTop = el.scrollHeight;
+    });
+    return () => cancelAnimationFrame(id);
   }, [conversation.messages.length, live?.committed.length, live?.streamingText, live?.raw]);
 
   // A conversation started from the New page carries its first message; send it
@@ -913,7 +935,7 @@ function ConversationThread({
           {items.map((it, i) =>
             it.kind === 'tool' ? <ToolCard key={i} call={it.call} result={it.result} /> : <ChatMessage key={i} turn={it.turn} />
           )}
-          {streaming ? <ChatMessage turn={{ role: 'assistant', text: streaming }} streaming /> : null}
+          {streaming ? <StreamingMessage text={streaming} /> : null}
           {rawOnly ? (
             <pre className="overflow-x-auto whitespace-pre-wrap break-words rounded-xl border border-(--color-border) bg-(--color-bg-elev) p-3 font-mono text-[11px] leading-relaxed text-(--color-fg-muted)">
               {rawOnly}
@@ -945,7 +967,7 @@ function ConversationThread({
 }
 
 /** One rendered chat turn: user → right bubble, assistant → full-width Markdown prose. */
-function ChatMessage({ turn, streaming }: { turn: TranscriptTurn; streaming?: boolean }) {
+function ChatMessage({ turn }: { turn: TranscriptTurn }) {
   if (turn.role === 'user') {
     return (
       <div className="flex justify-end">
@@ -958,7 +980,26 @@ function ChatMessage({ turn, streaming }: { turn: TranscriptTurn; streaming?: bo
   return (
     <div className="px-0.5">
       <Markdown text={turn.text} />
-      {streaming ? <span className="caret-md" /> : null}
+    </div>
+  );
+}
+
+/**
+ * In-flight assistant text. Smoothed to a steady type-out and rendered as plain
+ * text rather than Markdown: the Markdown parser re-parses the whole message on
+ * every render, which is O(n²) across a streaming message and the main source of
+ * mid-stream jank. The committed turn re-renders as full Markdown once the message
+ * finalizes (the `assistant` event supersedes this buffer), so formatting still
+ * lands — just not on every token.
+ */
+function StreamingMessage({ text }: { text: string }) {
+  const shown = useSmoothedText(text);
+  return (
+    <div className="px-0.5">
+      <p className="md-p whitespace-pre-wrap break-words text-[15px] leading-relaxed text-(--color-fg)">
+        {shown}
+        <span className="caret-md" />
+      </p>
     </div>
   );
 }

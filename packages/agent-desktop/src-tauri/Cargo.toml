@@ -28,3 +28,5 @@ tauri-plugin-os = "2"
 which = "6"
 tiny_http = "0.12"
 keyring = { version = "3", features = ["apple-native", "windows-native", "sync-secret-service"] }
+aes-gcm = "0.10"
+getrandom = "0.2"

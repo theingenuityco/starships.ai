@@ -10,6 +10,7 @@ import {
   eventsForPersona,
   getStore,
   initStore,
+  MODEL_OPTIONS,
   removeRuntime,
   updateHeartbeat,
   updatePersona,
@@ -1709,7 +1710,10 @@ function NewPersonaForm({
   return (
     <div className="mt-2 flex flex-col gap-2 rounded-md border border-(--color-border) p-2">
       <input className="inp text-xs" placeholder="Persona name" value={name} onChange={(e) => setName(e.target.value)} autoFocus />
-      <input className="inp text-xs" placeholder="Model (optional, e.g. claude-opus-4-8)" value={model} onChange={(e) => setModel(e.target.value)} />
+      <label className="flex items-center gap-2 text-[11px]">
+        <span className="muted shrink-0">Model</span>
+        <ModelSelect value={model} onChange={setModel} className="inp flex-1 text-xs" />
+      </label>
       <textarea
         className="inp font-mono text-xs"
         rows={3}
@@ -1823,6 +1827,30 @@ function PermissionEditor({
   );
 }
 
+/**
+ * Model picker shared by the create form and the persona card. Groups the current models by
+ * provider (<optgroup>) and keeps an empty "Default" choice (the runtime then infers provider +
+ * falls back to its default model). Any custom/legacy id already on the persona stays selectable.
+ */
+function ModelSelect({ value, onChange, className }: { value: string; onChange: (model: string) => void; className?: string }) {
+  const known = MODEL_OPTIONS.some((g) => g.models.some((m) => m.id === value));
+  return (
+    <select className={className ?? 'inp text-xs'} value={value} onChange={(e) => onChange(e.target.value)}>
+      <option value="">Default (Claude Haiku 4.5)</option>
+      {value && !known ? <option value={value}>{value} (custom)</option> : null}
+      {MODEL_OPTIONS.map((g) => (
+        <optgroup key={g.provider} label={g.label}>
+          {g.models.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.label}
+            </option>
+          ))}
+        </optgroup>
+      ))}
+    </select>
+  );
+}
+
 function PersonaCard({ persona, runtimes }: { persona: Persona; runtimes: Runtime[] }) {
   const [open, setOpen] = useState(false);
   const [running, setRunning] = useState(false);
@@ -1893,6 +1921,15 @@ function PersonaCard({ persona, runtimes }: { persona: Persona; runtimes: Runtim
             </option>
           ))}
         </select>
+      </label>
+
+      <label className="mt-2 flex items-center gap-2 text-[11px]">
+        <span className="muted shrink-0">Model</span>
+        <ModelSelect
+          value={persona.model ?? ''}
+          onChange={(model) => updatePersona(persona.id, { model: model || undefined })}
+          className="inp flex-1 text-xs"
+        />
       </label>
 
       <div className="mt-2 flex flex-col gap-1">

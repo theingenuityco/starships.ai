@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::fs;
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
@@ -8,6 +8,8 @@ use std::sync::mpsc::{channel, Sender};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, UNIX_EPOCH};
 
+use aes_gcm::aead::{Aead, KeyInit};
+use aes_gcm::{Aes256Gcm, Key, Nonce};
 use serde::Serialize;
 use tauri::ipc::Channel;
 use tauri::{Emitter, Manager};
@@ -77,8 +79,13 @@ async fn detect_agents() -> Vec<DetectedAgent> {
 // Everything lives under the platform app-data dir (on macOS:
 // ~/Library/Application Support/<bundle id>):
 //
-//   store.json            config blob: runtimes, personas, heartbeats, onboarding,
+//   store.json            config blob: heartbeats, providers, onboarding,
 //                          schemaVersion. Small + fully rewritten on each change.
+//   config/               dedicated folder for the agent definition + secrets:
+//     personas/<id>.json    one persona record per file.
+//     runtimes/<id>.json    one runtime record per file.
+//     secrets.enc           AES-256-GCM ciphertext of the provider-key map; the
+//                           32-byte master key lives in the OS keychain, never on disk.
 //   conversations/<id>.jsonl   one append-only thread per file (header line + turns).
 //   events.jsonl          append-only activity log.
 //
@@ -137,6 +144,106 @@ fn conversation_path(app: &tauri::AppHandle, id: &str) -> Result<PathBuf, String
 
 fn events_file(app: &tauri::AppHandle) -> Option<PathBuf> {
     data_dir(app).map(|d| d.join("events.jsonl"))
+}
+
+/// Ensure and return the dedicated config folder (personas, runtimes, encrypted secrets).
+fn config_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    let dir = data_dir(app).ok_or("no app data dir")?.join("config");
+    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    Ok(dir)
+}
+
+/// Ensure and return `config/personas`.
+fn personas_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    let dir = config_dir(app)?.join("personas");
+    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    Ok(dir)
+}
+
+/// Ensure and return `config/runtimes`.
+fn runtimes_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    let dir = config_dir(app)?.join("runtimes");
+    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    Ok(dir)
+}
+
+/// Read every `*.json` record in `dir` as a raw JSON string; the webview parses them.
+/// Missing/unreadable files are skipped (a record dir is created lazily on first write).
+fn read_records(dir: &Path) -> Vec<String> {
+    let Ok(entries) = fs::read_dir(dir) else {
+        return Vec::new();
+    };
+    let mut out = Vec::new();
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.extension().and_then(|e| e.to_str()) != Some("json") {
+            continue;
+        }
+        if let Ok(s) = fs::read_to_string(&path) {
+            let t = s.trim().to_string();
+            if !t.is_empty() {
+                out.push(t);
+            }
+        }
+    }
+    out
+}
+
+/// Atomically write one record file `<dir>/<id>.json` (0600). `id` must be UUID-shaped so
+/// it can't escape the dir; the temp+rename keeps a crash from leaving a half-written record.
+fn write_record(dir: &Path, id: &str, json: &str) -> Result<(), String> {
+    if !valid_id(id) {
+        return Err("invalid record id".into());
+    }
+    fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+    let path = dir.join(format!("{id}.json"));
+    let tmp = path.with_extension("json.tmp");
+    fs::write(&tmp, json).map_err(|e| e.to_string())?;
+    set_owner_only(&tmp);
+    fs::rename(&tmp, &path).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+/// Delete one record file (idempotent: a missing file is a no-op).
+fn delete_record(dir: &Path, id: &str) -> Result<(), String> {
+    if !valid_id(id) {
+        return Err("invalid record id".into());
+    }
+    match fs::remove_file(dir.join(format!("{id}.json"))) {
+        Ok(()) => Ok(()),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(e) => Err(e.to_string()),
+    }
+}
+
+#[tauri::command]
+fn list_personas(app: tauri::AppHandle) -> Result<Vec<String>, String> {
+    Ok(read_records(&personas_dir(&app)?))
+}
+
+#[tauri::command]
+fn write_persona(app: tauri::AppHandle, id: String, json: String) -> Result<(), String> {
+    write_record(&personas_dir(&app)?, &id, &json)
+}
+
+#[tauri::command]
+fn delete_persona(app: tauri::AppHandle, id: String) -> Result<(), String> {
+    delete_record(&personas_dir(&app)?, &id)
+}
+
+#[tauri::command]
+fn list_runtimes(app: tauri::AppHandle) -> Result<Vec<String>, String> {
+    Ok(read_records(&runtimes_dir(&app)?))
+}
+
+#[tauri::command]
+fn write_runtime(app: tauri::AppHandle, id: String, json: String) -> Result<(), String> {
+    write_record(&runtimes_dir(&app)?, &id, &json)
+}
+
+#[tauri::command]
+fn delete_runtime(app: tauri::AppHandle, id: String) -> Result<(), String> {
+    delete_record(&runtimes_dir(&app)?, &id)
 }
 
 /// Append one or more already-serialized JSONL lines to `path`, creating it if
@@ -987,27 +1094,114 @@ fn close_agent_input(run_id: String) -> Result<(), String> {
     Ok(())
 }
 
-// ---- API-key secrets (OS keychain) ----
+// ---- API-key secrets (encrypted file + keychain master key) ----
 //
-// BYO provider keys live in the OS keychain (Keychain / Credential Manager / Secret
-// Service) via the `keyring` crate, NEVER in store.json or the webview. The webview can
-// set/delete a key and read its presence + last-4 hint, but never the secret itself; the
-// secret reaches the agent-runtime sidecar only as an env var injected at spawn (below).
-// Only the two providers we support today are valid services.
+// BYO provider keys are stored as a single AES-256-GCM ciphertext at `config/secrets.enc`.
+// The 32-byte master key that encrypts them lives in the OS keychain (Keychain / Credential
+// Manager / Secret Service) via the `keyring` crate, so the secret bytes never touch disk in
+// the clear and the webview never sees them. The webview can set/delete a key and read its
+// presence + last-4 hint, but never the secret itself; the decrypted key reaches the
+// agent-runtime sidecar only as an env var injected at spawn (below). Only the two providers
+// we support today are valid.
 
 const KEYRING_SERVICE: &str = "ai.starships.agent.runtime";
+/// Keychain account holding the hex-encoded 32-byte master key for `secrets.enc`.
+const MASTER_KEY_ACCOUNT: &str = "master-key";
 
 fn valid_provider(provider: &str) -> bool {
     provider == "anthropic" || provider == "openai"
 }
 
-fn secret_entry(provider: &str) -> Result<keyring::Entry, String> {
-    keyring::Entry::new(KEYRING_SERVICE, provider).map_err(|e| e.to_string())
+fn to_hex(bytes: &[u8]) -> String {
+    let mut s = String::with_capacity(bytes.len() * 2);
+    for b in bytes {
+        s.push_str(&format!("{b:02x}"));
+    }
+    s
 }
 
-/// Read a stored key (None if absent). Used internally to populate the sidecar env.
-fn read_secret(provider: &str) -> Option<String> {
-    secret_entry(provider).ok().and_then(|e| e.get_password().ok()).filter(|s| !s.is_empty())
+fn from_hex(s: &str) -> Result<Vec<u8>, String> {
+    if s.len() % 2 != 0 {
+        return Err("bad hex length".into());
+    }
+    (0..s.len())
+        .step_by(2)
+        .map(|i| u8::from_str_radix(&s[i..i + 2], 16).map_err(|e| e.to_string()))
+        .collect()
+}
+
+/// Fetch (or lazily create) the 32-byte master key. It lives hex-encoded in the OS keychain;
+/// only the ciphertext it protects is ever written to disk.
+fn master_key() -> Result<[u8; 32], String> {
+    let entry = keyring::Entry::new(KEYRING_SERVICE, MASTER_KEY_ACCOUNT).map_err(|e| e.to_string())?;
+    match entry.get_password() {
+        Ok(hex) => from_hex(&hex)?
+            .as_slice()
+            .try_into()
+            .map_err(|_| "master key has wrong length".to_string()),
+        Err(keyring::Error::NoEntry) => {
+            let mut key = [0u8; 32];
+            getrandom::getrandom(&mut key).map_err(|e| e.to_string())?;
+            entry.set_password(&to_hex(&key)).map_err(|e| e.to_string())?;
+            Ok(key)
+        }
+        Err(e) => Err(e.to_string()),
+    }
+}
+
+fn secrets_file(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    Ok(config_dir(app)?.join("secrets.enc"))
+}
+
+/// Decrypt the provider-key map from `secrets.enc`. An absent file is an empty map; a
+/// present-but-undecryptable file is a hard error (corruption or a lost/rotated master key).
+fn read_secrets_map(app: &tauri::AppHandle) -> Result<BTreeMap<String, String>, String> {
+    let blob = match fs::read(secrets_file(app)?) {
+        Ok(b) => b,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(BTreeMap::new()),
+        Err(e) => return Err(e.to_string()),
+    };
+    if blob.len() < 12 {
+        return Err("secrets file is truncated".into());
+    }
+    let (nonce, ct) = blob.split_at(12);
+    let key = master_key()?;
+    let cipher = Aes256Gcm::new(Key::<Aes256Gcm>::from_slice(&key));
+    let plain = cipher
+        .decrypt(Nonce::from_slice(nonce), ct)
+        .map_err(|_| "could not decrypt secrets".to_string())?;
+    serde_json::from_slice(&plain).map_err(|e| e.to_string())
+}
+
+/// Encrypt + atomically write the provider-key map to `secrets.enc` (0600). The 12-byte
+/// random nonce is prepended to the ciphertext.
+fn write_secrets_map(app: &tauri::AppHandle, map: &BTreeMap<String, String>) -> Result<(), String> {
+    let plain = serde_json::to_vec(map).map_err(|e| e.to_string())?;
+    let key = master_key()?;
+    let cipher = Aes256Gcm::new(Key::<Aes256Gcm>::from_slice(&key));
+    let mut nonce = [0u8; 12];
+    getrandom::getrandom(&mut nonce).map_err(|e| e.to_string())?;
+    let ct = cipher
+        .encrypt(Nonce::from_slice(&nonce), plain.as_ref())
+        .map_err(|_| "could not encrypt secrets".to_string())?;
+    let mut blob = Vec::with_capacity(nonce.len() + ct.len());
+    blob.extend_from_slice(&nonce);
+    blob.extend_from_slice(&ct);
+
+    let path = secrets_file(app)?;
+    let tmp = path.with_extension("enc.tmp");
+    fs::write(&tmp, &blob).map_err(|e| e.to_string())?;
+    set_owner_only(&tmp);
+    fs::rename(&tmp, &path).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+/// Read one decrypted key (None if absent). Used internally to populate the sidecar env.
+fn read_secret(app: &tauri::AppHandle, provider: &str) -> Option<String> {
+    read_secrets_map(app)
+        .ok()
+        .and_then(|m| m.get(provider).cloned())
+        .filter(|s| !s.is_empty())
 }
 
 /// Store a provider key, then restart the runtime sidecar so it picks up the new env.
@@ -1019,7 +1213,9 @@ fn set_secret(app: tauri::AppHandle, provider: String, key: String) -> Result<()
     if key.trim().is_empty() {
         return Err("empty key".into());
     }
-    secret_entry(&provider)?.set_password(key.trim()).map_err(|e| e.to_string())?;
+    let mut map = read_secrets_map(&app)?;
+    map.insert(provider, key.trim().to_string());
+    write_secrets_map(&app, &map)?;
     restart_runtime(&app);
     Ok(())
 }
@@ -1030,12 +1226,9 @@ fn delete_secret(app: tauri::AppHandle, provider: String) -> Result<(), String> 
     if !valid_provider(&provider) {
         return Err(format!("unknown provider: {provider}"));
     }
-    if let Ok(entry) = secret_entry(&provider) {
-        match entry.delete_credential() {
-            Ok(()) => {}
-            Err(keyring::Error::NoEntry) => {}
-            Err(e) => return Err(e.to_string()),
-        }
+    let mut map = read_secrets_map(&app)?;
+    if map.remove(&provider).is_some() {
+        write_secrets_map(&app, &map)?;
     }
     restart_runtime(&app);
     Ok(())
@@ -1051,13 +1244,13 @@ struct SecretStatus {
 }
 
 #[tauri::command]
-fn secret_status() -> Vec<SecretStatus> {
+fn secret_status(app: tauri::AppHandle) -> Vec<SecretStatus> {
+    let map = read_secrets_map(&app).unwrap_or_default();
     ["anthropic", "openai"]
         .iter()
         .map(|p| {
-            let val = read_secret(p);
+            let val = map.get(*p).filter(|s| !s.is_empty());
             let hint = val
-                .as_ref()
                 .map(|v| if v.len() >= 4 { format!("…{}", &v[v.len() - 4..]) } else { "…".to_string() })
                 .unwrap_or_default();
             SecretStatus { provider: p.to_string(), present: val.is_some(), hint }
@@ -1165,10 +1358,10 @@ fn start_runtime(app: &tauri::AppHandle, state: &RuntimeState) -> Result<u16, St
     if let Some(dir) = &cwd {
         cmd.current_dir(dir);
     }
-    if let Some(k) = read_secret("anthropic") {
+    if let Some(k) = read_secret(app, "anthropic") {
         cmd.env("ANTHROPIC_API_KEY", k);
     }
-    if let Some(k) = read_secret("openai") {
+    if let Some(k) = read_secret(app, "openai") {
         cmd.env("OPENAI_API_KEY", k);
     }
 
@@ -1310,6 +1503,12 @@ pub fn run() {
             detect_agents,
             read_store,
             write_store,
+            list_personas,
+            write_persona,
+            delete_persona,
+            list_runtimes,
+            write_runtime,
+            delete_runtime,
             list_conversations,
             read_conversation,
             create_conversation,

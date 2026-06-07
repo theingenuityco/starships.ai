@@ -53,10 +53,20 @@ export const closeAgentInput = (runId: string) => invoke<void>('close_agent_inpu
 
 // Local state lives in Rust-managed 0600 files under the app-data dir (not the
 // webview's localStorage) so anything sensitive stays out of reach of in-page
-// script. Config (runtimes/personas/heartbeats) is one JSON blob; conversations
-// and events are append-only JSONL (see src-tauri lib.rs).
+// script. store.json is a small blob (heartbeats/providers/onboarding); personas
+// and runtimes are one-file-per-record under config/; conversations and events are
+// append-only JSONL (see src-tauri lib.rs).
 export const readStoreRaw = () => invoke<string>('read_store');
 export const writeStoreRaw = (json: string) => invoke<void>('write_store', { json });
+
+// Personas + runtimes: one JSON file per record under config/. list_* returns each
+// record's raw JSON string (the store parses); write/delete are keyed by record id.
+export const listPersonasRaw = () => invoke<string[]>('list_personas');
+export const writePersonaRaw = (id: string, json: string) => invoke<void>('write_persona', { id, json });
+export const deletePersonaRaw = (id: string) => invoke<void>('delete_persona', { id });
+export const listRuntimesRaw = () => invoke<string[]>('list_runtimes');
+export const writeRuntimeRaw = (id: string, json: string) => invoke<void>('write_runtime', { id, json });
+export const deleteRuntimeRaw = (id: string) => invoke<void>('delete_runtime', { id });
 
 /** A thread's filename id + raw header JSONL line + file mtime, for the sidebar list. */
 export interface ConversationHeaderRaw {

@@ -6,7 +6,7 @@
 // sidecar (it holds the keys in its env), so the webview never handles a saved secret.
 // Validation state is persisted (per provider) in store.json.
 import { useEffect, useState } from 'react';
-import { clearProviderMeta, getProviderMeta, setProviderStatus, useStore, type ProviderId } from './store';
+import { clearProviderMeta, getProviderMeta, setProviderStatus, type ProviderId } from './store';
 import { deleteSecret, isTauri, runtimeBaseUrl, secretStatus, setSecret, type SecretStatus } from './tauri';
 
 const PROVIDERS: { id: ProviderId; label: string; placeholder: string }[] = [
@@ -16,7 +16,6 @@ const PROVIDERS: { id: ProviderId; label: string; placeholder: string }[] = [
 
 /** The list of provider key rows. Embeddable (no page chrome of its own). */
 export function ProviderKeys() {
-  const store = useStore();
   const [statuses, setStatuses] = useState<Record<string, SecretStatus>>({});
 
   const refresh = () => {
@@ -38,7 +37,7 @@ export function ProviderKeys() {
       <ul className="grid gap-2 sm:grid-cols-2">
         {PROVIDERS.map((p) => (
           <ProviderRow
-            key={`${p.id}-${store.providers.length}`}
+            key={p.id}
             provider={p.id}
             label={p.label}
             placeholder={p.placeholder}

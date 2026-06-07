@@ -627,7 +627,13 @@ fn handle_approval_request(mut request: tiny_http::Request, app: tauri::AppHandl
     let (tool_name, tool_input, payload_correlation) = parse_hook_payload(format, &parsed);
     let correlation = header_correlation.unwrap_or(payload_correlation);
 
-    let id = format!("req-{}", REQUEST_SEQ.fetch_add(1, Ordering::Relaxed));
+    // Random, unguessable id: this is a raw loopback HTTP server reachable by any local
+    // process, so a sequential counter would let one forge an approval for a parked request.
+    let mut rand_bytes = [0u8; 16];
+    let id = match getrandom::getrandom(&mut rand_bytes) {
+        Ok(()) => format!("req-{}", to_hex(&rand_bytes)),
+        Err(_) => format!("req-{}", REQUEST_SEQ.fetch_add(1, Ordering::Relaxed)),
+    };
     log::info!("[approval] {} requested tool={} correlation={}", format.runtime(), tool_name, correlation);
     let (tx, rx) = channel::<String>();
     if let Ok(mut map) = pending.lock() {

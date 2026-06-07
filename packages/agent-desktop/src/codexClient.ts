@@ -216,6 +216,9 @@ export async function runCodexAppServer(opts: {
     return { ok: outcome.status === 'completed', durationMs: r.duration_ms, exitCode: r.exit_code };
   } catch (e) {
     appendRaw(dispatchId, `codex app-server error: ${(e as Error).message}`);
+    // Cancel any outstanding request() timers so they don't fire after we've returned.
+    for (const { reject: rej } of pending.values()) rej(new Error('codex session ended'));
+    pending.clear();
     await closeAgentInput(dispatchId).catch(() => {});
     const r = await resultPromise.catch(() => ({ exit_code: null as number | null, duration_ms: 0 }));
     return { ok: false, durationMs: r.duration_ms, exitCode: r.exit_code };

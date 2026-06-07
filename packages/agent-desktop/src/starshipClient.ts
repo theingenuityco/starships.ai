@@ -100,8 +100,9 @@ export async function runStarship(opts: {
         return;
       }
       if (!req.toolUseId) {
-        // Can't correlate the request — send an explicit deny so the runtime isn't left hanging.
-        approve('', 'deny');
+        // No id to correlate to a pending resolver (approve() is keyed by toolUseId), so a deny
+        // here would no-op. The runtime's abort-on-disconnect path denies anything still parked.
+        console.warn('[starship] permission event missing toolUseId — ignoring');
         return;
       }
       requestApproval({

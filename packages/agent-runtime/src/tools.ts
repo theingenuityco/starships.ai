@@ -135,10 +135,20 @@ export const TOOLS: RuntimeTool[] = [
     sensitive: true,
     execute: async (input, ctx) => {
       const { url } = input as { url: string };
-      // Block SSRF to loopback / link-local (e.g. the approval server, cloud metadata at 169.254.169.254).
-      const host = new URL(url).hostname.toLowerCase();
-      if (['127.0.0.1', 'localhost', '::1', '0.0.0.0'].includes(host) || host.endsWith('.localhost') || host.startsWith('169.254.')) {
-        return 'Fetching loopback or link-local addresses is not permitted.';
+      // Block SSRF to loopback / private / link-local destinations: the approval server, routers,
+      // cloud metadata (169.254.169.254), Tailscale CGNAT, and IPv6 loopback/link-local/ULA.
+      const host = new URL(url).hostname.replace(/^\[|\]$/g, '').toLowerCase();
+      const blocked =
+        ['127.0.0.1', '0.0.0.0', 'localhost', '::1', '::'].includes(host) ||
+        host.endsWith('.localhost') ||
+        /^(10|127)\./.test(host) ||
+        /^169\.254\./.test(host) ||
+        /^192\.168\./.test(host) ||
+        /^172\.(1[6-9]|2\d|3[01])\./.test(host) ||
+        /^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./.test(host) ||
+        (host.includes(':') && /^(fe80|fc|fd)/.test(host));
+      if (blocked) {
+        return 'Fetching loopback, private, or link-local addresses is not permitted.';
       }
       const res = await fetch(url, { signal: ctx.signal });
       const body = await res.text();

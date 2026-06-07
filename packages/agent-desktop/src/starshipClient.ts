@@ -25,7 +25,7 @@ function resolveProvider(model: string | undefined, executor: string): ProviderI
   const explicit = /--provider\s+(anthropic|openai)/.exec(executor);
   if (explicit) return explicit[1] as ProviderId;
   const id = (model ?? '').toLowerCase();
-  if (id.startsWith('gpt') || id.startsWith('o1') || id.startsWith('o3') || id.startsWith('o4') || id.includes('openai')) {
+  if (id.startsWith('gpt') || /^o[1-9]/.test(id) || id.includes('openai')) {
     return 'openai';
   }
   return 'anthropic';

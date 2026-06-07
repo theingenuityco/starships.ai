@@ -816,7 +816,9 @@ fn set_cursor_hook(app: &tauri::AppHandle, script: &Path, enable: bool) -> Resul
     let list = arr.as_array_mut().ok_or("cursor hook list not an array")?;
     list.retain(|e| e.get("command").and_then(|c| c.as_str()) != Some(script_str.as_str()));
     if enable {
-        list.push(serde_json::json!({ "command": script_str }));
+        // Match the hermes hook: exceed the approval server's 600s deny timeout so the server
+        // drives the timeout. Harmless if Cursor ignores an unknown field.
+        list.push(serde_json::json!({ "command": script_str, "timeout": 601 }));
     }
     if list.is_empty() {
         hooks_obj.remove("beforeShellExecution");

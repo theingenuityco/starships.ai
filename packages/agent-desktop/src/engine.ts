@@ -15,6 +15,7 @@ import { DEFAULT_PERMISSIONS, claudeRunSettings, permissionArgs, streamArgs } fr
 import { appendRaw, applyLiveUpdate, finishLiveRun, getLiveRun, lastAssistantText, startLiveRun } from './liveRuns';
 import { parseClaudeStreamLine } from './transcript';
 import { runCodexAppServer } from './codexClient';
+import { runStarship } from './starshipClient';
 
 /**
  * Tokenize a command line, honoring single/double quotes so multi-word args
@@ -117,13 +118,16 @@ async function executeRun(opts: {
 
   const dispatchId = crypto.randomUUID();
   onDispatch?.(dispatchId); // let the UI subscribe to the live conversation right away
-  const usesSession = rawParts.some((a) => a.includes('{{sessionId}}'));
+  // The starship runtime threads history server-side by sessionId, so it always resumes;
+  // CLI runtimes only resume if their executor actually carries {{sessionId}}.
+  const usesSession = runtime.kind === 'starship' || rawParts.some((a) => a.includes('{{sessionId}}'));
   const command = parts[0];
   // Compile the persona's permission policy + structured-streaming flags into this CLI's own
   // flags, appended after the prompt (trailing options parse cleanly and avoid subcommand-
   // position issues).
   const policy = persona.permissions ?? DEFAULT_PERMISSIONS;
   const isCodex = runtime.kind === 'codex';
+  const isStarship = runtime.kind === 'starship';
   // In allowlist mode, route gated tools to a dialog so the user can approve them mid-run
   // instead of them being silently denied. Transport differs by runtime: claude-code uses an
   // inline --settings hook; hermes/cursor a file-based hook we install for the run; codex its
@@ -132,7 +136,9 @@ async function executeRun(opts: {
   const fileHook = isCodex ? null : fileHookRuntime(runtime);
   const loopbackApproval = (runtime.kind === 'claude-code' || fileHook !== null) && policy.mode === 'allowlist';
   const runApprovalPort = loopbackApproval ? await getApprovalPort() : 0;
-  const approvalActive = runApprovalPort > 0 || (isCodex && policy.mode === 'allowlist');
+  // starship answers approvals over its own HTTP channel (no loopback port), so activate the
+  // shared context whenever it's in allowlist mode — same as codex.
+  const approvalActive = runApprovalPort > 0 || ((isCodex || isStarship) && policy.mode === 'allowlist');
   if (approvalActive) registerApprovalContext(dispatchId, persona.id, policy.allow);
   if (runApprovalPort && fileHook) {
     try {
@@ -204,8 +210,14 @@ async function executeRun(opts: {
 
   const sessionFields = usesSession ? { sessionId } : {};
   try {
-    // codex → app-server JSON-RPC (own channel); everything else → the streamed argv run.
-    const result = isCodex
+    // starship → local HTTP/SSE runtime; codex → app-server JSON-RPC; both drive their own
+    // channel. Everything else → the streamed argv run over Rust run_agent.
+    const result = isStarship
+      ? await runStarship({ dispatchId, persona, executor: runtime.executor, prompt, sessionId, policy }).then((o) => ({
+          exit_code: o.ok ? 0 : o.exitCode ?? 1,
+          duration_ms: o.durationMs,
+        }))
+      : isCodex
       ? await runCodexAppServer({ dispatchId, prompt, env, policy }).then((o) => ({
           exit_code: o.ok ? 0 : o.exitCode ?? 1,
           duration_ms: o.durationMs,

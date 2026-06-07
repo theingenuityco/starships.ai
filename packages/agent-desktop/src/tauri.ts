@@ -130,6 +130,25 @@ export async function onPermissionRequest(cb: (req: PermissionRequest) => void):
   }
 }
 
+// ---- In-house agent-runtime sidecar + provider keys ----
+
+/** Base URL of the local agent-runtime sidecar, starting it lazily on first use. */
+export const runtimeBaseUrl = () => invoke<string>('runtime_base_url');
+
+/** Presence + masked last-4 hint for a stored provider key (never the secret itself). */
+export interface SecretStatus {
+  provider: string;
+  present: boolean;
+  hint: string;
+}
+
+/** Store a provider API key in the OS keychain (restarts the sidecar to pick it up). */
+export const setSecret = (provider: string, key: string) => invoke<void>('set_secret', { provider, key });
+/** Delete a stored provider API key (idempotent; restarts the sidecar). */
+export const deleteSecret = (provider: string) => invoke<void>('delete_secret', { provider });
+/** Presence + hint for every supported provider key. */
+export const secretStatus = () => invoke<SecretStatus[]>('secret_status');
+
 /** Hostname for naming runtimes stably per machine; falls back gracefully. */
 export async function hostname(): Promise<string> {
   try {

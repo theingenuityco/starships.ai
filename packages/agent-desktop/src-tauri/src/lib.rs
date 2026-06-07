@@ -987,6 +987,297 @@ fn close_agent_input(run_id: String) -> Result<(), String> {
     Ok(())
 }
 
+// ---- API-key secrets (OS keychain) ----
+//
+// BYO provider keys live in the OS keychain (Keychain / Credential Manager / Secret
+// Service) via the `keyring` crate, NEVER in store.json or the webview. The webview can
+// set/delete a key and read its presence + last-4 hint, but never the secret itself; the
+// secret reaches the agent-runtime sidecar only as an env var injected at spawn (below).
+// Only the two providers we support today are valid services.
+
+const KEYRING_SERVICE: &str = "ai.starships.agent.runtime";
+
+fn valid_provider(provider: &str) -> bool {
+    provider == "anthropic" || provider == "openai"
+}
+
+fn secret_entry(provider: &str) -> Result<keyring::Entry, String> {
+    keyring::Entry::new(KEYRING_SERVICE, provider).map_err(|e| e.to_string())
+}
+
+/// Read a stored key (None if absent). Used internally to populate the sidecar env.
+fn read_secret(provider: &str) -> Option<String> {
+    secret_entry(provider).ok().and_then(|e| e.get_password().ok()).filter(|s| !s.is_empty())
+}
+
+/// Store a provider key, then restart the runtime sidecar so it picks up the new env.
+#[tauri::command]
+fn set_secret(app: tauri::AppHandle, provider: String, key: String) -> Result<(), String> {
+    if !valid_provider(&provider) {
+        return Err(format!("unknown provider: {provider}"));
+    }
+    if key.trim().is_empty() {
+        return Err("empty key".into());
+    }
+    secret_entry(&provider)?.set_password(key.trim()).map_err(|e| e.to_string())?;
+    restart_runtime(&app);
+    Ok(())
+}
+
+/// Delete a provider key (idempotent), then restart the runtime sidecar.
+#[tauri::command]
+fn delete_secret(app: tauri::AppHandle, provider: String) -> Result<(), String> {
+    if !valid_provider(&provider) {
+        return Err(format!("unknown provider: {provider}"));
+    }
+    if let Ok(entry) = secret_entry(&provider) {
+        match entry.delete_credential() {
+            Ok(()) => {}
+            Err(keyring::Error::NoEntry) => {}
+            Err(e) => return Err(e.to_string()),
+        }
+    }
+    restart_runtime(&app);
+    Ok(())
+}
+
+/// Presence + masked hint per provider (never the secret). Drives the Settings UI.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SecretStatus {
+    provider: String,
+    present: bool,
+    hint: String,
+}
+
+#[tauri::command]
+fn secret_status() -> Vec<SecretStatus> {
+    ["anthropic", "openai"]
+        .iter()
+        .map(|p| {
+            let val = read_secret(p);
+            let hint = val
+                .as_ref()
+                .map(|v| if v.len() >= 4 { format!("…{}", &v[v.len() - 4..]) } else { "…".to_string() })
+                .unwrap_or_default();
+            SecretStatus { provider: p.to_string(), present: val.is_some(), hint }
+        })
+        .collect()
+}
+
+// ---- agent-runtime sidecar lifecycle ----
+//
+// Our in-house runtime (@starships/agent-runtime) runs as a local HTTP+SSE service the
+// webview talks to over fetch. We spawn it here so we can inject the keychain keys into its
+// env (the webview never sees them), read the port it prints on stdout, and keep the child
+// alive. On a key change we restart it so the new env takes effect. In a release bundle the
+// runtime ships as an externalBin next to the app; in dev we run the built JS with node.
+
+struct RuntimeState {
+    child: Mutex<Option<std::process::Child>>,
+    port: Mutex<u16>,
+}
+
+/// Find a prebuilt `starship-runtime*` standalone binary in `dir` (any target-triple suffix).
+fn find_bundled_binary(dir: &Path) -> Option<PathBuf> {
+    for entry in fs::read_dir(dir).ok()?.flatten() {
+        let path = entry.path();
+        let is_bin = path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .map(|n| n.starts_with("starship-runtime"))
+            .unwrap_or(false);
+        if is_bin && path.is_file() {
+            return Some(path);
+        }
+    }
+    None
+}
+
+/// (program, args, cwd) used to launch the runtime sidecar.
+///
+/// Preference order: an explicit `STARSHIP_RUNTIME_CMD` override → a prebuilt standalone
+/// binary (needs no node) next to the app exe or in src-tauri/binaries → `node` running the
+/// built JS (dev fallback; `node` is resolved to an absolute path so a GUI launch without a
+/// shell PATH still finds it).
+fn runtime_spawn_cmd(app: &tauri::AppHandle) -> (String, Vec<String>, Option<PathBuf>) {
+    let cwd = app.path().home_dir().ok();
+
+    if let Ok(cmd) = std::env::var("STARSHIP_RUNTIME_CMD") {
+        if !cmd.trim().is_empty() {
+            return (cmd, Vec::new(), cwd);
+        }
+    }
+
+    // Prefer a standalone binary: next to the executable (release) or in src-tauri/binaries (dev).
+    let mut dirs: Vec<PathBuf> = Vec::new();
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(parent) = exe.parent() {
+            dirs.push(parent.to_path_buf());
+        }
+    }
+    dirs.push(Path::new(env!("CARGO_MANIFEST_DIR")).join("binaries"));
+    for dir in &dirs {
+        if let Some(bin) = find_bundled_binary(dir) {
+            return (bin.to_string_lossy().to_string(), Vec::new(), cwd);
+        }
+    }
+
+    // Dev fallback: node + the package's built entry. Resolve node to an absolute path.
+    let entry = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("..")
+        .join("..")
+        .join("agent-runtime")
+        .join("dist")
+        .join("server.js");
+    let node = which::which("node")
+        .ok()
+        .or_else(|| {
+            // Common install locations a GUI launch might miss (homebrew, system).
+            ["/opt/homebrew/bin/node", "/usr/local/bin/node", "/usr/bin/node"]
+                .iter()
+                .map(PathBuf::from)
+                .find(|p| p.exists())
+        })
+        .map(|p| p.to_string_lossy().to_string())
+        .unwrap_or_else(|| "node".to_string());
+    (node, vec![entry.to_string_lossy().to_string()], cwd)
+}
+
+/// Start the sidecar if it isn't running; return its port. Blocks briefly to read the
+/// `RUNTIME_LISTENING {"port":N}` handshake the service prints on stdout at boot.
+fn start_runtime(app: &tauri::AppHandle, state: &RuntimeState) -> Result<u16, String> {
+    {
+        let port = *state.port.lock().map_err(|e| e.to_string())?;
+        let alive = state.child.lock().map_err(|e| e.to_string())?.is_some();
+        if port > 0 && alive {
+            return Ok(port);
+        }
+    }
+
+    let (program, args, cwd) = runtime_spawn_cmd(app);
+    let mut cmd = Command::new(&program);
+    cmd.args(&args)
+        .env("PORT", "0")
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    if let Some(dir) = &cwd {
+        cmd.current_dir(dir);
+    }
+    if let Some(k) = read_secret("anthropic") {
+        cmd.env("ANTHROPIC_API_KEY", k);
+    }
+    if let Some(k) = read_secret("openai") {
+        cmd.env("OPENAI_API_KEY", k);
+    }
+
+    let mut child = cmd
+        .spawn()
+        .map_err(|e| format!("could not start runtime ({program}): {e}"))?;
+    let stdout = child.stdout.take().ok_or("runtime stdout missing")?;
+
+    // Capture stderr concurrently so a startup crash (e.g. a missing module) is visible in
+    // logs AND can be surfaced in the error if the handshake never arrives.
+    let err_buf: Arc<Mutex<String>> = Arc::new(Mutex::new(String::new()));
+    if let Some(stderr) = child.stderr.take() {
+        let eb = err_buf.clone();
+        std::thread::spawn(move || {
+            for l in BufReader::new(stderr).lines().map_while(Result::ok) {
+                log::info!("[runtime:err] {l}");
+                if let Ok(mut b) = eb.lock() {
+                    b.push_str(&l);
+                    b.push('\n');
+                }
+            }
+        });
+    }
+
+    // Read stdout on a thread: report the handshake port once, then keep draining (so the
+    // pipe never fills). EOF/error before the handshake reports None.
+    let (tx, rx) = channel::<Option<u16>>();
+    std::thread::spawn(move || {
+        let mut reader = BufReader::new(stdout);
+        let mut reported = false;
+        let mut line = String::new();
+        loop {
+            line.clear();
+            match reader.read_line(&mut line) {
+                Ok(0) | Err(_) => {
+                    if !reported {
+                        let _ = tx.send(None);
+                    }
+                    break;
+                }
+                Ok(_) => {
+                    if !reported {
+                        if let Some(rest) = line.trim().strip_prefix("RUNTIME_LISTENING ") {
+                            if let Ok(v) = serde_json::from_str::<serde_json::Value>(rest) {
+                                if let Some(p) = v.get("port").and_then(|p| p.as_u64()) {
+                                    let _ = tx.send(Some(p as u16));
+                                    reported = true;
+                                    continue;
+                                }
+                            }
+                        }
+                    }
+                    log::info!("[runtime] {}", line.trim());
+                }
+            }
+        }
+    });
+
+    let port = match rx.recv_timeout(Duration::from_secs(15)) {
+        Ok(Some(p)) => p,
+        _ => {
+            let _ = child.kill();
+            let tail = err_buf
+                .lock()
+                .map(|b| b.lines().rev().take(8).collect::<Vec<_>>().into_iter().rev().collect::<Vec<_>>().join("\n"))
+                .unwrap_or_default();
+            return Err(format!(
+                "runtime ({program}) did not start{}",
+                if tail.is_empty() { String::new() } else { format!(":\n{tail}") }
+            ));
+        }
+    };
+
+    *state.child.lock().map_err(|e| e.to_string())? = Some(child);
+    *state.port.lock().map_err(|e| e.to_string())? = port;
+    log::info!("[runtime] agent-runtime sidecar on http://127.0.0.1:{port}");
+    Ok(port)
+}
+
+/// Kill the running sidecar (if any) and reset the port.
+fn stop_runtime(state: &RuntimeState) {
+    if let Ok(mut guard) = state.child.lock() {
+        if let Some(mut child) = guard.take() {
+            let _ = child.kill();
+            let _ = child.wait();
+        }
+    }
+    if let Ok(mut p) = state.port.lock() {
+        *p = 0;
+    }
+}
+
+/// Restart the sidecar (after a key change) so the new env is in effect. Best-effort.
+fn restart_runtime(app: &tauri::AppHandle) {
+    if let Some(state) = app.try_state::<RuntimeState>() {
+        stop_runtime(&state);
+        if let Err(e) = start_runtime(app, &state) {
+            log::warn!("[runtime] restart failed (will retry on next use): {e}");
+        }
+    }
+}
+
+/// Base URL of the runtime sidecar, starting it lazily on first use.
+#[tauri::command]
+fn runtime_base_url(app: tauri::AppHandle, state: tauri::State<RuntimeState>) -> Result<String, String> {
+    let port = start_runtime(&app, &state)?;
+    Ok(format!("http://127.0.0.1:{port}"))
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -1010,6 +1301,9 @@ pub fn run() {
             };
             app.manage(ApprovalState { port, pending });
             log::info!("[approval] loopback hook server on http://127.0.0.1:{port}");
+            // The agent-runtime sidecar is started lazily on first use (runtime_base_url),
+            // so a missing node / unbuilt package can't block app startup.
+            app.manage(RuntimeState { child: Mutex::new(None), port: Mutex::new(0) });
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -1033,7 +1327,11 @@ pub fn run() {
             resolve_approval,
             set_runtime_hook,
             write_run_settings,
-            remove_run_settings
+            remove_run_settings,
+            set_secret,
+            delete_secret,
+            secret_status,
+            runtime_base_url
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

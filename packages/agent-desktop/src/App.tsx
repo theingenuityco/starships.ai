@@ -35,6 +35,7 @@ import { Markdown } from './markdown';
 import { detectAgents, hostname, isFullscreen, isTauri, readAgentTranscript, watchFullscreen, type DetectedAgent } from './tauri';
 import { parseClaudeTranscript, type TranscriptTurn, type TurnRole } from './transcript';
 import { Onboarding } from './Onboarding';
+import { ProviderKeys } from './ProvidersTab';
 import { COMMON_TOOLS, DEFAULT_PERMISSIONS, SUPPORTS_ALLOWLIST, SUPPORTS_APPROVAL, type PermissionPolicy } from './permissions';
 import { useLiveRun, type LiveRun } from './liveRuns';
 import { allowAlways, decideApproval, initApprovals, useApprovals } from './approvals';
@@ -45,6 +46,7 @@ const KIND_LABEL: Record<string, string> = {
   hermes: 'Hermes',
   cursor: 'Cursor',
   custom: 'Custom',
+  starship: 'Starship (built-in)',
 };
 export const kindLabel = (k: string) => KIND_LABEL[k] ?? k;
 
@@ -1560,6 +1562,11 @@ function RuntimeTab() {
     addRuntime({ name: `${kindLabel(d.kind)} · ${host}`, kind: d.kind as RuntimeKind, executor });
   }
 
+  const builtinRuntime = store.runtimes.find((r) => r.kind === 'starship');
+  function addBuiltin() {
+    addRuntime({ name: 'Starship', kind: 'starship', executor: 'starship' });
+  }
+
   return (
     <Page title="Runtimes" count={store.runtimes.length}>
       {store.runtimes.length === 0 ? (
@@ -1571,6 +1578,26 @@ function RuntimeTab() {
           ))}
         </ul>
       )}
+
+      <section className="mt-2">
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="section mb-0">Built-in runtime</h2>
+          {!builtinRuntime ? (
+            <button className="btn" onClick={addBuiltin}>
+              Add Starship
+            </button>
+          ) : null}
+        </div>
+        <p className="muted text-[11px]">
+          Runs the agent loop in-process with your own API keys — no external CLI. One runtime serves both providers;
+          a persona’s model picks which one runs.
+        </p>
+        {builtinRuntime ? (
+          <ProviderKeys />
+        ) : (
+          <p className="muted text-sm">Add the Starship runtime to configure provider keys.</p>
+        )}
+      </section>
 
       <section className="mt-2">
         <h2 className="section">Detected on this machine</h2>

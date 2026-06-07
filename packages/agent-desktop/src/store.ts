@@ -14,7 +14,21 @@ import { DEFAULT_PERMISSIONS, type PermissionPolicy } from './permissions';
 export type { PermissionPolicy } from './permissions';
 export { DEFAULT_PERMISSIONS };
 
-export type RuntimeKind = 'claude-code' | 'codex' | 'hermes' | 'custom';
+export type RuntimeKind = 'claude-code' | 'codex' | 'hermes' | 'custom' | 'starship';
+
+/** Providers the in-house runtime supports (BYO key). */
+export type ProviderId = 'anthropic' | 'openai';
+
+/**
+ * Non-secret metadata for a provider key. The secret lives in the OS keychain (Rust);
+ * here we only track validation state for the Settings UI. Presence + masked hint come
+ * from `secretStatus()`, not this.
+ */
+export interface ProviderMeta {
+  provider: ProviderId;
+  status: 'untested' | 'valid' | 'invalid';
+  lastValidatedAt?: string;
+}
 
 /** A local agent CLI we know how to drive. `executor` is the command template. */
 export interface Runtime {
@@ -70,6 +84,8 @@ export interface StoreData {
   personas: Persona[];
   heartbeats: Heartbeat[];
   events: AgentEvent[];
+  /** Provider-key validation metadata (the secrets live in the OS keychain, not here). */
+  providers: ProviderMeta[];
   /** Set once the first-run onboarding wizard is completed (or skipped). Absent = show it. */
   onboardedAt?: string;
 }
@@ -81,7 +97,7 @@ type ConfigData = Omit<StoreData, 'events'>;
  *  forward-looking migrations; we don't migrate anything yet. */
 const SCHEMA_VERSION = 1;
 
-const EMPTY: StoreData = { runtimes: [], personas: [], heartbeats: [], events: [] };
+const EMPTY: StoreData = { runtimes: [], personas: [], heartbeats: [], events: [], providers: [] };
 
 const uid = () => crypto.randomUUID();
 const now = () => new Date().toISOString();
@@ -96,6 +112,7 @@ function coerceConfig(raw: unknown): ConfigData {
     runtimes: Array.isArray(d.runtimes) ? d.runtimes : [],
     personas: Array.isArray(d.personas) ? d.personas : [],
     heartbeats: Array.isArray(d.heartbeats) ? d.heartbeats : [],
+    providers: Array.isArray(d.providers) ? d.providers : [],
     onboardedAt: typeof d.onboardedAt === 'string' ? d.onboardedAt : undefined,
   };
 }
@@ -146,6 +163,7 @@ function persistConfig(): void {
     runtimes: data.runtimes,
     personas: data.personas,
     heartbeats: data.heartbeats,
+    providers: data.providers,
     onboardedAt: data.onboardedAt,
   };
   writeStoreRaw(JSON.stringify(config)).catch((err) => console.error('[store] write failed:', err));
@@ -255,6 +273,21 @@ export function addEvent(input: Omit<AgentEvent, 'id' | 'createdAt'>): AgentEven
   return e;
 }
 export const eventsForPersona = (personaId: string): AgentEvent[] => data.events.filter((e) => e.personaId === personaId);
+
+// ---- Providers (BYO key metadata; secrets live in the OS keychain) ----
+export const getProviderMeta = (provider: ProviderId): ProviderMeta | undefined =>
+  data.providers.find((p) => p.provider === provider);
+
+/** Record a provider key's validation result (upsert by provider). */
+export function setProviderStatus(provider: ProviderId, status: ProviderMeta['status'], lastValidatedAt?: string): void {
+  const others = data.providers.filter((p) => p.provider !== provider);
+  commit({ ...data, providers: [...others, { provider, status, lastValidatedAt }] });
+}
+
+/** Forget a provider's metadata (after the key is removed). */
+export function clearProviderMeta(provider: ProviderId): void {
+  commit({ ...data, providers: data.providers.filter((p) => p.provider !== provider) });
+}
 
 // ---- Onboarding ----
 /** Mark first-run onboarding as done so the dashboard loads directly from now on. */

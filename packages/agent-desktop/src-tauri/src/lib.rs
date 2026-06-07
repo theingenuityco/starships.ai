@@ -948,15 +948,22 @@ fn run_agent_blocking(
     command: String,
     args: Vec<String>,
     env: HashMap<String, String>,
+    cwd: Option<String>,
     on_event: Channel<StreamMsg>,
 ) -> Result<RunResult, String> {
     let started = Instant::now();
-    let mut child = Command::new(&command)
-        .args(&args)
+    let mut cmd = Command::new(&command);
+    cmd.args(&args)
         .envs(&env)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
+        .stderr(Stdio::piped());
+    // Run inside the chosen working directory so the CLI sees the right project; an empty
+    // string means "no choice", so fall through to the app process cwd.
+    if let Some(dir) = cwd.as_deref().filter(|d| !d.is_empty()) {
+        cmd.current_dir(dir);
+    }
+    let mut child = cmd
         .spawn()
         .map_err(|e| format!("could not start {command}: {e}"))?;
 
@@ -991,9 +998,10 @@ async fn run_agent(
     command: String,
     args: Vec<String>,
     env: HashMap<String, String>,
+    cwd: Option<String>,
     on_event: Channel<StreamMsg>,
 ) -> Result<RunResult, String> {
-    tauri::async_runtime::spawn_blocking(move || run_agent_blocking(command, args, env, on_event))
+    tauri::async_runtime::spawn_blocking(move || run_agent_blocking(command, args, env, cwd, on_event))
         .await
         .map_err(|e| e.to_string())?
 }
@@ -1016,15 +1024,20 @@ fn run_agent_duplex_blocking(
     command: String,
     args: Vec<String>,
     env: HashMap<String, String>,
+    cwd: Option<String>,
     on_event: Channel<StreamMsg>,
 ) -> Result<RunResult, String> {
     let started = Instant::now();
-    let mut child = Command::new(&command)
-        .args(&args)
+    let mut cmd = Command::new(&command);
+    cmd.args(&args)
         .envs(&env)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
+        .stderr(Stdio::piped());
+    if let Some(dir) = cwd.as_deref().filter(|d| !d.is_empty()) {
+        cmd.current_dir(dir);
+    }
+    let mut child = cmd
         .spawn()
         .map_err(|e| format!("could not start {command}: {e}"))?;
 
@@ -1068,9 +1081,10 @@ async fn run_agent_duplex(
     command: String,
     args: Vec<String>,
     env: HashMap<String, String>,
+    cwd: Option<String>,
     on_event: Channel<StreamMsg>,
 ) -> Result<RunResult, String> {
-    tauri::async_runtime::spawn_blocking(move || run_agent_duplex_blocking(run_id, command, args, env, on_event))
+    tauri::async_runtime::spawn_blocking(move || run_agent_duplex_blocking(run_id, command, args, env, cwd, on_event))
         .await
         .map_err(|e| e.to_string())?
 }
@@ -1497,6 +1511,7 @@ fn runtime_base_url(app: tauri::AppHandle, state: tauri::State<RuntimeState>) ->
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_os::init())
+        .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             if cfg!(debug_assertions) {
                 app.handle().plugin(

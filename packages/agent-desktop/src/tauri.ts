@@ -3,6 +3,8 @@ import { Channel, invoke } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { hostname as osHostname } from '@tauri-apps/plugin-os';
+import { open as openDialog } from '@tauri-apps/plugin-dialog';
+import { homeDir } from '@tauri-apps/api/path';
 
 export interface DetectedAgent {
   kind: string;
@@ -30,8 +32,14 @@ export const detectAgents = () => invoke<DetectedAgent[]>('detect_agents');
  * Run an agent CLI once (argv array, no shell). `onEvent` streams each stdout/stderr
  * line as it arrives; the promise resolves with the exit code + duration when it ends.
  */
-export const runAgent = (args: { command: string; args: string[]; env: Record<string, string>; onEvent: Channel<StreamMsg> }) =>
-  invoke<RunResult>('run_agent', args);
+export const runAgent = (args: {
+  command: string;
+  args: string[];
+  env: Record<string, string>;
+  /** Working directory to launch the CLI in; omit/empty for the app process cwd. */
+  cwd?: string;
+  onEvent: Channel<StreamMsg>;
+}) => invoke<RunResult>('run_agent', args);
 
 /**
  * Run a duplex (bidirectional) process — stdin stays piped and is keyed by `runId` so
@@ -42,8 +50,30 @@ export const runAgentDuplex = (args: {
   command: string;
   args: string[];
   env: Record<string, string>;
+  /** Working directory to launch the process in; omit/empty for the app process cwd. */
+  cwd?: string;
   onEvent: Channel<StreamMsg>;
 }) => invoke<RunResult>('run_agent_duplex', args);
+
+/**
+ * Open the OS folder picker and return the chosen absolute path, or null if cancelled.
+ * No-op (null) outside Tauri. Used by the working-directory selector.
+ */
+export const pickDirectory = async (defaultPath?: string): Promise<string | null> => {
+  if (!isTauri()) return null;
+  const picked = await openDialog({ directory: true, multiple: false, defaultPath });
+  return typeof picked === 'string' ? picked : null;
+};
+
+/** The user's home directory, used as the default working folder. Null outside Tauri / on error. */
+export const homeDirectory = async (): Promise<string | null> => {
+  if (!isTauri()) return null;
+  try {
+    return await homeDir();
+  } catch {
+    return null;
+  }
+};
 
 /** Write one line (a JSON-RPC frame) to a duplex run's stdin. */
 export const sendAgentInput = (runId: string, data: string) => invoke<void>('send_agent_input', { runId, data });

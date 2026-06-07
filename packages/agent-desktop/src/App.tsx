@@ -11,6 +11,7 @@ import {
   getStore,
   initStore,
   MODEL_OPTIONS,
+  rememberSelection,
   removeRuntime,
   updateHeartbeat,
   updatePersona,
@@ -33,7 +34,7 @@ import {
 } from './conversations';
 import { runConversationTurn, runPersona } from './engine';
 import { Markdown } from './markdown';
-import { detectAgents, hostname, isFullscreen, isTauri, readAgentTranscript, watchFullscreen, type DetectedAgent } from './tauri';
+import { detectAgents, homeDirectory, hostname, isFullscreen, isTauri, pickDirectory, readAgentTranscript, watchFullscreen, type DetectedAgent } from './tauri';
 import { parseClaudeTranscript, type TranscriptTurn, type TurnRole } from './transcript';
 import { Onboarding } from './Onboarding';
 import { ProviderKeys } from './ProvidersTab';
@@ -241,8 +242,8 @@ function Dashboard() {
 
   // Send the first message from the New page: create the thread, then hand the
   // text to it as a pending message so it auto-sends once it mounts.
-  const startConversation = (personaId: string, text: string) => {
-    const conv = addConversation({ personaId, title: text.slice(0, 48) || 'New conversation' });
+  const startConversation = (personaId: string, text: string, cwd?: string | null) => {
+    const conv = addConversation({ personaId, title: text.slice(0, 48) || 'New conversation', cwd });
     setPendingMessage(text);
     setChatSelection(conv.id);
     setTab('new');
@@ -765,7 +766,7 @@ function ChatTab({
 }: {
   selectedId: string | null;
   onSelect: (id: string | null) => void;
-  onStart: (personaId: string, text: string) => void;
+  onStart: (personaId: string, text: string, cwd?: string | null) => void;
   pendingMessage: string | null;
   onConsumePending: () => void;
 }) {
@@ -793,18 +794,48 @@ function ChatTab({
  * first send. A persona must back every conversation, so a compact persona picker
  * sits under the input rather than a separate "create" step.
  */
-function NewChatPage({ personas, onStart }: { personas: Persona[]; onStart: (personaId: string, text: string) => void }) {
+function NewChatPage({ personas, onStart }: { personas: Persona[]; onStart: (personaId: string, text: string, cwd?: string | null) => void }) {
   const runnable = personas.filter((p) => p.runtimeId);
-  const [personaId, setPersonaId] = useState(runnable[0]?.id ?? personas[0]?.id ?? '');
+  // Restore the last-used persona (sticky across restarts), falling back to the first runnable.
+  const [personaId, setPersonaId] = useState(() => {
+    const last = getStore().lastPersonaId;
+    if (last && personas.some((p) => p.id === last)) return last;
+    return runnable[0]?.id ?? personas[0]?.id ?? '';
+  });
   const [input, setInput] = useState('');
+  // Restore the last-used working folder (sticky across restarts); seed the home dir on first run.
+  const [cwd, setCwd] = useState<string | null>(() => getStore().lastCwd ?? null);
+  useEffect(() => {
+    // Only seed when there's no sticky folder yet; persist it so the default is sticky too.
+    let live = true;
+    void homeDirectory().then((home) => {
+      if (live && home && !getStore().lastCwd) {
+        setCwd((cur) => cur ?? home);
+        rememberSelection({ cwd: home });
+      }
+    });
+    return () => {
+      live = false;
+    };
+  }, []);
   const persona = personas.find((p) => p.id === personaId);
   const noRuntime = !persona?.runtimeId;
+
+  // Update + persist so the pickers stay sticky across sessions and restarts.
+  const choosePersona = (id: string) => {
+    setPersonaId(id);
+    rememberSelection({ personaId: id });
+  };
+  const chooseCwd = (dir: string | null) => {
+    setCwd(dir);
+    if (dir) rememberSelection({ cwd: dir });
+  };
 
   function send() {
     const text = input.trim();
     if (!text || noRuntime) return;
     setInput('');
-    onStart(personaId, text);
+    onStart(personaId, text, cwd);
   }
 
   if (personas.length === 0) {
@@ -823,9 +854,12 @@ function NewChatPage({ personas, onStart }: { personas: Persona[]; onStart: (per
       </div>
 
       {/* Composer pinned to the bottom — single line that grows with its content.
-          The persona picker floats over its top-left corner. */}
-      <div className="relative mx-auto w-full max-w-4xl">
-        <PersonaSelect personas={personas} personaId={personaId} onChange={setPersonaId} className="absolute -top-2.5 left-0 z-10" />
+          The persona + working-dir pickers sit in a row just above the input. */}
+      <div className="mx-auto w-full max-w-4xl">
+        <div className="mb-2 flex items-center gap-1.5">
+          <PersonaSelect personas={personas} personaId={personaId} onChange={choosePersona} />
+          <WorkingDirSelect cwd={cwd} onChange={chooseCwd} />
+        </div>
         <Composer
           value={input}
           onChange={setInput}
@@ -918,6 +952,37 @@ function PersonaSelect({
           })}
         </div>
       ) : null}
+    </div>
+  );
+}
+
+/**
+ * Working-directory picker (sits beside the persona pill): opens the OS folder dialog and
+ * shows the chosen folder's name. The thread's agent CLI is launched from this directory, so
+ * a file-touching agent sees the right project. Empty = the app's own working directory.
+ */
+function WorkingDirSelect({ cwd, onChange }: { cwd: string | null; onChange: (cwd: string | null) => void }) {
+  // Last path segment, for a compact label (full path lives in the tooltip).
+  const label = cwd ? cwd.replace(/[/\\]+$/, '').split(/[/\\]/).pop() || cwd : 'Working folder';
+
+  async function pick() {
+    const picked = await pickDirectory(cwd ?? undefined);
+    if (picked) onChange(picked);
+  }
+
+  return (
+    <div className="flex items-center">
+      <button
+        type="button"
+        onClick={pick}
+        title={cwd ?? 'Choose the folder the agent runs in'}
+        className="flex items-center gap-1.5 rounded-lg border border-(--color-border) bg-(--color-bg-elev) px-2.5 py-1 text-[12px] text-(--color-fg-muted) transition-colors hover:border-(--color-border-strong) hover:text-(--color-fg)"
+      >
+        <svg className="h-3 w-3 shrink-0 opacity-80" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+        </svg>
+        <span className="max-w-[160px] truncate">{label}</span>
+      </button>
     </div>
   );
 }

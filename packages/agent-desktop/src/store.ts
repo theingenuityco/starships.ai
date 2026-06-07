@@ -127,11 +127,15 @@ export interface StoreData {
   providers: ProviderMeta[];
   /** Set once the first-run onboarding wizard is completed (or skipped). Absent = show it. */
   onboardedAt?: string;
+  /** Last persona chosen on the New page, so the picker is sticky across sessions/restarts. */
+  lastPersonaId?: string;
+  /** Last working folder chosen on the New page, sticky across sessions/restarts. */
+  lastCwd?: string;
 }
 
 /** The subset persisted to the `store.json` blob. Personas + runtimes are stored per-record
  *  under config/ (see persistPersona/persistRuntime); events append to their own log. */
-type ConfigData = Pick<StoreData, 'heartbeats' | 'providers' | 'onboardedAt'>;
+type ConfigData = Pick<StoreData, 'heartbeats' | 'providers' | 'onboardedAt' | 'lastPersonaId' | 'lastCwd'>;
 
 /** Bump when `store.json` / event-line shapes change incompatibly. Persisted for
  *  forward-looking migrations; we don't migrate anything yet. */
@@ -152,6 +156,8 @@ function coerceConfig(raw: unknown): ConfigData {
     heartbeats: Array.isArray(d.heartbeats) ? d.heartbeats : [],
     providers: Array.isArray(d.providers) ? d.providers : [],
     onboardedAt: typeof d.onboardedAt === 'string' ? d.onboardedAt : undefined,
+    lastPersonaId: typeof d.lastPersonaId === 'string' ? d.lastPersonaId : undefined,
+    lastCwd: typeof d.lastCwd === 'string' ? d.lastCwd : undefined,
   };
 }
 
@@ -228,6 +234,8 @@ function persistConfig(): void {
     heartbeats: data.heartbeats,
     providers: data.providers,
     onboardedAt: data.onboardedAt,
+    lastPersonaId: data.lastPersonaId,
+    lastCwd: data.lastCwd,
   };
   writeStoreRaw(JSON.stringify(config)).catch((err) => console.error('[store] write failed:', err));
 }
@@ -390,6 +398,16 @@ export function setProviderStatus(provider: ProviderId, status: ProviderMeta['st
 /** Forget a provider's metadata (after the key is removed). */
 export function clearProviderMeta(provider: ProviderId): void {
   commit({ ...data, providers: data.providers.filter((p) => p.provider !== provider) });
+}
+
+// ---- Sticky New-page selection ----
+/** Remember the last-used persona / working folder so the New-page pickers persist across
+ *  restarts. Only the provided fields change; both live in the `store.json` blob. */
+export function rememberSelection(patch: { personaId?: string; cwd?: string }): void {
+  const next = { ...data };
+  if (patch.personaId !== undefined) next.lastPersonaId = patch.personaId;
+  if (patch.cwd !== undefined) next.lastCwd = patch.cwd;
+  commit(next);
 }
 
 // ---- Onboarding ----

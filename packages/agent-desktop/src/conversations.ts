@@ -38,6 +38,8 @@ export interface ConversationSummary {
   title: string;
   /** Set after the first turn that mints a CLI session; later turns resume it. */
   sessionId?: string | null;
+  /** Working directory the agent CLI runs in for this thread (chosen on the New page). */
+  cwd?: string | null;
   createdAt: string;
   /** Derived from the file's mtime (bumped on every append). */
   updatedAt: string;
@@ -61,6 +63,7 @@ const summaryOf = (c: Conversation): ConversationSummary => ({
   personaId: c.personaId,
   title: c.title,
   sessionId: c.sessionId,
+  cwd: c.cwd,
   createdAt: c.createdAt,
   updatedAt: c.updatedAt,
 });
@@ -74,6 +77,7 @@ interface MetaLine {
   personaId: string;
   title: string;
   sessionId?: string | null;
+  cwd?: string | null;
   createdAt: string;
 }
 
@@ -95,6 +99,7 @@ function headerLine(meta: ConversationSummary): string {
     personaId: meta.personaId,
     title: meta.title,
     sessionId: meta.sessionId ?? null,
+    cwd: meta.cwd ?? null,
     createdAt: meta.createdAt,
   };
   return JSON.stringify(line);
@@ -119,6 +124,7 @@ function parseHeader(line: string, updatedAt: string): ConversationSummary | nul
       personaId: o.personaId,
       title: typeof o.title === 'string' ? o.title : 'Conversation',
       sessionId: o.sessionId ?? null,
+      cwd: typeof o.cwd === 'string' ? o.cwd : null,
       createdAt: typeof o.createdAt === 'string' ? o.createdAt : updatedAt,
       updatedAt,
     };
@@ -241,9 +247,18 @@ export function useConversation(id: string | null): Conversation | null {
 
 /** Start a new thread. Returns synchronously so callers can open it immediately;
  *  the file is created in the background. */
-export function addConversation(input: { personaId: string; title: string }): Conversation {
+export function addConversation(input: { personaId: string; title: string; cwd?: string | null }): Conversation {
   const ts = iso();
-  const convo: Conversation = { id: uid(), personaId: input.personaId, title: input.title, sessionId: null, createdAt: ts, updatedAt: ts, messages: [] };
+  const convo: Conversation = {
+    id: uid(),
+    personaId: input.personaId,
+    title: input.title,
+    sessionId: null,
+    cwd: input.cwd ?? null,
+    createdAt: ts,
+    updatedAt: ts,
+    messages: [],
+  };
   summaries = [...summaries, summaryOf(convo)];
   bodies.set(convo.id, convo);
   emit();

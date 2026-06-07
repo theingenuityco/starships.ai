@@ -53,8 +53,10 @@ export async function runStarship(opts: {
   prompt: string;
   sessionId: string;
   policy: PermissionPolicy;
+  /** Working directory chosen for this thread; overrides the executor's `--workspace`. */
+  cwd?: string | null;
 }): Promise<StarshipOutcome> {
-  const { dispatchId, persona, executor, prompt, sessionId, policy } = opts;
+  const { dispatchId, persona, executor, prompt, sessionId, policy, cwd } = opts;
   const start = Date.now();
 
   let base: string;
@@ -75,7 +77,7 @@ export async function runStarship(opts: {
     sessionId,
     mode: policy.mode,
     allow: policy.allow,
-    workspace: resolveWorkspace(executor),
+    workspace: cwd || resolveWorkspace(executor),
   };
 
   const approve = (toolUseId: string, decision: string): void => {

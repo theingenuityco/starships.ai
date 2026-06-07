@@ -72,10 +72,12 @@ export async function runCodexAppServer(opts: {
   prompt: string;
   env: Record<string, string>;
   policy: PermissionPolicy;
+  /** Working directory codex operates in; omit for the app process cwd. */
+  cwd?: string;
   /** Aborting closes the app-server's stdin (EOF), so the process exits and the turn ends. */
   signal?: AbortSignal;
 }): Promise<CodexOutcome> {
-  const { dispatchId, prompt, env, policy, signal } = opts;
+  const { dispatchId, prompt, env, policy, cwd, signal } = opts;
   const bypass = policy.mode === 'all';
 
   // Cancellation: closing stdin tells codex app-server to shut down; the Promise.race below
@@ -191,7 +193,7 @@ export async function runCodexAppServer(opts: {
     }
   };
 
-  const resultPromise = runAgentDuplex({ runId: dispatchId, command: 'codex', args: ['app-server'], env, onEvent: channel });
+  const resultPromise = runAgentDuplex({ runId: dispatchId, command: 'codex', args: ['app-server'], env, cwd, onEvent: channel });
 
   try {
     // experimentalApi:true is REQUIRED for the approval surface: `approvalPolicy` on
@@ -209,6 +211,7 @@ export async function runCodexAppServer(opts: {
     const thread = (await request('thread/start', {
       approvalPolicy: bypass ? 'never' : 'untrusted',
       sandbox: bypass ? 'danger-full-access' : 'read-only',
+      ...(cwd ? { cwd } : {}),
     })) as Record<string, unknown> | undefined;
     const threadId = ((thread?.thread as Record<string, unknown> | undefined)?.id ?? null) as string | null;
     if (!threadId) throw new Error('codex thread/start returned no thread id');

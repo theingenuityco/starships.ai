@@ -25,6 +25,7 @@ log = "0.4"
 tauri = { version = "2.11.2", features = [] }
 tauri-plugin-log = "2"
 tauri-plugin-os = "2"
+tauri-plugin-dialog = "2"
 which = "6"
 tiny_http = "0.12"
 keyring = { version = "3", features = ["apple-native", "windows-native", "sync-secret-service"] }

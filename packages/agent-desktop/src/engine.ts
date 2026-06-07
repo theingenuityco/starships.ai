@@ -109,9 +109,11 @@ async function executeRun(opts: {
   prompt: string;
   sessionId: string;
   resume: boolean;
+  /** Working directory to launch the CLI in; undefined/empty → app process cwd. */
+  cwd?: string | null;
   onDispatch?: (dispatchId: string) => void;
 }): Promise<ExecuteResult> {
-  const { persona, runtime, prompt, sessionId, resume, onDispatch } = opts;
+  const { persona, runtime, prompt, sessionId, resume, cwd, onDispatch } = opts;
   const rawParts = tokenize(runtime.executor);
   if (rawParts.length === 0) throw new Error('Runtime has an empty executor');
   const parts = resume ? resumeParts(rawParts, runtime.kind) : rawParts;
@@ -201,7 +203,7 @@ async function executeRun(opts: {
     // starship → local HTTP/SSE runtime; codex → app-server JSON-RPC; both drive their own
     // channel. Everything else → the streamed argv run over Rust run_agent.
     const result = isStarship
-      ? await runStarship({ dispatchId, persona, executor: runtime.executor, prompt, sessionId, policy }).then((o) => ({
+      ? await runStarship({ dispatchId, persona, executor: runtime.executor, prompt, sessionId, policy, cwd }).then((o) => ({
           exit_code: o.ok ? 0 : o.exitCode ?? 1,
           duration_ms: o.durationMs,
         }))
@@ -209,11 +211,11 @@ async function executeRun(opts: {
       ? // TODO(cross-runtime-abort): pass an AbortSignal once executeRun exposes one for a UI
         // Stop. runCodexAppServer already honors `signal` (closes stdin → exit); until the
         // engine threads a controller, codex runs (like the others here) can't be cancelled.
-        await runCodexAppServer({ dispatchId, prompt, env, policy }).then((o) => ({
+        await runCodexAppServer({ dispatchId, prompt, env, policy, cwd: cwd ?? undefined }).then((o) => ({
           exit_code: o.ok ? 0 : o.exitCode ?? 1,
           duration_ms: o.durationMs,
         }))
-      : await runAgent({ command, args, env, onEvent: channel });
+      : await runAgent({ command, args, env, cwd: cwd ?? undefined, onEvent: channel });
     const ok = result.exit_code === 0;
     const live = getLiveRun(dispatchId);
     // Final human-readable summary: Claude's `result` text, else the last assistant turn,
@@ -279,13 +281,18 @@ function committedTurns(dispatchId: string): ConversationMessage[] {
  * Execute a persona once with `prompt` as a standalone run (no thread). Mints a fresh
  * session id so the CLI's on-disk transcript is locatable later.
  */
-export async function runPersona(personaId: string, prompt: string, onDispatch?: (dispatchId: string) => void): Promise<RunOutcome> {
+export async function runPersona(
+  personaId: string,
+  prompt: string,
+  onDispatch?: (dispatchId: string) => void,
+  cwd?: string | null
+): Promise<RunOutcome> {
   const store = getStore();
   const persona = store.personas.find((p) => p.id === personaId);
   if (!persona) throw new Error('Persona not found');
   const runtime = persona.runtimeId ? store.runtimes.find((r) => r.id === persona.runtimeId) : undefined;
   if (!runtime) throw new Error('Assign this persona to a runtime first');
-  return executeRun({ persona, runtime, prompt, sessionId: crypto.randomUUID(), resume: false, onDispatch });
+  return executeRun({ persona, runtime, prompt, sessionId: crypto.randomUUID(), resume: false, cwd, onDispatch });
 }
 
 /**
@@ -308,7 +315,7 @@ export async function runConversationTurn(
 
   const resume = Boolean(convo.sessionId);
   const sessionId = convo.sessionId ?? crypto.randomUUID();
-  const res = await executeRun({ persona, runtime, prompt, sessionId, resume, onDispatch });
+  const res = await executeRun({ persona, runtime, prompt, sessionId, resume, cwd: convo.cwd, onDispatch });
 
   // Remember the session after the first turn (only if the runtime actually threads it).
   if (!convo.sessionId && res.usesSession) setConversationSession(conversationId, sessionId);

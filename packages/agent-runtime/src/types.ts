@@ -34,8 +34,17 @@ export interface RunRequest {
   workspace?: string;
   /** Permission policy for tool calls. Defaults to `all`. */
   mode?: PermissionMode;
-  /** Tool names pre-approved when `mode === 'allowlist'`. */
+  /**
+   * Tool names pre-approved when `mode === 'allowlist'`. Matched against the dotted fqn
+   * (`system.bash`), a toolset wildcard (`system.*`), `*`, or a legacy bare name (`bash`).
+   */
   allow?: string[];
+  /**
+   * Names of additional toolsets to enable for this run (user bundles / mcp servers). The
+   * `system` toolset is always present. Their tools are deferred (advertised in the catalog,
+   * loaded on demand via system.tool_search). Wired in Phase 1; accepted now for forward-compat.
+   */
+  toolsets?: string[];
   /** Max model<->tool round trips before the run stops. Defaults to 24. */
   maxSteps?: number;
   /**

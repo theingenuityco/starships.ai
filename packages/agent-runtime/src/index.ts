@@ -3,8 +3,17 @@
 export { runAgent } from './runtime';
 export { validateKey } from './validate';
 export { resolveModel, resolveApiKey } from './provider';
-export { TOOLS, TOOLS_BY_NAME, buildSdkTools } from './tools';
-export type { RuntimeTool, ToolContext } from './tools';
+export { ToolRegistry, buildSystemProvider, toWireName } from './tools';
+export type {
+  Capability,
+  ToolContext,
+  ToolResult,
+  JSONSchema,
+  ToolSchema,
+  ToolDescriptor,
+  ProviderInitContext,
+  ToolsetProvider,
+} from './tools';
 export * as translate from './translate';
 export type {
   ProviderId,

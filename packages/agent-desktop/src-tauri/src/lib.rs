@@ -1346,6 +1346,13 @@ fn runtime_spawn_cmd(app: &tauri::AppHandle) -> (String, Vec<String>, Option<Pat
 /// Start the sidecar if it isn't running; return its port. Blocks briefly to read the
 /// `RUNTIME_LISTENING {"port":N}` handshake the service prints on stdout at boot.
 fn start_runtime(app: &tauri::AppHandle, state: &RuntimeState) -> Result<u16, String> {
+    // Serialize the whole check-and-spawn: restart_runtime() (called from set_secret/delete_secret
+    // on the async thread pool) can race a webview-triggered runtime_base_url(). Without one guard
+    // both callers pass the liveness gate at port==0, spawn two sidecars, and the first child's
+    // handle is overwritten on state update — orphaning a running process on an unknown port. Held
+    // for the rest of the function, so the liveness re-check below also runs inside the lock.
+    static SPAWN_LOCK: std::sync::OnceLock<Mutex<()>> = std::sync::OnceLock::new();
+    let _spawn_guard = SPAWN_LOCK.get_or_init(|| Mutex::new(())).lock().map_err(|e| e.to_string())?;
     {
         let port = *state.port.lock().map_err(|e| e.to_string())?;
         // try_wait() is non-blocking: None = still running, Some(_) = already exited. Checking

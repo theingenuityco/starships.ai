@@ -93,12 +93,22 @@ function runBash(command: string, ctx: ToolContext): Promise<string> {
     const safeEnv = { ...process.env };
     delete safeEnv.ANTHROPIC_API_KEY;
     delete safeEnv.OPENAI_API_KEY;
-    const child = spawn('bash', ['-c', command], { cwd: ctx.workspace, env: safeEnv });
+    // detached:true puts the child in its own process group so we can signal the whole tree
+    // (negative pid) — otherwise backgrounded forks (`sleep 1000 &`) outlive the timeout/abort.
+    const child = spawn('bash', ['-c', command], { cwd: ctx.workspace, env: safeEnv, detached: true });
     let out = '';
-    const onAbort = () => child.kill('SIGTERM');
+    const kill = () => {
+      try {
+        if (child.pid) process.kill(-child.pid, 'SIGTERM');
+        else child.kill('SIGTERM');
+      } catch {
+        child.kill('SIGTERM'); // group already gone / pid reaped
+      }
+    };
+    const onAbort = () => kill();
     if (ctx.signal.aborted) onAbort();
     else ctx.signal.addEventListener('abort', onAbort, { once: true });
-    const timer = setTimeout(() => child.kill('SIGTERM'), DEFAULT_EXEC_TIMEOUT_MS);
+    const timer = setTimeout(kill, DEFAULT_EXEC_TIMEOUT_MS);
     child.stdout.on('data', (d) => (out += d.toString()));
     child.stderr.on('data', (d) => (out += d.toString()));
     child.on('error', (e) => {

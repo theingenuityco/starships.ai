@@ -233,5 +233,8 @@ export async function runCodexAppServer(opts: {
     await closeAgentInput(dispatchId).catch(() => {});
     const r = await resultPromise.catch(() => ({ exit_code: null as number | null, duration_ms: 0 }));
     return { ok: false, durationMs: r.duration_ms, exitCode: r.exit_code };
+  } finally {
+    // Drop the abort listener on the normal-return path too (once:true only fires on abort).
+    signal?.removeEventListener('abort', onAbort);
   }
 }

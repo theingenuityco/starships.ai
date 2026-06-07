@@ -206,7 +206,10 @@ async function executeRun(opts: {
           duration_ms: o.durationMs,
         }))
       : isCodex
-      ? await runCodexAppServer({ dispatchId, prompt, env, policy }).then((o) => ({
+      ? // TODO(cross-runtime-abort): pass an AbortSignal once executeRun exposes one for a UI
+        // Stop. runCodexAppServer already honors `signal` (closes stdin → exit); until the
+        // engine threads a controller, codex runs (like the others here) can't be cancelled.
+        await runCodexAppServer({ dispatchId, prompt, env, policy }).then((o) => ({
           exit_code: o.ok ? 0 : o.exitCode ?? 1,
           duration_ms: o.durationMs,
         }))

@@ -17,6 +17,10 @@ export async function runAgent(req: RunRequest, h: RuntimeHandlers): Promise<voi
   const sessionAllow = new Set(req.allow ?? []);
   const isAllowed = (name: string): boolean => mode === 'all' || sessionAllow.has(name);
 
+  // TODO(workspace-default): with no `--workspace` in the executor this falls back to the
+  // sidecar cwd, which is the user's home dir (set in lib.rs runtime_spawn_cmd). Under the
+  // default `{ mode: 'all' }` policy that gives the model read/write over ~/. Require a
+  // workspace in the executor (reject at validation) or warn in the executor-config UI.
   const workspace = req.workspace ?? process.cwd();
   const maxSteps = req.maxSteps ?? DEFAULT_MAX_STEPS;
   const denials: L.PermissionDenial[] = [];
@@ -102,7 +106,10 @@ export async function runAgent(req: RunRequest, h: RuntimeHandlers): Promise<voi
     finalText = e instanceof Error ? e.message : String(e);
   }
 
-  saveSession(req.sessionId, messages);
+  // Don't persist a history that ended mid-error: the loop may have appended a tool_use whose
+  // tool_result was never produced, an invalid state the next turn would resume into (provider
+  // 400 / confused model). Dropping the partial turn keeps the saved thread well-formed.
+  if (!isError) saveSession(req.sessionId, messages);
   h.onLine(L.buildResult({ finalText, durationMs: Date.now() - start, denials, isError }));
 }
 

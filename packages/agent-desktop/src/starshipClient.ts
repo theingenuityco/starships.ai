@@ -99,7 +99,11 @@ export async function runStarship(opts: {
       } catch {
         return;
       }
-      if (!req.toolUseId) return;
+      if (!req.toolUseId) {
+        // Can't correlate the request — send an explicit deny so the runtime isn't left hanging.
+        approve('', 'deny');
+        return;
+      }
       requestApproval({
         correlation: dispatchId,
         runtime: 'starship',

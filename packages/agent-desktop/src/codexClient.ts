@@ -88,7 +88,6 @@ export async function runCodexAppServer(opts: {
   // stdin may not be registered the instant we start writing; retry briefly.
   async function send(obj: unknown): Promise<void> {
     const line = JSON.stringify(obj);
-    console.log('[codex] →', line); // TEMP debug
     for (let i = 0; i < 40; i++) {
       try {
         await sendAgentInput(dispatchId, line);
@@ -151,7 +150,6 @@ export async function runCodexAppServer(opts: {
       return;
     }
     if (m.kind !== 'stdout') return; // 'exit' handled via the awaited duplex promise
-    console.log('[codex] ←', m.data.line); // TEMP debug
     let msg: Record<string, unknown>;
     try {
       msg = JSON.parse(m.data.line) as Record<string, unknown>;

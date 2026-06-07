@@ -45,7 +45,11 @@ export interface RuntimeTool {
 
 function runBash(command: string, ctx: ToolContext): Promise<string> {
   return new Promise((resolve) => {
-    const child = spawn('bash', ['-c', command], { cwd: ctx.workspace });
+    // Strip provider keys from the child env so a prompt-injected command can't exfiltrate them.
+    const safeEnv = { ...process.env };
+    delete safeEnv.ANTHROPIC_API_KEY;
+    delete safeEnv.OPENAI_API_KEY;
+    const child = spawn('bash', ['-c', command], { cwd: ctx.workspace, env: safeEnv });
     let out = '';
     const onAbort = () => child.kill('SIGTERM');
     if (ctx.signal.aborted) onAbort();
@@ -127,9 +131,15 @@ export const TOOLS: RuntimeTool[] = [
     name: 'http_fetch',
     description: 'Fetch a URL (GET) and return the status and response body.',
     inputSchema: z.object({ url: z.string().url().describe('Absolute URL to fetch.') }),
-    sensitive: false,
+    // Gated under allowlist mode: it can reach the network, so it needs approval like bash.
+    sensitive: true,
     execute: async (input, ctx) => {
       const { url } = input as { url: string };
+      // Block SSRF to loopback / link-local (e.g. the approval server, cloud metadata at 169.254.169.254).
+      const host = new URL(url).hostname.toLowerCase();
+      if (['127.0.0.1', 'localhost', '::1', '0.0.0.0'].includes(host) || host.endsWith('.localhost') || host.startsWith('169.254.')) {
+        return 'Fetching loopback or link-local addresses is not permitted.';
+      }
       const res = await fetch(url, { signal: ctx.signal });
       const body = await res.text();
       return clip(`HTTP ${res.status} ${res.statusText}\n\n${body}`);

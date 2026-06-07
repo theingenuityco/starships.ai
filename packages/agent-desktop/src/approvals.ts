@@ -74,10 +74,7 @@ export function requestApproval(args: {
   resolve: (decision: ApprovalDecision) => void;
 }): void {
   const ctx = contexts.get(args.correlation);
-  // TEMP debug: shows each gated call + whether it was auto-allowed or queued. Remove later.
-  console.log('[approvals] request', { runtime: args.runtime, tool: args.toolName, correlation: args.correlation, hasContext: !!ctx, allow: ctx?.allow });
   if (ctx && toolAllowed(args.toolName, ctx.allow)) {
-    console.log('[approvals] auto-allowed (on allowlist)', args.toolName);
     args.resolve('allow');
     return;
   }
@@ -101,7 +98,6 @@ export function requestApproval(args: {
 export function initApprovals(): void {
   if (started) return;
   started = true;
-  console.log('[approvals] listener attached');
   void onPermissionRequest((req) =>
     requestApproval({
       correlation: req.correlation,
@@ -131,7 +127,7 @@ export function allowAlways(key: string): void {
   if (!item) return;
   if (item.personaId) addAllowedTools(item.personaId, [item.toolName]);
   for (const ctx of contexts.values()) {
-    if (ctx.personaId === item.personaId && !ctx.allow.includes(item.toolName)) ctx.allow.push(item.toolName);
+    if (ctx.personaId === item.personaId && !ctx.allow.includes(item.toolName)) ctx.allow = [...ctx.allow, item.toolName];
   }
   decideApproval(key, 'allow-session');
 }

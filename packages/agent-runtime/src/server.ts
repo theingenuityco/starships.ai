@@ -25,10 +25,18 @@ const runs = new Map<string, ActiveRun>();
 
 const app = new Hono();
 
-// The desktop webview (origin tauri://localhost) calls this over http://127.0.0.1, which is
-// cross-origin — without CORS headers WKWebView blocks every fetch with "Load failed". The
-// service is loopback-only and single-user, so a permissive policy is fine.
-app.use('*', cors({ origin: '*', allowMethods: ['GET', 'POST', 'OPTIONS'], allowHeaders: ['content-type'] }));
+// The desktop webview (origin tauri://localhost, or http://localhost:<port> under the dev
+// server) calls this over http://127.0.0.1, which is cross-origin — without CORS headers
+// WKWebView blocks every fetch with "Load failed". Restrict CORS to the app's own webview
+// origins so a page in the user's system browser can't drive the loopback service via fetch.
+const ALLOWED_ORIGINS = new Set(['tauri://localhost', 'http://tauri.localhost', 'https://tauri.localhost']);
+function corsOrigin(origin: string): string | null {
+  if (ALLOWED_ORIGINS.has(origin)) return origin;
+  // Tauri dev runs the webview from the local vite server.
+  if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) return origin;
+  return null;
+}
+app.use('*', cors({ origin: corsOrigin, allowMethods: ['GET', 'POST', 'OPTIONS'], allowHeaders: ['content-type'] }));
 
 app.get('/health', (c) => c.json({ ok: true }));
 

@@ -163,18 +163,6 @@ async function executeRun(opts: {
     ...streamArgs(runtime.kind, runtime.executor),
   ];
 
-  // TEMP debug: shows which persona/runtime ran and what got injected. Remove once verified.
-  console.log('[engine] run', {
-    persona: persona.name,
-    runtime: runtime.name,
-    runtimeId: runtime.id,
-    kind: runtime.kind,
-    mode: policy.mode,
-    approvalPort: runApprovalPort,
-    command,
-    args,
-  });
-
   const env: Record<string, string> = {
     STARSHIP_DISPATCH_ID: dispatchId,
     STARSHIP_PERSONA_ID: persona.id,

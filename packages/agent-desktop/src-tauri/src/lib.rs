@@ -766,7 +766,9 @@ fn set_hermes_hook(app: &tauri::AppHandle, script: &Path, enable: bool) -> Resul
             if enable {
                 let mut entry = serde_yaml::Mapping::new();
                 entry.insert(s("command"), serde_yaml::Value::String(script_str.clone()));
-                entry.insert(s("timeout"), serde_yaml::Value::Number(300.into()));
+                // Exceed the approval server's 600s deny timeout so the server drives the timeout,
+                // not Hermes killing the hook mid-wait and stranding the open dialog.
+                entry.insert(s("timeout"), serde_yaml::Value::Number(601.into()));
                 seq.push(serde_yaml::Value::Mapping(entry));
             }
             if seq.is_empty() {

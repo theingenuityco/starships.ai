@@ -1,5 +1,6 @@
 // Bindings for the Rust commands exposed by the Tauri shell (src-tauri/src/lib.rs).
 import { Channel, invoke } from '@tauri-apps/api/core';
+import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { hostname as osHostname } from '@tauri-apps/plugin-os';
 
@@ -32,12 +33,40 @@ export const detectAgents = () => invoke<DetectedAgent[]>('detect_agents');
 export const runAgent = (args: { command: string; args: string[]; env: Record<string, string>; onEvent: Channel<StreamMsg> }) =>
   invoke<RunResult>('run_agent', args);
 
+/**
+ * Run a duplex (bidirectional) process — stdin stays piped and is keyed by `runId` so
+ * `sendAgentInput` can write to it mid-run. Used for codex app-server JSON-RPC.
+ */
+export const runAgentDuplex = (args: {
+  runId: string;
+  command: string;
+  args: string[];
+  env: Record<string, string>;
+  onEvent: Channel<StreamMsg>;
+}) => invoke<RunResult>('run_agent_duplex', args);
+
+/** Write one line (a JSON-RPC frame) to a duplex run's stdin. */
+export const sendAgentInput = (runId: string, data: string) => invoke<void>('send_agent_input', { runId, data });
+
+/** Close a duplex run's stdin (EOF) so a persistent server (codex app-server) shuts down. */
+export const closeAgentInput = (runId: string) => invoke<void>('close_agent_input', { runId });
+
 // Local state lives in Rust-managed 0600 files under the app-data dir (not the
 // webview's localStorage) so anything sensitive stays out of reach of in-page
-// script. Config (runtimes/personas/heartbeats) is one JSON blob; conversations
-// and events are append-only JSONL (see src-tauri lib.rs).
+// script. store.json is a small blob (heartbeats/providers/onboarding); personas
+// and runtimes are one-file-per-record under config/; conversations and events are
+// append-only JSONL (see src-tauri lib.rs).
 export const readStoreRaw = () => invoke<string>('read_store');
 export const writeStoreRaw = (json: string) => invoke<void>('write_store', { json });
+
+// Personas + runtimes: one JSON file per record under config/. list_* returns each
+// record's raw JSON string (the store parses); write/delete are keyed by record id.
+export const listPersonasRaw = () => invoke<string[]>('list_personas');
+export const writePersonaRaw = (id: string, json: string) => invoke<void>('write_persona', { id, json });
+export const deletePersonaRaw = (id: string) => invoke<void>('delete_persona', { id });
+export const listRuntimesRaw = () => invoke<string[]>('list_runtimes');
+export const writeRuntimeRaw = (id: string, json: string) => invoke<void>('write_runtime', { id, json });
+export const deleteRuntimeRaw = (id: string) => invoke<void>('delete_runtime', { id });
 
 /** A thread's filename id + raw header JSONL line + file mtime, for the sidebar list. */
 export interface ConversationHeaderRaw {
@@ -66,6 +95,69 @@ export const readEventsRaw = () => invoke<string>('read_events');
 
 /** Raw JSONL of a CLI run's transcript by session id, or null if none on disk. */
 export const readAgentTranscript = (sessionId: string) => invoke<string | null>('read_agent_transcript', { sessionId });
+
+// ---- Tool-permission approvals (claude-code mid-run) ----
+
+/** A decision for a gated tool call. `allow-session` = allow for the rest of this run. */
+export type ApprovalDecision = 'allow' | 'allow-session' | 'deny';
+
+/** One gated tool call awaiting a decision, emitted by the loopback approval server. */
+export interface PermissionRequest {
+  /** Opaque id to resolve this specific parked request. */
+  id: string;
+  /** Correlation key: the run's dispatchId (preferred) or the CLI's own session id. */
+  correlation: string;
+  /** Which CLI's hook posted: 'claude-code' | 'hermes' | 'cursor'. */
+  runtime: string;
+  toolName: string;
+  toolInput: unknown;
+}
+
+/** Loopback approval-server port (0 = server failed to start; mid-run approval disabled). */
+export const approvalPort = () => invoke<number>('approval_port');
+
+/** Deliver a decision back to a parked hook request. */
+export const resolveApproval = (id: string, decision: ApprovalDecision) => invoke<void>('resolve_approval', { id, decision });
+
+/** Install (enable) or release a file-based hook for 'hermes' | 'cursor'. Ref-counted. */
+export const setRuntimeHook = (runtime: 'hermes' | 'cursor', port: number, enable: boolean) =>
+  invoke<void>('set_runtime_hook', { runtime, port, enable });
+
+/** Write a per-run claude settings file (hooks load from files, not inline). Returns its path. */
+export const writeRunSettings = (dispatchId: string, contents: string) =>
+  invoke<string>('write_run_settings', { dispatchId, contents });
+
+/** Delete a per-run claude settings file. */
+export const removeRunSettings = (dispatchId: string) => invoke<void>('remove_run_settings', { dispatchId });
+
+/** Subscribe to gated tool calls. Returns an unlisten fn; no-op resolver outside Tauri. */
+export async function onPermissionRequest(cb: (req: PermissionRequest) => void): Promise<UnlistenFn> {
+  if (!isTauri()) return () => {};
+  try {
+    return await listen<PermissionRequest>('permission-request', (e) => cb(e.payload));
+  } catch {
+    return () => {};
+  }
+}
+
+// ---- In-house agent-runtime sidecar + provider keys ----
+
+/** Base URL of the local agent-runtime sidecar, starting it lazily on first use. */
+export const runtimeBaseUrl = () => invoke<string>('runtime_base_url');
+
+/** Presence + masked last-4 hint for a stored provider key (never the secret itself). */
+export interface SecretStatus {
+  provider: string;
+  present: boolean;
+  hint: string;
+}
+
+/** Store a provider API key in the OS keychain (restarts the sidecar to pick it up). */
+export const setSecret = (provider: string, key: string) => invoke<void>('set_secret', { provider, key });
+/** Delete a stored provider API key (idempotent; restarts the sidecar). */
+export const deleteSecret = (provider: string) => invoke<void>('delete_secret', { provider });
+/** Presence + hint for every supported provider key. */
+export const secretStatus = () => invoke<SecretStatus[]>('secret_status');
 
 /** Hostname for naming runtimes stably per machine; falls back gracefully. */
 export async function hostname(): Promise<string> {

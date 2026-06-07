@@ -7,14 +7,66 @@
 //   - The activity log is append-only JSONL in `events.jsonl` (append_event).
 //   - Conversations live one-file-per-thread; see ./conversations.
 import { useSyncExternalStore } from 'react';
-import { appendEvent, isTauri, readEventsRaw, readStoreRaw, writeStoreRaw } from './tauri';
+import {
+  appendEvent,
+  deletePersonaRaw,
+  deleteRuntimeRaw,
+  isTauri,
+  listPersonasRaw,
+  listRuntimesRaw,
+  readEventsRaw,
+  readStoreRaw,
+  writePersonaRaw,
+  writeRuntimeRaw,
+  writeStoreRaw,
+} from './tauri';
 import { deleteConversationsForPersona } from './conversations';
-import type { PermissionPolicy } from './permissions';
+import { DEFAULT_PERMISSIONS, type PermissionPolicy } from './permissions';
 
 export type { PermissionPolicy } from './permissions';
-export { DEFAULT_PERMISSIONS } from './permissions';
+export { DEFAULT_PERMISSIONS };
 
-export type RuntimeKind = 'claude-code' | 'codex' | 'hermes' | 'openclaw' | 'custom';
+export type RuntimeKind = 'claude-code' | 'codex' | 'hermes' | 'custom' | 'starship';
+
+/** Providers the in-house runtime supports (BYO key). */
+export type ProviderId = 'anthropic' | 'openai';
+
+/**
+ * Current chat models offered in the persona model picker, grouped by provider.
+ * The starship runtime infers the provider from the model id (see starshipClient.resolveProvider),
+ * so each id must keep its provider-identifying prefix (`claude-*` → Anthropic, `gpt-*` → OpenAI).
+ */
+export const MODEL_OPTIONS: { provider: ProviderId; label: string; models: { id: string; label: string }[] }[] = [
+  {
+    provider: 'anthropic',
+    label: 'Anthropic',
+    models: [
+      { id: 'claude-opus-4-8', label: 'Claude Opus 4.8' },
+      { id: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6' },
+      { id: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5' },
+    ],
+  },
+  {
+    provider: 'openai',
+    label: 'OpenAI',
+    models: [
+      { id: 'gpt-5.5', label: 'GPT-5.5' },
+      { id: 'gpt-5.4', label: 'GPT-5.4' },
+      { id: 'gpt-5.4-mini', label: 'GPT-5.4 mini' },
+    ],
+  },
+];
+
+/**
+ * Non-secret metadata for a provider key. The secret lives in the OS keychain (Rust);
+ * here we only track validation state for the Settings UI. Presence + masked hint come
+ * from `secretStatus()`, not this.
+ */
+export interface ProviderMeta {
+  provider: ProviderId;
+  status: 'untested' | 'valid' | 'invalid';
+  lastValidatedAt?: string;
+}
 
 /** A local agent CLI we know how to drive. `executor` is the command template. */
 export interface Runtime {
@@ -63,25 +115,29 @@ export interface AgentEvent {
   createdAt: string;
 }
 
-/** In-memory app state. `events` is loaded from `events.jsonl`; the rest is the
- *  `store.json` config blob. Conversations are not held here (see ./conversations). */
+/** In-memory app state, assembled from several stores: `personas`/`runtimes` are
+ *  one-file-per-record under `config/`, `events` is `events.jsonl`, and the rest is the
+ *  small `store.json` blob. Conversations are not held here (see ./conversations). */
 export interface StoreData {
   runtimes: Runtime[];
   personas: Persona[];
   heartbeats: Heartbeat[];
   events: AgentEvent[];
+  /** Provider-key validation metadata (the secrets live encrypted in config/, not here). */
+  providers: ProviderMeta[];
   /** Set once the first-run onboarding wizard is completed (or skipped). Absent = show it. */
   onboardedAt?: string;
 }
 
-/** The persisted-to-`store.json` subset (everything except the append-only event log). */
-type ConfigData = Omit<StoreData, 'events'>;
+/** The subset persisted to the `store.json` blob. Personas + runtimes are stored per-record
+ *  under config/ (see persistPersona/persistRuntime); events append to their own log. */
+type ConfigData = Pick<StoreData, 'heartbeats' | 'providers' | 'onboardedAt'>;
 
 /** Bump when `store.json` / event-line shapes change incompatibly. Persisted for
  *  forward-looking migrations; we don't migrate anything yet. */
 const SCHEMA_VERSION = 1;
 
-const EMPTY: StoreData = { runtimes: [], personas: [], heartbeats: [], events: [] };
+const EMPTY: StoreData = { runtimes: [], personas: [], heartbeats: [], events: [], providers: [] };
 
 const uid = () => crypto.randomUUID();
 const now = () => new Date().toISOString();
@@ -93,11 +149,24 @@ const emit = () => listeners.forEach((l) => l());
 function coerceConfig(raw: unknown): ConfigData {
   const d = (raw ?? {}) as Partial<ConfigData>;
   return {
-    runtimes: Array.isArray(d.runtimes) ? d.runtimes : [],
-    personas: Array.isArray(d.personas) ? d.personas : [],
     heartbeats: Array.isArray(d.heartbeats) ? d.heartbeats : [],
+    providers: Array.isArray(d.providers) ? d.providers : [],
     onboardedAt: typeof d.onboardedAt === 'string' ? d.onboardedAt : undefined,
   };
+}
+
+/** Parse one-file-per-record JSON strings into typed records; skip unparseable / id-less ones. */
+function parseRecords<T extends { id: string }>(raw: string[]): T[] {
+  const out: T[] = [];
+  for (const line of raw) {
+    try {
+      const v = JSON.parse(line) as T;
+      if (v && typeof v.id === 'string') out.push(v);
+    } catch {
+      // skip
+    }
+  }
+  return out;
 }
 
 /** Parse the append-only event log; skip unparseable / forward-compat lines. */
@@ -124,6 +193,8 @@ export async function initStore(): Promise<void> {
   }
   let config: ConfigData = coerceConfig({});
   let events: AgentEvent[] = [];
+  let personas: Persona[] = [];
+  let runtimes: Runtime[] = [];
   try {
     config = coerceConfig(JSON.parse(await readStoreRaw()));
   } catch {
@@ -134,27 +205,58 @@ export async function initStore(): Promise<void> {
   } catch {
     // keep defaults
   }
-  data = { ...config, events };
+  try {
+    personas = parseRecords<Persona>(await listPersonasRaw());
+  } catch {
+    // keep defaults
+  }
+  try {
+    runtimes = parseRecords<Runtime>(await listRuntimesRaw());
+  } catch {
+    // keep defaults
+  }
+  data = { ...config, personas, runtimes, events };
   emit();
 }
 
-/** Persist the config subset (not events — those append independently). */
+/** Persist the small `store.json` blob (heartbeats/providers/onboarding). Personas, runtimes,
+ *  and events each persist independently (per-record files / append-only log). */
 function persistConfig(): void {
   if (!isTauri()) return;
   const config = {
     schemaVersion: SCHEMA_VERSION,
-    runtimes: data.runtimes,
-    personas: data.personas,
     heartbeats: data.heartbeats,
+    providers: data.providers,
     onboardedAt: data.onboardedAt,
   };
   writeStoreRaw(JSON.stringify(config)).catch((err) => console.error('[store] write failed:', err));
 }
 
-function commit(next: StoreData): void {
+/** Update in-memory state + notify, without touching disk. Disk writes are the caller's job
+ *  (persistConfig for the blob, the persist/remove record helpers for per-record files). */
+function setData(next: StoreData): void {
   data = next;
   emit();
+}
+
+/** blob mutators (heartbeats/providers/onboarding) keep the read-modify-write-blob shape. */
+function commit(next: StoreData): void {
+  setData(next);
   persistConfig();
+}
+
+// Per-record persistence for the config/ folder (personas + runtimes).
+function persistPersona(p: Persona): void {
+  if (isTauri()) writePersonaRaw(p.id, JSON.stringify(p)).catch((err) => console.error('[store] persona write failed:', err));
+}
+function removePersonaFile(id: string): void {
+  if (isTauri()) deletePersonaRaw(id).catch((err) => console.error('[store] persona delete failed:', err));
+}
+function persistRuntime(r: Runtime): void {
+  if (isTauri()) writeRuntimeRaw(r.id, JSON.stringify(r)).catch((err) => console.error('[store] runtime write failed:', err));
+}
+function removeRuntimeFile(id: string): void {
+  if (isTauri()) deleteRuntimeRaw(id).catch((err) => console.error('[store] runtime delete failed:', err));
 }
 
 // ---- React binding ----
@@ -168,16 +270,20 @@ export const useStore = (): StoreData => useSyncExternalStore(subscribe, getStor
 // ---- Runtimes ----
 export function addRuntime(input: { name: string; kind: RuntimeKind; executor: string }): Runtime {
   const rt: Runtime = { id: uid(), createdAt: now(), ...input };
-  commit({ ...data, runtimes: [...data.runtimes, rt] });
+  setData({ ...data, runtimes: [...data.runtimes, rt] });
+  persistRuntime(rt);
   return rt;
 }
 export function removeRuntime(id: string): void {
-  commit({
+  // Unassign personas that pointed at this runtime; each changed persona is its own file.
+  const reassigned = data.personas.filter((p) => p.runtimeId === id).map((p): Persona => ({ ...p, runtimeId: null }));
+  setData({
     ...data,
     runtimes: data.runtimes.filter((r) => r.id !== id),
-    // Unassign personas that pointed at this runtime.
     personas: data.personas.map((p) => (p.runtimeId === id ? { ...p, runtimeId: null } : p)),
   });
+  removeRuntimeFile(id);
+  reassigned.forEach(persistPersona);
 }
 
 // ---- Personas ----
@@ -190,18 +296,52 @@ export function addPersona(input: {
   permissions?: PermissionPolicy;
 }): Persona {
   const p: Persona = { id: uid(), createdAt: now(), ...input };
-  commit({ ...data, personas: [...data.personas, p] });
+  setData({ ...data, personas: [...data.personas, p] });
+  persistPersona(p);
   return p;
 }
 export function updatePersona(id: string, patch: Partial<Omit<Persona, 'id' | 'createdAt'>>): void {
-  commit({ ...data, personas: data.personas.map((p) => (p.id === id ? { ...p, ...patch } : p)) });
+  let updated: Persona | undefined;
+  setData({
+    ...data,
+    personas: data.personas.map((p) => {
+      if (p.id !== id) return p;
+      updated = { ...p, ...patch };
+      return updated;
+    }),
+  });
+  if (updated) persistPersona(updated);
 }
+/**
+ * Add tool patterns to a persona's allowlist, switching it into 'allowlist' mode if it
+ * was on its default. Used by the "Allow + rerun" affordance after a run denied a tool,
+ * and by "Allow always" in the live approval dialog. Idempotent (de-dupes).
+ */
+export function addAllowedTools(id: string, tools: string[]): void {
+  const clean = tools.map((t) => t.trim()).filter(Boolean);
+  if (!clean.length) return;
+  let updated: Persona | undefined;
+  setData({
+    ...data,
+    personas: data.personas.map((p) => {
+      if (p.id !== id) return p;
+      const cur = p.permissions ?? DEFAULT_PERMISSIONS;
+      const allow = [...new Set([...cur.allow, ...clean])];
+      updated = { ...p, permissions: { mode: 'allowlist', allow } };
+      return updated;
+    }),
+  });
+  if (updated) persistPersona(updated);
+}
+
 export function deletePersona(id: string): void {
-  commit({
+  setData({
     ...data,
     personas: data.personas.filter((p) => p.id !== id),
     heartbeats: data.heartbeats.filter((h) => h.personaId !== id),
   });
+  removePersonaFile(id);
+  persistConfig(); // heartbeats live in the blob and changed above
   // Conversations are stored separately (one file per thread) — cascade the delete.
   deleteConversationsForPersona(id);
 }
@@ -236,6 +376,21 @@ export function addEvent(input: Omit<AgentEvent, 'id' | 'createdAt'>): AgentEven
   return e;
 }
 export const eventsForPersona = (personaId: string): AgentEvent[] => data.events.filter((e) => e.personaId === personaId);
+
+// ---- Providers (BYO key metadata; secrets live in the OS keychain) ----
+export const getProviderMeta = (provider: ProviderId): ProviderMeta | undefined =>
+  data.providers.find((p) => p.provider === provider);
+
+/** Record a provider key's validation result (upsert by provider). */
+export function setProviderStatus(provider: ProviderId, status: ProviderMeta['status'], lastValidatedAt?: string): void {
+  const others = data.providers.filter((p) => p.provider !== provider);
+  commit({ ...data, providers: [...others, { provider, status, lastValidatedAt }] });
+}
+
+/** Forget a provider's metadata (after the key is removed). */
+export function clearProviderMeta(provider: ProviderId): void {
+  commit({ ...data, providers: data.providers.filter((p) => p.provider !== provider) });
+}
 
 // ---- Onboarding ----
 /** Mark first-run onboarding as done so the dashboard loads directly from now on. */

@@ -146,7 +146,9 @@ export const TOOLS: RuntimeTool[] = [
         /^192\.168\./.test(host) ||
         /^172\.(1[6-9]|2\d|3[01])\./.test(host) ||
         /^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./.test(host) ||
-        (host.includes(':') && /^(fe80|fc|fd)/.test(host));
+        // IPv6 link-local/ULA, plus IPv4-mapped IPv6 (::ffff:127.0.0.1 etc.) wholesale — an agent
+        // tool has no need for IPv4-mapped destinations, and they otherwise tunnel past the v4 checks.
+        (host.includes(':') && /^(fe80|fc|fd|::ffff:)/.test(host));
       if (blocked) {
         return 'Fetching loopback, private, or link-local addresses is not permitted.';
       }

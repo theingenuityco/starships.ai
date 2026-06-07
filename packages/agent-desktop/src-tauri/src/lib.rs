@@ -1028,18 +1028,14 @@ fn run_agent_duplex_blocking(
     let stdout = child.stdout.take().expect("piped stdout");
     let stderr = child.stderr.take().expect("piped stderr");
 
-    // TEMP debug: mirror codex app-server stdio to the terminal so failures are visible
-    // without opening devtools.
     let err_event = on_event.clone();
     let stderr_handle = std::thread::spawn(move || {
         for line in BufReader::new(stderr).lines().map_while(Result::ok) {
-            log::info!("[codex-io] err: {line}");
             let _ = err_event.send(StreamMsg::Stderr { line });
         }
     });
 
     for line in BufReader::new(stdout).lines().map_while(Result::ok) {
-        log::info!("[codex-io] out: {line}");
         let _ = on_event.send(StreamMsg::Stdout { line });
     }
     let _ = stderr_handle.join();

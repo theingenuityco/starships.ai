@@ -12,7 +12,7 @@ import { detectAgents, hostname, isTauri, type DetectedAgent } from './tauri';
 type Step = 'welcome' | 'runtime' | 'persona' | 'test' | 'done';
 const STEPS: Step[] = ['welcome', 'runtime', 'persona', 'test', 'done'];
 const SAMPLE_PROMPT = 'Say hello and tell me, in one sentence, what you can help with.';
-const RUNTIME_KINDS: RuntimeKind[] = ['claude-code', 'codex', 'hermes', 'openclaw', 'custom'];
+const RUNTIME_KINDS: RuntimeKind[] = ['claude-code', 'codex', 'hermes', 'custom'];
 
 export function Onboarding() {
   const [step, setStep] = useState<Step>('welcome');

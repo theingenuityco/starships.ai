@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useSmoothedText } from './useSmoothedText';
 import {
+  addAllowedTools,
   addHeartbeat,
   addPersona,
   addRuntime,
@@ -8,6 +10,7 @@ import {
   eventsForPersona,
   getStore,
   initStore,
+  MODEL_OPTIONS,
   removeRuntime,
   updateHeartbeat,
   updatePersona,
@@ -33,15 +36,18 @@ import { Markdown } from './markdown';
 import { detectAgents, hostname, isFullscreen, isTauri, readAgentTranscript, watchFullscreen, type DetectedAgent } from './tauri';
 import { parseClaudeTranscript, type TranscriptTurn, type TurnRole } from './transcript';
 import { Onboarding } from './Onboarding';
-import { COMMON_TOOLS, DEFAULT_PERMISSIONS, SUPPORTS_ALLOWLIST, type PermissionPolicy } from './permissions';
+import { ProviderKeys } from './ProvidersTab';
+import { COMMON_TOOLS, DEFAULT_PERMISSIONS, SUPPORTS_ALLOWLIST, SUPPORTS_APPROVAL, type PermissionPolicy } from './permissions';
 import { useLiveRun, type LiveRun } from './liveRuns';
+import { allowAlways, decideApproval, initApprovals, useApprovals } from './approvals';
 
 const KIND_LABEL: Record<string, string> = {
   'claude-code': 'Claude Code',
   codex: 'Codex',
   hermes: 'Hermes',
-  openclaw: 'OpenClaw',
+  cursor: 'Cursor',
   custom: 'Custom',
+  starship: 'Starship (built-in)',
 };
 export const kindLabel = (k: string) => KIND_LABEL[k] ?? k;
 
@@ -55,6 +61,7 @@ export default function App() {
   useEffect(() => {
     if (started.current) return;
     started.current = true;
+    initApprovals(); // subscribe to mid-run tool-approval requests (claude-code)
     Promise.all([initStore(), initConversations()]).finally(() => setBooting(false));
   }, []);
 
@@ -92,9 +99,71 @@ export default function App() {
     );
   }
 
-  if (!store.onboardedAt) return <Onboarding />;
+  return (
+    <>
+      {store.onboardedAt ? <Dashboard /> : <Onboarding />}
+      <ApprovalLayer />
+    </>
+  );
+}
 
-  return <Dashboard />;
+/**
+ * Global overlay that surfaces mid-run tool-approval requests (claude-code). The agent
+ * is paused on the other end of the loopback hook until the user answers, so we show one
+ * request at a time as a modal. "Allow always" teaches the persona (adds the tool to its
+ * allowlist) so the same tool won't ask again.
+ */
+function ApprovalLayer() {
+  const queue = useApprovals();
+  const req = queue[0];
+  if (!req) return null;
+  const more = queue.length - 1;
+  const input = (() => {
+    try {
+      const s = JSON.stringify(req.toolInput, null, 2);
+      return s && s !== 'null' ? (s.length > 1200 ? `${s.slice(0, 1200)}…` : s) : '';
+    } catch {
+      return '';
+    }
+  })();
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="w-full max-w-md rounded-xl border border-(--color-border) bg-(--color-bg-elev) p-4 shadow-xl">
+        <div className="flex items-center justify-between gap-2">
+          <div className="text-sm font-medium">Permission request</div>
+          <span className="muted text-[10px] uppercase tracking-wide">{kindLabel(req.runtime)}</span>
+        </div>
+        <div className="muted mt-0.5 text-[11px]">
+          {req.personaName ? `${req.personaName} ` : 'An agent '}wants to use a tool not on its allowlist.
+        </div>
+        <div className="mt-3 rounded-md border border-(--color-border) bg-(--color-bg) p-2">
+          <div className="text-[13px]">
+            Tool: <span className="font-mono">{req.toolName}</span>
+          </div>
+          {input ? (
+            <pre className="mt-1 max-h-48 overflow-auto whitespace-pre-wrap break-words font-mono text-[11px] leading-relaxed text-(--color-fg-muted)">
+              {input}
+            </pre>
+          ) : null}
+        </div>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <button className="btn text-xs" onClick={() => decideApproval(req.key, 'allow')}>
+            Allow once
+          </button>
+          {req.personaId ? (
+            <button className="btn-ghost text-xs" onClick={() => allowAlways(req.key)}>
+              Allow always
+            </button>
+          ) : null}
+          <button className="btn-ghost text-xs text-red-400" onClick={() => decideApproval(req.key, 'deny')}>
+            Deny
+          </button>
+          {more > 0 ? <span className="muted ml-auto text-[11px]">{more} more queued</span> : null}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 type Tab = 'new' | 'runtime' | 'personas' | 'heartbeats' | 'activity';
@@ -141,6 +210,7 @@ function Dashboard() {
   // A first message typed on the New page, handed to the freshly-created thread to auto-send.
   const [pendingMessage, setPendingMessage] = useState<string | null>(null);
   const fullscreen = useFullscreen();
+  const conversations = useConversations();
 
   // ⌘K / Ctrl+K opens the search palette from anywhere.
   useEffect(() => {
@@ -193,6 +263,20 @@ function Dashboard() {
     if (chatSelection === id) setChatSelection(null);
   };
 
+  // When a conversation is open, its breadcrumb rides inside the top strip's row
+  // so it lines up with the traffic lights and the sidebar's collapse/search
+  // controls, instead of sitting in a band below them.
+  const openConvo = chatSelection ? conversations.find((c) => c.id === chatSelection) : null;
+  const breadcrumb = openConvo ? (
+    <ConversationHeader
+      title={openConvo.title}
+      onHome={newChat}
+      onRename={(t) => updateConversationTitle(openConvo.id, t)}
+      onDelete={() => removeConversation(openConvo.id)}
+      onToggleSidebar={() => setCollapsed((c) => !c)}
+    />
+  ) : null;
+
   // App shell: a floating nav sidebar beside a flush content area. There's no
   // separate title band — the macOS traffic lights overlay the sidebar's own top
   // inset (Claude-style), so the nav sits right under them with no empty gap. The
@@ -214,7 +298,13 @@ function Dashboard() {
       )}
 
       <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-        <TopStrip collapsed={collapsed} fullscreen={fullscreen} onExpand={() => setCollapsed(false)} onSearch={() => setSearchOpen(true)} />
+        <TopStrip
+          collapsed={collapsed}
+          fullscreen={fullscreen}
+          onExpand={() => setCollapsed(false)}
+          onSearch={() => setSearchOpen(true)}
+          breadcrumb={breadcrumb}
+        />
         {chatSelection ? (
           <ChatTab
             selectedId={chatSelection}
@@ -336,7 +426,7 @@ function Sidebar({
   const personaName = (id: string) => store.personas.find((p) => p.id === id)?.name ?? 'Unknown persona';
 
   return (
-    <aside className="m-1.5 flex w-52 shrink-0 flex-col overflow-hidden rounded-lg border border-(--color-border) bg-(--color-bg-elev) px-2 pb-2 pt-1 shadow-[0_8px_30px_rgba(0,0,0,0.35)] sm:w-60 lg:mr-0 lg:w-72">
+    <aside className="m-1.5 flex w-52 shrink-0 flex-col overflow-hidden rounded-xl border border-(--color-border) bg-(--color-bg-elev) px-2 pb-2 pt-1 shadow-[0_8px_30px_rgba(0,0,0,0.35)] sm:w-60 lg:mr-0 lg:w-72">
       {/* Top toolbar: a drag spacer the traffic lights overlay, then the collapse
           and search controls — like Claude's sidebar header. Top inset is m-1.5 +
           pt-1 = 10px; left inset is m-1.5 + px-2 = 14px, so the spacer width (w-16)
@@ -478,12 +568,17 @@ function TopStrip({
   fullscreen,
   onExpand,
   onSearch,
+  breadcrumb,
 }: {
   collapsed: boolean;
   fullscreen: boolean;
   onExpand: () => void;
   onSearch: () => void;
+  breadcrumb?: ReactNode;
 }) {
+  // When a conversation is open its breadcrumb fills the row; otherwise the row is
+  // a bare drag region. The breadcrumb carries its own interior drag spacer, so the
+  // window stays movable from the empty stretch between the title and the controls.
   return (
     <div className="flex shrink-0 flex-col">
       {/* Top pad = sidebar's 10px top inset (m-1.5 + pt-1), so this row sits at the
@@ -501,8 +596,11 @@ function TopStrip({
             <IconButton title="Search (⌘K)" onClick={onSearch}>
               <SearchIcon />
             </IconButton>
-            <div data-tauri-drag-region className="h-full flex-1" />
+            {breadcrumb ? <div className="ml-1 flex min-w-0 flex-1">{breadcrumb}</div> : <div data-tauri-drag-region className="h-full flex-1" />}
           </>
+        ) : breadcrumb ? (
+          // Left-pad to the content's own inset so the breadcrumb lines up with the messages below.
+          <div className="flex min-w-0 flex-1 pl-5 sm:pl-6">{breadcrumb}</div>
         ) : (
           <div data-tauri-drag-region className="h-full w-full" />
         )}
@@ -681,7 +779,6 @@ function ChatTab({
         key={selected.id}
         conversation={selected}
         persona={store.personas.find((p) => p.id === selected.personaId)}
-        onBack={() => onSelect(null)}
         pendingMessage={pendingMessage}
         onConsumePending={onConsumePending}
       />
@@ -784,7 +881,7 @@ function PersonaSelect({
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="flex items-center gap-1.5 rounded border border-(--color-border) bg-(--color-bg-elev) px-1.5 py-0.5 text-[11px] text-(--color-fg-muted) shadow-[0_2px_12px_rgba(0,0,0,0.35)] transition-colors hover:border-(--color-border-strong) hover:text-(--color-fg)"
+        className="flex items-center gap-1.5 rounded-lg border border-(--color-border) bg-(--color-bg-elev) px-2.5 py-1 text-[12px] text-(--color-fg-muted) transition-colors hover:border-(--color-border-strong) hover:text-(--color-fg)"
       >
         <svg className="h-3 w-3 shrink-0 opacity-80" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
           <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
@@ -825,16 +922,157 @@ function PersonaSelect({
   );
 }
 
+/** Monitor/laptop glyph that leads the conversation breadcrumb (matches the app brand mark). */
+function MonitorIcon() {
+  return (
+    <svg className="h-3.5 w-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="3" width="20" height="14" rx="2" />
+      <line x1="8" y1="21" x2="16" y2="21" />
+      <line x1="12" y1="17" x2="12" y2="21" />
+    </svg>
+  );
+}
+
+/** Right-side panel toggle glyph (rounded frame with a divider toward the trailing edge). */
+function PanelIcon() {
+  return (
+    <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="3" width="18" height="18" rx="2" />
+      <line x1="15" y1="3" x2="15" y2="21" />
+    </svg>
+  );
+}
+
+/**
+ * Breadcrumb header for an open conversation: `▢ starships.ai / <title> ⌄` on the
+ * left with a panel toggle on the right. The brand mark routes home (new chat); the
+ * title carries a dropdown (rename / delete) and supports inline rename in place.
+ */
+function ConversationHeader({
+  title,
+  onHome,
+  onRename,
+  onDelete,
+  onToggleSidebar,
+}: {
+  title: string;
+  onHome: () => void;
+  onRename: (title: string) => void;
+  onDelete: () => void;
+  onToggleSidebar?: () => void;
+}) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(title);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onDown = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setMenuOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMenuOpen(false);
+    };
+    window.addEventListener('mousedown', onDown);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('mousedown', onDown);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [menuOpen]);
+
+  const startRename = () => {
+    setDraft(title);
+    setEditing(true);
+    setMenuOpen(false);
+  };
+  const commitRename = () => {
+    const next = draft.trim();
+    if (next && next !== title) onRename(next);
+    setEditing(false);
+  };
+
+  return (
+    <div className="flex h-7 min-w-0 flex-1 items-center text-[13px]">
+      <div className="flex min-w-0 items-center gap-1.5">
+        <button
+          type="button"
+          onClick={onHome}
+          title="New chat"
+          className="flex shrink-0 items-center gap-1.5 rounded-md px-1 py-0.5 text-(--color-fg) transition-colors hover:bg-(--color-accent-soft)"
+        >
+          <MonitorIcon />
+          <span className="tracking-tight">starships.ai</span>
+        </button>
+        <span className="shrink-0 text-(--color-fg-subtle)">/</span>
+        {editing ? (
+          <input
+            autoFocus
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onBlur={commitRename}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') commitRename();
+              if (e.key === 'Escape') setEditing(false);
+            }}
+            className="min-w-0 flex-1 rounded border border-(--color-border) bg-(--color-bg-elev) px-1.5 py-0.5 text-[13px] text-(--color-fg) outline-none"
+          />
+        ) : (
+          <div ref={ref} className="relative min-w-0">
+            <button
+              type="button"
+              onClick={() => setMenuOpen((o) => !o)}
+              className="flex min-w-0 items-center gap-1 rounded-md px-1 py-0.5 text-(--color-fg-muted) transition-colors hover:bg-(--color-accent-soft) hover:text-(--color-fg)"
+            >
+              <span className="truncate">{title}</span>
+              <svg className="h-3 w-3 shrink-0 opacity-70" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </button>
+            {menuOpen ? (
+              <div className="absolute left-0 top-full z-20 mt-1 w-40 overflow-hidden rounded-lg border border-(--color-border) bg-(--color-bg-elev) p-0.5 shadow-[0_8px_30px_rgba(0,0,0,0.4)]">
+                <button
+                  type="button"
+                  onClick={startRename}
+                  className="flex w-full items-center gap-2 rounded px-2 py-1 text-left text-[12px] text-(--color-fg-muted) transition-colors hover:bg-(--color-accent-soft) hover:text-(--color-fg)"
+                >
+                  Rename
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onDelete();
+                  }}
+                  className="flex w-full items-center gap-2 rounded px-2 py-1 text-left text-[12px] text-(--color-fg-muted) transition-colors hover:bg-(--color-accent-soft) hover:text-red-400"
+                >
+                  Delete chat
+                </button>
+              </div>
+            ) : null}
+          </div>
+        )}
+      </div>
+      {/* Draggable filler so the window still moves from the empty stretch of the row. */}
+      <div data-tauri-drag-region className="h-full flex-1" />
+      {onToggleSidebar ? (
+        <IconButton title="Toggle sidebar" onClick={onToggleSidebar}>
+          <PanelIcon />
+        </IconButton>
+      ) : null}
+    </div>
+  );
+}
+
 function ConversationThread({
   conversation,
   persona,
-  onBack,
   pendingMessage,
   onConsumePending,
 }: {
   conversation: ConversationRecord;
   persona?: Persona;
-  onBack: () => void;
   pendingMessage?: string | null;
   onConsumePending?: () => void;
 }) {
@@ -842,14 +1080,37 @@ function ConversationThread({
   const [running, setRunning] = useState(false);
   const [activeDispatch, setActiveDispatch] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [denied, setDenied] = useState<string[]>([]);
+  const lastTextRef = useRef('');
   const live = useLiveRun(activeDispatch);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const noRuntime = !persona?.runtimeId;
 
-  // Keep the newest content in view as messages land and tokens stream.
+  // Track whether the user is pinned to the bottom; if they scroll up to read
+  // back, we stop yanking them down on every new token.
+  const pinnedRef = useRef(true);
   useEffect(() => {
-    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    const el = scrollRef.current;
+    if (!el) return;
+    const onScroll = () => {
+      pinnedRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    };
+    el.addEventListener('scroll', onScroll, { passive: true });
+    return () => el.removeEventListener('scroll', onScroll);
+  }, []);
+
+  // Keep the newest content in view as messages land and tokens stream — but only
+  // when pinned, and coalesced into a single rAF write so streaming doesn't force
+  // a synchronous layout on every token.
+  useEffect(() => {
+    if (!pinnedRef.current) return;
+    const el = scrollRef.current;
+    if (!el) return;
+    const id = requestAnimationFrame(() => {
+      el.scrollTop = el.scrollHeight;
+    });
+    return () => cancelAnimationFrame(id);
   }, [conversation.messages.length, live?.committed.length, live?.streamingText, live?.raw]);
 
   // A conversation started from the New page carries its first message; send it
@@ -871,19 +1132,28 @@ function ConversationThread({
     if (!text || running || noRuntime) return;
     if (textArg == null) setInput('');
     setError(null);
+    setDenied([]);
+    lastTextRef.current = text;
     setRunning(true);
     // Show the user's message right away; the engine appends the agent's turns when it returns.
     appendConversationMessages(conversation.id, [{ role: 'user', text, at: new Date().toISOString() }]);
-    if (conversation.title === 'New conversation') updateConversationTitle(conversation.id, text.slice(0, 48));
     try {
       const r = await runConversationTurn(conversation.id, text, setActiveDispatch);
       if (!r.ok) setError(`Run failed${r.exitCode != null ? ` (exit ${r.exitCode})` : ''}`);
+      setDenied(r.deniedTools ?? []);
     } catch (e) {
       setError((e as Error).message);
     } finally {
       setRunning(false);
       setActiveDispatch(null);
     }
+  }
+
+  // Allow the denied tools on this conversation's persona, then resend the last prompt.
+  function allowAndRerun() {
+    if (persona) addAllowedTools(persona.id, denied);
+    setDenied([]);
+    void send(lastTextRef.current);
   }
 
   const liveTurns = live?.status === 'running' ? live.committed : [];
@@ -893,29 +1163,18 @@ function ConversationThread({
   const empty = conversation.messages.length === 0 && !running;
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col px-5 pb-8 pt-4 sm:px-6">
-      <div className="flex items-center gap-3 pb-2">
-        <button className="btn-ghost shrink-0 text-[11px]" onClick={onBack}>
-          ← New chat
-        </button>
-        <div className="min-w-0">
-          <div className="truncate text-sm">{conversation.title}</div>
-          {persona ? (
-            <div className="muted text-[11px]">
-              {persona.name}
-              {persona.model ? ` · ${persona.model}` : ''}
-            </div>
-          ) : null}
-        </div>
-      </div>
-
+    <div className="flex min-h-0 flex-1 flex-col px-5 pb-2 pt-2 sm:px-6">
       <div ref={scrollRef} className="flex-1 overflow-y-auto">
         <div className="mx-auto flex max-w-4xl flex-col gap-6 px-1 py-5">
           {empty ? <div className="muted py-16 text-center text-sm">Send a message to start the conversation.</div> : null}
           {items.map((it, i) =>
-            it.kind === 'tool' ? <ToolCard key={i} call={it.call} result={it.result} /> : <ChatMessage key={i} turn={it.turn} />
+            it.kind === 'tools' ? (
+              <ToolGroup key={i} items={it.items} defaultOpen={live?.status === 'running' && i === items.length - 1} />
+            ) : (
+              <ChatMessage key={i} turn={it.turn} />
+            )
           )}
-          {streaming ? <ChatMessage turn={{ role: 'assistant', text: streaming }} streaming /> : null}
+          {streaming ? <StreamingMessage text={streaming} /> : null}
           {rawOnly ? (
             <pre className="overflow-x-auto whitespace-pre-wrap break-words rounded-xl border border-(--color-border) bg-(--color-bg-elev) p-3 font-mono text-[11px] leading-relaxed text-(--color-fg-muted)">
               {rawOnly}
@@ -933,6 +1192,11 @@ function ConversationThread({
       <div className="mx-auto w-full max-w-4xl pt-2">
         {noRuntime ? <p className="muted mb-2 text-center text-[11px]">Assign this persona to a runtime (Personas tab) to chat.</p> : null}
         {error ? <p className="mb-2 text-center text-[11px] text-red-400">{error}</p> : null}
+        {!running && denied.length ? (
+          <div className="mb-2">
+            <DenialBanner tools={denied} onAllowRerun={allowAndRerun} busy={running} />
+          </div>
+        ) : null}
         <Composer
           value={input}
           onChange={setInput}
@@ -946,8 +1210,31 @@ function ConversationThread({
   );
 }
 
+/**
+ * Shown after a run that the permission policy blocked: names the denied tools and
+ * offers a one-click "add them to this persona's allowlist and run the same prompt
+ * again". The universal fallback for every runtime — for claude-code, mid-run approval
+ * (the live dialog) means this is rarely hit, but it still catches anything denied
+ * unattended.
+ */
+function DenialBanner({ tools, onAllowRerun, busy }: { tools: string[]; onAllowRerun: () => void; busy?: boolean }) {
+  if (!tools.length) return null;
+  const many = tools.length > 1;
+  return (
+    <div className="mt-2 rounded-md border border-amber-500/30 bg-amber-500/10 p-2 text-[11px]">
+      <div className="text-amber-300">
+        Blocked {many ? 'tools' : 'tool'}: <span className="font-mono">{tools.join(', ')}</span>
+      </div>
+      <div className="muted mt-0.5">The agent asked to use {many ? 'tools' : 'a tool'} this persona's permissions don't allow.</div>
+      <button className="btn-ghost mt-1 text-[11px] text-amber-300 disabled:opacity-50" onClick={onAllowRerun} disabled={busy}>
+        Allow {many ? 'them' : 'it'} + rerun
+      </button>
+    </div>
+  );
+}
+
 /** One rendered chat turn: user → right bubble, assistant → full-width Markdown prose. */
-function ChatMessage({ turn, streaming }: { turn: TranscriptTurn; streaming?: boolean }) {
+function ChatMessage({ turn }: { turn: TranscriptTurn }) {
   if (turn.role === 'user') {
     return (
       <div className="flex justify-end">
@@ -960,60 +1247,231 @@ function ChatMessage({ turn, streaming }: { turn: TranscriptTurn; streaming?: bo
   return (
     <div className="px-0.5">
       <Markdown text={turn.text} />
-      {streaming ? <span className="caret-md" /> : null}
     </div>
   );
 }
 
-type ChatItem = { kind: 'msg'; turn: TranscriptTurn } | { kind: 'tool'; call: TranscriptTurn; result?: TranscriptTurn };
+/**
+ * In-flight assistant text. Smoothed to a steady type-out and rendered as plain
+ * text rather than Markdown: the Markdown parser re-parses the whole message on
+ * every render, which is O(n²) across a streaming message and the main source of
+ * mid-stream jank. The committed turn re-renders as full Markdown once the message
+ * finalizes (the `assistant` event supersedes this buffer), so formatting still
+ * lands — just not on every token.
+ */
+function StreamingMessage({ text }: { text: string }) {
+  const shown = useSmoothedText(text);
+  return (
+    <div className="px-0.5">
+      <p className="md-p whitespace-pre-wrap break-words text-[15px] leading-relaxed text-(--color-fg)">
+        {shown}
+        <span className="caret-md" />
+      </p>
+    </div>
+  );
+}
 
-/** Fold a flat turn list into render items, pairing each tool call with its following result. */
+type ToolPair = { call: TranscriptTurn; result?: TranscriptTurn };
+type ChatItem = { kind: 'msg'; turn: TranscriptTurn } | { kind: 'tools'; items: ToolPair[] };
+
+/**
+ * Match a cluster's tool calls to their results. Parallel tool use arrives as
+ * `tool, tool, result, result` with the results ordered by `tool_use` id rather
+ * than position, so pair by id first; fall back to positional order for runtimes
+ * (e.g. Codex) that emit no ids. Results with no matching call render on their own.
+ */
+function buildPairs(calls: TranscriptTurn[], results: TranscriptTurn[]): ToolPair[] {
+  const byId = new Map<string, TranscriptTurn>();
+  for (const r of results) if (r.id) byId.set(r.id, r);
+  const loose = results.filter((r) => !r.id);
+  const used = new Set<TranscriptTurn>();
+  let looseIdx = 0;
+
+  const pairs: ToolPair[] = calls.map((call) => {
+    let result: TranscriptTurn | undefined;
+    if (call.id && byId.has(call.id)) {
+      result = byId.get(call.id);
+    } else if (looseIdx < loose.length) {
+      result = loose[looseIdx++];
+    }
+    if (result) used.add(result);
+    return { call, result };
+  });
+
+  for (const r of results) {
+    if (!used.has(r)) pairs.push({ call: { role: 'tool', text: '', tool: r.tool ?? 'result' }, result: r });
+  }
+  return pairs;
+}
+
+/**
+ * Fold a flat turn list into render items. Runs of consecutive tool calls/results
+ * collapse into a single `tools` group (the way Claude's app clusters back-to-back
+ * tool use between prose turns), with calls paired to results by id within each run.
+ */
 function groupTurns(turns: TranscriptTurn[]): ChatItem[] {
   const items: ChatItem[] = [];
-  for (let i = 0; i < turns.length; i++) {
-    const t = turns[i];
-    if (t.role === 'tool') {
-      const next = turns[i + 1];
-      if (next?.role === 'result') {
-        items.push({ kind: 'tool', call: t, result: next });
-        i++;
-      } else {
-        items.push({ kind: 'tool', call: t });
-      }
-    } else if (t.role === 'result') {
-      items.push({ kind: 'tool', call: { role: 'tool', text: '', tool: t.tool ?? 'result' }, result: t });
-    } else {
+  let calls: TranscriptTurn[] = [];
+  let results: TranscriptTurn[] = [];
+  const flush = () => {
+    if (calls.length || results.length) items.push({ kind: 'tools', items: buildPairs(calls, results) });
+    calls = [];
+    results = [];
+  };
+  for (const t of turns) {
+    if (t.role === 'tool') calls.push(t);
+    else if (t.role === 'result') results.push(t);
+    else {
+      flush();
       items.push({ kind: 'msg', turn: t });
     }
   }
+  flush();
   return items;
 }
 
-/** A collapsible tool-use card (call + result), styled like Claude's tool pills. */
-function ToolCard({ call, result }: { call: TranscriptTurn; result?: TranscriptTurn }) {
-  const [open, setOpen] = useState(false);
+/** Pretty-print a compact JSON input string; fall back to the raw text if it isn't JSON. */
+function prettyInput(text: string): string {
+  try {
+    return JSON.stringify(JSON.parse(text), null, 2);
+  } catch {
+    return text;
+  }
+}
+
+/** Best-effort human label for a tool call: a verb plus a concise target (file, command, pattern). */
+function toolLabel(call: TranscriptTurn): { verb: string; detail: string } {
+  const name = call.tool ?? 'tool';
+  let input: Record<string, unknown> = {};
+  try {
+    if (call.text) input = JSON.parse(call.text) as Record<string, unknown>;
+  } catch {
+    // non-JSON input (e.g. Codex shell commands stored as raw text)
+  }
+  const str = (v: unknown) => (typeof v === 'string' ? v : '');
+  const base = (v: unknown) => {
+    const s = str(v);
+    return s ? (s.split('/').pop() ?? s) : '';
+  };
+  const firstLine = (v: unknown) => str(v).split('\n')[0];
+  switch (name) {
+    case 'Read':
+      return { verb: 'Read', detail: base(input.file_path) };
+    case 'Write':
+      return { verb: 'Wrote', detail: base(input.file_path) };
+    case 'Edit':
+    case 'NotebookEdit':
+      return { verb: 'Edited', detail: base(input.file_path) };
+    case 'Bash':
+    case 'shell':
+      return { verb: 'Ran', detail: firstLine(input.command) || firstLine(call.text) };
+    case 'Grep':
+      return { verb: 'Searched', detail: str(input.pattern) };
+    case 'Glob':
+      return { verb: 'Found files', detail: str(input.pattern) };
+    case 'WebFetch':
+      return { verb: 'Fetched', detail: str(input.url) };
+    case 'WebSearch':
+      return { verb: 'Searched web', detail: str(input.query) };
+    case 'Task':
+      return { verb: 'Delegated', detail: str(input.description) };
+    case 'result':
+      return { verb: 'Tool result', detail: '' };
+    default:
+      return { verb: name, detail: firstLine(input.command || input.file_path || input.path) };
+  }
+}
+
+/** A rotating disclosure chevron, shared by tool rows and group headers. */
+function Chevron({ open }: { open: boolean }) {
   return (
-    <div className="overflow-hidden rounded-xl border border-(--color-border) bg-(--color-bg-elev)">
+    <svg
+      className={`shrink-0 transition-transform ${open ? 'rotate-90' : ''}`}
+      width="11"
+      height="11"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="m9 18 6-6-6-6" />
+    </svg>
+  );
+}
+
+/**
+ * Condense a run of tool calls into a header phrase: verbs in first-seen order,
+ * with a "×n" suffix when one verb repeats (e.g. "Read ×3 · Edited · Ran").
+ */
+function groupSummary(items: ToolPair[]): string {
+  const counts = new Map<string, number>();
+  for (const p of items) {
+    const v = toolLabel(p.call).verb;
+    counts.set(v, (counts.get(v) ?? 0) + 1);
+  }
+  return [...counts.entries()].map(([v, n]) => (n > 1 ? `${v} ×${n}` : v)).join(' · ');
+}
+
+/** One clickable tool row: a text line that expands an inline details card (call input + result). */
+function ToolRow({ pair }: { pair: ToolPair }) {
+  const [open, setOpen] = useState(false);
+  const { call, result } = pair;
+  const { verb, detail } = toolLabel(call);
+  return (
+    <div>
       <button
-        className="flex w-full items-center gap-2 px-3 py-2 text-left text-[13px] text-(--color-fg-muted) hover:bg-(--color-bg-soft)"
+        className="flex w-full items-center gap-1.5 rounded-md px-1 py-1 text-left text-[13px] text-(--color-fg-subtle) hover:bg-(--color-bg-soft) hover:text-(--color-fg-muted)"
         onClick={() => setOpen((o) => !o)}
       >
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
-        </svg>
-        <span className="font-medium">{call.tool ?? 'tool'}</span>
-        <span className="ml-auto text-[11px] text-(--color-fg-subtle)">{open ? 'Hide' : 'Details'}</span>
+        <Chevron open={open} />
+        <span className="shrink-0 font-medium text-(--color-fg-muted)">{verb}</span>
+        {detail ? <span className="truncate font-mono text-[12px]">{detail}</span> : null}
       </button>
       {open ? (
-        <div className="space-y-2 border-t border-(--color-border) px-3 py-2.5">
+        <div className="mb-1 ml-[18px] mt-1.5 space-y-2 rounded-lg border border-(--color-border) bg-(--color-bg-elev) px-3 py-2.5">
           {call.text ? (
-            <pre className="overflow-x-auto whitespace-pre-wrap break-words font-mono text-[11px] leading-relaxed text-(--color-fg-muted)">{call.text}</pre>
+            <pre className="overflow-x-auto whitespace-pre-wrap break-words font-mono text-[11px] leading-relaxed text-(--color-fg-muted)">
+              {prettyInput(call.text)}
+            </pre>
           ) : null}
           {result?.text ? (
-            <pre className="overflow-x-auto whitespace-pre-wrap break-words border-t border-(--color-border) pt-2 font-mono text-[11px] leading-relaxed text-(--color-fg-muted)">
+            <pre
+              className={`overflow-x-auto whitespace-pre-wrap break-words font-mono text-[11px] leading-relaxed text-(--color-fg-muted) ${call.text ? 'border-t border-(--color-border) pt-2' : ''}`}
+            >
               {result.text}
             </pre>
           ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * A run of consecutive tool calls. A single call renders as a bare row; multiple
+ * collapse under one summary header (Claude-app style) that expands to the rows,
+ * connected by a left rail. Each row still expands to its own details.
+ */
+function ToolGroup({ items, defaultOpen = false }: { items: ToolPair[]; defaultOpen?: boolean }) {
+  const [open, setOpen] = useState(defaultOpen);
+  if (items.length === 1) return <ToolRow pair={items[0]} />;
+  return (
+    <div>
+      <button
+        className="flex w-full items-center gap-1.5 rounded-md px-1 py-1 text-left text-[13px] text-(--color-fg-subtle) hover:bg-(--color-bg-soft) hover:text-(--color-fg-muted)"
+        onClick={() => setOpen((o) => !o)}
+      >
+        <Chevron open={open} />
+        <span className="truncate font-medium text-(--color-fg-muted)">{groupSummary(items)}</span>
+        <span className="ml-auto shrink-0 text-[11px] text-(--color-fg-subtle)">{items.length} steps</span>
+      </button>
+      {open ? (
+        <div className="ml-[5px] mt-0.5 flex flex-col gap-0.5 border-l border-(--color-border) pl-3">
+          {items.map((pair, i) => (
+            <ToolRow key={i} pair={pair} />
+          ))}
         </div>
       ) : null}
     </div>
@@ -1047,7 +1505,7 @@ function Composer({
   const canSend = !disabled && !running && value.trim().length > 0;
 
   return (
-    <div className="flex items-end gap-1 rounded-lg border border-(--color-border) bg-(--color-bg-elev) px-2 py-2 shadow-[0_2px_18px_rgba(0,0,0,0.35)] transition-colors focus-within:border-(--color-border-strong)">
+    <div className="flex items-end gap-1 rounded-xl border border-(--color-border) bg-(--color-bg-elev) px-2 py-2 shadow-[0_2px_18px_rgba(0,0,0,0.35)] transition-colors focus-within:border-(--color-border-strong)">
       <textarea
         ref={ref}
         rows={1}
@@ -1105,6 +1563,11 @@ function RuntimeTab() {
     addRuntime({ name: `${kindLabel(d.kind)} · ${host}`, kind: d.kind as RuntimeKind, executor });
   }
 
+  const builtinRuntime = store.runtimes.find((r) => r.kind === 'starship');
+  function addBuiltin() {
+    addRuntime({ name: 'Starship', kind: 'starship', executor: 'starship' });
+  }
+
   return (
     <Page title="Runtimes" count={store.runtimes.length}>
       {store.runtimes.length === 0 ? (
@@ -1116,6 +1579,26 @@ function RuntimeTab() {
           ))}
         </ul>
       )}
+
+      <section className="mt-2">
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="section mb-0">Built-in runtime</h2>
+          {!builtinRuntime ? (
+            <button className="btn" onClick={addBuiltin}>
+              Add Starship
+            </button>
+          ) : null}
+        </div>
+        <p className="muted text-[11px]">
+          Runs the agent loop in-process with your own API keys — no external CLI. One runtime serves both providers;
+          a persona’s model picks which one runs.
+        </p>
+        {builtinRuntime ? (
+          <ProviderKeys />
+        ) : (
+          <p className="muted text-sm">Add the Starship runtime to configure provider keys.</p>
+        )}
+      </section>
 
       <section className="mt-2">
         <h2 className="section">Detected on this machine</h2>
@@ -1227,7 +1710,10 @@ function NewPersonaForm({
   return (
     <div className="mt-2 flex flex-col gap-2 rounded-md border border-(--color-border) p-2">
       <input className="inp text-xs" placeholder="Persona name" value={name} onChange={(e) => setName(e.target.value)} autoFocus />
-      <input className="inp text-xs" placeholder="Model (optional, e.g. claude-opus-4-8)" value={model} onChange={(e) => setModel(e.target.value)} />
+      <label className="flex items-center gap-2 text-[11px]">
+        <span className="muted shrink-0">Model</span>
+        <ModelSelect value={model} onChange={setModel} className="inp flex-1 text-xs" />
+      </label>
       <textarea
         className="inp font-mono text-xs"
         rows={3}
@@ -1256,6 +1742,20 @@ function NewPersonaForm({
  * the CLI's default approvals, which we make explicit). `kind` is undefined before a runtime
  * is assigned (e.g. at creation).
  */
+/** Helper text under the allowlist editor, tailored to how the runtime handles approval. */
+function approvalNote(kind?: RuntimeKind): string {
+  switch (kind) {
+    case 'claude-code':
+    case 'hermes':
+    case 'codex':
+      return 'Tools you don’t list will pause and ask for approval while the app is open (denied if it’s closed).';
+    case 'custom':
+      return 'For cursor-agent, unlisted shell commands ask for approval (only Deny is reliably enforced). Other custom CLIs (aider, gemini) ignore this — use “Allow all”.';
+    default:
+      return 'This runtime runs with its default approvals; unlisted tools may be blocked in unattended runs.';
+  }
+}
+
 function PermissionEditor({
   kind,
   value,
@@ -1265,18 +1765,25 @@ function PermissionEditor({
   value: PermissionPolicy;
   onChange: (p: PermissionPolicy) => void;
 }) {
-  const supportsAllowlist = kind != null && SUPPORTS_ALLOWLIST.includes(kind);
-  const commons = value.allow.filter((t) => COMMON_TOOLS.includes(t));
-  const parseExtra = (text: string) =>
+  // Claude shows tool checkboxes (its tool names); approval-capable runtimes whose tool
+  // names differ list tools as free text. Runtimes with no approval channel get neither.
+  const showChecks = kind != null && SUPPORTS_ALLOWLIST.includes(kind);
+  const canApprove = kind != null && SUPPORTS_APPROVAL.includes(kind);
+
+  // With checkboxes, the text field holds only the non-checkbox "extra" patterns; without
+  // them it holds the whole allowlist (and must not strip names that happen to be COMMON_TOOLS).
+  const commons = showChecks ? value.allow.filter((t) => COMMON_TOOLS.includes(t)) : [];
+  const parseText = (text: string) =>
     text
       .split(',')
       .map((s) => s.trim())
-      .filter((s) => s && !COMMON_TOOLS.includes(s));
-  const [extraText, setExtraText] = useState(() => value.allow.filter((t) => !COMMON_TOOLS.includes(t)).join(', '));
+      .filter((s) => s && (!showChecks || !COMMON_TOOLS.includes(s)));
+  const initialText = showChecks ? value.allow.filter((t) => !COMMON_TOOLS.includes(t)) : value.allow;
+  const [text, setText] = useState(() => initialText.join(', '));
 
   const toggle = (tool: string) => {
     const nextCommons = commons.includes(tool) ? commons.filter((t) => t !== tool) : [...commons, tool];
-    onChange({ ...value, allow: [...nextCommons, ...parseExtra(extraText)] });
+    onChange({ ...value, allow: [...nextCommons, ...parseText(text)] });
   };
 
   return (
@@ -1291,8 +1798,8 @@ function PermissionEditor({
       </div>
 
       {value.mode === 'allowlist' ? (
-        supportsAllowlist ? (
-          <>
+        <>
+          {showChecks ? (
             <div className="flex flex-wrap gap-x-3 gap-y-1">
               {COMMON_TOOLS.map((t) => (
                 <label key={t} className="flex items-center gap-1 text-[11px]">
@@ -1301,24 +1808,46 @@ function PermissionEditor({
                 </label>
               ))}
             </div>
+          ) : null}
+          {canApprove ? (
             <input
               className="inp font-mono text-xs"
-              placeholder="Extra patterns, comma-separated (e.g. Bash(git *))"
-              value={extraText}
+              placeholder={showChecks ? 'Extra patterns, comma-separated (e.g. Bash(git *))' : 'Allowed tools, comma-separated (e.g. Shell, Read)'}
+              value={text}
               onChange={(e) => {
-                setExtraText(e.target.value);
-                onChange({ ...value, allow: [...commons, ...parseExtra(e.target.value)] });
+                setText(e.target.value);
+                onChange({ ...value, allow: [...commons, ...parseText(e.target.value)] });
               }}
             />
-          </>
-        ) : (
-          <p className="muted text-[11px]">
-            {kind ? kindLabel(kind) : 'This runtime'} runs with its default approvals; in unattended runs most tools stay
-            blocked. Use “Allow all” to let it act.
-          </p>
-        )
+          ) : null}
+          <p className="muted text-[11px]">{approvalNote(kind)}</p>
+        </>
       ) : null}
     </div>
+  );
+}
+
+/**
+ * Model picker shared by the create form and the persona card. Groups the current models by
+ * provider (<optgroup>) and keeps an empty "Default" choice (the runtime then infers provider +
+ * falls back to its default model). Any custom/legacy id already on the persona stays selectable.
+ */
+function ModelSelect({ value, onChange, className }: { value: string; onChange: (model: string) => void; className?: string }) {
+  const known = MODEL_OPTIONS.some((g) => g.models.some((m) => m.id === value));
+  return (
+    <select className={className ?? 'inp text-xs'} value={value} onChange={(e) => onChange(e.target.value)}>
+      <option value="">Default (Claude Haiku 4.5)</option>
+      {value && !known ? <option value={value}>{value} (custom)</option> : null}
+      {MODEL_OPTIONS.map((g) => (
+        <optgroup key={g.provider} label={g.label}>
+          {g.models.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.label}
+            </option>
+          ))}
+        </optgroup>
+      ))}
+    </select>
   );
 }
 
@@ -1327,6 +1856,7 @@ function PersonaCard({ persona, runtimes }: { persona: Persona; runtimes: Runtim
   const [running, setRunning] = useState(false);
   const [prompt, setPrompt] = useState('');
   const [outcome, setOutcome] = useState<string | null>(null);
+  const [denied, setDenied] = useState<string[]>([]);
   const [editPerms, setEditPerms] = useState(false);
   const [activeDispatch, setActiveDispatch] = useState<string | null>(null);
   const live = useLiveRun(activeDispatch);
@@ -1337,18 +1867,29 @@ function PersonaCard({ persona, runtimes }: { persona: Persona; runtimes: Runtim
   const permSummary =
     policy.mode === 'all' ? 'Allow all tools' : policy.allow.length ? `Restrict · ${policy.allow.join(', ')}` : 'Restrict · nothing';
 
-  async function run() {
-    if (!prompt.trim()) return;
+  async function run(textArg?: string) {
+    const text = (textArg ?? prompt).trim();
+    if (!text) return;
     setRunning(true);
     setOutcome(null);
+    setDenied([]);
     try {
-      const r = await runPersona(persona.id, prompt.trim(), setActiveDispatch);
+      const r = await runPersona(persona.id, text, setActiveDispatch);
       setOutcome(r.ok ? `Done in ${r.durationMs}ms` : `Failed${r.exitCode != null ? ` (exit ${r.exitCode})` : ''}`);
+      setDenied(r.deniedTools ?? []);
     } catch (e) {
       setOutcome((e as Error).message);
     } finally {
       setRunning(false);
     }
+  }
+
+  // Add the denied tools to this persona's allowlist, then run the same prompt again.
+  function allowAndRerun() {
+    const text = prompt.trim();
+    addAllowedTools(persona.id, denied);
+    setDenied([]);
+    void run(text);
   }
 
   return (
@@ -1382,6 +1923,15 @@ function PersonaCard({ persona, runtimes }: { persona: Persona; runtimes: Runtim
         </select>
       </label>
 
+      <label className="mt-2 flex items-center gap-2 text-[11px]">
+        <span className="muted shrink-0">Model</span>
+        <ModelSelect
+          value={persona.model ?? ''}
+          onChange={(model) => updatePersona(persona.id, { model: model || undefined })}
+          className="inp flex-1 text-xs"
+        />
+      </label>
+
       <div className="mt-2 flex flex-col gap-1">
         <div className="flex items-center justify-between gap-2 text-[11px]">
           <span className="muted truncate">Permissions · {permSummary}</span>
@@ -1408,12 +1958,13 @@ function PersonaCard({ persona, runtimes }: { persona: Persona; runtimes: Runtim
           disabled={!persona.runtimeId}
         />
         <div className="flex items-center gap-2">
-          <button className="btn text-xs" onClick={run} disabled={running || !persona.runtimeId || !prompt.trim()}>
+          <button className="btn text-xs" onClick={() => void run()} disabled={running || !persona.runtimeId || !prompt.trim()}>
             {running ? 'Running…' : 'Run now'}
           </button>
           {outcome ? <span className="muted text-[11px]">{outcome}</span> : null}
         </div>
         {live ? <LiveConversation run={live} /> : null}
+        {!running ? <DenialBanner tools={denied} onAllowRerun={allowAndRerun} busy={running} /> : null}
       </div>
 
       {open ? (

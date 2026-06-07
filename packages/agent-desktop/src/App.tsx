@@ -18,6 +18,7 @@ import {
   useStore,
   type AgentEvent,
   type Heartbeat,
+  type McpServerConfig,
   type Persona,
   type Runtime,
   type RuntimeKind,
@@ -1892,6 +1893,165 @@ function PermissionEditor({
   );
 }
 
+// ---- Toolset editor (Starship runtime: MCP servers + user bundles) ----
+
+interface McpRow {
+  id: number;
+  name: string;
+  /** A shell command line (`npx -y server`) or an https URL. */
+  conn: string;
+  /** Optional `KEY=value, KEY2=value2`. */
+  env: string;
+}
+interface BundleRow {
+  id: number;
+  name: string;
+  dir: string;
+}
+
+/** `{url}` for an https connection, else split into command + args. */
+function parseConn(conn: string): McpServerConfig {
+  const s = conn.trim();
+  if (/^https?:\/\//i.test(s)) return { url: s };
+  const [command, ...args] = s.split(/\s+/).filter(Boolean);
+  return command ? { command, args: args.length ? args : undefined } : {};
+}
+function serializeConn(cfg: McpServerConfig): string {
+  return cfg.url ?? [cfg.command, ...(cfg.args ?? [])].filter(Boolean).join(' ');
+}
+function parseEnv(env: string): Record<string, string> | undefined {
+  const out: Record<string, string> = {};
+  for (const pair of env.split(',')) {
+    const i = pair.indexOf('=');
+    if (i <= 0) continue;
+    const k = pair.slice(0, i).trim();
+    if (k) out[k] = pair.slice(i + 1).trim();
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+function serializeEnv(env?: Record<string, string>): string {
+  return env ? Object.entries(env).map(([k, v]) => `${k}=${v}`).join(', ') : '';
+}
+
+let toolsetRowId = 0;
+
+/**
+ * Edits a persona's Starship toolsets: MCP servers (`mcpServers`) and user bundles (`bundles`).
+ * Both are deferred at run time — their tools ride a catalog and load on demand via tool_search.
+ * Only meaningful for the in-house `starship` runtime; other runtimes manage tools themselves.
+ */
+function ToolsetEditor({ persona }: { persona: Persona }) {
+  const [servers, setServers] = useState<McpRow[]>(() =>
+    Object.entries(persona.mcpServers ?? {}).map(([name, cfg]) => ({
+      id: toolsetRowId++,
+      name,
+      conn: serializeConn(cfg),
+      env: serializeEnv(cfg.env),
+    }))
+  );
+  const [bundles, setBundles] = useState<BundleRow[]>(() =>
+    Object.entries(persona.bundles ?? {}).map(([name, dir]) => ({ id: toolsetRowId++, name, dir }))
+  );
+
+  // Rebuild the records from the rows and persist. Rows with a blank name are dropped.
+  const persist = (nextServers: McpRow[], nextBundles: BundleRow[]) => {
+    const mcpServers: Record<string, McpServerConfig> = {};
+    for (const r of nextServers) {
+      if (!r.name.trim()) continue;
+      mcpServers[r.name.trim()] = { ...parseConn(r.conn), env: parseEnv(r.env) };
+    }
+    const bundleMap: Record<string, string> = {};
+    for (const r of nextBundles) {
+      if (r.name.trim() && r.dir.trim()) bundleMap[r.name.trim()] = r.dir.trim();
+    }
+    updatePersona(persona.id, {
+      mcpServers: Object.keys(mcpServers).length ? mcpServers : undefined,
+      bundles: Object.keys(bundleMap).length ? bundleMap : undefined,
+    });
+  };
+
+  const setServerRows = (rows: McpRow[]) => {
+    setServers(rows);
+    persist(rows, bundles);
+  };
+  const setBundleRows = (rows: BundleRow[]) => {
+    setBundles(rows);
+    persist(servers, rows);
+  };
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-1">
+        <span className="muted text-[11px]">MCP servers</span>
+        {servers.map((row) => (
+          <div key={row.id} className="flex flex-col gap-1 rounded border border-(--color-border) p-1.5">
+            <div className="flex items-center gap-1">
+              <input
+                className="inp w-28 text-xs"
+                placeholder="name"
+                value={row.name}
+                onChange={(e) => setServerRows(servers.map((r) => (r.id === row.id ? { ...r, name: e.target.value } : r)))}
+              />
+              <input
+                className="inp flex-1 font-mono text-xs"
+                placeholder="npx -y @scope/server  ·  or https://mcp.example.com/sse"
+                value={row.conn}
+                onChange={(e) => setServerRows(servers.map((r) => (r.id === row.id ? { ...r, conn: e.target.value } : r)))}
+              />
+              <button className="btn-ghost shrink-0 text-[11px] text-red-400" onClick={() => setServerRows(servers.filter((r) => r.id !== row.id))}>
+                ✕
+              </button>
+            </div>
+            <input
+              className="inp font-mono text-[11px]"
+              placeholder="env (optional): TOKEN=abc, REGION=us"
+              value={row.env}
+              onChange={(e) => setServerRows(servers.map((r) => (r.id === row.id ? { ...r, env: e.target.value } : r)))}
+            />
+          </div>
+        ))}
+        <button
+          className="btn-ghost self-start text-[11px]"
+          onClick={() => setServerRows([...servers, { id: toolsetRowId++, name: '', conn: '', env: '' }])}
+        >
+          + Add MCP server
+        </button>
+      </div>
+
+      <div className="flex flex-col gap-1">
+        <span className="muted text-[11px]">Bundles (local tool directories)</span>
+        {bundles.map((row) => (
+          <div key={row.id} className="flex items-center gap-1">
+            <input
+              className="inp w-28 text-xs"
+              placeholder="name"
+              value={row.name}
+              onChange={(e) => setBundleRows(bundles.map((r) => (r.id === row.id ? { ...r, name: e.target.value } : r)))}
+            />
+            <input
+              className="inp flex-1 font-mono text-xs"
+              placeholder="/abs/path/to/bundle (holds toolset.json)"
+              value={row.dir}
+              onChange={(e) => setBundleRows(bundles.map((r) => (r.id === row.id ? { ...r, dir: e.target.value } : r)))}
+            />
+            <button className="btn-ghost shrink-0 text-[11px] text-red-400" onClick={() => setBundleRows(bundles.filter((r) => r.id !== row.id))}>
+              ✕
+            </button>
+          </div>
+        ))}
+        <button
+          className="btn-ghost self-start text-[11px]"
+          onClick={() => setBundleRows([...bundles, { id: toolsetRowId++, name: '', dir: '' }])}
+        >
+          + Add bundle
+        </button>
+      </div>
+
+      <p className="muted text-[11px]">Tools load on demand via tool_search, so adding many here won&apos;t bloat the prompt.</p>
+    </div>
+  );
+}
+
 /**
  * Model picker shared by the create form and the persona card. Groups the current models by
  * provider (<optgroup>) and keeps an empty "Default" choice (the runtime then infers provider +
@@ -1923,6 +2083,7 @@ function PersonaCard({ persona, runtimes }: { persona: Persona; runtimes: Runtim
   const [outcome, setOutcome] = useState<string | null>(null);
   const [denied, setDenied] = useState<string[]>([]);
   const [editPerms, setEditPerms] = useState(false);
+  const [editToolsets, setEditToolsets] = useState(false);
   const [activeDispatch, setActiveDispatch] = useState<string | null>(null);
   const live = useLiveRun(activeDispatch);
   const events = open ? eventsForPersona(persona.id).slice(-30).reverse() : [];
@@ -1931,6 +2092,12 @@ function PersonaCard({ persona, runtimes }: { persona: Persona; runtimes: Runtim
   const runtimeKind = runtimes.find((r) => r.id === persona.runtimeId)?.kind;
   const permSummary =
     policy.mode === 'all' ? 'Allow all tools' : policy.allow.length ? `Restrict · ${policy.allow.join(', ')}` : 'Restrict · nothing';
+  const serverCount = Object.keys(persona.mcpServers ?? {}).length;
+  const bundleCount = Object.keys(persona.bundles ?? {}).length;
+  const toolsetSummary =
+    serverCount || bundleCount
+      ? [serverCount && `${serverCount} MCP`, bundleCount && `${bundleCount} bundle${bundleCount === 1 ? '' : 's'}`].filter(Boolean).join(' · ')
+      : 'None';
 
   async function run(textArg?: string) {
     const text = (textArg ?? prompt).trim();
@@ -2011,6 +2178,24 @@ function PersonaCard({ persona, runtimes }: { persona: Persona; runtimes: Runtim
             onChange={(permissions) => updatePersona(persona.id, { permissions })}
           />
         ) : null}
+      </div>
+
+      <div className="mt-2 flex flex-col gap-1">
+        <div className="flex items-center justify-between gap-2 text-[11px]">
+          <span className="muted truncate">Toolsets · {toolsetSummary}</span>
+          {runtimeKind === 'starship' ? (
+            <button className="btn-ghost shrink-0 text-[11px]" onClick={() => setEditToolsets((v) => !v)}>
+              {editToolsets ? 'Done' : 'Edit'}
+            </button>
+          ) : null}
+        </div>
+        {runtimeKind === 'starship' ? (
+          editToolsets ? (
+            <ToolsetEditor persona={persona} />
+          ) : null
+        ) : (
+          <p className="muted text-[11px]">MCP servers &amp; bundles apply to the Starship runtime. Assign it to add toolsets.</p>
+        )}
       </div>
 
       <div className="mt-2 flex flex-col gap-1">

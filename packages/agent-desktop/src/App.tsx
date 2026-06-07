@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useSmoothedText } from './useSmoothedText';
 import {
+  addAllowedTools,
   addHeartbeat,
   addPersona,
   addRuntime,
@@ -33,14 +34,15 @@ import { Markdown } from './markdown';
 import { detectAgents, hostname, isFullscreen, isTauri, readAgentTranscript, watchFullscreen, type DetectedAgent } from './tauri';
 import { parseClaudeTranscript, type TranscriptTurn, type TurnRole } from './transcript';
 import { Onboarding } from './Onboarding';
-import { COMMON_TOOLS, DEFAULT_PERMISSIONS, SUPPORTS_ALLOWLIST, type PermissionPolicy } from './permissions';
+import { COMMON_TOOLS, DEFAULT_PERMISSIONS, SUPPORTS_ALLOWLIST, SUPPORTS_APPROVAL, type PermissionPolicy } from './permissions';
 import { useLiveRun, type LiveRun } from './liveRuns';
+import { allowAlways, decideApproval, initApprovals, useApprovals } from './approvals';
 
 const KIND_LABEL: Record<string, string> = {
   'claude-code': 'Claude Code',
   codex: 'Codex',
   hermes: 'Hermes',
-  openclaw: 'OpenClaw',
+  cursor: 'Cursor',
   custom: 'Custom',
 };
 export const kindLabel = (k: string) => KIND_LABEL[k] ?? k;
@@ -55,6 +57,7 @@ export default function App() {
   useEffect(() => {
     if (started.current) return;
     started.current = true;
+    initApprovals(); // subscribe to mid-run tool-approval requests (claude-code)
     Promise.all([initStore(), initConversations()]).finally(() => setBooting(false));
   }, []);
 
@@ -92,9 +95,71 @@ export default function App() {
     );
   }
 
-  if (!store.onboardedAt) return <Onboarding />;
+  return (
+    <>
+      {store.onboardedAt ? <Dashboard /> : <Onboarding />}
+      <ApprovalLayer />
+    </>
+  );
+}
 
-  return <Dashboard />;
+/**
+ * Global overlay that surfaces mid-run tool-approval requests (claude-code). The agent
+ * is paused on the other end of the loopback hook until the user answers, so we show one
+ * request at a time as a modal. "Allow always" teaches the persona (adds the tool to its
+ * allowlist) so the same tool won't ask again.
+ */
+function ApprovalLayer() {
+  const queue = useApprovals();
+  const req = queue[0];
+  if (!req) return null;
+  const more = queue.length - 1;
+  const input = (() => {
+    try {
+      const s = JSON.stringify(req.toolInput, null, 2);
+      return s && s !== 'null' ? (s.length > 1200 ? `${s.slice(0, 1200)}…` : s) : '';
+    } catch {
+      return '';
+    }
+  })();
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="w-full max-w-md rounded-xl border border-(--color-border) bg-(--color-bg-elev) p-4 shadow-xl">
+        <div className="flex items-center justify-between gap-2">
+          <div className="text-sm font-medium">Permission request</div>
+          <span className="muted text-[10px] uppercase tracking-wide">{kindLabel(req.runtime)}</span>
+        </div>
+        <div className="muted mt-0.5 text-[11px]">
+          {req.personaName ? `${req.personaName} ` : 'An agent '}wants to use a tool not on its allowlist.
+        </div>
+        <div className="mt-3 rounded-md border border-(--color-border) bg-(--color-bg) p-2">
+          <div className="text-[13px]">
+            Tool: <span className="font-mono">{req.toolName}</span>
+          </div>
+          {input ? (
+            <pre className="mt-1 max-h-48 overflow-auto whitespace-pre-wrap break-words font-mono text-[11px] leading-relaxed text-(--color-fg-muted)">
+              {input}
+            </pre>
+          ) : null}
+        </div>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <button className="btn text-xs" onClick={() => decideApproval(req.key, 'allow')}>
+            Allow once
+          </button>
+          {req.personaId ? (
+            <button className="btn-ghost text-xs" onClick={() => allowAlways(req.key)}>
+              Allow always
+            </button>
+          ) : null}
+          <button className="btn-ghost text-xs text-red-400" onClick={() => decideApproval(req.key, 'deny')}>
+            Deny
+          </button>
+          {more > 0 ? <span className="muted ml-auto text-[11px]">{more} more queued</span> : null}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 type Tab = 'new' | 'runtime' | 'personas' | 'heartbeats' | 'activity';
@@ -842,6 +907,8 @@ function ConversationThread({
   const [running, setRunning] = useState(false);
   const [activeDispatch, setActiveDispatch] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [denied, setDenied] = useState<string[]>([]);
+  const lastTextRef = useRef('');
   const live = useLiveRun(activeDispatch);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -892,18 +959,28 @@ function ConversationThread({
     if (!text || running || noRuntime) return;
     if (textArg == null) setInput('');
     setError(null);
+    setDenied([]);
+    lastTextRef.current = text;
     setRunning(true);
     // Show the user's message right away; the engine appends the agent's turns when it returns.
     appendConversationMessages(conversation.id, [{ role: 'user', text, at: new Date().toISOString() }]);
     try {
       const r = await runConversationTurn(conversation.id, text, setActiveDispatch);
       if (!r.ok) setError(`Run failed${r.exitCode != null ? ` (exit ${r.exitCode})` : ''}`);
+      setDenied(r.deniedTools ?? []);
     } catch (e) {
       setError((e as Error).message);
     } finally {
       setRunning(false);
       setActiveDispatch(null);
     }
+  }
+
+  // Allow the denied tools on this conversation's persona, then resend the last prompt.
+  function allowAndRerun() {
+    if (persona) addAllowedTools(persona.id, denied);
+    setDenied([]);
+    void send(lastTextRef.current);
   }
 
   const liveTurns = live?.status === 'running' ? live.committed : [];
@@ -953,6 +1030,11 @@ function ConversationThread({
       <div className="mx-auto w-full max-w-4xl pt-2">
         {noRuntime ? <p className="muted mb-2 text-center text-[11px]">Assign this persona to a runtime (Personas tab) to chat.</p> : null}
         {error ? <p className="mb-2 text-center text-[11px] text-red-400">{error}</p> : null}
+        {!running && denied.length ? (
+          <div className="mb-2">
+            <DenialBanner tools={denied} onAllowRerun={allowAndRerun} busy={running} />
+          </div>
+        ) : null}
         <Composer
           value={input}
           onChange={setInput}
@@ -962,6 +1044,29 @@ function ConversationThread({
           placeholder={noRuntime ? 'Assign a runtime to chat' : `Reply to ${persona?.name ?? 'agent'}…`}
         />
       </div>
+    </div>
+  );
+}
+
+/**
+ * Shown after a run that the permission policy blocked: names the denied tools and
+ * offers a one-click "add them to this persona's allowlist and run the same prompt
+ * again". The universal fallback for every runtime — for claude-code, mid-run approval
+ * (the live dialog) means this is rarely hit, but it still catches anything denied
+ * unattended.
+ */
+function DenialBanner({ tools, onAllowRerun, busy }: { tools: string[]; onAllowRerun: () => void; busy?: boolean }) {
+  if (!tools.length) return null;
+  const many = tools.length > 1;
+  return (
+    <div className="mt-2 rounded-md border border-amber-500/30 bg-amber-500/10 p-2 text-[11px]">
+      <div className="text-amber-300">
+        Blocked {many ? 'tools' : 'tool'}: <span className="font-mono">{tools.join(', ')}</span>
+      </div>
+      <div className="muted mt-0.5">The agent asked to use {many ? 'tools' : 'a tool'} this persona's permissions don't allow.</div>
+      <button className="btn-ghost mt-1 text-[11px] text-amber-300 disabled:opacity-50" onClick={onAllowRerun} disabled={busy}>
+        Allow {many ? 'them' : 'it'} + rerun
+      </button>
     </div>
   );
 }
@@ -1295,6 +1400,20 @@ function NewPersonaForm({
  * the CLI's default approvals, which we make explicit). `kind` is undefined before a runtime
  * is assigned (e.g. at creation).
  */
+/** Helper text under the allowlist editor, tailored to how the runtime handles approval. */
+function approvalNote(kind?: RuntimeKind): string {
+  switch (kind) {
+    case 'claude-code':
+    case 'hermes':
+    case 'codex':
+      return 'Tools you don’t list will pause and ask for approval while the app is open (denied if it’s closed).';
+    case 'custom':
+      return 'For cursor-agent, unlisted shell commands ask for approval (only Deny is reliably enforced). Other custom CLIs (aider, gemini) ignore this — use “Allow all”.';
+    default:
+      return 'This runtime runs with its default approvals; unlisted tools may be blocked in unattended runs.';
+  }
+}
+
 function PermissionEditor({
   kind,
   value,
@@ -1304,18 +1423,25 @@ function PermissionEditor({
   value: PermissionPolicy;
   onChange: (p: PermissionPolicy) => void;
 }) {
-  const supportsAllowlist = kind != null && SUPPORTS_ALLOWLIST.includes(kind);
-  const commons = value.allow.filter((t) => COMMON_TOOLS.includes(t));
-  const parseExtra = (text: string) =>
+  // Claude shows tool checkboxes (its tool names); approval-capable runtimes whose tool
+  // names differ list tools as free text. Runtimes with no approval channel get neither.
+  const showChecks = kind != null && SUPPORTS_ALLOWLIST.includes(kind);
+  const canApprove = kind != null && SUPPORTS_APPROVAL.includes(kind);
+
+  // With checkboxes, the text field holds only the non-checkbox "extra" patterns; without
+  // them it holds the whole allowlist (and must not strip names that happen to be COMMON_TOOLS).
+  const commons = showChecks ? value.allow.filter((t) => COMMON_TOOLS.includes(t)) : [];
+  const parseText = (text: string) =>
     text
       .split(',')
       .map((s) => s.trim())
-      .filter((s) => s && !COMMON_TOOLS.includes(s));
-  const [extraText, setExtraText] = useState(() => value.allow.filter((t) => !COMMON_TOOLS.includes(t)).join(', '));
+      .filter((s) => s && (!showChecks || !COMMON_TOOLS.includes(s)));
+  const initialText = showChecks ? value.allow.filter((t) => !COMMON_TOOLS.includes(t)) : value.allow;
+  const [text, setText] = useState(() => initialText.join(', '));
 
   const toggle = (tool: string) => {
     const nextCommons = commons.includes(tool) ? commons.filter((t) => t !== tool) : [...commons, tool];
-    onChange({ ...value, allow: [...nextCommons, ...parseExtra(extraText)] });
+    onChange({ ...value, allow: [...nextCommons, ...parseText(text)] });
   };
 
   return (
@@ -1330,8 +1456,8 @@ function PermissionEditor({
       </div>
 
       {value.mode === 'allowlist' ? (
-        supportsAllowlist ? (
-          <>
+        <>
+          {showChecks ? (
             <div className="flex flex-wrap gap-x-3 gap-y-1">
               {COMMON_TOOLS.map((t) => (
                 <label key={t} className="flex items-center gap-1 text-[11px]">
@@ -1340,22 +1466,20 @@ function PermissionEditor({
                 </label>
               ))}
             </div>
+          ) : null}
+          {canApprove ? (
             <input
               className="inp font-mono text-xs"
-              placeholder="Extra patterns, comma-separated (e.g. Bash(git *))"
-              value={extraText}
+              placeholder={showChecks ? 'Extra patterns, comma-separated (e.g. Bash(git *))' : 'Allowed tools, comma-separated (e.g. Shell, Read)'}
+              value={text}
               onChange={(e) => {
-                setExtraText(e.target.value);
-                onChange({ ...value, allow: [...commons, ...parseExtra(e.target.value)] });
+                setText(e.target.value);
+                onChange({ ...value, allow: [...commons, ...parseText(e.target.value)] });
               }}
             />
-          </>
-        ) : (
-          <p className="muted text-[11px]">
-            {kind ? kindLabel(kind) : 'This runtime'} runs with its default approvals; in unattended runs most tools stay
-            blocked. Use “Allow all” to let it act.
-          </p>
-        )
+          ) : null}
+          <p className="muted text-[11px]">{approvalNote(kind)}</p>
+        </>
       ) : null}
     </div>
   );
@@ -1366,6 +1490,7 @@ function PersonaCard({ persona, runtimes }: { persona: Persona; runtimes: Runtim
   const [running, setRunning] = useState(false);
   const [prompt, setPrompt] = useState('');
   const [outcome, setOutcome] = useState<string | null>(null);
+  const [denied, setDenied] = useState<string[]>([]);
   const [editPerms, setEditPerms] = useState(false);
   const [activeDispatch, setActiveDispatch] = useState<string | null>(null);
   const live = useLiveRun(activeDispatch);
@@ -1376,18 +1501,29 @@ function PersonaCard({ persona, runtimes }: { persona: Persona; runtimes: Runtim
   const permSummary =
     policy.mode === 'all' ? 'Allow all tools' : policy.allow.length ? `Restrict · ${policy.allow.join(', ')}` : 'Restrict · nothing';
 
-  async function run() {
-    if (!prompt.trim()) return;
+  async function run(textArg?: string) {
+    const text = (textArg ?? prompt).trim();
+    if (!text) return;
     setRunning(true);
     setOutcome(null);
+    setDenied([]);
     try {
-      const r = await runPersona(persona.id, prompt.trim(), setActiveDispatch);
+      const r = await runPersona(persona.id, text, setActiveDispatch);
       setOutcome(r.ok ? `Done in ${r.durationMs}ms` : `Failed${r.exitCode != null ? ` (exit ${r.exitCode})` : ''}`);
+      setDenied(r.deniedTools ?? []);
     } catch (e) {
       setOutcome((e as Error).message);
     } finally {
       setRunning(false);
     }
+  }
+
+  // Add the denied tools to this persona's allowlist, then run the same prompt again.
+  function allowAndRerun() {
+    const text = prompt.trim();
+    addAllowedTools(persona.id, denied);
+    setDenied([]);
+    void run(text);
   }
 
   return (
@@ -1447,12 +1583,13 @@ function PersonaCard({ persona, runtimes }: { persona: Persona; runtimes: Runtim
           disabled={!persona.runtimeId}
         />
         <div className="flex items-center gap-2">
-          <button className="btn text-xs" onClick={run} disabled={running || !persona.runtimeId || !prompt.trim()}>
+          <button className="btn text-xs" onClick={() => void run()} disabled={running || !persona.runtimeId || !prompt.trim()}>
             {running ? 'Running…' : 'Run now'}
           </button>
           {outcome ? <span className="muted text-[11px]">{outcome}</span> : null}
         </div>
         {live ? <LiveConversation run={live} /> : null}
+        {!running ? <DenialBanner tools={denied} onAllowRerun={allowAndRerun} busy={running} /> : null}
       </div>
 
       {open ? (

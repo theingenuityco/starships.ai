@@ -3,11 +3,14 @@ use std::fs;
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
-use std::time::{Instant, UNIX_EPOCH};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::mpsc::{channel, Sender};
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant, UNIX_EPOCH};
 
 use serde::Serialize;
 use tauri::ipc::Channel;
-use tauri::Manager;
+use tauri::{Emitter, Manager};
 
 #[derive(Serialize)]
 struct DetectedAgent {
@@ -23,9 +26,11 @@ struct DetectedAgent {
 fn known_agents() -> &'static [(&'static str, &'static str, &'static str)] {
     &[
         ("claude", "claude-code", "claude --session-id {{sessionId}} -p {{prompt}}"),
-        ("codex", "codex", "codex exec {{prompt}}"),
-        ("hermes", "hermes", "hermes -p {{prompt}}"),
-        ("openclaw", "openclaw", "openclaw -p {{prompt}}"),
+        // Codex is driven via its app-server JSON-RPC (see engine.ts), not `codex exec` —
+        // exec mode has no mid-run approval channel. The template is informational.
+        ("codex", "codex", "codex app-server"),
+        // Hermes one-shot is `chat -q` (NOT `-p`, which is --profile in Hermes).
+        ("hermes", "hermes", "hermes chat -q {{prompt}}"),
         ("aider", "custom", "aider --message {{prompt}}"),
         ("gemini", "custom", "gemini -p {{prompt}}"),
         ("opencode", "custom", "opencode run {{prompt}}"),
@@ -364,6 +369,431 @@ fn read_agent_transcript(app: tauri::AppHandle, session_id: String) -> Result<Op
     Ok(None)
 }
 
+// ---- Tool-permission approval back-channel ----
+//
+// We drive agent CLIs headlessly, so they can't prompt for tool approval interactively.
+// claude-code, hermes and cursor-agent each support a *hook*: before running a gated
+// tool the CLI spawns a command, pipes a JSON event to its stdin, and reads a decision
+// from its stdout. We make that command a tiny `curl` that POSTs to this loopback server
+// (one endpoint per CLI, since each expects a different decision JSON shape). The server
+// parks the request, emits a `permission-request` Tauri event (the webview pops the
+// dialog), and blocks until the webview calls `resolve_approval`; the HTTP response body
+// becomes the hook's stdout. (codex is different — it has no hook; it's driven over its
+// app-server JSON-RPC, where approvals are answered on the process's own stdin.)
+//
+// The server is dumb on purpose: it relays and waits. All policy (auto-allow listed
+// tools, "allow always") lives in the webview. Requests are correlated to a run by the
+// `X-Starship-Dispatch` header (the run's dispatchId, which we set in the run env so the
+// hook subprocess can forward it), falling back to the CLI's own session/conversation id.
+
+type Pending = Arc<Mutex<HashMap<String, Sender<String>>>>;
+
+/// Managed state: the loopback port (handed to the webview so it can build the hook
+/// command) and the map of in-flight approvals awaiting a decision.
+struct ApprovalState {
+    port: u16,
+    pending: Pending,
+}
+
+/// Process-unique id per parked approval (monotonic; only needs to be unique in-process).
+static REQUEST_SEQ: AtomicU64 = AtomicU64::new(1);
+
+/// Which CLI's hook posted — selects how we parse the request and shape the response.
+#[derive(Clone, Copy, PartialEq)]
+enum HookFormat {
+    Claude,
+    Hermes,
+    Cursor,
+}
+
+impl HookFormat {
+    fn from_path(path: &str) -> Option<Self> {
+        // Ignore any query string.
+        match path.split('?').next().unwrap_or(path) {
+            "/hook/claude" => Some(Self::Claude),
+            "/hook/hermes" => Some(Self::Hermes),
+            "/hook/cursor" => Some(Self::Cursor),
+            _ => None,
+        }
+    }
+    fn runtime(self) -> &'static str {
+        match self {
+            Self::Claude => "claude-code",
+            Self::Hermes => "hermes",
+            Self::Cursor => "cursor",
+        }
+    }
+}
+
+/// Payload emitted to the webview for each gated tool call.
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PermissionRequest {
+    id: String,
+    /// Correlation key: the run's dispatchId (preferred) or the CLI's own session id.
+    correlation: String,
+    runtime: String,
+    tool_name: String,
+    tool_input: serde_json::Value,
+}
+
+/// Format the decision JSON each CLI's hook expects on stdout. `decision` is one of
+/// "allow", "allow-session" (treated as allow) or "deny".
+fn hook_decision_json(format: HookFormat, decision: &str) -> String {
+    let allow = decision == "allow" || decision == "allow-session";
+    match format {
+        // https://code.claude.com hooks: PreToolUse permissionDecision allow|deny.
+        HookFormat::Claude => {
+            let d = if allow { "allow" } else { "deny" };
+            format!(
+                "{{\"hookSpecificOutput\":{{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"{d}\",\"permissionDecisionReason\":\"Starship desktop approval\"}}}}"
+            )
+        }
+        // Hermes hooks: allow = empty object, deny = {"decision":"block","reason":...}.
+        HookFormat::Hermes => {
+            if allow {
+                "{}".to_string()
+            } else {
+                "{\"decision\":\"block\",\"reason\":\"Denied in Starship desktop\"}".to_string()
+            }
+        }
+        // Cursor hooks: {"permission":"allow"|"deny", ...}. (Only deny is reliably enforced.)
+        HookFormat::Cursor => {
+            if allow {
+                "{\"permission\":\"allow\"}".to_string()
+            } else {
+                "{\"permission\":\"deny\",\"agent_message\":\"Denied in Starship desktop\"}".to_string()
+            }
+        }
+    }
+}
+
+/// Pull `(toolName, toolInput, fallbackCorrelation)` out of a hook payload per format.
+fn parse_hook_payload(format: HookFormat, body: &serde_json::Value) -> (String, serde_json::Value, String) {
+    let get_str = |k: &str| body.get(k).and_then(|v| v.as_str()).unwrap_or_default().to_string();
+    match format {
+        HookFormat::Claude | HookFormat::Hermes => (
+            get_str("tool_name"),
+            body.get("tool_input").cloned().unwrap_or(serde_json::Value::Null),
+            get_str("session_id"),
+        ),
+        // Cursor's beforeShellExecution payload is a shell command, not a named tool.
+        HookFormat::Cursor => {
+            let command = get_str("command");
+            (
+                "Shell".to_string(),
+                serde_json::json!({ "command": command }),
+                get_str("conversation_id"),
+            )
+        }
+    }
+}
+
+/// Read the `X-Starship-Dispatch` correlation header, if present (case-insensitive).
+fn dispatch_header(request: &tiny_http::Request) -> Option<String> {
+    request
+        .headers()
+        .iter()
+        .find(|h| h.field.as_str().as_str().eq_ignore_ascii_case("x-starship-dispatch"))
+        .map(|h| h.value.as_str().to_string())
+        .filter(|s| !s.is_empty())
+}
+
+/// Handle one POSTed hook event: park it, notify the webview, block for the decision
+/// (default deny after a generous timeout so a closed dialog can't wedge a run forever).
+fn handle_approval_request(mut request: tiny_http::Request, app: tauri::AppHandle, pending: Pending) {
+    let format = match HookFormat::from_path(request.url()) {
+        Some(f) if request.method() == &tiny_http::Method::Post => f,
+        _ => {
+            let _ = request.respond(tiny_http::Response::from_string("not found").with_status_code(404));
+            return;
+        }
+    };
+
+    let header_correlation = dispatch_header(&request);
+    let mut body = String::new();
+    if request.as_reader().read_to_string(&mut body).is_err() {
+        let _ = request.respond(tiny_http::Response::from_string(hook_decision_json(format, "deny")));
+        return;
+    }
+    let parsed: serde_json::Value = serde_json::from_str(&body).unwrap_or(serde_json::Value::Null);
+    let (tool_name, tool_input, payload_correlation) = parse_hook_payload(format, &parsed);
+    let correlation = header_correlation.unwrap_or(payload_correlation);
+
+    let id = format!("req-{}", REQUEST_SEQ.fetch_add(1, Ordering::Relaxed));
+    log::info!("[approval] {} requested tool={} correlation={}", format.runtime(), tool_name, correlation);
+    let (tx, rx) = channel::<String>();
+    if let Ok(mut map) = pending.lock() {
+        map.insert(id.clone(), tx);
+    }
+
+    let _ = app.emit(
+        "permission-request",
+        PermissionRequest {
+            id: id.clone(),
+            correlation,
+            runtime: format.runtime().to_string(),
+            tool_name,
+            tool_input,
+        },
+    );
+
+    // Block until resolve_approval delivers a decision (or 10 min elapses → deny).
+    let decision = rx.recv_timeout(Duration::from_secs(600)).unwrap_or_else(|_| "deny".to_string());
+    log::info!("[approval] {} resolved → {}", format.runtime(), decision);
+    if let Ok(mut map) = pending.lock() {
+        map.remove(&id);
+    }
+    let _ = request.respond(tiny_http::Response::from_string(hook_decision_json(format, &decision)));
+}
+
+/// Bind the loopback server on an ephemeral port and serve each request on its own
+/// thread (so one parked approval can't block decisions for a concurrent run).
+fn start_approval_server(app: tauri::AppHandle, pending: Pending) -> Result<u16, String> {
+    let server = tiny_http::Server::http("127.0.0.1:0").map_err(|e| e.to_string())?;
+    let port = server.server_addr().to_ip().map(|a| a.port()).unwrap_or(0);
+    std::thread::spawn(move || {
+        for request in server.incoming_requests() {
+            let app = app.clone();
+            let pending = pending.clone();
+            std::thread::spawn(move || handle_approval_request(request, app, pending));
+        }
+    });
+    Ok(port)
+}
+
+/// The loopback approval-server port, for the webview to bake into the hook command.
+/// 0 means the server failed to start (approvals fall back to the policy allowlist).
+#[tauri::command]
+fn approval_port(state: tauri::State<ApprovalState>) -> u16 {
+    state.port
+}
+
+/// Deliver a user's decision ("allow" | "allow-session" | "deny") to the parked hook
+/// request `id`. A missing id (already resolved, or timed out) is a no-op, not an error.
+#[tauri::command]
+fn resolve_approval(state: tauri::State<ApprovalState>, id: String, decision: String) -> Result<(), String> {
+    let sender = state.pending.lock().map_err(|e| e.to_string())?.remove(&id);
+    if let Some(tx) = sender {
+        let normalized = match decision.as_str() {
+            "allow" | "allow-session" => decision,
+            _ => "deny".to_string(),
+        };
+        let _ = tx.send(normalized);
+    }
+    Ok(())
+}
+
+// ---- Hook-file management for hermes & cursor ----
+//
+// Unlike claude-code (a clean per-run `--settings` hook), hermes and cursor-agent only
+// read hooks from files in the user's home: hermes `~/.hermes/config.yaml` (a
+// `pre_tool_call` hook) and cursor `~/.cursor/hooks.json` (a `beforeShellExecution`
+// hook). We install a tiny per-runtime forwarding script and reference it from those
+// files, MERGING into existing config rather than clobbering it. Installs are ref-counted
+// so a run finishing doesn't tear down a hook another concurrent run still needs; our
+// entry is removed only when the last run using it ends.
+//
+// NOTE: the exact cursor `hooks.json` schema and hermes hook-entry shape should be
+// validated against the installed CLI versions; adjust the templates below if they differ.
+
+/// Per-runtime install ref-counts (so concurrent runs share one installed hook).
+fn hook_refs() -> &'static Mutex<HashMap<String, u32>> {
+    static REFS: std::sync::OnceLock<Mutex<HashMap<String, u32>>> = std::sync::OnceLock::new();
+    REFS.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+/// Path of the per-runtime forwarding script under app-data.
+fn hook_script_path(app: &tauri::AppHandle, runtime: &str) -> Result<PathBuf, String> {
+    Ok(data_dir(app).ok_or("no app data dir")?.join("hooks").join(format!("starship-hook-{runtime}.sh")))
+}
+
+/// Write (idempotently) the per-runtime forwarding script with the live port baked in.
+/// It reads the hook event on stdin, tags it with the inherited dispatch id, and POSTs to
+/// the loopback server; the server's response becomes the script's stdout (the decision).
+fn write_hook_script(app: &tauri::AppHandle, runtime: &str, port: u16) -> Result<PathBuf, String> {
+    let path = hook_script_path(app, runtime)?;
+    if let Some(dir) = path.parent() {
+        fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+    }
+    let script = format!(
+        "#!/bin/sh\n# Starship desktop approval hook ({runtime}). Auto-generated; do not edit.\nexec curl -sS --max-time 600 -X POST -H \"X-Starship-Dispatch: ${{STARSHIP_DISPATCH_ID:-}}\" --data-binary @- \"http://127.0.0.1:{port}/hook/{runtime}\"\n"
+    );
+    fs::write(&path, script).map_err(|e| e.to_string())?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = fs::set_permissions(&path, fs::Permissions::from_mode(0o755));
+    }
+    Ok(path)
+}
+
+/// Add (or remove) our `pre_tool_call` entry in `~/.hermes/config.yaml`, preserving any
+/// existing user config. Our entry is identified by its command == the script path.
+fn set_hermes_hook(app: &tauri::AppHandle, script: &Path, enable: bool) -> Result<(), String> {
+    let home = app.path().home_dir().map_err(|e| e.to_string())?;
+    let path = home.join(".hermes").join("config.yaml");
+    let script_str = script.to_string_lossy().to_string();
+
+    let mut root: serde_yaml::Value = if path.exists() {
+        serde_yaml::from_str(&fs::read_to_string(&path).map_err(|e| e.to_string())?)
+            .unwrap_or_else(|_| serde_yaml::Value::Mapping(Default::default()))
+    } else {
+        serde_yaml::Value::Mapping(Default::default())
+    };
+    if !root.is_mapping() {
+        root = serde_yaml::Value::Mapping(Default::default());
+    }
+    let s = |k: &str| serde_yaml::Value::String(k.to_string());
+
+    let map = root.as_mapping_mut().ok_or("hermes config not a mapping")?;
+    if enable && !map.get(&s("hooks")).map(|v| v.is_mapping()).unwrap_or(false) {
+        map.insert(s("hooks"), serde_yaml::Value::Mapping(Default::default()));
+    }
+    if let Some(hooks) = map.get_mut(&s("hooks")).and_then(|v| v.as_mapping_mut()) {
+        if enable && !hooks.get(&s("pre_tool_call")).map(|v| v.is_sequence()).unwrap_or(false) {
+            hooks.insert(s("pre_tool_call"), serde_yaml::Value::Sequence(Vec::new()));
+        }
+        if let Some(seq) = hooks.get_mut(&s("pre_tool_call")).and_then(|v| v.as_sequence_mut()) {
+            seq.retain(|e| e.get("command").and_then(|c| c.as_str()) != Some(script_str.as_str()));
+            if enable {
+                let mut entry = serde_yaml::Mapping::new();
+                entry.insert(s("command"), serde_yaml::Value::String(script_str.clone()));
+                entry.insert(s("timeout"), serde_yaml::Value::Number(300.into()));
+                seq.push(serde_yaml::Value::Mapping(entry));
+            }
+            if seq.is_empty() {
+                hooks.remove(&s("pre_tool_call"));
+            }
+        }
+        if hooks.is_empty() {
+            map.remove(&s("hooks"));
+        }
+    }
+
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    fs::write(&path, serde_yaml::to_string(&root).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+/// Add (or remove) our `beforeShellExecution` entry in `~/.cursor/hooks.json`, preserving
+/// existing user config. Our entry is identified by its command == the script path.
+fn set_cursor_hook(app: &tauri::AppHandle, script: &Path, enable: bool) -> Result<(), String> {
+    let home = app.path().home_dir().map_err(|e| e.to_string())?;
+    let path = home.join(".cursor").join("hooks.json");
+    let script_str = script.to_string_lossy().to_string();
+
+    let mut root: serde_json::Value = if path.exists() {
+        serde_json::from_str(&fs::read_to_string(&path).map_err(|e| e.to_string())?).unwrap_or_else(|_| serde_json::json!({}))
+    } else {
+        serde_json::json!({})
+    };
+    if !root.is_object() {
+        root = serde_json::json!({});
+    }
+    let obj = root.as_object_mut().ok_or("cursor hooks not an object")?;
+    obj.entry("version").or_insert(serde_json::json!(1));
+    let hooks = obj.entry("hooks").or_insert(serde_json::json!({}));
+    if !hooks.is_object() {
+        *hooks = serde_json::json!({});
+    }
+    let hooks_obj = hooks.as_object_mut().ok_or("cursor hooks block not an object")?;
+    let arr = hooks_obj.entry("beforeShellExecution").or_insert(serde_json::json!([]));
+    if !arr.is_array() {
+        *arr = serde_json::json!([]);
+    }
+    let list = arr.as_array_mut().ok_or("cursor hook list not an array")?;
+    list.retain(|e| e.get("command").and_then(|c| c.as_str()) != Some(script_str.as_str()));
+    if enable {
+        list.push(serde_json::json!({ "command": script_str }));
+    }
+    if list.is_empty() {
+        hooks_obj.remove("beforeShellExecution");
+    }
+
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    fs::write(&path, serde_json::to_string_pretty(&root).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+/// Install (`enable=true`) or release (`enable=false`) the file-based hook for a runtime
+/// ("hermes" | "cursor"). Ref-counted: the hook file entry is added on the first install
+/// and removed only when the last user releases it. Best-effort; surfaces errors to the UI.
+#[tauri::command]
+fn set_runtime_hook(app: tauri::AppHandle, runtime: String, port: u16, enable: bool) -> Result<(), String> {
+    if runtime != "hermes" && runtime != "cursor" {
+        return Err(format!("unsupported hook runtime: {runtime}"));
+    }
+    let remaining = {
+        let mut refs = hook_refs().lock().map_err(|e| e.to_string())?;
+        let c = refs.entry(runtime.clone()).or_insert(0);
+        if enable {
+            *c += 1;
+        } else if *c > 0 {
+            *c -= 1;
+        }
+        *c
+    };
+
+    if enable {
+        let script = write_hook_script(&app, &runtime, port)?;
+        match runtime.as_str() {
+            "hermes" => set_hermes_hook(&app, &script, true),
+            "cursor" => set_cursor_hook(&app, &script, true),
+            _ => Ok(()),
+        }
+    } else if remaining == 0 {
+        let script = hook_script_path(&app, &runtime)?;
+        match runtime.as_str() {
+            "hermes" => set_hermes_hook(&app, &script, false),
+            "cursor" => set_cursor_hook(&app, &script, false),
+            _ => Ok(()),
+        }
+    } else {
+        Ok(())
+    }
+}
+
+// ---- Per-run claude settings file ----
+//
+// claude-code only loads hooks from settings FILES, not from inline `--settings` JSON. So
+// for each gated claude run we write a throwaway settings file (with the PreToolUse hook +
+// a `default` permission mode that overrides any bypass in the user's own settings) and pass
+// it via `--settings <path>`. The webview builds the JSON (it knows the port + dispatchId);
+// we just persist it owner-only and hand back the path, then delete it when the run ends.
+
+/// Write a per-run claude settings file and return its absolute path.
+#[tauri::command]
+fn write_run_settings(app: tauri::AppHandle, dispatch_id: String, contents: String) -> Result<String, String> {
+    if !valid_id(&dispatch_id) {
+        return Err("invalid dispatch id".into());
+    }
+    let dir = data_dir(&app).ok_or("no app data dir")?.join("hooks");
+    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let path = dir.join(format!("claude-{dispatch_id}.json"));
+    fs::write(&path, contents).map_err(|e| e.to_string())?;
+    set_owner_only(&path);
+    Ok(path.to_string_lossy().to_string())
+}
+
+/// Delete a per-run claude settings file (idempotent).
+#[tauri::command]
+fn remove_run_settings(app: tauri::AppHandle, dispatch_id: String) -> Result<(), String> {
+    if !valid_id(&dispatch_id) {
+        return Err("invalid dispatch id".into());
+    }
+    let path = data_dir(&app).ok_or("no app data dir")?.join("hooks").join(format!("claude-{dispatch_id}.json"));
+    match fs::remove_file(&path) {
+        Ok(()) => Ok(()),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(e) => Err(e.to_string()),
+    }
+}
+
 /// Slim result returned once the process exits. The full output is delivered
 /// live over the `Channel` (see `StreamMsg`), so we no longer capture/truncate it
 /// here — the webview accumulates the stream and, for Claude, the on-disk
@@ -451,6 +881,112 @@ async fn run_agent(
         .map_err(|e| e.to_string())?
 }
 
+// ---- Duplex (bidirectional) process runs, for codex app-server ----
+//
+// codex has no hook; it's driven over `codex app-server` JSON-RPC on stdio, where the
+// approval reply goes back on the process's OWN stdin. So unlike run_agent (stdin null),
+// this keeps stdin piped and registers the handle by `run_id` so `send_agent_input` can
+// write JSON-RPC frames to it mid-run. stdout/stderr stream the same way as run_agent.
+
+/// Live duplex process stdins, keyed by run_id (the webview's dispatchId).
+fn duplex_stdins() -> &'static Mutex<HashMap<String, std::process::ChildStdin>> {
+    static STDINS: std::sync::OnceLock<Mutex<HashMap<String, std::process::ChildStdin>>> = std::sync::OnceLock::new();
+    STDINS.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn run_agent_duplex_blocking(
+    run_id: String,
+    command: String,
+    args: Vec<String>,
+    env: HashMap<String, String>,
+    on_event: Channel<StreamMsg>,
+) -> Result<RunResult, String> {
+    let started = Instant::now();
+    let mut child = Command::new(&command)
+        .args(&args)
+        .envs(&env)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|e| format!("could not start {command}: {e}"))?;
+
+    log::info!("[codex-io] spawned {command} {args:?}");
+    let stdin = child.stdin.take().expect("piped stdin");
+    if let Ok(mut map) = duplex_stdins().lock() {
+        map.insert(run_id.clone(), stdin);
+    }
+    let stdout = child.stdout.take().expect("piped stdout");
+    let stderr = child.stderr.take().expect("piped stderr");
+
+    // TEMP debug: mirror codex app-server stdio to the terminal so failures are visible
+    // without opening devtools.
+    let err_event = on_event.clone();
+    let stderr_handle = std::thread::spawn(move || {
+        for line in BufReader::new(stderr).lines().map_while(Result::ok) {
+            log::info!("[codex-io] err: {line}");
+            let _ = err_event.send(StreamMsg::Stderr { line });
+        }
+    });
+
+    for line in BufReader::new(stdout).lines().map_while(Result::ok) {
+        log::info!("[codex-io] out: {line}");
+        let _ = on_event.send(StreamMsg::Stdout { line });
+    }
+    let _ = stderr_handle.join();
+
+    // Drop the stdin handle so a stuck writer can't keep the child alive.
+    if let Ok(mut map) = duplex_stdins().lock() {
+        map.remove(&run_id);
+    }
+    let status = child.wait().map_err(|e| e.to_string())?;
+    let exit_code = status.code();
+    let duration_ms = started.elapsed().as_millis() as u64;
+    log::info!("[codex-io] exited code={exit_code:?} after {duration_ms}ms");
+    let _ = on_event.send(StreamMsg::Exit { exit_code, duration_ms });
+    Ok(RunResult { exit_code, duration_ms })
+}
+
+/// Spawn a duplex process (piped stdin) and stream it. `run_id` keys the stdin handle for
+/// `send_agent_input`. Used for codex app-server; see codexClient.ts.
+#[tauri::command]
+async fn run_agent_duplex(
+    run_id: String,
+    command: String,
+    args: Vec<String>,
+    env: HashMap<String, String>,
+    on_event: Channel<StreamMsg>,
+) -> Result<RunResult, String> {
+    tauri::async_runtime::spawn_blocking(move || run_agent_duplex_blocking(run_id, command, args, env, on_event))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+/// Write a line to a duplex run's stdin (a JSON-RPC frame for codex app-server). A trailing
+/// newline is added if absent (the protocol is newline-delimited JSON). Errors if the run
+/// isn't live (already exited).
+#[tauri::command]
+fn send_agent_input(run_id: String, data: String) -> Result<(), String> {
+    use std::io::Write;
+    let mut map = duplex_stdins().lock().map_err(|e| e.to_string())?;
+    let stdin = map.get_mut(&run_id).ok_or("no such run")?;
+    stdin.write_all(data.as_bytes()).map_err(|e| e.to_string())?;
+    if !data.ends_with('\n') {
+        stdin.write_all(b"\n").map_err(|e| e.to_string())?;
+    }
+    stdin.flush().map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+/// Close a duplex run's stdin (drop the handle → EOF). `codex app-server` is a persistent
+/// server that won't exit on its own; closing stdin lets it shut down so the run resolves.
+/// No-op if the run already ended.
+#[tauri::command]
+fn close_agent_input(run_id: String) -> Result<(), String> {
+    duplex_stdins().lock().map_err(|e| e.to_string())?.remove(&run_id);
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -463,6 +999,17 @@ pub fn run() {
                         .build(),
                 )?;
             }
+            // Start the loopback approval back-channel and stash its port + pending map.
+            let pending: Pending = Arc::new(Mutex::new(HashMap::new()));
+            let port = match start_approval_server(app.handle().clone(), pending.clone()) {
+                Ok(p) => p,
+                Err(e) => {
+                    log::error!("approval server failed to start: {e}");
+                    0
+                }
+            };
+            app.manage(ApprovalState { port, pending });
+            log::info!("[approval] loopback hook server on http://127.0.0.1:{port}");
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -478,7 +1025,15 @@ pub fn run() {
             append_event,
             read_events,
             read_agent_transcript,
-            run_agent
+            run_agent,
+            run_agent_duplex,
+            send_agent_input,
+            close_agent_input,
+            approval_port,
+            resolve_approval,
+            set_runtime_hook,
+            write_run_settings,
+            remove_run_settings
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

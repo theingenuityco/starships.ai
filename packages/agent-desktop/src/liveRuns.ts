@@ -19,6 +19,8 @@ export interface LiveRun {
   finalText?: string;
   durationMs?: number;
   denials?: number;
+  /** Distinct tool names the CLI refused to run for lack of permission (Claude `result`). */
+  deniedTools?: string[];
 }
 
 const MAX_RUNS = 40; // bound memory; evict oldest by insertion order
@@ -54,6 +56,7 @@ export function applyLiveUpdate(dispatchId: string, update: StreamUpdate): void 
       if (update.finalText !== undefined) next.finalText = update.finalText;
       if (update.durationMs !== undefined) next.durationMs = update.durationMs;
       if (update.denials !== undefined) next.denials = update.denials;
+      if (update.deniedTools !== undefined) next.deniedTools = update.deniedTools;
       break;
     case 'system':
       break; // metadata only; nothing rendered yet

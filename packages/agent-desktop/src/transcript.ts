@@ -108,7 +108,7 @@ export type StreamUpdate =
   | { kind: 'delta'; text: string }
   | { kind: 'assistant'; turns: TranscriptTurn[] }
   | { kind: 'toolResults'; turns: TranscriptTurn[] }
-  | { kind: 'result'; finalText?: string; durationMs?: number; denials?: number; isError?: boolean }
+  | { kind: 'result'; finalText?: string; durationMs?: number; denials?: number; deniedTools?: string[]; isError?: boolean }
   | { kind: 'system'; sessionId?: string; model?: string };
 
 /** Parse one Claude `--output-format stream-json` line into updates (token-by-token capable). */
@@ -151,13 +151,24 @@ export function parseClaudeStreamLine(line: string): StreamUpdate[] {
       return turns.length ? [{ kind: 'toolResults', turns }] : [];
     }
     case 'result': {
-      const denials = Array.isArray(obj.permission_denials) ? obj.permission_denials.length : undefined;
+      // `permission_denials` is an array of { tool_name, tool_use_id, tool_input }.
+      // Keep the distinct tool names so the UI can offer a one-click "allow + rerun"
+      // per denied tool (not just a bare count).
+      const denialList = Array.isArray(obj.permission_denials) ? obj.permission_denials : [];
+      const deniedTools = [
+        ...new Set(
+          denialList
+            .map((d) => (d && typeof d === 'object' ? String((d as Record<string, unknown>).tool_name ?? '') : ''))
+            .filter(Boolean)
+        ),
+      ];
       return [
         {
           kind: 'result',
           finalText: typeof obj.result === 'string' ? obj.result : undefined,
           durationMs: typeof obj.duration_ms === 'number' ? obj.duration_ms : undefined,
-          denials,
+          denials: denialList.length || undefined,
+          deniedTools: deniedTools.length ? deniedTools : undefined,
           isError: obj.is_error === true,
         },
       ];

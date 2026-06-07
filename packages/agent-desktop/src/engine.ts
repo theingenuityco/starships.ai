@@ -2,7 +2,8 @@
 // This replaces the old server dispatch loop (pull/ack/complete over MCP) with a
 // direct, in-app call to the Rust `run_agent` command.
 import { Channel } from '@tauri-apps/api/core';
-import { runAgent, type StreamMsg } from './tauri';
+import { approvalPort, isTauri, removeRunSettings, runAgent, setRuntimeHook, writeRunSettings, type StreamMsg } from './tauri';
+import { clearApprovalContext, registerApprovalContext } from './approvals';
 import { addEvent, getStore, type Persona, type Runtime, type RuntimeKind } from './store';
 import {
   appendConversationMessages,
@@ -10,9 +11,10 @@ import {
   setConversationSession,
   type ConversationMessage,
 } from './conversations';
-import { DEFAULT_PERMISSIONS, permissionArgs, streamArgs } from './permissions';
+import { DEFAULT_PERMISSIONS, claudeRunSettings, permissionArgs, streamArgs } from './permissions';
 import { appendRaw, applyLiveUpdate, finishLiveRun, getLiveRun, lastAssistantText, startLiveRun } from './liveRuns';
-import { parseClaudeStreamLine, parseCodexStreamLine } from './transcript';
+import { parseClaudeStreamLine } from './transcript';
+import { runCodexAppServer } from './codexClient';
 
 /**
  * Tokenize a command line, honoring single/double quotes so multi-word args
@@ -48,6 +50,8 @@ export interface RunOutcome {
   durationMs: number;
   /** Lets callers subscribe to the live conversation via `useLiveRun(dispatchId)`. */
   dispatchId: string;
+  /** Tool names the CLI refused for lack of permission, so the UI can offer "Allow + rerun". */
+  deniedTools?: string[];
 }
 
 /** Richer result for callers (conversations) that need the produced turns + session. */
@@ -67,6 +71,29 @@ interface ExecuteResult extends RunOutcome {
 function resumeParts(parts: string[], kind: RuntimeKind): string[] {
   if (kind !== 'claude-code') return parts;
   return parts.map((p) => (p === '--session-id' ? '--resume' : p));
+}
+
+// The loopback approval-server port is fixed for the app's lifetime; fetch it once.
+let cachedApprovalPort: number | null = null;
+async function getApprovalPort(): Promise<number> {
+  if (cachedApprovalPort !== null) return cachedApprovalPort;
+  try {
+    cachedApprovalPort = isTauri() ? await approvalPort() : 0;
+  } catch {
+    cachedApprovalPort = 0;
+  }
+  return cachedApprovalPort;
+}
+
+/**
+ * The file-based-hook runtime for a given runtime, or null. claude-code uses an inline
+ * `--settings` hook (handled in permissionArgs), not a file. cursor-agent is a 'custom'
+ * runtime detected by its executor. (aider/gemini/opencode have no usable hook → static.)
+ */
+function fileHookRuntime(runtime: Runtime): 'hermes' | 'cursor' | null {
+  if (runtime.kind === 'hermes') return 'hermes';
+  if (runtime.kind === 'custom' && runtime.executor.includes('cursor-agent')) return 'cursor';
+  return null;
 }
 
 /**
@@ -95,17 +122,59 @@ async function executeRun(opts: {
   // Compile the persona's permission policy + structured-streaming flags into this CLI's own
   // flags, appended after the prompt (trailing options parse cleanly and avoid subcommand-
   // position issues).
-  const permArgs = permissionArgs(runtime.kind, runtime.executor, persona.permissions ?? DEFAULT_PERMISSIONS);
+  const policy = persona.permissions ?? DEFAULT_PERMISSIONS;
+  const isCodex = runtime.kind === 'codex';
+  // In allowlist mode, route gated tools to a dialog so the user can approve them mid-run
+  // instead of them being silently denied. Transport differs by runtime: claude-code uses an
+  // inline --settings hook; hermes/cursor a file-based hook we install for the run; codex its
+  // app-server JSON-RPC (handled in runCodexAppServer, not here). All register this run's
+  // persona + allowlist keyed by dispatchId so requests can be auto-allowed and attributed.
+  const fileHook = isCodex ? null : fileHookRuntime(runtime);
+  const loopbackApproval = (runtime.kind === 'claude-code' || fileHook !== null) && policy.mode === 'allowlist';
+  const runApprovalPort = loopbackApproval ? await getApprovalPort() : 0;
+  const approvalActive = runApprovalPort > 0 || (isCodex && policy.mode === 'allowlist');
+  if (approvalActive) registerApprovalContext(dispatchId, persona.id, policy.allow);
+  if (runApprovalPort && fileHook) {
+    try {
+      await setRuntimeHook(fileHook, runApprovalPort, true);
+    } catch (e) {
+      console.error('[engine] failed to install', fileHook, 'hook:', e);
+    }
+  }
+  // claude-code only loads hooks from a settings FILE, so write one per run and pass its path.
+  let claudeSettingsPath: string | undefined;
+  if (runApprovalPort && runtime.kind === 'claude-code') {
+    try {
+      claudeSettingsPath = await writeRunSettings(dispatchId, claudeRunSettings(runApprovalPort, dispatchId));
+    } catch (e) {
+      console.error('[engine] failed to write claude settings file:', e);
+    }
+  }
+  const permArgs = permissionArgs(runtime.kind, runtime.executor, policy, { claudeSettingsPath });
   const args = [
     ...parts.slice(1).map((a) => substitute(a, prompt, sessionId, persona)),
     ...permArgs,
     ...streamArgs(runtime.kind, runtime.executor),
   ];
 
+  // TEMP debug: shows which persona/runtime ran and what got injected. Remove once verified.
+  console.log('[engine] run', {
+    persona: persona.name,
+    runtime: runtime.name,
+    runtimeId: runtime.id,
+    kind: runtime.kind,
+    mode: policy.mode,
+    approvalPort: runApprovalPort,
+    command,
+    args,
+  });
+
   const env: Record<string, string> = {
     STARSHIP_DISPATCH_ID: dispatchId,
     STARSHIP_PERSONA_ID: persona.id,
   };
+  // Hermes won't honor a freshly-added hook in a non-TTY run without explicit acceptance.
+  if (runtime.kind === 'hermes' && runApprovalPort) env.HERMES_ACCEPT_HOOKS = '1';
   if (persona.systemPrompt) env.STARSHIP_PERSONA_SYSTEM_PROMPT = persona.systemPrompt;
   if (persona.model) env.STARSHIP_PERSONA_MODEL = persona.model;
   if (persona.instructions) env.STARSHIP_PERSONA_INSTRUCTIONS = persona.instructions;
@@ -118,14 +187,14 @@ async function executeRun(opts: {
     payload: { prompt },
   });
 
-  // Stream the run live: each stdout line is parsed (structured for claude/codex, raw
-  // otherwise) into the ephemeral live-run store; stderr always accumulates as raw text.
+  // Stream the run live: each stdout line is parsed (structured for claude, raw otherwise)
+  // into the ephemeral live-run store; stderr always accumulates as raw text. (codex drives
+  // its own channel inside runCodexAppServer, so this generic channel is unused for it.)
   startLiveRun(dispatchId, runtime.kind);
   const channel = new Channel<StreamMsg>();
   channel.onmessage = (m) => {
     if (m.kind === 'stdout') {
       if (runtime.kind === 'claude-code') for (const u of parseClaudeStreamLine(m.data.line)) applyLiveUpdate(dispatchId, u);
-      else if (runtime.kind === 'codex') for (const u of parseCodexStreamLine(m.data.line)) applyLiveUpdate(dispatchId, u);
       else appendRaw(dispatchId, m.data.line);
     } else if (m.kind === 'stderr') {
       appendRaw(dispatchId, m.data.line);
@@ -135,7 +204,13 @@ async function executeRun(opts: {
 
   const sessionFields = usesSession ? { sessionId } : {};
   try {
-    const result = await runAgent({ command, args, env, onEvent: channel });
+    // codex → app-server JSON-RPC (own channel); everything else → the streamed argv run.
+    const result = isCodex
+      ? await runCodexAppServer({ dispatchId, prompt, env, policy }).then((o) => ({
+          exit_code: o.ok ? 0 : o.exitCode ?? 1,
+          duration_ms: o.durationMs,
+        }))
+      : await runAgent({ command, args, env, onEvent: channel });
     const ok = result.exit_code === 0;
     const live = getLiveRun(dispatchId);
     // Final human-readable summary: Claude's `result` text, else the last assistant turn,
@@ -151,7 +226,15 @@ async function executeRun(opts: {
         ? { exitCode: result.exit_code, durationMs: result.duration_ms, output: finalText, ...sessionFields }
         : { exitCode: result.exit_code, durationMs: result.duration_ms, error: live?.raw.trim() || finalText, ...sessionFields },
     });
-    return { ok, exitCode: result.exit_code, durationMs: result.duration_ms, dispatchId, committed: committedTurns(dispatchId), usesSession };
+    return {
+      ok,
+      exitCode: result.exit_code,
+      durationMs: result.duration_ms,
+      dispatchId,
+      committed: committedTurns(dispatchId),
+      usesSession,
+      deniedTools: live?.deniedTools,
+    };
   } catch (e) {
     finishLiveRun(dispatchId, { ok: false });
     addEvent({
@@ -162,6 +245,16 @@ async function executeRun(opts: {
       payload: { error: (e as Error).message, ...sessionFields },
     });
     return { ok: false, exitCode: null, durationMs: 0, dispatchId, committed: committedTurns(dispatchId), usesSession };
+  } finally {
+    if (approvalActive) clearApprovalContext(dispatchId);
+    if (runApprovalPort && fileHook) {
+      try {
+        await setRuntimeHook(fileHook, runApprovalPort, false);
+      } catch (e) {
+        console.error('[engine] failed to release', fileHook, 'hook:', e);
+      }
+    }
+    if (claudeSettingsPath) await removeRunSettings(dispatchId).catch(() => {});
   }
 }
 
@@ -170,7 +263,7 @@ function committedTurns(dispatchId: string): ConversationMessage[] {
   const at = new Date().toISOString();
   const live = getLiveRun(dispatchId);
   const committed = live?.committed ?? [];
-  // Raw-output runtimes (hermes/openclaw/custom) emit no structured turns, so
+  // Raw-output runtimes (hermes/custom) emit no structured turns, so
   // `committed` stays empty. Wrap their raw stdout as a single assistant turn so
   // the conversation isn't left with just the user's prompt and no reply.
   if (committed.length === 0 && live?.raw.trim()) {

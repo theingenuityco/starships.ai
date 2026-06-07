@@ -1,5 +1,6 @@
 // Bindings for the Rust commands exposed by the Tauri shell (src-tauri/src/lib.rs).
 import { Channel, invoke } from '@tauri-apps/api/core';
+import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { hostname as osHostname } from '@tauri-apps/plugin-os';
 
@@ -31,6 +32,24 @@ export const detectAgents = () => invoke<DetectedAgent[]>('detect_agents');
  */
 export const runAgent = (args: { command: string; args: string[]; env: Record<string, string>; onEvent: Channel<StreamMsg> }) =>
   invoke<RunResult>('run_agent', args);
+
+/**
+ * Run a duplex (bidirectional) process — stdin stays piped and is keyed by `runId` so
+ * `sendAgentInput` can write to it mid-run. Used for codex app-server JSON-RPC.
+ */
+export const runAgentDuplex = (args: {
+  runId: string;
+  command: string;
+  args: string[];
+  env: Record<string, string>;
+  onEvent: Channel<StreamMsg>;
+}) => invoke<RunResult>('run_agent_duplex', args);
+
+/** Write one line (a JSON-RPC frame) to a duplex run's stdin. */
+export const sendAgentInput = (runId: string, data: string) => invoke<void>('send_agent_input', { runId, data });
+
+/** Close a duplex run's stdin (EOF) so a persistent server (codex app-server) shuts down. */
+export const closeAgentInput = (runId: string) => invoke<void>('close_agent_input', { runId });
 
 // Local state lives in Rust-managed 0600 files under the app-data dir (not the
 // webview's localStorage) so anything sensitive stays out of reach of in-page
@@ -66,6 +85,50 @@ export const readEventsRaw = () => invoke<string>('read_events');
 
 /** Raw JSONL of a CLI run's transcript by session id, or null if none on disk. */
 export const readAgentTranscript = (sessionId: string) => invoke<string | null>('read_agent_transcript', { sessionId });
+
+// ---- Tool-permission approvals (claude-code mid-run) ----
+
+/** A decision for a gated tool call. `allow-session` = allow for the rest of this run. */
+export type ApprovalDecision = 'allow' | 'allow-session' | 'deny';
+
+/** One gated tool call awaiting a decision, emitted by the loopback approval server. */
+export interface PermissionRequest {
+  /** Opaque id to resolve this specific parked request. */
+  id: string;
+  /** Correlation key: the run's dispatchId (preferred) or the CLI's own session id. */
+  correlation: string;
+  /** Which CLI's hook posted: 'claude-code' | 'hermes' | 'cursor'. */
+  runtime: string;
+  toolName: string;
+  toolInput: unknown;
+}
+
+/** Loopback approval-server port (0 = server failed to start; mid-run approval disabled). */
+export const approvalPort = () => invoke<number>('approval_port');
+
+/** Deliver a decision back to a parked hook request. */
+export const resolveApproval = (id: string, decision: ApprovalDecision) => invoke<void>('resolve_approval', { id, decision });
+
+/** Install (enable) or release a file-based hook for 'hermes' | 'cursor'. Ref-counted. */
+export const setRuntimeHook = (runtime: 'hermes' | 'cursor', port: number, enable: boolean) =>
+  invoke<void>('set_runtime_hook', { runtime, port, enable });
+
+/** Write a per-run claude settings file (hooks load from files, not inline). Returns its path. */
+export const writeRunSettings = (dispatchId: string, contents: string) =>
+  invoke<string>('write_run_settings', { dispatchId, contents });
+
+/** Delete a per-run claude settings file. */
+export const removeRunSettings = (dispatchId: string) => invoke<void>('remove_run_settings', { dispatchId });
+
+/** Subscribe to gated tool calls. Returns an unlisten fn; no-op resolver outside Tauri. */
+export async function onPermissionRequest(cb: (req: PermissionRequest) => void): Promise<UnlistenFn> {
+  if (!isTauri()) return () => {};
+  try {
+    return await listen<PermissionRequest>('permission-request', (e) => cb(e.payload));
+  } catch {
+    return () => {};
+  }
+}
 
 /** Hostname for naming runtimes stably per machine; falls back gracefully. */
 export async function hostname(): Promise<string> {

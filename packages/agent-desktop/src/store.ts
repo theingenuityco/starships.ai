@@ -9,12 +9,12 @@
 import { useSyncExternalStore } from 'react';
 import { appendEvent, isTauri, readEventsRaw, readStoreRaw, writeStoreRaw } from './tauri';
 import { deleteConversationsForPersona } from './conversations';
-import type { PermissionPolicy } from './permissions';
+import { DEFAULT_PERMISSIONS, type PermissionPolicy } from './permissions';
 
 export type { PermissionPolicy } from './permissions';
-export { DEFAULT_PERMISSIONS } from './permissions';
+export { DEFAULT_PERMISSIONS };
 
-export type RuntimeKind = 'claude-code' | 'codex' | 'hermes' | 'openclaw' | 'custom';
+export type RuntimeKind = 'claude-code' | 'codex' | 'hermes' | 'custom';
 
 /** A local agent CLI we know how to drive. `executor` is the command template. */
 export interface Runtime {
@@ -196,6 +196,25 @@ export function addPersona(input: {
 export function updatePersona(id: string, patch: Partial<Omit<Persona, 'id' | 'createdAt'>>): void {
   commit({ ...data, personas: data.personas.map((p) => (p.id === id ? { ...p, ...patch } : p)) });
 }
+/**
+ * Add tool patterns to a persona's allowlist, switching it into 'allowlist' mode if it
+ * was on its default. Used by the "Allow + rerun" affordance after a run denied a tool,
+ * and by "Allow always" in the live approval dialog. Idempotent (de-dupes).
+ */
+export function addAllowedTools(id: string, tools: string[]): void {
+  const clean = tools.map((t) => t.trim()).filter(Boolean);
+  if (!clean.length) return;
+  commit({
+    ...data,
+    personas: data.personas.map((p) => {
+      if (p.id !== id) return p;
+      const cur = p.permissions ?? DEFAULT_PERMISSIONS;
+      const allow = [...new Set([...cur.allow, ...clean])];
+      return { ...p, permissions: { mode: 'allowlist', allow } };
+    }),
+  });
+}
+
 export function deletePersona(id: string): void {
   commit({
     ...data,

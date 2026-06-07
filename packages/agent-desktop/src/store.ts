@@ -78,6 +78,15 @@ export interface Runtime {
   createdAt: string;
 }
 
+/** How to reach one MCP server (mirrors @starships/agent-runtime's McpServerConfig). */
+export interface McpServerConfig {
+  command?: string;
+  args?: string[];
+  env?: Record<string, string>;
+  cwd?: string;
+  url?: string;
+}
+
 /** A user-authored actor (behaviour) that runs on a runtime. */
 export interface Persona {
   id: string;
@@ -88,6 +97,13 @@ export interface Persona {
   runtimeId?: string | null;
   /** Tool-permission policy compiled into the runtime's approval flags at run time. */
   permissions?: PermissionPolicy;
+  /**
+   * Extra toolsets for the in-house (starship) runtime. Both are deferred: their tools ride a
+   * catalog and load on demand via tool_search. `mcpServers` is keyed by toolset namespace;
+   * `bundles` maps a toolset namespace to a local bundle directory (holding `toolset.json`).
+   */
+  mcpServers?: Record<string, McpServerConfig>;
+  bundles?: Record<string, string>;
   createdAt: string;
 }
 

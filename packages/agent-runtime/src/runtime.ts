@@ -8,7 +8,14 @@
 // deferred-tool model that keeps a large catalog from filling the context window.
 import { streamText, type ModelMessage } from 'ai';
 import { resolveApiKey, resolveModel } from './provider';
-import { ToolRegistry, buildSystemProvider, type ToolContext, type ToolDescriptor } from './tools';
+import {
+  ToolRegistry,
+  buildSystemProvider,
+  buildMcpProvider,
+  buildBundleProvider,
+  type ToolContext,
+  type ToolDescriptor,
+} from './tools';
 import * as L from './translate';
 import { getSession, saveSession } from './sessions';
 import type { RunRequest, RuntimeHandlers } from './types';
@@ -47,10 +54,25 @@ export async function runAgent(req: RunRequest, h: RuntimeHandlers): Promise<voi
 
   const model = resolveModel(req.provider, req.model, apiKey);
 
-  // Assemble the registry for this run. System is always present; mcp / user-bundle providers
-  // (selected by req.toolsets) plug in here in Phase 1.
+  // Assemble the registry for this run. System is always present; mcp servers and user
+  // bundles from the request plug in as deferred toolsets. A provider that fails to load
+  // (bad MCP connection, missing manifest) is skipped with a warning, not fatal to the run.
   const registry = new ToolRegistry();
   await registry.register(buildSystemProvider(), { workspace });
+  for (const [name, cfg] of Object.entries(req.mcpServers ?? {})) {
+    try {
+      await registry.register(buildMcpProvider(name, cfg), { workspace });
+    } catch (e) {
+      console.warn(`[runtime] MCP toolset "${name}" failed to load: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+  for (const [name, dir] of Object.entries(req.bundles ?? {})) {
+    try {
+      await registry.register(buildBundleProvider(name, dir), { workspace });
+    } catch (e) {
+      console.warn(`[runtime] bundle toolset "${name}" failed to load: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
 
   // The deferred-tool loaded set: resident tools are in scope from the start; tool_search
   // adds more (and `load` is the closure it calls to do so).

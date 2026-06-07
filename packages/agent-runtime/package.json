@@ -5,7 +5,8 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
-    "starship-runtime": "dist/server.js"
+    "starship-runtime": "dist/server.js",
+    "starship-toolsets": "dist/mcp-stdio.js"
   },
   "scripts": {
     "dev": "tsx watch src/server.ts",
@@ -20,9 +21,11 @@
     "@ai-sdk/anthropic": "^2.0.0",
     "@ai-sdk/openai": "^2.0.0",
     "@hono/node-server": "^1.13.7",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "ai": "^5.0.0",
     "hono": "^4.6.14",
-    "zod": "^3.23.8"
+    "zod": "^3.23.8",
+    "zod-to-json-schema": "^3.24.0"
   },
   "devDependencies": {
     "@types/node": "^24.0.10",

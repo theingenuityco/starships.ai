@@ -6,6 +6,15 @@
 
 export type ProviderId = 'anthropic' | 'openai';
 
+/** How to reach one MCP server. `url` => HTTP transport; otherwise spawn `command`. */
+export interface McpServerConfig {
+  command?: string;
+  args?: string[];
+  env?: Record<string, string>;
+  cwd?: string;
+  url?: string;
+}
+
 /** How tool calls are gated. Mirrors the desktop PermissionPolicy. */
 export type PermissionMode = 'all' | 'allowlist';
 
@@ -40,11 +49,15 @@ export interface RunRequest {
    */
   allow?: string[];
   /**
-   * Names of additional toolsets to enable for this run (user bundles / mcp servers). The
-   * `system` toolset is always present. Their tools are deferred (advertised in the catalog,
-   * loaded on demand via system.tool_search). Wired in Phase 1; accepted now for forward-compat.
+   * MCP servers to connect for this run, keyed by toolset namespace (`github` -> `github.*`).
+   * Their tools are deferred: advertised in the catalog, loaded on demand via system.tool_search.
    */
-  toolsets?: string[];
+  mcpServers?: Record<string, McpServerConfig>;
+  /**
+   * User toolset bundles to load, keyed by toolset namespace -> absolute bundle directory
+   * (the dir holding `toolset.json`). Also deferred.
+   */
+  bundles?: Record<string, string>;
   /** Max model<->tool round trips before the run stops. Defaults to 24. */
   maxSteps?: number;
   /**

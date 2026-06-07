@@ -52,29 +52,70 @@ Net positive once the catalog is large; keep the resident set stable and batch s
 
 ## Providers
 
-| Provider | source | `init()` | `execute()` | lifecycle |
-|----------|--------|----------|-------------|-----------|
-| `system` | `system` | static list | in-process fn (Zod-validated) | none |
-| `mcp` *(Phase 1)* | `mcp` | connect + `tools/list` | `tools/call` (JSON-RPC) | long-lived; `dispose` closes |
-| `bundle:process` *(Phase 1)* | `user` | parse `toolset.json` | one-shot subprocess, JSON over stdio | none |
-| `bundle:node` *(Phase 2)* | `user` | import module | in-process call | none |
+| Provider | source | `init()` | `execute()` | lifecycle | file |
+|----------|--------|----------|-------------|-----------|------|
+| `system` | `system` | static list | in-process fn (Zod-validated) | none | `src/tools/system/` |
+| `mcp` | `mcp` | connect + `tools/list` | `tools/call` (JSON-RPC) | long-lived; `dispose` closes | `src/tools/mcp/provider.ts` |
+| `bundle` (process) | `user` | parse `toolset.json` | one-shot subprocess, JSON over stdio | none | `src/tools/bundle/provider.ts` |
+| `bundle` (node) | `user` | import entry module | in-process call | none | `src/tools/bundle/provider.ts` |
 
-`system` is implemented in `src/tools/system/`. The 5 built-ins (`bash`, `read_file`,
-`write_file`, `list_dir`, `http_fetch`) plus the meta-tool `tool_search`.
+`system` is the 5 built-ins (`bash`, `read_file`, `write_file`, `list_dir`, `http_fetch`) plus
+the meta-tool `tool_search`. MCP servers and bundles are selected per run via
+`RunRequest.mcpServers` / `RunRequest.bundles` (the desktop sets these per persona). A provider
+that fails to load is skipped with a warning, not fatal to the run.
+
+### Authoring a bundle
+
+A bundle is a local directory with a `toolset.json`:
+
+```jsonc
+{
+  "name": "acme",
+  "version": "0.1.0",
+  "runtime": "process",            // "process" (default) | "node"
+  "tools": [
+    {
+      "name": "shout",
+      "description": "Uppercase a message.",
+      "input": { "type": "object", "properties": { "msg": { "type": "string" } } },
+      "sensitive": false,
+      "capabilities": ["exec"],
+      "run": { "command": ["./tools/shout.sh"] }   // process runtime
+    }
+  ]
+}
+```
+
+Process tools get the validated input as JSON on **stdin**, `STARSHIP_WORKSPACE` in env, and run
+as a subprocess scoped to the workspace (provider keys scrubbed). stdout is the result; nonzero
+exit is an error. For `"runtime": "node"`, set `"entry": "index.js"` (a compiled module exporting
+handlers by tool name, or a `tools` map) and drop `run.command`; handlers run in-process with
+`(input, ctx)`.
+
+### Exposing toolsets via MCP (the inverse direction)
+
+`createToolsetMcpServer(registry, getCtx)` serves the registry as an MCP server. The
+`starship-toolsets` bin runs it over stdio so any MCP client can consume Starship's tools:
+
+```jsonc
+{ "command": "starship-toolsets", "args": ["--workspace", "/path/to/repo"] }
+```
+
+Set `STARSHIP_BUNDLES='{"acme":"/abs/bundle/dir"}'` to also expose user bundles. Deferral does
+not apply on this side (the consuming runtime owns its own context budget); `tool_search` is
+omitted.
 
 ## Roadmap
 
 - **Phase 0 (done).** Registry + provider seam, `system` toolset, deferred model + catalog +
-  `tool_search`, wire-name encoding, allowlist back-compat. Behaviour-equivalent to the old
-  flat tool list, with namespaced names.
-- **Phase 1.** `mcp` provider (stdio + http) and user `bundle:process` provider, both deferred
-  by default. `RunRequest.toolsets` selects them (field already accepted). MCP servers
-  configured via the standard `mcpServers` map in local config. MCP tool annotations
-  (`readOnlyHint`/`destructiveHint`) map to `sensitive` / `capabilities`.
-- **Phase 2.** `bundle:node` in-process adapter + author DX, HTTP MCP auth, cached-catalog lazy
-  connect, MCP resources/prompts, semantic search.
-- **Phase 3.** Expose the registry *as* an MCP server so external CLI runtimes (claude-code,
-  codex) can consume Starship's toolsets.
+  `tool_search`, wire-name encoding, allowlist back-compat.
+- **Phase 1 (done).** `mcp` provider (stdio + Streamable HTTP / SSE) and user `bundle` process
+  provider, both deferred by default. `RunRequest.mcpServers` / `RunRequest.bundles` select them;
+  the desktop forwards them per persona. MCP `readOnlyHint` maps to `sensitive`.
+- **Phase 2 (partial).** `bundle` node in-process adapter (done). Still open: HTTP MCP auth
+  (OAuth), cached-catalog lazy connect, MCP resources/prompts, semantic search.
+- **Phase 3 (done).** `createToolsetMcpServer` + the `starship-toolsets` stdio bin expose the
+  registry as an MCP server for external runtimes.
 
 ## Notes / not-yet
 

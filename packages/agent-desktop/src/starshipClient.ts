@@ -78,6 +78,10 @@ export async function runStarship(opts: {
     mode: policy.mode,
     allow: policy.allow,
     workspace: cwd || resolveWorkspace(executor),
+    // Deferred toolsets the runtime connects/loads for this run (advertised in the catalog,
+    // pulled into context on demand via tool_search).
+    mcpServers: persona.mcpServers,
+    bundles: persona.bundles,
   };
 
   const approve = (toolUseId: string, decision: string): void => {

@@ -269,7 +269,7 @@ function committedTurns(dispatchId: string): ConversationMessage[] {
   if (committed.length === 0 && live?.raw.trim()) {
     return [{ role: 'assistant', text: live.raw.trim(), at }];
   }
-  return committed.map((t) => ({ role: t.role, text: t.text, tool: t.tool, at: t.ts ?? at }));
+  return committed.map((t) => ({ role: t.role, text: t.text, tool: t.tool, id: t.id, at: t.ts ?? at }));
 }
 
 /**

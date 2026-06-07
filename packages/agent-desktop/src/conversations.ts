@@ -25,6 +25,8 @@ export interface ConversationMessage {
   role: TurnRole;
   /** Tool name, for `tool`/`result` turns. */
   tool?: string;
+  /** Correlation id pairing a `tool` call with its `result` (see {@link TranscriptTurn}). */
+  id?: string;
   text: string;
   at: string;
 }
@@ -79,6 +81,7 @@ interface MessageLine {
   type: 'message';
   role: TurnRole;
   tool?: string;
+  id?: string;
   text: string;
   at: string;
 }
@@ -101,6 +104,7 @@ function headerLine(meta: ConversationSummary): string {
 function messageLine(m: ConversationMessage): string {
   const line: MessageLine = { type: 'message', role: m.role, text: m.text, at: m.at };
   if (m.tool) line.tool = m.tool;
+  if (m.id) line.id = m.id;
   return JSON.stringify(line);
 }
 
@@ -143,6 +147,7 @@ function parseConversation(jsonl: string, updatedAt: string): Conversation | nul
       if (!VALID_ROLES.has(o.role)) continue;
       const m: ConversationMessage = { role: o.role as TurnRole, text: o.text, at: typeof o.at === 'string' ? o.at : updatedAt };
       if (typeof o.tool === 'string') m.tool = o.tool;
+      if (typeof o.id === 'string') m.id = o.id;
       messages.push(m);
     } catch {
       // skip unparseable / forward-compat lines

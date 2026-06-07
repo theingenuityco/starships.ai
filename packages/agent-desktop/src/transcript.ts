@@ -13,6 +13,8 @@ export interface TranscriptTurn {
   text: string;
   /** Tool name, for `tool`/`result` turns. */
   tool?: string;
+  /** Correlation id: the `tool_use` id on a `tool` turn, the referenced id on a `result` turn. Pairs calls with results across parallel tool use. */
+  id?: string;
   ts?: string;
 }
 
@@ -60,12 +62,14 @@ function messageToTurns(type: 'user' | 'assistant', content: unknown, ts?: strin
       }
       case 'tool_use': {
         const input = block.input ? clip(JSON.stringify(block.input), MAX_RESULT) : '';
-        turns.push({ role: 'tool', tool: String(block.name ?? 'tool'), text: input, ts });
+        const id = typeof block.id === 'string' ? block.id : undefined;
+        turns.push({ role: 'tool', tool: String(block.name ?? 'tool'), text: input, id, ts });
         break;
       }
       case 'tool_result': {
         const text = blockText(block.content);
-        turns.push({ role: 'result', tool: 'result', text: clip(text || '(no output)', MAX_RESULT), ts });
+        const id = typeof block.tool_use_id === 'string' ? block.tool_use_id : undefined;
+        turns.push({ role: 'result', tool: 'result', text: clip(text || '(no output)', MAX_RESULT), id, ts });
         break;
       }
       default:

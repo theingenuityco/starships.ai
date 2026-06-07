@@ -1165,7 +1165,11 @@ function ConversationThread({
         <div className="mx-auto flex max-w-4xl flex-col gap-6 px-1 py-5">
           {empty ? <div className="muted py-16 text-center text-sm">Send a message to start the conversation.</div> : null}
           {items.map((it, i) =>
-            it.kind === 'tool' ? <ToolCard key={i} call={it.call} result={it.result} /> : <ChatMessage key={i} turn={it.turn} />
+            it.kind === 'tools' ? (
+              <ToolGroup key={i} items={it.items} defaultOpen={live?.status === 'running' && i === items.length - 1} />
+            ) : (
+              <ChatMessage key={i} turn={it.turn} />
+            )
           )}
           {streaming ? <StreamingMessage text={streaming} /> : null}
           {rawOnly ? (
@@ -1264,55 +1268,207 @@ function StreamingMessage({ text }: { text: string }) {
   );
 }
 
-type ChatItem = { kind: 'msg'; turn: TranscriptTurn } | { kind: 'tool'; call: TranscriptTurn; result?: TranscriptTurn };
+type ToolPair = { call: TranscriptTurn; result?: TranscriptTurn };
+type ChatItem = { kind: 'msg'; turn: TranscriptTurn } | { kind: 'tools'; items: ToolPair[] };
 
-/** Fold a flat turn list into render items, pairing each tool call with its following result. */
+/**
+ * Match a cluster's tool calls to their results. Parallel tool use arrives as
+ * `tool, tool, result, result` with the results ordered by `tool_use` id rather
+ * than position, so pair by id first; fall back to positional order for runtimes
+ * (e.g. Codex) that emit no ids. Results with no matching call render on their own.
+ */
+function buildPairs(calls: TranscriptTurn[], results: TranscriptTurn[]): ToolPair[] {
+  const byId = new Map<string, TranscriptTurn>();
+  for (const r of results) if (r.id) byId.set(r.id, r);
+  const loose = results.filter((r) => !r.id);
+  const used = new Set<TranscriptTurn>();
+  let looseIdx = 0;
+
+  const pairs: ToolPair[] = calls.map((call) => {
+    let result: TranscriptTurn | undefined;
+    if (call.id && byId.has(call.id)) {
+      result = byId.get(call.id);
+    } else if (looseIdx < loose.length) {
+      result = loose[looseIdx++];
+    }
+    if (result) used.add(result);
+    return { call, result };
+  });
+
+  for (const r of results) {
+    if (!used.has(r)) pairs.push({ call: { role: 'tool', text: '', tool: r.tool ?? 'result' }, result: r });
+  }
+  return pairs;
+}
+
+/**
+ * Fold a flat turn list into render items. Runs of consecutive tool calls/results
+ * collapse into a single `tools` group (the way Claude's app clusters back-to-back
+ * tool use between prose turns), with calls paired to results by id within each run.
+ */
 function groupTurns(turns: TranscriptTurn[]): ChatItem[] {
   const items: ChatItem[] = [];
-  for (let i = 0; i < turns.length; i++) {
-    const t = turns[i];
-    if (t.role === 'tool') {
-      const next = turns[i + 1];
-      if (next?.role === 'result') {
-        items.push({ kind: 'tool', call: t, result: next });
-        i++;
-      } else {
-        items.push({ kind: 'tool', call: t });
-      }
-    } else if (t.role === 'result') {
-      items.push({ kind: 'tool', call: { role: 'tool', text: '', tool: t.tool ?? 'result' }, result: t });
-    } else {
+  let calls: TranscriptTurn[] = [];
+  let results: TranscriptTurn[] = [];
+  const flush = () => {
+    if (calls.length || results.length) items.push({ kind: 'tools', items: buildPairs(calls, results) });
+    calls = [];
+    results = [];
+  };
+  for (const t of turns) {
+    if (t.role === 'tool') calls.push(t);
+    else if (t.role === 'result') results.push(t);
+    else {
+      flush();
       items.push({ kind: 'msg', turn: t });
     }
   }
+  flush();
   return items;
 }
 
-/** A collapsible tool-use card (call + result), styled like Claude's tool pills. */
-function ToolCard({ call, result }: { call: TranscriptTurn; result?: TranscriptTurn }) {
-  const [open, setOpen] = useState(false);
+/** Pretty-print a compact JSON input string; fall back to the raw text if it isn't JSON. */
+function prettyInput(text: string): string {
+  try {
+    return JSON.stringify(JSON.parse(text), null, 2);
+  } catch {
+    return text;
+  }
+}
+
+/** Best-effort human label for a tool call: a verb plus a concise target (file, command, pattern). */
+function toolLabel(call: TranscriptTurn): { verb: string; detail: string } {
+  const name = call.tool ?? 'tool';
+  let input: Record<string, unknown> = {};
+  try {
+    if (call.text) input = JSON.parse(call.text) as Record<string, unknown>;
+  } catch {
+    // non-JSON input (e.g. Codex shell commands stored as raw text)
+  }
+  const str = (v: unknown) => (typeof v === 'string' ? v : '');
+  const base = (v: unknown) => {
+    const s = str(v);
+    return s ? (s.split('/').pop() ?? s) : '';
+  };
+  const firstLine = (v: unknown) => str(v).split('\n')[0];
+  switch (name) {
+    case 'Read':
+      return { verb: 'Read', detail: base(input.file_path) };
+    case 'Write':
+      return { verb: 'Wrote', detail: base(input.file_path) };
+    case 'Edit':
+    case 'NotebookEdit':
+      return { verb: 'Edited', detail: base(input.file_path) };
+    case 'Bash':
+    case 'shell':
+      return { verb: 'Ran', detail: firstLine(input.command) || firstLine(call.text) };
+    case 'Grep':
+      return { verb: 'Searched', detail: str(input.pattern) };
+    case 'Glob':
+      return { verb: 'Found files', detail: str(input.pattern) };
+    case 'WebFetch':
+      return { verb: 'Fetched', detail: str(input.url) };
+    case 'WebSearch':
+      return { verb: 'Searched web', detail: str(input.query) };
+    case 'Task':
+      return { verb: 'Delegated', detail: str(input.description) };
+    case 'result':
+      return { verb: 'Tool result', detail: '' };
+    default:
+      return { verb: name, detail: firstLine(input.command || input.file_path || input.path) };
+  }
+}
+
+/** A rotating disclosure chevron, shared by tool rows and group headers. */
+function Chevron({ open }: { open: boolean }) {
   return (
-    <div className="overflow-hidden rounded-xl border border-(--color-border) bg-(--color-bg-elev)">
+    <svg
+      className={`shrink-0 transition-transform ${open ? 'rotate-90' : ''}`}
+      width="11"
+      height="11"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="m9 18 6-6-6-6" />
+    </svg>
+  );
+}
+
+/**
+ * Condense a run of tool calls into a header phrase: verbs in first-seen order,
+ * with a "×n" suffix when one verb repeats (e.g. "Read ×3 · Edited · Ran").
+ */
+function groupSummary(items: ToolPair[]): string {
+  const counts = new Map<string, number>();
+  for (const p of items) {
+    const v = toolLabel(p.call).verb;
+    counts.set(v, (counts.get(v) ?? 0) + 1);
+  }
+  return [...counts.entries()].map(([v, n]) => (n > 1 ? `${v} ×${n}` : v)).join(' · ');
+}
+
+/** One clickable tool row: a text line that expands an inline details card (call input + result). */
+function ToolRow({ pair }: { pair: ToolPair }) {
+  const [open, setOpen] = useState(false);
+  const { call, result } = pair;
+  const { verb, detail } = toolLabel(call);
+  return (
+    <div>
       <button
-        className="flex w-full items-center gap-2 px-3 py-2 text-left text-[13px] text-(--color-fg-muted) hover:bg-(--color-bg-soft)"
+        className="flex w-full items-center gap-1.5 rounded-md px-1 py-1 text-left text-[13px] text-(--color-fg-subtle) hover:bg-(--color-bg-soft) hover:text-(--color-fg-muted)"
         onClick={() => setOpen((o) => !o)}
       >
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
-        </svg>
-        <span className="font-medium">{call.tool ?? 'tool'}</span>
-        <span className="ml-auto text-[11px] text-(--color-fg-subtle)">{open ? 'Hide' : 'Details'}</span>
+        <Chevron open={open} />
+        <span className="shrink-0 font-medium text-(--color-fg-muted)">{verb}</span>
+        {detail ? <span className="truncate font-mono text-[12px]">{detail}</span> : null}
       </button>
       {open ? (
-        <div className="space-y-2 border-t border-(--color-border) px-3 py-2.5">
+        <div className="mb-1 ml-[18px] mt-1.5 space-y-2 rounded-lg border border-(--color-border) bg-(--color-bg-elev) px-3 py-2.5">
           {call.text ? (
-            <pre className="overflow-x-auto whitespace-pre-wrap break-words font-mono text-[11px] leading-relaxed text-(--color-fg-muted)">{call.text}</pre>
+            <pre className="overflow-x-auto whitespace-pre-wrap break-words font-mono text-[11px] leading-relaxed text-(--color-fg-muted)">
+              {prettyInput(call.text)}
+            </pre>
           ) : null}
           {result?.text ? (
-            <pre className="overflow-x-auto whitespace-pre-wrap break-words border-t border-(--color-border) pt-2 font-mono text-[11px] leading-relaxed text-(--color-fg-muted)">
+            <pre
+              className={`overflow-x-auto whitespace-pre-wrap break-words font-mono text-[11px] leading-relaxed text-(--color-fg-muted) ${call.text ? 'border-t border-(--color-border) pt-2' : ''}`}
+            >
               {result.text}
             </pre>
           ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * A run of consecutive tool calls. A single call renders as a bare row; multiple
+ * collapse under one summary header (Claude-app style) that expands to the rows,
+ * connected by a left rail. Each row still expands to its own details.
+ */
+function ToolGroup({ items, defaultOpen = false }: { items: ToolPair[]; defaultOpen?: boolean }) {
+  const [open, setOpen] = useState(defaultOpen);
+  if (items.length === 1) return <ToolRow pair={items[0]} />;
+  return (
+    <div>
+      <button
+        className="flex w-full items-center gap-1.5 rounded-md px-1 py-1 text-left text-[13px] text-(--color-fg-subtle) hover:bg-(--color-bg-soft) hover:text-(--color-fg-muted)"
+        onClick={() => setOpen((o) => !o)}
+      >
+        <Chevron open={open} />
+        <span className="truncate font-medium text-(--color-fg-muted)">{groupSummary(items)}</span>
+        <span className="ml-auto shrink-0 text-[11px] text-(--color-fg-subtle)">{items.length} steps</span>
+      </button>
+      {open ? (
+        <div className="ml-[5px] mt-0.5 flex flex-col gap-0.5 border-l border-(--color-border) pl-3">
+          {items.map((pair, i) => (
+            <ToolRow key={i} pair={pair} />
+          ))}
         </div>
       ) : null}
     </div>

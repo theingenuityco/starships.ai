@@ -72,9 +72,20 @@ export async function runCodexAppServer(opts: {
   prompt: string;
   env: Record<string, string>;
   policy: PermissionPolicy;
+  /** Aborting closes the app-server's stdin (EOF), so the process exits and the turn ends. */
+  signal?: AbortSignal;
 }): Promise<CodexOutcome> {
-  const { dispatchId, prompt, env, policy } = opts;
+  const { dispatchId, prompt, env, policy, signal } = opts;
   const bypass = policy.mode === 'all';
+
+  // Cancellation: closing stdin tells codex app-server to shut down; the Promise.race below
+  // then resolves via the process-exit branch. (No caller passes a signal yet — the engine/UI
+  // Stop wiring is a cross-runtime follow-up — but the capability is here once it lands.)
+  const onAbort = () => void closeAgentInput(dispatchId).catch(() => {});
+  if (signal) {
+    if (signal.aborted) onAbort();
+    else signal.addEventListener('abort', onAbort, { once: true });
+  }
 
   let nextId = 1;
   const pending = new Map<number, { resolve: (result: unknown) => void; reject: (e: Error) => void }>();

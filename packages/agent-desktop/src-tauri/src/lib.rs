@@ -1348,7 +1348,16 @@ fn runtime_spawn_cmd(app: &tauri::AppHandle) -> (String, Vec<String>, Option<Pat
 fn start_runtime(app: &tauri::AppHandle, state: &RuntimeState) -> Result<u16, String> {
     {
         let port = *state.port.lock().map_err(|e| e.to_string())?;
-        let alive = state.child.lock().map_err(|e| e.to_string())?.is_some();
+        // try_wait() is non-blocking: None = still running, Some(_) = already exited. Checking
+        // only is_some() would treat a crashed-but-not-reaped child as alive and hand back a
+        // dead port, so the first request fails with "connection refused" instead of respawning.
+        let alive = state
+            .child
+            .lock()
+            .map_err(|e| e.to_string())?
+            .as_mut()
+            .map(|c| c.try_wait().ok().flatten().is_none())
+            .unwrap_or(false);
         if port > 0 && alive {
             return Ok(port);
         }

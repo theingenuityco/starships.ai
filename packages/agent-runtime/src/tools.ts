@@ -6,7 +6,7 @@
 // manual agent loop so it can gate each call on approval before running it. The actual
 // implementations live here in `execute` and are invoked by runtime.ts.
 import { spawn } from 'node:child_process';
-import { readdir, readFile, mkdir, writeFile, stat } from 'node:fs/promises';
+import { readdir, readFile, mkdir, writeFile, stat, realpath } from 'node:fs/promises';
 import path from 'node:path';
 import { tool, type Tool } from 'ai';
 import { z } from 'zod';
@@ -18,14 +18,58 @@ function clip(s: string): string {
   return s.length > MAX_OUTPUT ? `${s.slice(0, MAX_OUTPUT)}\n…[truncated]` : s;
 }
 
-/** Resolve `p` inside `workspace`, refusing paths that escape it. */
-function resolveInWorkspace(workspace: string, p: string): string {
+/** True if `a`/`b` (a relative path from path.relative) escapes its base. */
+function escapes(rel: string): boolean {
+  return rel === '..' || rel.startsWith(`..${path.sep}`) || path.isAbsolute(rel);
+}
+
+/**
+ * Resolve `p` inside `workspace`, refusing paths that escape it lexically OR via symlink.
+ * path.resolve/relative only see the lexical path, so a symlink inside the workspace pointing
+ * out (workspace/link -> /etc) would otherwise pass. After the lexical check we realpath the
+ * target — or its nearest existing ancestor, for not-yet-created files — and re-assert containment.
+ */
+async function resolveInWorkspace(workspace: string, p: string): Promise<string> {
   const abs = path.resolve(workspace, p);
-  const rel = path.relative(workspace, abs);
-  if (rel === '..' || rel.startsWith(`..${path.sep}`) || path.isAbsolute(rel)) {
+  if (escapes(path.relative(workspace, abs))) {
     throw new Error(`Path escapes the workspace: ${p}`);
   }
+  const realWs = await realpath(workspace);
+  let probe = abs;
+  for (;;) {
+    try {
+      if (escapes(path.relative(realWs, await realpath(probe)))) {
+        throw new Error(`Path escapes the workspace via symlink: ${p}`);
+      }
+      break;
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code !== 'ENOENT') throw e;
+      const parent = path.dirname(probe);
+      if (parent === probe) break; // reached the filesystem root
+      probe = parent;
+    }
+  }
   return abs;
+}
+
+/** Hostname of `url`, IPv6 brackets stripped and lowercased. */
+function hostOf(url: string): string {
+  return new URL(url).hostname.replace(/^\[|\]$/g, '').toLowerCase();
+}
+
+/** True if `host` is a loopback / private / link-local target we refuse to fetch (SSRF guard). */
+function isBlockedHost(host: string): boolean {
+  return (
+    ['127.0.0.1', '0.0.0.0', 'localhost', '::1', '::'].includes(host) ||
+    host.endsWith('.localhost') ||
+    /^(10|127)\./.test(host) ||
+    /^169\.254\./.test(host) ||
+    /^192\.168\./.test(host) ||
+    /^172\.(1[6-9]|2\d|3[01])\./.test(host) ||
+    /^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./.test(host) ||
+    // IPv6 link-local/ULA, plus IPv4-mapped IPv6 (::ffff:127.0.0.1) wholesale.
+    (host.includes(':') && /^(fe80|fc|fd|::ffff:)/.test(host))
+  );
 }
 
 export interface ToolContext {
@@ -85,7 +129,7 @@ export const TOOLS: RuntimeTool[] = [
     inputSchema: z.object({ path: z.string().describe('Path relative to the workspace root.') }),
     sensitive: false,
     execute: async (input, ctx) => {
-      const abs = resolveInWorkspace(ctx.workspace, (input as { path: string }).path);
+      const abs = await resolveInWorkspace(ctx.workspace, (input as { path: string }).path);
       return clip(await readFile(abs, 'utf8'));
     },
   } as RuntimeTool,
@@ -99,7 +143,7 @@ export const TOOLS: RuntimeTool[] = [
     sensitive: true,
     execute: async (input, ctx) => {
       const { path: p, content } = input as { path: string; content: string };
-      const abs = resolveInWorkspace(ctx.workspace, p);
+      const abs = await resolveInWorkspace(ctx.workspace, p);
       await mkdir(path.dirname(abs), { recursive: true });
       await writeFile(abs, content, 'utf8');
       return `Wrote ${content.length} bytes to ${p}`;
@@ -111,7 +155,7 @@ export const TOOLS: RuntimeTool[] = [
     inputSchema: z.object({ path: z.string().default('.').describe('Directory relative to the workspace root.') }),
     sensitive: false,
     execute: async (input, ctx) => {
-      const abs = resolveInWorkspace(ctx.workspace, (input as { path?: string }).path ?? '.');
+      const abs = await resolveInWorkspace(ctx.workspace, (input as { path?: string }).path ?? '.');
       const entries = await readdir(abs, { withFileTypes: true });
       const lines = await Promise.all(
         entries.map(async (e) => {
@@ -135,24 +179,16 @@ export const TOOLS: RuntimeTool[] = [
     sensitive: true,
     execute: async (input, ctx) => {
       const { url } = input as { url: string };
-      // Block SSRF to loopback / private / link-local destinations: the approval server, routers,
-      // cloud metadata (169.254.169.254), Tailscale CGNAT, and IPv6 loopback/link-local/ULA.
-      const host = new URL(url).hostname.replace(/^\[|\]$/g, '').toLowerCase();
-      const blocked =
-        ['127.0.0.1', '0.0.0.0', 'localhost', '::1', '::'].includes(host) ||
-        host.endsWith('.localhost') ||
-        /^(10|127)\./.test(host) ||
-        /^169\.254\./.test(host) ||
-        /^192\.168\./.test(host) ||
-        /^172\.(1[6-9]|2\d|3[01])\./.test(host) ||
-        /^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./.test(host) ||
-        // IPv6 link-local/ULA, plus IPv4-mapped IPv6 (::ffff:127.0.0.1 etc.) wholesale — an agent
-        // tool has no need for IPv4-mapped destinations, and they otherwise tunnel past the v4 checks.
-        (host.includes(':') && /^(fe80|fc|fd|::ffff:)/.test(host));
-      if (blocked) {
+      // Block SSRF to loopback / private / link-local destinations (approval server, routers,
+      // cloud metadata, CGNAT). Check the initial URL...
+      if (isBlockedHost(hostOf(url))) {
         return 'Fetching loopback, private, or link-local addresses is not permitted.';
       }
       const res = await fetch(url, { signal: ctx.signal });
+      // ...and the final URL, since fetch follows redirects and one could land on a blocked host.
+      if (res.url && res.url !== url && isBlockedHost(hostOf(res.url))) {
+        return 'Redirect to a loopback, private, or link-local address is not permitted.';
+      }
       const body = await res.text();
       return clip(`HTTP ${res.status} ${res.statusText}\n\n${body}`);
     },

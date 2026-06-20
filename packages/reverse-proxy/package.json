@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@starships/env": "workspace:*",
-    "http-proxy-middleware": "^3.0.5",
+    "http-proxy-middleware": "^3.0.7",
     "express": "^5.2.0"
   },
   "devDependencies": {

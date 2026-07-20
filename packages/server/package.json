@@ -23,7 +23,7 @@
     "@starships/protocol": "workspace:*",
     "@types/cookie-parser": "^1.4.9",
     "@types/lodash": "^4.17.20",
-    "axios": "^1.15.2",
+    "axios": "^1.18.0",
     "axios-retry": "^4.0.0",
     "bcrypt": "^6.0.0",
     "cookie-parser": "^1.4.7",

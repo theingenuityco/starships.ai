@@ -38,7 +38,7 @@
     "class-validator": "^0.14.2",
     "fs-extra": "^11.3.0",
     "googleapis": "^161.0.0",
-    "js-yaml": "^4.2.0",
+    "js-yaml": "^4.3.1",
     "nanoid": "^5.1.5",
     "pg": "^8.16.3",
     "reflect-metadata": "^0.2.2"
